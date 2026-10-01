@@ -1,0 +1,28 @@
+# Dependencies and build output
+**/node_modules/
+**/dist/
+**/dist-ssr/
+**/coverage/
+**/out/
+**/cache/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+**/keystore/
+
+# Logs and local tooling
+*.log
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Local WSL/diagnostic archives
+WSL-Diagnostics/
+WslLogs-*.tar.gz
