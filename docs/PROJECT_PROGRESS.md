@@ -280,3 +280,7 @@ keeps the dated implementation history and its verification evidence.
 - The published slice includes protocol source, test fixtures, seven suites
   and approved project documentation; unrelated backend lockfile changes and
   local workflow instructions remain outside this slice.
+- Feature commit: `4d8fd57` — `feat: add campaign funding bond and refund flows`.
+- Verified a clean recursive clone of that commit: all pinned submodules were
+  fetched successfully; forge test -vv reported 59 passed, 0 failed, 0 skipped,
+  including 256 fuzz runs. forge build exited 0 with four timestamp warnings.
