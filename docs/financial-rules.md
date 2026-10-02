@@ -2,7 +2,7 @@
 
 > **Status:** Approved MVP baseline for implementation
 > **Version:** 0.3-draft
-> **Updated:** 2026-10-02
+> **Updated:** 2026-10-03
 > **Related:** [Protocol specification](./protocol-spec.md), [State machine](./state-machine.md)
 
 ## 1. Accounting principles
@@ -56,7 +56,7 @@ This formula assumes sequential milestones and must be re-evaluated if the contr
 - The contract records the contribution and emits `ContributionReceived`.
 - A contribution cannot be silently changed by backend metadata.
 
-The exact rule for a goal reached before the deadline remains an open contract parameter: either finalize immediately or allow funding until the deadline. The selected rule must be consistent across state machine, UI and tests.
+Approved funding rule: accept donations only in `FUNDING` and strictly before the deadline. Reject amounts above the remaining goal; reaching the goal immediately moves the campaign to `FUNDED`.
 
 ## 4. Milestone release
 
@@ -78,6 +78,10 @@ Normal completion or an approved normal failure returns the remaining bond accor
 
 The exact slash formula is still an open item. Until it is specified, no implementation may infer a slash amount from a UI status or from an arbitrary resolver input.
 
+For cancellation or funding failure before `FUNDED`, the full locked bond returns to the organizer in the same transaction that creates the refund snapshot. Set the recorded bond amount to zero and clear `bondLocked` before transferring. A failed transfer reverts the entire terminal transition, allowing a retry once the token transfer can succeed. No bond slash applies to this path. A terminal campaign cannot lock bond again.
+
+The organizer may cancel in `DRAFT`, `APPROVED` or `FUNDING`, even after the funding deadline. This recovers a bond on an unpublished campaign without requiring resolver approval or publication. With no locked bond, cancellation skips the token transfer and emits no `BondReturned` event. Unpublished campaigns have no accepted donations, so their refund snapshot is zero.
+
 ## 6. Refund pool and entitlement
 
 The refund pool is immutable once the contract creates the refund snapshot:
@@ -96,6 +100,23 @@ claimable_i    = entitlement_i - Claim_i
 The contract must define how any rounding dust is retained or allocated. MVP default: dust remains in the contract and is visible as unallocated dust; it is not silently transferred to an admin.
 
 The donor claims only `claimable_i`. A second claim cannot transfer additional funds.
+
+### Implemented pre-funded refund path
+
+Before funding succeeds, no milestone funds have been released. The approved rule simplifies to:
+
+```text
+P = T
+entitlement_i = C_i
+```
+
+`contributions[campaignId][donor]` accumulates successful donations. Cancellation or deadline failure snapshots `refundPool = totalContributed` once; the pool value remains unchanged after claims. Each donor calls `claimRefund(campaignId)` for their full contribution, with `claimedRefund` preventing a second payment. There is no donor loop or rounding in this path, and claims have no expiry.
+
+Bond and unsolicited token transfers are excluded from the snapshot. Refunds go only to the calling donor; organizers, resolvers and deadline-finalization callers cannot redirect them. Claim flags are written before the transfer; a failed transfer rolls them back. OpenZeppelin `ReentrancyGuard` protects fund-moving entry points against token callbacks.
+
+This prototype assumes a standard ERC20 with exact transfers, as provided by MockUSDC. Fee-on-transfer and rebasing tokens are unsupported. A token that persistently rejects the organizer's bond transfer also prevents terminal finalization and donor claims; the approved same-transaction design has no separate bond recovery path yet.
+
+The proportional formula above remains design guidance for later post-funded outcomes, not implemented behavior.
 
 ## 7. Bond allocation on misconduct
 
@@ -135,8 +156,8 @@ INV-10  A challenge alone does not automatically slash funds.
 
 ## 10. Open items before financial freeze
 
-1. Goal-reached-before-deadline finalization rule.
-2. Exact normal-failure refund pool composition.
+1. Refund composition for failures after funding or milestone releases.
+2. Recovery for persistent token transfer failures.
 3. Exact misconduct slash formula and resolver payload.
 4. Dust destination after proportional refund rounding.
 5. Treatment of unexpected token transfers into the contract.

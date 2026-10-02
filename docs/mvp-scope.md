@@ -57,6 +57,7 @@ The following are explicitly deferred:
 ```text
 native ETH donations
 multiple stablecoins
+direct bank-transfer donations and fiat-to-USDC conversion
 private evidence encryption
 EIP-712 verifier signatures
 multisig resolver governance
@@ -71,6 +72,12 @@ mobile app
 complex admin analytics
 controlled vendor withdrawals
 ```
+
+Bank transfer support is intentionally deferred from the protocol MVP. A later
+payment bridge may accept settled fiat payments, convert or source MockUSDC or
+the selected production token, and submit an on-chain contribution through a
+treasury or custodial flow. That bridge must define payment reconciliation,
+donor attribution, refund payout and failure recovery before implementation.
 
 ## 4. Required user journeys
 

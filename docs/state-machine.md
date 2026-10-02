@@ -2,7 +2,7 @@
 
 > **Status:** Approved MVP baseline for implementation
 > **Version:** 0.3-draft
-> **Updated:** 2026-10-02
+> **Updated:** 2026-10-03
 > **Related:** [Protocol specification](./protocol-spec.md), [Financial rules](./financial-rules.md)
 
 ## 1. State machine rules
@@ -19,9 +19,13 @@ The contract is the final authority for on-chain transitions. The backend and fr
 
 ```text
 DRAFT
-  └─ publishCampaign → FUNDING
-       ├─ finalizeFunding(goal met) → FUNDED
-       └─ finalizeFunding(deadline failed) → FUNDING_FAILED
+  ├─ cancelCampaign (organizer) → CANCELLED
+  └─ approveCampaign (resolver) → APPROVED
+       ├─ cancelCampaign (organizer) → CANCELLED
+       └─ publishCampaign (organizer, bond locked) → FUNDING
+            ├─ donate reaches goal → FUNDED
+            ├─ finalizeFundingFailure at/after deadline → FUNDING_FAILED
+            └─ cancelCampaign (organizer) → CANCELLED
 
 FUNDED
   └─ activateMilestone → MILESTONE_ACTIVE
@@ -43,26 +47,28 @@ MILESTONE_SETTLED
   ├─ activate next milestone → MILESTONE_ACTIVE
   └─ last milestone settled → COMPLETED
 
-FUNDING_FAILED or CANCELLED
-  └─ finalizeRefundPool → REFUNDABLE
-
-REFUNDABLE
-  └─ all claims are individually processed → REFUND_CLAIMS_OPEN
+Pre-funded FUNDING_FAILED or CANCELLED
+  └─ same transaction: snapshot refund pool + return bond
+       └─ each donor calls claimRefund independently
 ```
 
-`REFUND_CLAIMS_OPEN` is a claim entitlement state, not a guarantee that a donor has already received tokens.
+The contract currently implements the lifecycle through funding and pre-funded refunds. Milestone and post-funded challenge/cancellation states shown above remain planned. Refund availability is stored separately from campaign state; the campaign remains `CANCELLED` or `FUNDING_FAILED` while donors claim.
 
 ## 3. Campaign transitions
 
 | From | Action | Caller | Guard | To | Event |
 |---|---|---|---|---|---|
-| DRAFT | publish | Organizer | Config valid; bond locked; not already published | FUNDING | `CampaignCreated` |
-| FUNDING | finalize success | Anyone | Goal reached and finalization rule satisfied | FUNDED | `FundingFinalized` |
-| FUNDING | finalize failure | Anyone | Deadline passed and goal not reached | FUNDING_FAILED | `FundingFinalized` |
+| DRAFT | approve | Resolver | Existing campaign | APPROVED | `CampaignApproved` |
+| APPROVED | publish | Organizer | Bond locked; deadline still in future | FUNDING | `CampaignPublished` |
+| FUNDING | donate reaches goal | Donor | Before deadline; amount does not exceed remaining goal | FUNDED | `DonationReceived`, `FundingFinalized` |
+| FUNDING | finalize failure | Anyone | At/after deadline; goal not reached | FUNDING_FAILED | `FundingFinalized`, `RefundPoolSnapshotted`, `BondReturned` |
+| DRAFT/APPROVED/FUNDING | cancel | Organizer | Campaign has not reached FUNDED; no deadline restriction | CANCELLED | `CampaignCancelled`, `RefundPoolSnapshotted`, `BondReturned` only if bond amount > 0 |
 | FUNDED | activate | Organizer/allowed caller | Next sequential milestone; bond coverage valid | MILESTONE_ACTIVE | `MilestoneActivated` |
 | MILESTONE_SETTLED | activate next | Organizer/allowed caller | Previous settlement confirmed | MILESTONE_ACTIVE | `MilestoneActivated` |
 | MILESTONE_SETTLED | complete | Anyone | No remaining milestone | COMPLETED | completion event or final settlement |
-| FUNDING/FUNDED/ACTIVE/REVIEW | cancel | Authorized path | Cancellation guard satisfied | CANCELLED | `CampaignCancelled` |
+| FUNDED/ACTIVE/REVIEW (planned) | cancel | Authorized path | Post-funded outcome rules still to be implemented | CANCELLED | `CampaignCancelled` |
+
+Unpublished campaigns can be cancelled with or without a locked bond, including after the funding deadline. No token call is made when the recorded bond amount is zero. A cancelled draft cannot later be approved, published or bonded again. Its zero refund snapshot creates no donor entitlement because donations were never accepted.
 
 ## 4. Milestone transitions
 
@@ -125,6 +131,8 @@ NOT_AVAILABLE
 ```
 
 Each donor claim is independent and idempotent. A donor may not claim more than the entitlement calculated from the immutable pool snapshot.
+
+For the implemented pre-funded path, the snapshot and claim availability are created together. Each donor moves directly from unclaimed to fully claimed; partial claims are not implemented. No contribution or an already-claimed refund reverts. If a bond transfer fails, the campaign stays `FUNDING` and no snapshot is created. If a refund transfer fails, the donor remains unclaimed and can retry.
 
 ## 8. Timeout semantics
 

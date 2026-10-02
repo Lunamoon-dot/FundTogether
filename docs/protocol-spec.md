@@ -2,7 +2,7 @@
 
 > **Status:** Approved MVP baseline for implementation
 > **Version:** 0.3-draft
-> **Updated:** 2026-10-02
+> **Updated:** 2026-10-03
 > **Source:** FundTogether v0.2 Process, Tech Stack and Threat Model
 
 ## 1. Purpose
@@ -100,11 +100,15 @@ Long descriptions, images and beneficiary profiles are off-chain metadata. If an
 | Submit evidence | Organizer | Active milestone; valid evidence version | Commits evidence reference/hash |
 | Open challenge | Eligible donor | Review window open; evidence exists | Opens challenge |
 | Settle milestone | Resolver or permissionless timeout caller | Review/challenge conditions satisfied | Releases budget or applies approved outcome |
-| Cancel campaign | Authorized caller | Valid failure/cancellation condition | Freezes future work and creates refund path |
+| Cancel campaign before funding | Organizer | Campaign in DRAFT, APPROVED or FUNDING | Creates immutable full-contribution refund snapshot and returns any locked bond atomically |
 | Claim refund | Donor | Refund pool snapshot exists; entitlement > claimed | Transfers claimable amount once |
 | Return/slash bond | Protocol outcome | Terminal settlement rule satisfied | Returns or allocates bond according to financial rules |
 
 The API may prepare an action or publish intent. The contract receipt and indexed event determine whether the action actually happened.
+
+The current prototype exposes `approveCampaign` for the trusted resolver (the deployer) and `publishCampaign` for the organizer. Donations are accepted only during `FUNDING` before the deadline, capped at the remaining goal. Reaching the goal immediately enters `FUNDED`. Anyone may call `finalizeFundingFailure` at or after the deadline if the campaign is still `FUNDING`.
+
+Pre-funded cancellation/failure emits `RefundPoolSnapshotted` and, when a positive bond is returned, `BondReturned` in the terminal transaction. The organizer can cancel unpublished campaigns before or after the deadline; no token call is needed when no bond was locked. A donor's independent claim emits `RefundClaimed`. The pool excludes bond and unsolicited transfers, and each donor receives their full recorded contribution once. Post-funded settlement and slashing are still planned.
 
 ## 7. Evidence and challenge
 
@@ -155,6 +159,8 @@ BondSlashed
 
 Every event must contain enough identifiers for an idempotent indexer: campaign ID, relevant actor, milestone ID where applicable, block context and event-specific values.
 
+The event list above includes planned milestone events. Current prototype names include `DonationReceived` (rather than `ContributionReceived`), `CampaignApproved`, `CampaignPublished` and `RefundPoolSnapshotted` (rather than `RefundAvailable`). Shared ABI/event agreement remains a separate delivery step; indexers must use the generated ABI.
+
 ## 10. Implementation guardrails
 
 - Use integer token amounts and `bigint`; never use floating point for financial values.
@@ -167,7 +173,7 @@ Every event must contain enough identifiers for an idempotent indexer: campaign 
 
 These items are intentionally still open for the detailed documents:
 
-1. Exact campaign funding finalization rule when goal is reached before deadline.
+1. Post-funded cancellation and refund outcomes after milestone releases.
 2. Exact resolver timeout duration and fallback outcome.
 3. Exact bond slash amount and allocation cap.
 4. Rounding and dust handling for refund claims.
