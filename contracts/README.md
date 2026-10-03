@@ -5,7 +5,19 @@ multiple campaigns with separate accounting in one contract. Implemented flows
 include approval, publication, token donations, organizer bond locking and
 pre-funded cancellation/failure refunds. Unpublished drafts and approved campaigns
 can also be cancelled to recover their bond, including after the deadline.
-Milestones and slashing remain planned.
+Milestone budgets are fixed at creation; goal is their sum and bond is their
+maximum. The funded organizer can activate the first milestone without moving
+tokens. Organizers commit each milestone's acceptance criteria hash while DRAFT;
+approval requires all criteria and freezes them. Criteria content stays off-chain.
+Evidence creates an immutable pending version. OpenZeppelin AccessControl lets
+the deployer admin grant/revoke verifier roles and assign/reassign pending reviews.
+Only the assigned active verifier can accept/reject the exact version/hash;
+organizers cannot review their own campaigns. Rejection permits a new version
+without deleting history. Acceptance starts a fixed 72-hour review. Donors can challenge before expiry;
+anyone can settle an unchallenged review at/after expiry. Settlement pays the
+milestone budget to the organizer, advances sequentially and returns bond on
+final completion. Dispute resolution, post-funded refunds and slashing remain
+planned; CHALLENGED, pending admission and organizer abandonment can still leave funds stuck.
 
 ## Toolchain
 
@@ -22,7 +34,10 @@ contracts/
 ├── test/
 │   ├── mocks/
 │   │   ├── MockUSDC.sol             # Mintable test token
-│   │   └── RefundCallbackToken.sol  # Adversarial token callback fixture
+│   │   ├── RefundCallbackToken.sol  # Adversarial token callback fixture
+│   │   └── SettlementCallbackToken.sol # Release callback/transfer failure fixture
+│   ├── helpers/
+│   │   └── CampaignFixtures.sol    # Shared test budget fixtures
 │   └── unit/
 │       ├── MockUSDC.t.sol
 │       └── FundTogether/
@@ -31,6 +46,10 @@ contracts/
 │           ├── FundTogetherBond.t.sol
 │           ├── FundTogetherFunding.t.sol
 │           ├── FundTogetherCancellation.t.sol
+│           ├── FundTogetherMilestone.t.sol
+│           ├── FundTogetherCriteria.t.sol
+│           ├── FundTogetherSettlement.t.sol
+│           ├── FundTogetherVerifier.t.sol
 │           └── FundTogetherRefund.t.sol
 ├── lib/                            # External dependencies
 ├── foundry.toml
@@ -42,6 +61,11 @@ contracts/
 `test/mocks/`; test suites are grouped by the contract and behavior they verify.
 Small caller helpers used by one suite remain next to that suite. `out/` and
 `cache/` are generated and ignored by Git.
+
+The prototype creation API is `createCampaign(name, token, deadline, budgets)`.
+Manual goal/bond arguments were replaced by the committed budget list. The ABI
+is still under development until dispute resolution and recovery are
+implemented; generated integration artifacts must track the exact contract build.
 
 Deployment scripts will go in `script/` when an actual deployment flow is added.
 The single protocol contract keeps state transitions and fund custody together;

@@ -2,6 +2,7 @@ pragma solidity 0.8.24;
 
 import { FundTogether } from "../../../src/FundTogether.sol";
 import { MockUSDC } from "../../mocks/MockUSDC.sol";
+import { CampaignFixtures } from "../../helpers/CampaignFixtures.sol";
 import { Test } from "forge-std/Test.sol";
 import { IERC20Errors } from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 
@@ -22,6 +23,7 @@ contract FundTogetherErc20Test is Test {
         token.mint(address(this), 500_000);
         token.approve(address(fundTogether), 500_000);
         fundTogether.lockBond(campaignId);
+        CampaignFixtures.configureCriteria(fundTogether, campaignId);
         fundTogether.approveCampaign(campaignId);
         fundTogether.publishCampaign(campaignId);
     }
@@ -42,7 +44,10 @@ contract FundTogetherErc20Test is Test {
         vm.expectEmit(true, false, false, true, address(fundTogether));
         emit CampaignCreated(0, "Clean water", address(token), 1_000_000, 500_000);
         fundTogether.createCampaign(
-            "Clean water", address(token), 1_000_000, 500_000, block.timestamp + 7 days
+            "Clean water",
+            address(token),
+            block.timestamp + 7 days,
+            CampaignFixtures.equalBudgets(2, 500_000)
         );
     }
 
@@ -50,12 +55,16 @@ contract FundTogetherErc20Test is Test {
         MockUSDC token = new MockUSDC();
         FundTogether fundTogether = new FundTogether();
         uint256 campaignId = fundTogether.createCampaign(
-            "Clean water", address(token), 1_000_000, 500_000, block.timestamp + 7 days
+            "Clean water",
+            address(token),
+            block.timestamp + 7 days,
+            CampaignFixtures.equalBudgets(2, 500_000)
         );
         uint256 donation = 250_000;
         token.mint(address(this), 750_000);
         token.approve(address(fundTogether), 750_000);
         fundTogether.lockBond(campaignId);
+        CampaignFixtures.configureCriteria(fundTogether, campaignId);
         fundTogether.approveCampaign(campaignId);
         fundTogether.publishCampaign(campaignId);
 
@@ -69,19 +78,25 @@ contract FundTogetherErc20Test is Test {
         MockUSDC token = new MockUSDC();
 
         try fundTogether.createCampaign(
-            "", address(token), 1_000_000, 500_000, block.timestamp + 7 days
+            "", address(token), block.timestamp + 7 days, CampaignFixtures.equalBudgets(2, 500_000)
         ) {
             revert("empty name did not revert");
         } catch { }
         try fundTogether.createCampaign(
-            "Clean water", address(0), 1_000_000, 500_000, block.timestamp + 7 days
+            "Clean water",
+            address(0),
+            block.timestamp + 7 days,
+            CampaignFixtures.equalBudgets(2, 500_000)
         ) {
             revert("zero token did not revert");
         } catch { }
         try fundTogether.createCampaign(
-            "Clean water", address(token), 0, 500_000, block.timestamp + 7 days
+            "Clean water",
+            address(token),
+            block.timestamp + 7 days,
+            CampaignFixtures.equalBudgets(2, 0)
         ) {
-            revert("zero goal did not revert");
+            revert("zero milestone budget did not revert");
         } catch { }
     }
 
@@ -89,13 +104,17 @@ contract FundTogetherErc20Test is Test {
         MockUSDC token = new MockUSDC();
         FundTogether fundTogether = new FundTogether();
         uint256 campaignId = fundTogether.createCampaign(
-            "Clean water", address(token), 1_000_000, 500_000, block.timestamp + 7 days
+            "Clean water",
+            address(token),
+            block.timestamp + 7 days,
+            CampaignFixtures.equalBudgets(2, 500_000)
         );
         uint256 donation = 250_000;
 
         token.mint(address(this), 750_000);
         token.approve(address(fundTogether), 750_000);
         fundTogether.lockBond(campaignId);
+        CampaignFixtures.configureCriteria(fundTogether, campaignId);
         fundTogether.approveCampaign(campaignId);
         fundTogether.publishCampaign(campaignId);
         fundTogether.donate(campaignId, donation);
@@ -112,7 +131,10 @@ contract FundTogetherErc20Test is Test {
         MockUSDC token = new MockUSDC();
         FundTogether fundTogether = new FundTogether();
         uint256 campaignId = fundTogether.createCampaign(
-            "Clean water", address(token), 1_000_000, 500_000, block.timestamp + 7 days
+            "Clean water",
+            address(token),
+            block.timestamp + 7 days,
+            CampaignFixtures.equalBudgets(2, 500_000)
         );
         uint256 donation = 250_000;
 
@@ -131,7 +153,10 @@ contract FundTogetherErc20Test is Test {
         MockUSDC token = new MockUSDC();
         FundTogether fundTogether = new FundTogether();
         uint256 campaignId = fundTogether.createCampaign(
-            "Clean water", address(token), 1_000_000, 500_000, block.timestamp + 7 days
+            "Clean water",
+            address(token),
+            block.timestamp + 7 days,
+            CampaignFixtures.equalBudgets(2, 500_000)
         );
         uint256 donation = 250_000;
 
@@ -156,12 +181,16 @@ contract FundTogetherErc20Test is Test {
         DonorActor donorA = new DonorActor();
         DonorActor donorB = new DonorActor();
         uint256 campaignId = fundTogether.createCampaign(
-            "Clean water", address(token), 1_000_000, 500_000, block.timestamp + 7 days
+            "Clean water",
+            address(token),
+            block.timestamp + 7 days,
+            CampaignFixtures.equalBudgets(2, 500_000)
         );
 
         token.mint(address(this), 500_000);
         token.approve(address(fundTogether), 500_000);
         fundTogether.lockBond(campaignId);
+        CampaignFixtures.configureCriteria(fundTogether, campaignId);
         fundTogether.approveCampaign(campaignId);
         fundTogether.publishCampaign(campaignId);
         token.mint(address(donorA), 100_000);
@@ -180,7 +209,10 @@ contract FundTogetherErc20Test is Test {
         MockUSDC token = new MockUSDC();
         FundTogether fundTogether = new FundTogether();
         uint256 campaignId = fundTogether.createCampaign(
-            "Clean water", address(token), 1_000_000, 500_000, block.timestamp + 7 days
+            "Clean water",
+            address(token),
+            block.timestamp + 7 days,
+            CampaignFixtures.equalBudgets(2, 500_000)
         );
 
         _publish(fundTogether, token, campaignId);
@@ -203,7 +235,10 @@ contract FundTogetherErc20Test is Test {
         MockUSDC otherToken = new MockUSDC();
         FundTogether fundTogether = new FundTogether();
         uint256 campaignId = fundTogether.createCampaign(
-            "Clean water", address(campaignToken), 1_000_000, 500_000, block.timestamp + 7 days
+            "Clean water",
+            address(campaignToken),
+            block.timestamp + 7 days,
+            CampaignFixtures.equalBudgets(2, 500_000)
         );
         uint256 donation = 250_000;
 
@@ -223,7 +258,10 @@ contract FundTogetherErc20Test is Test {
         MockUSDC token = new MockUSDC();
         FundTogether fundTogether = new FundTogether();
         uint256 campaignId = fundTogether.createCampaign(
-            "Clean water", address(token), 1_000_000, 500_000, block.timestamp + 7 days
+            "Clean water",
+            address(token),
+            block.timestamp + 7 days,
+            CampaignFixtures.equalBudgets(2, 500_000)
         );
 
         try fundTogether.donate(campaignId, 0) {

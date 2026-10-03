@@ -2,13 +2,17 @@ pragma solidity 0.8.24;
 
 import { FundTogether } from "../../../src/FundTogether.sol";
 import { MockUSDC } from "../../mocks/MockUSDC.sol";
+import { CampaignFixtures } from "../../helpers/CampaignFixtures.sol";
 
 contract FundTogetherTest {
     function testCreateCampaignStoresConfiguration() public {
         FundTogether fundTogether = new FundTogether();
         MockUSDC token = new MockUSDC();
         uint256 campaignId = fundTogether.createCampaign(
-            "Clean water", address(token), 100, 50, block.timestamp + 7 days
+            "Clean water",
+            address(token),
+            block.timestamp + 7 days,
+            CampaignFixtures.equalBudgets(2, 50)
         );
 
         (
@@ -35,11 +39,15 @@ contract FundTogetherTest {
         FundTogether fundTogether = new FundTogether();
         MockUSDC token = new MockUSDC();
         uint256 campaignId = fundTogether.createCampaign(
-            "Clean water", address(token), 100, 50, block.timestamp + 7 days
+            "Clean water",
+            address(token),
+            block.timestamp + 7 days,
+            CampaignFixtures.equalBudgets(2, 50)
         );
         token.mint(address(this), 75);
         token.approve(address(fundTogether), 75);
         fundTogether.lockBond(campaignId);
+        CampaignFixtures.configureCriteria(fundTogether, campaignId);
         fundTogether.approveCampaign(campaignId);
         fundTogether.publishCampaign(campaignId);
 
@@ -53,11 +61,15 @@ contract FundTogetherTest {
         FundTogether fundTogether = new FundTogether();
         MockUSDC token = new MockUSDC();
         uint256 campaignId = fundTogether.createCampaign(
-            "Clean water", address(token), 100, 50, block.timestamp + 7 days
+            "Clean water",
+            address(token),
+            block.timestamp + 7 days,
+            CampaignFixtures.equalBudgets(2, 50)
         );
         token.mint(address(this), 50);
         token.approve(address(fundTogether), 50);
         fundTogether.lockBond(campaignId);
+        CampaignFixtures.configureCriteria(fundTogether, campaignId);
         fundTogether.approveCampaign(campaignId);
         fundTogether.publishCampaign(campaignId);
 

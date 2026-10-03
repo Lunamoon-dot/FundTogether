@@ -2,6 +2,7 @@ pragma solidity 0.8.24;
 
 import { FundTogether } from "../../../src/FundTogether.sol";
 import { MockUSDC } from "../../mocks/MockUSDC.sol";
+import { CampaignFixtures } from "../../helpers/CampaignFixtures.sol";
 import { Test } from "forge-std/Test.sol";
 
 contract FundingCaller {
@@ -25,7 +26,7 @@ contract FundTogetherFundingTest is Test {
         returns (uint256 campaignId)
     {
         campaignId = fundTogether.createCampaign(
-            "Clean water", address(token), 1_000_000, 500_000, deadline
+            "Clean water", address(token), deadline, CampaignFixtures.equalBudgets(2, 500_000)
         );
     }
 
@@ -33,6 +34,7 @@ contract FundTogetherFundingTest is Test {
         token.mint(address(this), 500_000);
         token.approve(address(fundTogether), 500_000);
         fundTogether.lockBond(campaignId);
+        CampaignFixtures.configureCriteria(fundTogether, campaignId);
         fundTogether.approveCampaign(campaignId);
         vm.expectEmit(true, false, false, true, address(fundTogether));
         emit CampaignPublished(campaignId, fundTogether.fundingDeadlines(campaignId));
@@ -47,6 +49,7 @@ contract FundTogetherFundingTest is Test {
         require(
             fundTogether.campaignState(campaignId) == FundTogether.CampaignState.DRAFT, "not draft"
         );
+        CampaignFixtures.configureCriteria(fundTogether, campaignId);
         vm.expectEmit(true, true, false, true, address(fundTogether));
         emit CampaignApproved(campaignId, address(this));
         fundTogether.approveCampaign(campaignId);
@@ -65,6 +68,7 @@ contract FundTogetherFundingTest is Test {
             revert("unapproved campaign published");
         } catch { }
 
+        CampaignFixtures.configureCriteria(fundTogether, campaignId);
         fundTogether.approveCampaign(campaignId);
         try fundTogether.publishCampaign(campaignId) {
             revert("unbonded campaign published");

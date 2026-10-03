@@ -2,6 +2,7 @@ pragma solidity 0.8.24;
 
 import { FundTogether } from "../../../src/FundTogether.sol";
 import { MockUSDC } from "../../mocks/MockUSDC.sol";
+import { CampaignFixtures } from "../../helpers/CampaignFixtures.sol";
 import { RefundAccounting, RefundCallbackToken } from "../../mocks/RefundCallbackToken.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -34,13 +35,14 @@ contract FundTogetherRefundTest is Test {
     function _publish() internal returns (uint256 id) {
         vm.prank(organizer);
         id = fundTogether.createCampaign(
-            "Clean water", address(token), 10_000_000, 2_000_000, deadline
+            "Clean water", address(token), deadline, CampaignFixtures.equalBudgets(5, 2_000_000)
         );
         token.mint(organizer, 2_000_000);
         vm.startPrank(organizer);
         token.approve(address(fundTogether), 2_000_000);
         fundTogether.lockBond(id);
         vm.stopPrank();
+        CampaignFixtures.configureCriteria(fundTogether, id);
         fundTogether.approveCampaign(id);
         vm.prank(organizer);
         fundTogether.publishCampaign(id);
@@ -272,11 +274,15 @@ contract FundTogetherRefundTest is Test {
     function testTokenCallbackCannotClaimDuringBondReturn() public {
         RefundCallbackToken callbackToken = new RefundCallbackToken();
         uint256 id = fundTogether.createCampaign(
-            "Callback", address(callbackToken), 10_000_000, 2_000_000, deadline
+            "Callback",
+            address(callbackToken),
+            deadline,
+            CampaignFixtures.equalBudgets(5, 2_000_000)
         );
         callbackToken.mint(address(this), 2_000_000);
         callbackToken.approve(address(fundTogether), 2_000_000);
         fundTogether.lockBond(id);
+        CampaignFixtures.configureCriteria(fundTogether, id);
         fundTogether.approveCampaign(id);
         fundTogether.publishCampaign(id);
         callbackToken.mint(address(callbackToken), 3_000_000);

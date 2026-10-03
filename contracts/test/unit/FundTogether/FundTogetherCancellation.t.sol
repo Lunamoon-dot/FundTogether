@@ -2,6 +2,7 @@ pragma solidity 0.8.24;
 
 import { FundTogether } from "../../../src/FundTogether.sol";
 import { MockUSDC } from "../../mocks/MockUSDC.sol";
+import { CampaignFixtures } from "../../helpers/CampaignFixtures.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Test } from "forge-std/Test.sol";
@@ -27,7 +28,7 @@ contract FundTogetherCancellationTest is Test {
     function _create(address donationToken) internal returns (uint256 id) {
         vm.prank(organizer);
         id = fundTogether.createCampaign(
-            "Clean water", donationToken, 10_000_000, 2_000_000, deadline
+            "Clean water", donationToken, deadline, CampaignFixtures.equalBudgets(5, 2_000_000)
         );
     }
 
@@ -69,6 +70,7 @@ contract FundTogetherCancellationTest is Test {
 
     function testApprovedCancellationRecoversBondAfterPublicationDeadline() public {
         _lock(campaignId);
+        CampaignFixtures.configureCriteria(fundTogether, campaignId);
         fundTogether.approveCampaign(campaignId);
         vm.warp(deadline);
         vm.expectRevert("deadline passed");
@@ -99,6 +101,7 @@ contract FundTogetherCancellationTest is Test {
 
     function testUnbondedApprovedCancellationDoesNotCallToken() public {
         uint256 id = _create(address(0xBAD));
+        CampaignFixtures.configureCriteria(fundTogether, id);
         fundTogether.approveCampaign(id);
         _cancel(id);
         assertEq(
@@ -111,6 +114,7 @@ contract FundTogetherCancellationTest is Test {
         vm.expectRevert("only organizer");
         vm.prank(donor);
         fundTogether.cancelCampaign(campaignId);
+        CampaignFixtures.configureCriteria(fundTogether, campaignId);
         fundTogether.approveCampaign(campaignId);
         vm.expectRevert("only organizer");
         vm.prank(donor);
@@ -164,6 +168,7 @@ contract FundTogetherCancellationTest is Test {
         _lock(campaignId);
         uint256 activeId = _create(address(token));
         _lock(activeId);
+        CampaignFixtures.configureCriteria(fundTogether, activeId);
         fundTogether.approveCampaign(activeId);
         vm.prank(organizer);
         fundTogether.publishCampaign(activeId);
