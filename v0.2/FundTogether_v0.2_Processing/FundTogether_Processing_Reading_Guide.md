@@ -70,3 +70,11 @@ Bộ tài liệu đã chuyển vào `FundTogether/v0.2` theo xác nhận ngườ
 [hồ sơ mẫu](../FundTogether_Evidence_Example_v0.1.md) trước khi triển khai Mốc 6.
 Các addenda này phân biệt package cố định và report có thể chạy lại; đây là
 đặc tả, không phải upload/AI feature đã hoạt động.
+
+
+## Trạng thái 10 mốc — cập nhật 2026-10-03
+
+Đọc [bảng rà soát](../FundTogether_Milestone_Review_2026-10-03.md) trước khi dùng
+ví dụ cũ làm implementation plan. Các mốc đã cập nhật network/runtime/indexer/UX
+theo [Arc priority plan](../FundTogether_Arc_Evaluation_v0.1.md).
+Local Anvil giữ nguyên; Arc trial ưu tiên, chưa deploy; production gate còn mở.

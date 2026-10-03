@@ -2575,3 +2575,20 @@ reputation projection
 Hash chỉ chứng minh tính toàn vẹn của nội dung đã cam kết; hash không chứng minh nội dung đó là sự thật. MVP dùng trusted resolver để giới hạn độ phức tạp, nhưng đây là giả định tin cậy phải được ghi rõ khi đánh giá threat model.
 
 EIP-712 verifier signature và multisig resolver là hướng hardening sau prototype. Timeout cần được thiết kế ngay trong state machine theo nguyên tắc permissionless execution: khi đủ điều kiện, bất kỳ bên nào cũng có thể gửi transaction kết thúc; contract vẫn tự kiểm tra guard và không tự chạy nếu không có transaction.
+
+
+## Arc-specific review — 2026-10-03 (mitigations TODO)
+
+- Shared USDC gas/token: fee reserve, đúng đơn vị; không suy donation từ net balance.
+- Token blocklist/failed payouts có thể giữ tiền lâu. Recovery chưa có; không tự
+  cấp admin quyền rút escrow/bond. Kiểm tra rollback atomically khi transfer fail.
+- Native inflows/SELFDESTRUCT không tạo donor rights. Surplus/dust vẫn cần policy,
+  không tăng raised từ raw balance.
+- Native/ERC20 logs có thể đếm tiền hai lần; chọn source/emitter, protocol events.
+- Arc consensus finality khác indexer readiness và evidence truth; ghi giả định
+  permissioned validators/issuer controls trong trust model.
+- Fee-floor drop không receipt cần reconcile; included revert vẫn có thể tốn gas.
+- CHALLENGED exit, timeout/no-quorum và post-funded recovery vẫn chưa triển khai.
+
+Nguồn/checklist: [Arc evaluation](./FundTogether_Arc_Evaluation_v0.1.md).
+Trạng thái: [milestone review](./FundTogether_Milestone_Review_2026-10-03.md).

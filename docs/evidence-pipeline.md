@@ -1,7 +1,7 @@
 # Evidence Pipeline v0.1
 
 > Updated: 2026-10-03
-> Status: Data specifications and examples documented; backend pipeline not implemented.
+> Status: Specifications documented; schema/metadata ownership foundation exists; upload, storage, auth and report workflow not implemented.
 
 ## Source documents
 
@@ -42,10 +42,27 @@ mandatory safety/integrity checks remain required.
 
 ## Next implementation steps
 
-1. Typed DTO/schema validation and tests for the documented fields and cases.
+1. ~~Typed DTO/schema validation~~ (schema parser implemented; route-level API
+   integration and automated test coverage remain).
 2. Authorized upload, immutable storage and manifest hashing with access tests.
 3. Rule report generation and manual verifier workflow; optional analysis later.
 4. Link decisions to the exact chain version and index events idempotently.
+
+## Backend implementation checkpoint — 2026-10-03
+
+This checkpoint describes local implementation work. Backend source is not
+included in the documentation publication; commit it separately before treating
+the parser/ownership service as available from a fresh GitHub clone.
+
+- Added a strict Zod parser for Evidence Schema v0.1, including supported
+  document MIME types, EVM addresses/hashes, integer strings, unique IDs and
+  document/expense references.
+- Added a campaign metadata ownership guard service for authenticated user IDs.
+- SIWE authentication/session issuance, campaign chain ownership projection,
+  evidence routes/persistence, criteria hash/version verification, upload,
+  freeze and manifest hashing are not implemented by this checkpoint.
+- Verification: backend Nest build succeeds. Automated evidence schema and
+  access tests have not yet been added.
 
 Before enabling upload, select documented file limits and access/redaction policy.
 Before production, settle waiting-stage deadlines, fallback, retention and

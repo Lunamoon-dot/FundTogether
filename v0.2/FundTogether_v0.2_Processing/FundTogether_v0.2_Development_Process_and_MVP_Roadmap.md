@@ -756,7 +756,7 @@ API
 Frontend
 ```
 
-Events MVP:
+Events minh họa theo prototype; danh sách đầy đủ trong docs/protocol-spec.md:
 
 ```text
 CampaignCreated
@@ -765,15 +765,18 @@ FundingFinalized
 BondLocked
 
 MilestoneActivated
-EvidenceSubmitted
+EvidenceSubmissionCreated
+VerifierAssigned
+SubmissionVerified
+SubmissionRejected
 ChallengeOpened
 MilestoneSettled
 
-RefundAvailable
+RefundPoolSnapshotted
 RefundClaimed
 
 BondReturned
-BondSlashed
+CampaignCompleted
 ```
 
 Phải xử lý:
@@ -1295,33 +1298,32 @@ Khi hai đường này chạy đúng end-to-end, FundTogether mới thực sự 
 
 ---
 
-# MVP Decision Baseline — trước khi viết Protocol Specification
+# MVP Decision Baseline — cập nhật 2026-10-03
 
-Phần này ghi baseline đề xuất để team dùng khi soạn bốn tài liệu đặc tả. Nó chưa thay thế quyết định được phê duyệt trong `protocol-spec.md`, `state-machine.md`, `financial-rules.md` và `mvp-scope.md`.
+Baseline cũ đã được đối chiếu code và các quyết định mới. Các phương án học ở
+phần trên không ghi đè bảng này. Backend metadata/schema/auth và FE nền có thể
+chuẩn bị song song; journey tài chính chỉ tích hợp slice đã thống nhất.
 
-```text
-Blockchain       : EVM; Anvil trước, Sepolia sau
-Donation asset   : ERC20 MockUSDC
-Bond asset       : cùng MockUSDC
-Milestone        : tuần tự
-Release          : release theo milestone sau settlement
-Resolver         : trusted resolver trong MVP
-Challenge        : chỉ donor của campaign
-Challenge stake  : không có
-Failure model    : NORMAL_FAILURE / MISCONDUCT
-Evidence         : public-only
-Verifier         : optional; resolver quyết định cuối
-Refund           : snapshot của unconsumed pool
-Reputation       : off-chain projection từ event
-Indexer          : event-driven, checkpoint, idempotent
-Timeout          : permissionless terminal execution
-```
+| Nội dung | Baseline hiện tại | Bằng chứng / giới hạn |
+|---|---|---|
+| Mạng | Anvil local; Arc testnet ưu tiên; Arc production candidate | Chưa deploy Arc |
+| Token | Local MockUSDC; Arc trial dự kiến ERC20 USDC precompile | Native gas cùng balance, khác đơn vị |
+| Goal/bond | Goal = tổng budgets; bond = budget lớn nhất | Có code |
+| Milestone | Tuần tự; activate không release, settle mới release | Có code nhánh không challenge |
+| Funding | Đạt goal sớm vào FUNDED; cancel chỉ trước FUNDED | Có code |
+| Verifier | Mandatory admission, version/hash, assignment | AccessControl có code; không optional |
+| Review | 72 giờ từ verifier accept | Có code; admin duration chưa hỗ trợ |
+| Resolver | Prototype deployer approval; target arbitration 2/3 | Committee đã chọn, chưa có code |
+| Evidence | Restricted originals + public redactions | Parser nền có; upload/report chưa có |
+| Refund | Pre-FUNDED full snapshot/pull claims | Post-FUNDED/slash OPEN |
+| Failure/timeout | DEFAULT không tự đồng nghĩa MISCONDUCT | Taxonomy, appeals, no-quorum/recovery OPEN |
+| Indexer | Protocol events, checkpoint/idempotency, Arc finality | Chưa chạy |
+| Reputation/research | Sau MVP | Chưa triển khai |
 
-Các giới hạn được chấp nhận trong baseline này:
+Safe execution, EIP-712, mã hóa end-to-end, bank conversion, cross-chain và nhiều
+token vẫn hoãn. Committee 2/3 không phải Safe và không bị đẩy sau MVP.
 
-- MVP chưa yêu cầu EIP-712 verifier signature.
-- MVP chưa yêu cầu multisig resolver; đây là hướng hardening sau prototype.
-- IPFS/Pinata là lựa chọn lưu evidence public, không phải blockchain.
-- ReputationRegistry on-chain, private evidence, cross-chain và multiple stablecoins nằm ngoài MVP.
-
-Mọi mục trong baseline phải được đánh dấu `APPROVED`, `PROPOSED`, `OPEN` hoặc `OUT OF SCOPE` trong bộ tài liệu đặc tả trước khi freeze contract.
+Đọc [bảng rà 10 mốc](../FundTogether_Milestone_Review_2026-10-03.md) và
+[Arc evaluation](../FundTogether_Arc_Evaluation_v0.1.md). Trạng thái triển khai
+được ghi ở docs/PROJECT_PROGRESS.md; kế hoạch trong tài liệu này không phải
+bằng chứng tính năng đã hoàn tất.

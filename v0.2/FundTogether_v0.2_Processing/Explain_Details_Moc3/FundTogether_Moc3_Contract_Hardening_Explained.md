@@ -205,4 +205,13 @@ Nguồn: [Process — Mốc 3 và Final Development Order](../FundTogether_v0.2_
 
 ## MVP baseline alignment
 
-Hardening phải kiểm tra permissionless timeout, không release vượt budget, không claim refund hai lần, bond coverage theo maximum exposure, event đầy đủ cho indexer và quyền resolver trong phạm vi MVP. Multisig và verifier signature là hardening sau prototype, không phải điều kiện tối thiểu của MVP.
+Hardening phải kiểm tra permissionless timeout, không release vượt budget, không claim refund hai lần, bond coverage theo maximum exposure, event đầy đủ cho indexer và quyền resolver trong phạm vi MVP. Committee 2/3 đã chọn cho MVP nhưng chưa có code; không đồng nhất với Safe còn hoãn. AccessControl admission/versioning đã có; EIP-712 vẫn hoãn. Timeout/recovery ngoài funding failure và unchallenged settlement chưa triển khai.
+
+## Rà soát mốc và hướng Arc — 2026-10-03
+
+CHALLENGED chưa exit; admission timeout, organizer abandonment và post-funded refund/slash chưa có. TODO kiểm tra Arc blocklist/failed payout/atomic rollback, unsolicited native inflows và dust; không thêm admin sweep có thể lấy escrow/bond.
+
+Arc testnet là hướng tích hợp ưu tiên, chưa deploy/kiểm chứng runtime. Xem
+[bảng rà 10 mốc](../../FundTogether_Milestone_Review_2026-10-03.md) và
+[Arc sources và checklist](../../FundTogether_Arc_Evaluation_v0.1.md).
+Các yêu cầu Arc ở đây là TODO, không phải kết quả test/deploy.

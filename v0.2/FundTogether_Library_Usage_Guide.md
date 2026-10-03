@@ -6,15 +6,7 @@
 
 # 1. Kiến trúc tổng quan
 
-FundTogether được tách thành 2 application chính:
-
-```text
-FundTogether/
-├── frontend/
-└── backend/
-```
-
-Về sau smart contract nên là một project riêng:
+Repository hiện có frontend, backend và contracts với dependency/build riêng:
 
 ```text
 FundTogether/
@@ -1676,3 +1668,14 @@ multi-chain support
 ```
 
 mà không phải thay lại toàn bộ kiến trúc.
+
+## Trạng thái sử dụng và Arc — 2026-10-03
+
+Danh sách thư viện là vai trò đề xuất, không chứng minh integration hoàn tất.
+Viem/Wagmi cần Arc chain/deployment metadata; không mặc định native currency ETH.
+Token 6 decimals, native gas/value 18 decimals dùng bigint; JSON decimal strings.
+Không lấy parseUnits(amount, 6) làm native tx.value hoặc cộng hai balance.
+
+Ponder chưa setup; BlockchainService hiện chỉ kiểm tra RPC config. Xem
+[Arc sources](./FundTogether_Arc_Evaluation_v0.1.md) và
+[mốc còn thiếu](./FundTogether_Milestone_Review_2026-10-03.md).

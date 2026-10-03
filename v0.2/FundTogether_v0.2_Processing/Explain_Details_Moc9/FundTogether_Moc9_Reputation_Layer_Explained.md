@@ -123,3 +123,13 @@ Nguồn: [Process — Mốc 9](../FundTogether_v0.2_Development_Process_and_MVP_
 ## MVP baseline alignment
 
 Reputation không nằm trong critical path của MVP. Giai đoạn đầu dùng off-chain projection từ event đã index; `ReputationRegistry` on-chain và badge/scoring nâng cao chỉ được xem xét sau khi lifecycle và dữ liệu lịch sử đáng tin cậy.
+
+
+## Rà soát mốc và hướng Arc — 2026-10-03
+
+Vẫn post-MVP. Dùng protocol events và chainId+contract+campaignId; không tính USDC Transfer hoặc biến động ví sau gas thành donation/reputation. Arc finality không chứng minh kết quả từ thiện; địa chỉ ví không tự chứng minh identity.
+
+Arc testnet là hướng tích hợp ưu tiên, chưa deploy/kiểm chứng runtime. Xem
+[bảng rà 10 mốc](../../FundTogether_Milestone_Review_2026-10-03.md) và
+[Arc sources và checklist](../../FundTogether_Arc_Evaluation_v0.1.md).
+Các yêu cầu Arc ở đây là TODO, không phải kết quả test/deploy.

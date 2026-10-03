@@ -8,9 +8,13 @@
 | Directory | Responsibility | Current implementation |
 |---|---|---|
 | frontend/ | Forms, wallet interaction, transaction and indexed state | React/TypeScript Vite starter UI with API/Web3 boundaries |
-| backend/ | Authentication, metadata, storage and chain projections | NestJS foundation; metadata schema and health endpoint; no domain/indexer flow yet |
+| backend/ | Authentication, metadata, storage and chain projections | NestJS foundation, health and metadata schema; evidence parser/metadata ownership service; no domain routes, SIWE or indexer |
 | contracts/ | Financial rules and on-chain campaign state | Funding, bond, pre-funded refunds, sequential evidence/review and unchallenged settlement |
 | docs/ | Approved rules, current implementation and history | Protocol, financial rules, state machine and progress |
+
+The evidence parser/metadata ownership service is local work in progress and is
+not included in this documentation publication. Published backend code remains
+the foundation until that implementation is committed separately.
 
 Blockchain is authoritative for custody, contributions, bond, refund entitlement
 and milestone state. PostgreSQL holds application metadata and derived chain
@@ -24,6 +28,26 @@ projections. Evidence files belong in storage; financial commitments belong on-c
 - Protocol source is in contracts/src/; mocks, shared fixtures and suites are
   under contracts/test/.
 - Follow [contracts setup](../contracts/README.md) to clone dependencies and run tests.
+
+## Development network and gas
+
+Local integration targets Anvil with ERC20 MockUSDC (6 decimals); native test ETH
+pays transaction gas. ERC20 names the token standard, not the network. Arc testnet
+is the priority public integration target; Sepolia is an optional fallback. Arc is
+the preferred production candidate, pending acceptance. Solidity/EVM
+does not imply an Ethereum mainnet deployment. Contract tests do not prove a live
+FE/BE integration deployment. See [network and gas specification](../v0.2/FundTogether_Development_Network_and_Gas_v0.1.md)
+and [TypeScript conventions](./web3-conventions.md).
+
+The current direct-wallet flow requires native gas and allowance where applicable.
+MockUSDC has no permit/EIP-3009; relayer/paymaster support is not implemented.
+Anvil account funding must not hide zero-native-balance cases in future UX tests.
+
+Arc testnet is now the prioritized evaluation target while local Anvil stays the dev
+baseline. Arc USDC shares its native gas balance (18 decimals) and ERC20 balance
+(6 decimals); fee reserve and indexer duplicate-stream handling need dedicated
+validation. See [Arc evaluation plan](../v0.2/FundTogether_Arc_Evaluation_v0.1.md).
+No Arc deployment, adapter or production network selection is claimed.
 
 ## Current contract interface
 
@@ -113,3 +137,14 @@ The user moved the design corpus into repository `v0.2/`. The
 Verification Report and a synthetic worked example. Immutable organizer packages
 are separate from rerunnable rule/OCR/AI reports. These are design artifacts;
 upload, report generation and verifier screens are not implemented yet.
+
+## Milestone review and Arc readiness
+
+The [dated milestone review](../v0.2/FundTogether_Milestone_Review_2026-10-03.md)
+separates implemented slices from target design across all ten milestones.
+Arc Foundry, runtime/USDC validation, shared deployment artifacts, idempotent
+indexing and integrated journeys are TODO. Contract settings pin Solidity 0.8.24;
+an Arc-compatible compiler/EVM target has not been verified.
+
+Prototype CHALLENGED has no exit; admission/organizer inactivity recovery and
+post-funded refund/slash remain blockers before accepting real funds.

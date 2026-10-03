@@ -156,7 +156,7 @@ Public evidence: storage/content có thể đọc công khai. Chỉ commit/publi
 
 Private evidence: backend kiểm tra phiên, role và policy, rồi cấp link ngắn hạn; object không public. Nếu có mã hóa, xác định ai giữ key và Resolver đọc thế nào. URL ngắn hạn có thể bị chia sẻ trong thời gian hiệu lực; người tải có thể giữ bản sao.
 
-Chọn public-only cho prototype không đồng nghĩa được đưa thông tin cá nhân thật lên public. Dùng dữ liệu demo phù hợp.
+Baseline hiện tại dùng restricted originals/manifests và public redacted derivatives với hash/access riêng. Mã hóa end-to-end còn hoãn. Dùng dữ liệu giả cho demo.
 
 ## 12. Làm sao thao tác và biết từng bước đã xong?
 
@@ -205,5 +205,14 @@ EIP-712 verifier signature chưa được chọn; prototype dùng role và giao 
   kiểm thử cần triển khai; không phải test đã chạy.
 
 Admission/versioning đã có trong contract; review 72 giờ bắt đầu khi assigned
-verifier accept. Backend upload/checklist/report và giao diện chưa triển khai.
+verifier accept. Backend đã có schema parser/metadata ownership service; upload/checklist/report, SIWE, on-chain ownership và giao diện chưa triển khai.
 OCR/AI có thể bổ sung sau mà không đổi evidenceHash hoặc quyền tài chính.
+
+## Rà soát mốc và hướng Arc — 2026-10-03
+
+Parser/schema nền đã có; uploads, freeze/hash/report và auth/chain ownership checks còn TODO. Commitment hiện là SHA-256 exact UTF-8 frozen manifest bytes; report version không đổi evidenceHash. Arc finality/indexed/verified không đồng nghĩa; optional OCR/AI không cấp quyền tài chính.
+
+Arc testnet là hướng tích hợp ưu tiên, chưa deploy/kiểm chứng runtime. Xem
+[bảng rà 10 mốc](../../FundTogether_Milestone_Review_2026-10-03.md) và
+[Arc sources và checklist](../../FundTogether_Arc_Evaluation_v0.1.md).
+Các yêu cầu Arc ở đây là TODO, không phải kết quả test/deploy.

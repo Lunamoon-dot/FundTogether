@@ -140,3 +140,13 @@ Nguồn: [Process — Mốc 10: Research / Experiment Layer và Metrics](../Fund
 ## MVP baseline alignment
 
 Các thí nghiệm nên so sánh baseline giải ngân toàn bộ, milestone không bond và milestone có bond/challenge sau khi MVP có dữ liệu. Không thêm NFT, token riêng hoặc cross-chain chỉ để tăng số lượng thành phần blockchain; ưu tiên đo exposure, collateral efficiency, refund accuracy, governance overhead và campaign liveness.
+
+
+## Rà soát mốc và hướng Arc — 2026-10-03
+
+Vẫn post-MVP; chưa có benchmark Arc. Đo toàn journey bằng receipt gasUsed×effectiveGasPrice và native 18 decimals, ghi chain/compiler/tool version. Tách testnet/mainnet; không ngoại suy faucet fees thành chi phí production.
+
+Arc testnet là hướng tích hợp ưu tiên, chưa deploy/kiểm chứng runtime. Xem
+[bảng rà 10 mốc](../../FundTogether_Milestone_Review_2026-10-03.md) và
+[Arc sources và checklist](../../FundTogether_Arc_Evaluation_v0.1.md).
+Các yêu cầu Arc ở đây là TODO, không phải kết quả test/deploy.

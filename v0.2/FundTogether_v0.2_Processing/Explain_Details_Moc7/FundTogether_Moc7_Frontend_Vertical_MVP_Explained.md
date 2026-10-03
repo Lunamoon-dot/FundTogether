@@ -82,10 +82,11 @@ Transaction gửi được ≠ receipt thành công ≠ database đã index. Khi
 
 ```text
 Organizer activate
-→ Nộp evidence
-→ Review window
-→ Không challenge hoặc mở dispute
-→ Resolve/settle
+→ Nộp evidence: EVIDENCE_PENDING
+→ Assigned verifier accept đúng hash/version (reject → nộp version mới)
+→ Review window 72 giờ
+→ Không challenge: settle; challenge: CHALLENGED
+→ Resolve còn là mục tiêu, chưa có exit trong prototype
 → Tiếp mốc sau
 ```
 
@@ -202,3 +203,12 @@ Nguồn: [Process — Mốc 7, bốn journey](../FundTogether_v0.2_Development_P
 ## MVP baseline alignment
 
 Frontend phải biểu diễn riêng `submitted`, receipt success, confirmed và indexed. Wagmi/Viem xử lý wallet transaction; TanStack Query xử lý server projection; Zustand chỉ giữ client state. Frontend không tự tính refund hoặc financial truth thay contract.
+
+## Rà soát mốc và hướng Arc — 2026-10-03
+
+FE vẫn starter. TODO Arc: một USDC balance với reserve approve+donate, refresh quote sau approve, không yêu cầu mua ETH. Refund gross khác net balance sau phí. Pending/no receipt cần reconcile; final receipt status=0 là failed; indexed là bước riêng.
+
+Arc testnet là hướng tích hợp ưu tiên, chưa deploy/kiểm chứng runtime. Xem
+[bảng rà 10 mốc](../../FundTogether_Milestone_Review_2026-10-03.md) và
+[Arc sources và checklist](../../FundTogether_Arc_Evaluation_v0.1.md).
+Các yêu cầu Arc ở đây là TODO, không phải kết quả test/deploy.

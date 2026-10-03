@@ -24,20 +24,23 @@ This specification defines the protocol boundary. UI details, search, notificati
 
 | Decision | MVP value | Status |
 |---|---|---|
-| Blockchain | EVM-compatible; Anvil for local development, Sepolia for validation | APPROVED |
+| Blockchain | EVM; Anvil local; Arc testnet priority for integration; Sepolia optional fallback | APPROVED LOCAL; ARC TRIAL TODO |
 | Donation asset | ERC20 MockUSDC | APPROVED |
 | Bond asset | Same MockUSDC as donations | APPROVED |
+| Local gas asset | Anvil native test ETH, separate from donation and bond | APPROVED DEV BASELINE |
+| Priority target | Arc testnet; USDC native gas and ERC20 share one balance | SELECTED TRIAL; NOT DEPLOYED |
+| Production chain / sponsorship | Arc preferred candidate; production acceptance and sponsorship still open | CANDIDATE; NOT IMPLEMENTED |
 | Milestones | Sequential; only the current milestone can be active | APPROVED |
 | Release | Release the current milestone budget after successful settlement | APPROVED |
 | Resolver | Current prototype: deployer role; target: independent final arbitration after verification/response | CURRENT LIMITATION; TARGET DESIGN REVIEWED |
 | Challenge eligibility | Donor of the campaign being challenged | APPROVED |
 | Challenge stake | None in MVP | APPROVED |
-| Failure classification | `NORMAL_FAILURE` and `MISCONDUCT` | APPROVED MVP SIMPLIFICATION |
-| Evidence | Public evidence only | APPROVED MVP LIMITATION |
+| Failure classification | Draft: `CANCEL_WITHOUT_FAULT`, `DEFAULT`, `MISCONDUCT`; taxonomy/slash mapping not frozen | OPEN; NOT IMPLEMENTED |
+| Evidence | Restricted originals/manifests; public redacted derivatives; immutable versions | DOCUMENTED; STORAGE TODO |
 | Verifier | One VERIFIER_ROLE: submission admission/versioning implemented; challenge/remediation specified; no edits/adjudication/direct transfers | PARTIALLY IMPLEMENTED |
-| Refund | Snapshot-based unconsumed pool accounting | APPROVED |
+| Refund | Pre-FUNDED full contribution snapshot/pull claims implemented; post-FUNDED composition open | PARTIALLY IMPLEMENTED |
 | Reputation | Off-chain projection from indexed events | APPROVED |
-| Timeout execution | Permissionless: anyone may call an eligible terminal action | APPROVED |
+| Timeout execution | Permissionless funding failure and unchallenged settlement; waiting-stage recovery still open | PARTIALLY IMPLEMENTED |
 
 Deferred features include native ETH, multiple stablecoins, private evidence encryption, EIP-712 verifier signatures, Safe-based resolver execution, dynamic resolver registry, on-chain reputation registry, cross-chain support and DAO governance.
 
@@ -210,27 +213,34 @@ The exact timeout durations are an implementation parameter and must be recorded
 
 ## 9. Required events
 
-The first contract event model should include:
+FundTogether-specific event names checked against source on 2026-10-03:
 
 ```text
 CampaignCreated
+MilestoneConfigured
+MilestoneCriteriaConfigured
+CampaignApproved
 BondLocked
-ContributionReceived
+CampaignPublished
+DonationReceived
 FundingFinalized
 MilestoneActivated
-EvidenceSubmitted
+EvidenceSubmissionCreated
+VerifierAssigned
+SubmissionVerified
+SubmissionRejected
 ChallengeOpened
 MilestoneSettled
+CampaignCompleted
 CampaignCancelled
-RefundAvailable
-RefundClaimed
+RefundPoolSnapshotted
 BondReturned
-BondSlashed
+RefundClaimed
 ```
 
 Every event must contain enough identifiers for an idempotent indexer: campaign ID, relevant actor, milestone ID where applicable, block context and event-specific values.
 
-The event list above includes planned milestone events. Current prototype names include `DonationReceived` (rather than `ContributionReceived`), `CampaignApproved`, `CampaignPublished` and `RefundPoolSnapshotted` (rather than `RefundAvailable`). Shared ABI/event agreement remains a separate delivery step; indexers must use the generated ABI.
+AccessControl also emits inherited role events. Slashing and committee verdict events are not implemented. Generate ABI from the build; this list is not a shared ABI/deployment artifact.
 
 ## 10. Implementation guardrails
 

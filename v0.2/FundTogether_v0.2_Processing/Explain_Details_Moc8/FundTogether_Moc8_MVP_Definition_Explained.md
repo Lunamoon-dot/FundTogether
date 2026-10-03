@@ -118,4 +118,13 @@ Nguồn: [Process — Mốc 8, những thứ không cần cho MVP, Definition of
 
 ## MVP baseline alignment
 
-Phạm vi MVP hiện ưu tiên một campaign lifecycle hoàn chỉnh với ERC20 MockUSDC, milestone tuần tự, evidence public, challenge donor-only, trusted resolver và refund theo snapshot. Reputation nâng cao, multisig, private evidence, cross-chain và multiple stablecoins nằm ngoài phạm vi.
+MVP: milestone tuần tự, donor-only challenge, mandatory admission/versioning, originals hạn chế và public redactions. Committee 2/3 đã chọn nhưng chưa có code. Refund trước FUNDED có snapshot/pull claim; post-FUNDED còn OPEN. Safe, EIP-712, mã hóa end-to-end, cross-chain, nhiều token và reputation nâng cao vẫn hoãn.
+
+## Rà soát mốc và hướng Arc — 2026-10-03
+
+Anvil local; Arc testnet ưu tiên public integration, Arc production candidate ưu tiên. MVP chưa DONE: committee/recovery, auth/storage/API/indexer và FE journey còn thiếu. Chốt production sau runtime/accounting, complete failure paths và fund-safety review. Bank conversion/AI tự phân xử vẫn post-MVP.
+
+Arc testnet là hướng tích hợp ưu tiên, chưa deploy/kiểm chứng runtime. Xem
+[bảng rà 10 mốc](../../FundTogether_Milestone_Review_2026-10-03.md) và
+[Arc sources và checklist](../../FundTogether_Arc_Evaluation_v0.1.md).
+Các yêu cầu Arc ở đây là TODO, không phải kết quả test/deploy.

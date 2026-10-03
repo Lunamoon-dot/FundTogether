@@ -8,6 +8,11 @@ evidence.
 
 ## Current milestone
 
+Arc update: local Anvil remains; Arc testnet is now the priority integration
+target and Arc is the preferred production candidate, pending acceptance.
+See [ten-milestone review](../v0.2/FundTogether_Milestone_Review_2026-10-03.md).
+No Arc tooling, deployment or live runtime validation is recorded as DONE.
+
 Latest design review: [Verification and dispute escalation](./verification-and-disputes.md).
 Evidence admission/versioning is implemented; challenge screening/response and
 the selected three-resolver/two-matching-verdict committee remain unimplemented.
@@ -40,6 +45,22 @@ abandonment recovery, post-funded refunds and slashing remain unimplemented.
   and two intentional validation-loop warnings.
 
 ## Verified progress
+
+### IN_PROGRESS — Evidence schema validation and organizer access foundation
+
+Local implementation work; backend source is not included in this documentation
+publication and will be committed separately.
+
+- Added a strict Zod parser for Evidence Schema v0.1, including integer-safe
+  values, EVM address/hash formats, allowed document media types, unique IDs,
+  date ordering and reference integrity.
+- Added an authorization service that checks an authenticated user ID against
+  the campaign metadata owner.
+- Verification: `npm.cmd run build` in `backend/` succeeded.
+- Not implemented yet: SIWE challenge/session verification, endpoint integration,
+  evidence persistence, on-chain campaign/organizer/criteria/version checks and
+  automated tests. Current ownership check covers only the existing metadata
+  owner relation; it does not claim on-chain authorization.
 
 ### DONE — Verifier roles and evidence admission/versioning
 
@@ -486,3 +507,57 @@ keeps the dated implementation history and its verification evidence.
 - Reran the full contract suite before publication: 129 passed, 0 failed,
   0 skipped across 11 suites. No contract source changes in this documentation task;
   publication includes the previously implemented local milestone/admission work.
+
+### 2026-10-03 — Clarify dev network, gas and TypeScript conventions
+
+- DONE (documentation): local EVM development uses Anvil + ERC20 MockUSDC;
+  donation/bond and native test ETH for gas are separate. Production is unselected;
+  Sepolia is planned validation, not a verified deployment.
+- Added network/gas design in v0.2; synchronized protocol, overview and Web3
+  conventions. TS uses bigint for token/native/fee values and decimal strings
+  in JSON, with nativeCurrency/token deployment metadata rather than hardcoding.
+- Recorded zero-native-balance UX checks and MockUSDC authorization limitations.
+  Relayer/paymaster, signature entrypoints and sponsor fee policy remain unimplemented/open.
+- No source, ABI, dependency or FE/BE behavior changed in this documentation task.
+  Existing backend evidence work and its progress entry are retained.
+- Verification: 22 local links across five documents resolve; git diff --check
+  passes. Inspected MockUSDC source to confirm 6 decimals and no authorization
+  extension. No runtime test/build was run for this documentation-only update.
+
+### 2026-10-03 — Add Arc testnet evaluation candidate
+
+- DONE (documentation): Arc evaluation plan, source references and testnet
+  parameters, with network/gas, TS, protocol, overview and accounting alignment.
+- Local dev remains Anvil + MockUSDC. Arc testnet trial is approved; production
+  chain, sponsorship and actual Arc deployment/integration remain open/TODO.
+- Specified shared USDC balance with native 18/ERC20 6 decimals, bigint unit
+  conversion, fee reserve and gross refund versus net balance change.
+- Added native/ERC20 event-stream double-counting safeguards; FundTogether
+  events remain the source of protocol contribution/refund projections.
+- Official Arc sources were consulted on 2026-10-03. No source/dependency/ABI
+  change, wallet creation or transaction broadcast in this documentation task.
+- Verification: 33 local links across eight relevant documents resolve;
+  tracked documentation diff formatting passes. Arc runtime validation and
+  deployment checklist remain TODO; no runtime tests were run for this update.
+
+### 2026-10-03 — Review ten milestones and prioritize Arc integration
+
+- DONE (documentation): checked all ten milestone guides against current contract,
+  backend boundaries and approved design updates; added a dated review matrix.
+- Corrected early funding success, activation versus settlement payout, mandatory
+  verifier admission and review start, committee 2/3 versus deferred Safe,
+  restricted originals/redactions, actual events and partial backend status.
+- Arc testnet is prioritized; Sepolia becomes an optional fallback. Arc production
+  remains a candidate subject to runtime/accounting, complete recovery journeys
+  and fund-safety acceptance, not an approved deployment.
+- Read official Arc native model, gas, lifecycle, finality, system logs, RPC,
+  porting and Arc Foundry references. Recorded unit/status inconsistencies in
+  source snippets and specific validation requirements rather than copying them.
+- Updated network/TS/protocol/MVP/accounting references, roadmap, stack, library
+  guide and threat model. Historical entries remain dated history.
+- Verification: 181 local links across 34 documentation files resolve;
+  git diff --check passes. All 20 FundTogether-specific event names match source
+  in protocol-spec and web3-conventions. Contract/frontend source diff is empty.
+- No runtime test/build, Arc installation, deployment or transaction broadcast.
+  Existing backend changes are preserved. CHALLENGED exit, waiting-stage recovery
+  and post-funded refunds/slash remain unimplemented.

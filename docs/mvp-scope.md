@@ -152,7 +152,7 @@ Phase 1  Single-campaign contract prototype
 Phase 2  Contract tests and hardening
 Phase 3  Backend database/auth/API foundation
 Phase 4  Event indexer and projections
-Phase 5  Evidence public pipeline
+Phase 5  Restricted originals and public redacted evidence pipeline
 Phase 6  Frontend vertical journeys
 Phase 7  End-to-end MVP and security review
 ```
@@ -161,10 +161,18 @@ Do not move a phase to `DONE` because a later phase has a mock or because docume
 
 ## 7. MVP risks and accepted limitations
 
-- Trusted resolver is centralized in the MVP.
+- Prototype approval uses one trusted resolver; selected MVP arbitration uses a 2-of-3 committee, not implemented yet.
 - Public evidence does not provide privacy.
 - Evidence hashes prove integrity, not real-world truth.
 - An indexer can lag the chain; the UI must show pending/indexed distinction.
 - A permissionless timeout still needs someone to submit the transaction.
 - Research claims require comparison data after the MVP has reproducible behavior.
+
+## Arc acceptance gate
+
+Anvil remains local development; Arc testnet is prioritized for public integration.
+Production Arc deployment requires validated native/ERC20 accounting and gas UX,
+ABI/address/start-block artifacts, finality-aware indexing, complete success and
+failure/recovery journeys, and fund-safety review. A passing local suite does not
+satisfy this gate. See [milestone review](../v0.2/FundTogether_Milestone_Review_2026-10-03.md).
 

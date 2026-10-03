@@ -123,13 +123,13 @@ Mục tiêu là thấy từng test pass/fail; test pass chỉ xác nhận các a
 
 ### Ví dụ một vòng thêm feature
 
-Giả sử thêm `finalizeFunding`:
+Theo rule hiện tại, thêm `finalizeFundingFailure`:
 
-1. Đọc rule: chỉ finalize sau deadline.
-2. Viết ca raised bằng goal và thấp hơn goal.
-3. Viết ca gọi trước deadline phải bị từ chối.
-4. Viết ca gọi sau deadline lần hai không tạo thêm entitlement/event gây hiểu nhầm.
-5. Implement nhánh FUNDED và FUNDING_FAILED.
+1. Chỉ xử lý campaign còn FUNDING tại hoặc sau deadline.
+2. Kiểm tra donate đạt goal chuyển ngay sang FUNDED.
+3. Finalize failure trước deadline hoặc khi đã FUNDED bị từ chối.
+4. Deadline failure snapshot/trả bond một lần; donor claim độc lập.
+5. Implement FUNDING_FAILED; nhánh FUNDED nằm trong donate.
 6. Chạy tests, đọc trace khi fail, sửa code hoặc sửa spec nếu phát hiện rule chưa thể thi hành.
 7. Chỉ rồi mới thêm feature phụ thuộc, như activate milestone.
 
@@ -198,4 +198,13 @@ Nguồn: [Process — Mốc 2](../FundTogether_v0.2_Development_Process_and_MVP_
 
 ## MVP baseline alignment
 
-Prototype contract nên bắt đầu với ERC20 MockUSDC, milestone tuần tự, bond bằng cùng token và các đường `fund → milestone → settlement → refund`. Chưa đưa EIP-712 verifier signature, multisig resolver, private evidence hoặc reputation on-chain vào prototype đầu tiên.
+Prototype contract nên bắt đầu với ERC20 MockUSDC, milestone tuần tự, bond bằng cùng token và các đường `fund → milestone → settlement → refund`. Committee 2/3 đã chọn cho MVP nhưng chưa có code; Safe và EIP-712 là cơ chế riêng còn hoãn. Restricted originals/public redactions đã được đặc tả; storage chưa có. Reputation on-chain sau MVP.
+
+## Rà soát mốc và hướng Arc — 2026-10-03
+
+Một FundTogether.sol hiện quản lý nhiều campaignId. Prototype đã có funding, bond, criteria, admission và unchallenged settlement. Arc Foundry/compiler/EVM target/precompile validation còn TODO; 129 tests là kết quả lịch sử, không phải lần chạy mới hoặc bằng chứng tương thích Arc.
+
+Arc testnet là hướng tích hợp ưu tiên, chưa deploy/kiểm chứng runtime. Xem
+[bảng rà 10 mốc](../../FundTogether_Milestone_Review_2026-10-03.md) và
+[Arc sources và checklist](../../FundTogether_Arc_Evaluation_v0.1.md).
+Các yêu cầu Arc ở đây là TODO, không phải kết quả test/deploy.

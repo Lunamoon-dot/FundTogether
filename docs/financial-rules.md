@@ -9,6 +9,13 @@
 
 All token amounts are integer values in the donation token's smallest unit. The implementation uses Solidity integers and JavaScript/TypeScript `bigint`; floating point is forbidden for financial calculations.
 
+Arc is a network evaluation candidate, not a deployed integration. If selected,
+retain ERC20 units (6 decimals) for USDC donation/bond/refund accounting; native
+gas units are 18 decimals over the same balance. Gas is a separate expense, not
+a deduction from recorded donation or refund entitlement. Direct transactions
+need fee reserve; operator gas funds remain separate from escrow/bond. See
+[Arc accounting and validation requirements](../v0.2/FundTogether_Arc_Evaluation_v0.1.md).
+
 The contract must preserve conservation of funds:
 
 ```text
@@ -198,4 +205,17 @@ slash/refund formulas and timeout effects remain unapproved and unimplemented.
 3. Exact misconduct slash formula and resolver payload.
 4. Dust destination after proportional refund rounding.
 5. Treatment of unexpected token transfers into the contract.
+
+## 11. Arc financial readiness — TODO
+
+Arc is the preferred production candidate, not an accepted deployment. Retain
+ERC20 accounting for donations/bond/refunds; native USDC fees are caller costs
+even though the two interfaces share a balance. Unexpected native inflows and
+sub-token-unit dust do not create contributor rights.
+
+Token blocklist/failed transfers can prevent settlement/refund. Current atomic
+rollback protects recorded state on a revert but does not provide eventual
+recovery. Define and validate a recovery policy before real funds; do not add an
+admin sweep over donor escrow or bond. See
+[Arc validation plan](../v0.2/FundTogether_Arc_Evaluation_v0.1.md).
 

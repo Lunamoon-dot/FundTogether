@@ -1,6 +1,6 @@
 # FundTogether — Giải thích Mốc 4: Backend Foundation
 
-> Stack như NestJS/Drizzle/PostgreSQL/Redis/S3/Viem/Ponder là định hướng trong Tech Stack. Endpoints và schemas dưới đây là ví dụ; chưa khẳng định backend đã có code.
+> Stack như NestJS/Drizzle/PostgreSQL/Redis/S3/Viem/Ponder là định hướng trong Tech Stack. NestJS foundation, health, metadata schema và evidence parser/metadata ownership service đã có. Domain routes, SIWE session, uploads và indexer còn là mục tiêu.
 
 ## 1. Backend Foundation làm gì?
 
@@ -255,3 +255,12 @@ Nguồn: [Process — Mốc 4](../FundTogether_v0.2_Development_Process_and_MVP_
 ## MVP baseline alignment
 
 Backend MVP dùng SIWE, PostgreSQL/Drizzle cho metadata và projection, OpenAPI làm API contract. Campaign nên đi qua draft và publish intent; backend không coi metadata đã lưu hoặc transaction đã submit là campaign on-chain thành công.
+
+## Rà soát mốc và hướng Arc — 2026-10-03
+
+Metadata owner check chưa xác thực SIWE/on-chain organizer. TODO domain routes/auth, typed chain/address/ABI/start block; bigint amount/fees, JSON decimal strings. BlockchainService hiện chỉ kiểm tra RPC config; Ponder chưa setup.
+
+Arc testnet là hướng tích hợp ưu tiên, chưa deploy/kiểm chứng runtime. Xem
+[bảng rà 10 mốc](../../FundTogether_Milestone_Review_2026-10-03.md) và
+[Arc sources và checklist](../../FundTogether_Arc_Evaluation_v0.1.md).
+Các yêu cầu Arc ở đây là TODO, không phải kết quả test/deploy.

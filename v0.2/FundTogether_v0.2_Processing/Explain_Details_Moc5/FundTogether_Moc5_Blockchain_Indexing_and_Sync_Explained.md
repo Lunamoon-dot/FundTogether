@@ -97,7 +97,7 @@ Retry RPC cần backoff/giới hạn và log rõ lỗi. Retry không được bi
 ### Luồng polling khi worker khởi động
 
 1. Đọc `lastFinalizedBlock` và block hash đã lưu.
-2. Lấy chain head, áp confirmation policy để chọn block an toàn.
+2. Lấy chain head, áp finality policy theo mạng; Arc dùng committed block, không mặc định lùi N confirmations.
 3. Chọn range vừa phải từ checkpoint tới block đó.
 4. Lấy logs cho đúng contract/topic.
 5. Decode bằng ABI và mapping đúng phiên bản.
@@ -201,7 +201,7 @@ Worker dừng lâu cần có chỉ số head/last indexed block, runbook resume/
 - `FundingFinalized`: kiểm tra event emitted đúng nhánh và chain.
 - `RefundAvailable`: có thể nghĩa quyền đã mở, chưa có tiền trả.
 - `RefundClaimed`: transaction thực sự thành công mới ghi claim.
-- `EvidenceSubmitted`: event commit hash, chưa nói evidence verified.
+- `EvidenceSubmissionCreated`: hash/version chưa được accept. `SubmissionVerified` bắt đầu review; không chứng minh công việc đúng ngoài đời.
 - `MilestoneSettled`: cần biết kết quả và tác động tiền chính xác; tên settlement chung chung chưa đủ.
 
 Backend nên thể hiện riêng trạng thái “refund claimable” và “refund claimed”.
@@ -239,3 +239,12 @@ Nguồn: [Process — Mốc 5](../FundTogether_v0.2_Development_Process_and_MVP_
 ## MVP baseline alignment
 
 Indexer MVP phải event-driven, có checkpoint, confirmation policy, retry và idempotency. `BlockchainService` chỉ cung cấp RPC/contract access; indexer mới chuyển event thành projection PostgreSQL. Ponder hoặc Viem indexer vẫn là lựa chọn triển khai sau khi ABI/event model được freeze.
+
+## Rà soát mốc và hướng Arc — 2026-10-03
+
+TODO Arc: committed block final nhưng receipt.status phải success trước projection. Chọn USDC emitter/decimals; hai stream không phải hai donation. Protocol projection dùng FundTogether events. Public log span hiện 10.000 blocks, khuyến nghị ≤9.999; shrink -32012, bounded backoff -32014. Checkpoint/replay/reconciliation vẫn cần. Reorg phần trên là khung cho chain khác/khôi phục bất thường, không phải chờ N blocks trên Arc.
+
+Arc testnet là hướng tích hợp ưu tiên, chưa deploy/kiểm chứng runtime. Xem
+[bảng rà 10 mốc](../../FundTogether_Milestone_Review_2026-10-03.md) và
+[Arc sources và checklist](../../FundTogether_Arc_Evaluation_v0.1.md).
+Các yêu cầu Arc ở đây là TODO, không phải kết quả test/deploy.

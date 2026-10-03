@@ -24,7 +24,7 @@ Hướng mục tiêu tách admission, donor review, organizer response, re-verif
 và phân xử cuối cùng. Resolver không cần kiểm tra mọi milestone. Nội dung học/ví dụ
 bên dưới vẫn cần đối chiếu bản cập nhật. Người dùng chọn committee 2/3 cho MVP
 trong [Dispute Policy](../../FundTogether_Dispute_Policy_and_Resolver_Committee_2026-10-03.md).
-Ai giữ/cấp quyền verifier, timeout và slash vẫn cần chốt; committee chưa được triển khai.
+Admin cấp/thu hồi quyền verifier và phân công hồ sơ pending đã được chốt và triển khai; timeout, appeal, slash và committee vẫn chưa hoàn tất.
 > Cập nhật tiếp: quyền/giới hạn verifier đã được chốt trong [Verifier Specification v0.1](../../FundTogether_Verifier_Specification_v0.1.md).
 > Admission gate/versioning đã triển khai: deployer admin cấp/thu hồi role và
 > phân công lại hồ sơ pending. Timeout, appeal và slash vẫn mở; committee chưa có.
@@ -803,52 +803,57 @@ Ví dụ campaign vẫn EXECUTING trong khi M1 ACCEPTED, M2 REVIEW và M3 NOT_ST
 
 “Refund available” cũng có thể là một quyền được tính từ trạng thái terminal và pool, không bắt buộc là trạng thái campaign độc lập. Campaign CANCELLED vẫn có donor chưa claim.
 
-### 3. Giả định để có một ví dụ nhất quán
+### 3. Ví dụ theo prototype hiện tại — cập nhật 2026-10-03
 
 - Goal 10.000, budgets 2.000 / 5.000 / 3.000 MockUSDC.
 - Chỉ nhận tới goal; không nhận vượt mức trong ví dụ.
-- Finalize sau funding deadline, kể cả đã đạt goal sớm.
+- Donation đạt đúng goal chuyển ngay sang FUNDED; không chờ funding deadline.
 - Bond 5.000 được khóa trước khi mở funding.
 - Chỉ một milestone chưa được chấp nhận tại một thời điểm.
-- Kích hoạt milestone chuyển toàn budget cho Organizer.
-- Settlement chấp nhận kết quả, không chuyển lại budget.
-- Review window minh họa là 72 giờ; không coi đây là con số đã chốt.
-- Trong ví dụ, attestation Verifier không phải điều kiện bắt buộc cho nhánh không challenge. Nếu team chọn bắt buộc, guard phải được bổ sung.
+- Kích hoạt milestone chỉ đổi state; budget vẫn nằm trong escrow.
+- Settlement thành công mới chuyển budget đúng một lần cho Organizer.
+- Review window đã chốt mặc định 72 giờ, bắt đầu từ verifier acceptance.
+- Assigned verifier có role còn hiệu lực phải accept đúng evidence hash/version; submission chưa được accept không bắt đầu review.
 
-Các lựa chọn này chỉ dùng để giải thích. Timeout dispute và phân loại vi phạm vẫn cần quyết định ở 1.7/1.10.
+Ví dụ này khớp đường không có challenge trong code. Committee 2/3 đã chọn nhưng chưa triển khai; timeout dispute và hệ quả tài chính sau FUNDED vẫn OPEN.
 
 ### 4. Sơ đồ bằng chữ
 
 ```text
 Campaign:
-CREATED → FUNDING → FUNDED → EXECUTING → COMPLETED
-             │                    │
-             └→ FUNDING_FAILED    └→ CANCELLED
+DRAFT → APPROVED → FUNDING → FUNDED → MILESTONE_ACTIVE
+  │        │          │                      ↓
+  └────────┴──────────┴→ CANCELLED      EVIDENCE_PENDING
+                      └→ FUNDING_FAILED       ↓ verifier accept
+                                          IN_REVIEW
+                                          │       │
+                                     settle       challenge
+                                          ↓       ↓
+                    MILESTONE_SETTLED / COMPLETED CHALLENGED
 
 Milestone:
-NOT_STARTED → ACTIVE → REVIEW → ACCEPTED
-                │        │          │
-                │        └→ DISPUTED┤ nếu được chấp nhận
-                │                │
-                └→ xử lý quá hạn └→ REJECTED → hủy campaign
+PENDING → ACTIVE → SUBMITTED → REVIEWING → SETTLED
+                     │ reject           │
+                     └→ ACTIVE          └→ CHALLENGED (chưa có exit)
 ```
 
-Nhánh “xử lý quá hạn” là đường phải thiết kế, chưa được tự hiểu là fraud hoặc tự động slash. Đường chuyển từ dispute phải được diễn tả bằng kết quả rõ như “milestone accepted” hoặc “challenge upheld”, tránh dùng PASS/FAIL mà không biết ai thắng.
+Tên trong sơ đồ dùng enum hiện tại; milestone SUBMITTED tương ứng campaign EVIDENCE_PENDING, REVIEWING tương ứng IN_REVIEW. Recovery do quá hạn và exit khỏi CHALLENGED chưa triển khai; không tự hiểu là fraud hoặc tự động slash.
 
 ### 5. Bảng transition mẫu
 
 | Trước | Hành động minh họa | Ai gọi? | Điều kiện chính | Sau | Tác động tiền |
 |---|---|---|---|---|---|
-| CREATED | openFunding | Organizer | Config hợp lệ, bond đủ | FUNDING | Không chuyển donation |
-| FUNDING | donate | Donor | Trước deadline, amount > 0, không vượt cap | FUNDING | Token donor → escrow |
-| FUNDING | finalizeFunding | Bất kỳ ai | Đã tới deadline, raised đủ goal | FUNDED | Không chuyển token |
-| FUNDING | finalizeFunding | Bất kỳ ai | Đã tới deadline, raised thiếu goal | FUNDING_FAILED | Mở quyền refund và xử lý trả bond |
-| FUNDED / EXECUTING | activateMilestone | Organizer trong ví dụ | Mốc trước ACCEPTED; đủ tiền và bond; mốc mới NOT_STARTED | EXECUTING; mốc ACTIVE | Chuyển budget của mốc này đúng một lần |
-| ACTIVE | submitEvidence | Organizer | Đúng mốc; commitment hợp lệ theo policy | REVIEW | Không chuyển tiền |
-| REVIEW | challenge | Người đủ điều kiện | Trước reviewEnd; chưa có dispute theo policy | DISPUTED | Không slash; stake chỉ có nếu thiết kế chọn |
-| REVIEW | settle | Bất kỳ ai | Đã tới reviewEnd; không dispute; đủ điều kiện review khác | ACCEPTED | Không trả lại budget đã pre-fund |
-| DISPUTED | resolve | Resolver được chỉ định | Đúng dispute, còn quyền xử lý, kết quả hợp lệ | ACCEPTED hoặc REJECTED | Chỉ hệ quả được financial rules cho phép |
-| Mốc cuối ACCEPTED | complete | Bất kỳ ai trong ví dụ | Không nghĩa vụ/dispute chưa giải quyết | COMPLETED | Mở quyền trả bond |
+| DRAFT | approveCampaign | Resolver prototype | Mỗi milestone có criteria hash | APPROVED | Không chuyển tiền |
+| APPROVED | publishCampaign | Organizer | Bond đủ, trước deadline | FUNDING | Không chuyển donation |
+| FUNDING | donate | Donor | Trước deadline, amount > 0, không vượt cap | FUNDING hoặc FUNDED nếu đạt goal | Token donor → escrow |
+| FUNDING | finalizeFundingFailure | Bất kỳ ai | Tới deadline, raised thiếu goal | FUNDING_FAILED | Snapshot refund và trả bond atomically |
+| DRAFT / APPROVED / FUNDING | cancelCampaign | Organizer | Chưa FUNDED | CANCELLED | Snapshot refund và trả bond atomically |
+| FUNDED / MILESTONE_SETTLED | activateMilestone | Organizer | Đúng mốc hiện tại, mốc trước settled | MILESTONE_ACTIVE | Không chuyển budget |
+| MILESTONE_ACTIVE | submitEvidence | Organizer | Đúng mốc, hash khác zero | EVIDENCE_PENDING | Không chuyển tiền |
+| EVIDENCE_PENDING | verifySubmission / rejectSubmission | Assigned verifier | Role còn hiệu lực, đúng hash/version | IN_REVIEW / MILESTONE_ACTIVE | Không chuyển tiền |
+| IN_REVIEW | openChallenge | Donor đã đóng góp | Trước reviewEnd | CHALLENGED | Không slash; chưa có exit |
+| IN_REVIEW | settleMilestone | Bất kỳ ai | Tới reviewEnd, không challenge | MILESTONE_SETTLED hoặc COMPLETED | Chuyển budget; mốc cuối trả bond trong cùng tx |
+| CHALLENGED | Committee resolution | Committee 2/3 mục tiêu | Policy chưa hoàn tất | Chưa triển khai | Chưa được phép giả định refund/slash |
 | FUNDING_FAILED / CANCELLED | claimRefund | Donor có quyền | Pool đã chốt, chưa claim đủ | Không đổi terminal state | Escrow → donor |
 
 “Bất kỳ ai gọi” không phải bất kỳ ai được tự quyết kết quả. Contract tính kết quả từ điều kiện đã lưu. Người gọi chỉ kích hoạt phép tính và trả gas theo cơ chế giao dịch.
@@ -860,17 +865,16 @@ Không tính gas vào token pool, không có phí protocol trong ví dụ.
 | Mốc thời gian | Donation còn trong escrow | Bond khóa | Tổng donation đã release |
 |---|---:|---:|---:|
 | Funding hoàn tất | 10.000 | 5.000 | 0 |
-| Activate M1 | 8.000 | 5.000 | 2.000 |
-| Accept M1 | 8.000 | 5.000 | 2.000 |
-| Activate M2 | 3.000 | 5.000 | 7.000 |
-| Accept M2 | 3.000 | 5.000 | 7.000 |
-| Activate M3 | 0 | 5.000 | 10.000 |
-| Accept M3, complete | 0 | 5.000 cho tới khi trả | 10.000 |
-| Organizer claim bond | 0 | 0 | 10.000 |
+| Activate M1; submit và verifier accept | 10.000 | 5.000 | 0 |
+| Settle M1 sau review | 8.000 | 5.000 | 2.000 |
+| Activate M2; submit và verifier accept | 8.000 | 5.000 | 2.000 |
+| Settle M2 sau review | 3.000 | 5.000 | 7.000 |
+| Activate M3; submit và verifier accept | 3.000 | 5.000 | 7.000 |
+| Settle M3, complete và trả bond atomically | 0 | 0 | 10.000 |
 
-Accept M1 không có nghĩa escrow giảm thêm 2.000. Nếu cả activate và settle đều trả full budget thì đã giải ngân hai lần.
+Verifier accept không giải ngân. Nếu cả activate và settle đều trả full budget thì đã giải ngân hai lần.
 
-Nếu team chọn giải ngân sau xác minh, phải thay bảng này và định nghĩa exposure; không giữ nguyên các công thức của pre-funding mà không kiểm tra.
+Đây là release-after-settlement đã chọn. Các phân tích pre-funding ở phần học khác là phương án lịch sử, không áp dụng nguyên công thức exposure cho prototype này. Trên Arc, phí caller vẫn tách khỏi accounting donation/bond dù cùng tài sản USDC.
 
 ### 7. Deadline không tự chạy code
 
@@ -1616,7 +1620,7 @@ Do đó, nhánh không challenge là **chấp nhận theo quy tắc protocol**, 
 |---|---|
 | Ai được challenge? | Ví có contribution > 0 trong chính campaign |
 | Khi nào? | Milestone đang REVIEW và trước reviewEnd |
-| Window bao lâu? | 72 giờ từ mốc commit hợp lệ đã chọn |
+| Window bao lâu? | Mặc định đã chốt: 72 giờ từ assigned verifier acceptance |
 | Có stake không? | Chưa dùng stake trong ví dụ |
 | Có protocol fee không? | Không trong ví dụ; người gửi vẫn có thể phải trả gas |
 | Có nhiều dispute cùng lúc không? | Một dispute active cho một milestone/version |
@@ -1631,7 +1635,7 @@ Giới hạn một dispute không có nghĩa cấm cung cấp thêm bằng chứ
 Ví dụ dùng UTC để thống nhất log và timestamp:
 
 ```text
-01/10/2026 09:00 UTC: M2 commit evidence, review bắt đầu
+01/10/2026 09:00 UTC: assigned verifier accept M2, review bắt đầu
 04/10/2026 09:00 UTC: reviewEnd
 ```
 
@@ -1649,7 +1653,7 @@ resolveBy = 09/10/2026 10:00 UTC
 
 Đây là thời hạn mới của dispute; không phải tới reviewEnd ngày 04/10 thì tự bỏ qua challenge.
 
-Số 72 giờ và bảy ngày chỉ là ví dụ. Chọn thời hạn thật phải xét khả năng đọc hồ sơ, người trực xử lý và thời gian thực hiện ngoài đời.
+72 giờ là mặc định đã chốt và hiện có trong contract. Bảy ngày cho resolver chỉ là ví dụ; timeout, no-quorum và hệ quả tài chính chưa chốt.
 
 ### 5. Quy trình challenge qua Web2 và blockchain
 
@@ -2560,6 +2564,15 @@ Nguồn: [Process — 1.10 và Các quyết định cần team trả lời trư�
 
 ## MVP baseline alignment
 
-Baseline hiện tại để chuyển sang bộ đặc tả là ERC20 MockUSDC, bond cùng token, milestone tuần tự, trusted resolver, challenge chỉ dành cho donor, failure gồm `NORMAL_FAILURE` và `MISCONDUCT`, evidence public-only, refund theo snapshot unconsumed pool và permissionless terminal execution. Đây vẫn là baseline cần được đánh dấu `APPROVED` trong protocol specification.
+Baseline hiện tại: Anvil + ERC20 MockUSDC cho local; Arc testnet ưu tiên tích hợp, Arc là ứng viên production ưu tiên. Goal bằng tổng budgets; bond bằng budget lớn nhất; release sau settlement. Verifier admission/versioning bắt buộc trước review 72 giờ đã triển khai. Committee 2/3 đã chọn nhưng chưa có code; taxonomy, timeout và tài chính sau FUNDED vẫn OPEN. Originals truy cập hạn chế, bản redacted mới công khai; không còn baseline public-only.
 
 ---
+
+## Rà soát mốc và hướng Arc — 2026-10-03
+
+Ví dụ accounting đã cập nhật theo code: đạt goal sớm vào FUNDED; activate không release; review từ verifier accept; settlement mới trả budget. Timeout/appeals/no-quorum và slash sau FUNDED vẫn OPEN.
+
+Arc testnet là hướng tích hợp ưu tiên, chưa deploy/kiểm chứng runtime. Xem
+[bảng rà 10 mốc](../../FundTogether_Milestone_Review_2026-10-03.md) và
+[Arc sources và checklist](../../FundTogether_Arc_Evaluation_v0.1.md).
+Các yêu cầu Arc ở đây là TODO, không phải kết quả test/deploy.

@@ -25,12 +25,15 @@
 
 # 1. Architecture Overview
 
-FundTogether nên được tách thành 3 project độc lập:
+Repository hiện tổ chức ba boundary trong cùng Git repository:
 
 ```text
-fundtogether-frontend/
-fundtogether-backend/
-fundtogether-contracts/
+FundTogether/
+├── frontend/
+├── backend/
+├── contracts/
+├── docs/
+└── v0.2/
 ```
 
 Kiến trúc tổng quát:
@@ -1719,3 +1722,15 @@ Evidence            : PostgreSQL metadata + public object storage/IPFS
 Trong MVP, blockchain giữ financial truth và backend giữ metadata/projection. `submitted`, `receipt confirmed` và `indexed` là các trạng thái khác nhau; frontend không được gộp chúng thành một trạng thái thành công duy nhất.
 
 EIP-712 verifier signatures, Safe/multisig resolver, private evidence encryption, ReputationRegistry on-chain và cross-chain được ghi nhận là hướng phát triển sau MVP, chưa phải dependency của setup FE/BE hiện tại.
+
+## Stack checkpoint và Arc — 2026-10-03
+
+React/TS/Vite, NestJS/Drizzle và Foundry/OZ có nền; dependency được khai báo
+không chứng minh auth/workers/indexer đang chạy. BlockchainService chưa có RPC
+client/journey; Ponder chưa setup. Anvil local giữ nguyên; Arc testnet ưu tiên.
+Viem/Wagmi cần chain/deployment metadata, native/ERC20 units và finality policy.
+
+Arc Foundry/compiler/runtime compatibility còn TODO; chưa tự đổi Solidity 0.8.24
+hoặc pin EVM target theo tên Osaka. Xem
+[Arc plan](./FundTogether_Arc_Evaluation_v0.1.md) và
+[milestone review](./FundTogether_Milestone_Review_2026-10-03.md).
