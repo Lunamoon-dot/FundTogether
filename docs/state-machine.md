@@ -31,7 +31,11 @@ FUNDED
   └─ activateMilestone → MILESTONE_ACTIVE
 
 MILESTONE_ACTIVE
-  └─ submitEvidence → IN_REVIEW
+  └─ submitEvidence → EVIDENCE_PENDING
+
+EVIDENCE_PENDING
+  ├─ rejectSubmission (assigned active verifier) → MILESTONE_ACTIVE; new version allowed
+  └─ verifySubmission (assigned active verifier) → IN_REVIEW; 72 hours starts here
 
 IN_REVIEW
   ├─ review expires without challenge → SETTLEABLE
@@ -52,20 +56,34 @@ Pre-funded FUNDING_FAILED or CANCELLED
        └─ each donor calls claimRefund independently
 ```
 
-The contract currently implements the lifecycle through funding and pre-funded refunds. Milestone and post-funded challenge/cancellation states shown above remain planned. Refund availability is stored separately from campaign state; the campaign remains `CANCELLED` or `FUNDING_FAILED` while donors claim.
+The contract implements funding, pre-funded refunds, sequential activation,
+versioned evidence admission/rejection, donor challenge and unchallenged settlement/completion.
+SETTLEABLE is a derived time condition, not a stored enum: campaign stays
+IN_REVIEW until settleMilestone executes. Last settlement directly enters
+COMPLETED and returns bond in the same transaction. Challenge resolution and
+post-funded cancellation remain planned; CHALLENGED currently has no exit.
+Review is fixed at 72 hours from verifier acceptance; admin duration changes are deferred.
+Refund availability
+is stored separately from campaign state; the campaign remains `CANCELLED` or
+`FUNDING_FAILED` while donors claim.
 
 ## 3. Campaign transitions
 
 | From | Action | Caller | Guard | To | Event |
 |---|---|---|---|---|---|
-| DRAFT | approve | Resolver | Existing campaign | APPROVED | `CampaignApproved` |
+| DRAFT | approve | Resolver | Criteria committed for every milestone | APPROVED | `CampaignApproved` |
 | APPROVED | publish | Organizer | Bond locked; deadline still in future | FUNDING | `CampaignPublished` |
 | FUNDING | donate reaches goal | Donor | Before deadline; amount does not exceed remaining goal | FUNDED | `DonationReceived`, `FundingFinalized` |
 | FUNDING | finalize failure | Anyone | At/after deadline; goal not reached | FUNDING_FAILED | `FundingFinalized`, `RefundPoolSnapshotted`, `BondReturned` |
 | DRAFT/APPROVED/FUNDING | cancel | Organizer | Campaign has not reached FUNDED; no deadline restriction | CANCELLED | `CampaignCancelled`, `RefundPoolSnapshotted`, `BondReturned` only if bond amount > 0 |
-| FUNDED | activate | Organizer/allowed caller | Next sequential milestone; bond coverage valid | MILESTONE_ACTIVE | `MilestoneActivated` |
-| MILESTONE_SETTLED | activate next | Organizer/allowed caller | Previous settlement confirmed | MILESTONE_ACTIVE | `MilestoneActivated` |
-| MILESTONE_SETTLED | complete | Anyone | No remaining milestone | COMPLETED | completion event or final settlement |
+| FUNDED | activate first | Organizer | Index 0; locked bond covers budget | MILESTONE_ACTIVE | `MilestoneActivated` |
+| MILESTONE_SETTLED | activate next | Organizer | Current index; locked bond covers budget | MILESTONE_ACTIVE | `MilestoneActivated` |
+| MILESTONE_ACTIVE | submit evidence | Organizer | Current index; nonzero hash | EVIDENCE_PENDING | `EvidenceSubmissionCreated` |
+| EVIDENCE_PENDING | assign/reassign reviewer | Admin | Current pending version; active verifier role; not organizer | EVIDENCE_PENDING | `VerifierAssigned` |
+| EVIDENCE_PENDING | accept evidence | Assigned verifier | Active role; current version/hash | IN_REVIEW | `SubmissionVerified` |
+| EVIDENCE_PENDING | reject evidence | Assigned verifier | Active role; current version/hash; reason required | MILESTONE_ACTIVE | `SubmissionRejected` |
+| IN_REVIEW | challenge | Contributing donor | Current index; now < reviewEnd; nonzero reason hash | CHALLENGED | `ChallengeOpened` |
+| IN_REVIEW | settle | Anyone | Current index; now >= reviewEnd; not challenged | MILESTONE_SETTLED or COMPLETED | `MilestoneSettled`; final: `BondReturned`, `CampaignCompleted` |
 | FUNDED/ACTIVE/REVIEW (planned) | cancel | Authorized path | Post-funded outcome rules still to be implemented | CANCELLED | `CampaignCancelled` |
 
 Unpublished campaigns can be cancelled with or without a locked bond, including after the funding deadline. No token call is made when the recorded bond amount is zero. A cancelled draft cannot later be approved, published or bonded again. Its zero refund snapshot creates no donor entitlement because donations were never accepted.
@@ -91,6 +109,14 @@ Required guards:
 - a challenge cannot be opened after the review window;
 - the resolver can choose only outcomes allowed by the protocol;
 - a timeout caller cannot bypass the underlying state and time guards.
+
+Implemented milestone states are PENDING, ACTIVE, REVIEWING, CHALLENGED, SETTLED
+and SUBMITTED. Submission transitions ACTIVE to SUBMITTED; acceptance transitions
+to REVIEWING and starts the timer. Rejection returns ACTIVE and permits a new
+immutable version. Decisions/history are not overwritten. Activation moves no funds. Settlement pays exactly
+the budget once; next activation is organizer-only after settlement. Challenge
+resolution states in the diagram remain planned. There is no evidence-submission
+timeout or resolver timeout recovery implementation yet.
 
 ## 5. Evidence states
 
@@ -146,6 +172,27 @@ The detailed specification must define the outcome for:
 - organizer inactivity.
 
 ## 9. Transition test matrix
+
+### Reviewed target extension — not implemented
+
+The proposed extension separates evidence admission, pending challenge screening,
+organizer response, re-verification and final arbitration. The existing contract
+enum/guards above still describe the implemented flow. Do not interpret the
+following target as a deployed state machine:
+
+```text
+Evidence submitted -> admission -> donor review (72h)
+Timely challenge -> settlement hold -> challenge screening
+  inadmissible -> reasoned dismissal with contest path
+  admissible -> organizer response -> re-verification
+    correction accepted -> new evidence version -> fresh donor review
+    unresolved -> independent resolver -> permitted verdict
+```
+
+Every waiting stage needs an explicit timeout/fallback; revised evidence must
+not overwrite a previous commitment. Max correction rounds, appeal finality and
+timing are still OPEN. Committee 2-of-3 is selected for MVP in the user's follow-up,
+but not implemented. See [Verification and disputes](./verification-and-disputes.md).
 
 At minimum, contract tests must cover:
 

@@ -8,15 +8,49 @@ evidence.
 
 ## Current milestone
 
+Latest design review: [Verification and dispute escalation](./verification-and-disputes.md).
+Evidence admission/versioning is implemented; challenge screening/response and
+the selected three-resolver/two-matching-verdict committee remain unimplemented.
+Verifier authority is approved as admissibility/objective checks without edits,
+adjudication or direct transfers. Multiple platform-appointed verifier wallets,
+initially two, are selected. AccessControl grant/revoke and pending submission
+assignment/reassignment are implemented; event history records reviewer changes.
+Committee membership/conflict handling, appeals, stage
+deadlines and financial outcomes still need decisions before coding.
+
 ```text
 Phase 1 — Contract prototype: IN_PROGRESS
 ```
 
 The current prototype validates ERC20 donations, organizer bond custody,
-funding transitions and pre-funded cancellation/failure refunds. Milestone
-release, post-funded refunds and slashing remain unimplemented.
+funding transitions, pre-funded cancellation/failure refunds, committed
+milestone budgets, criteria commitments frozen at approval, versioned evidence admission,
+fixed 72-hour review, donor challenge and sequential unchallenged settlement.
+Final completion returns bond atomically. Challenge resolution, organizer
+abandonment recovery, post-funded refunds and slashing remain unimplemented.
+
+### DONE — Milestone acceptance criteria commitments
+
+- Only the organizer can configure nonzero criteria hashes for existing
+  milestones while DRAFT. Corrections are allowed before approval.
+- Resolver approval requires criteria for every milestone and freezes hashes.
+- Full criteria content remains off-chain; no money moves when hashes change.
+- Verification: 85 tests passed, 0 failed, 0 skipped across nine suites;
+  formatting check and build succeeded. Build reports four timestamp warnings
+  and two intentional validation-loop warnings.
 
 ## Verified progress
+
+### DONE — Verifier roles and evidence admission/versioning
+
+- Deployer receives DEFAULT_ADMIN_ROLE through OpenZeppelin AccessControl;
+  admin manages multiple verifier wallets and pending reviewer assignments.
+- Only the assigned active verifier accepts/rejects the exact current version/hash;
+  organizer cannot review itself. Acceptance starts 72-hour review; rejection
+  records reason and permits a new version. History is retained; no token transfer.
+- Verification: 129 passed, 0 failed, 0 skipped across eleven suites;
+  four fuzz tests with 256 runs each. Build/formatting check succeeded.
+  Six timestamp and two intentional validation-loop warnings remain.
 
 ### DONE — Local contract toolchain
 
@@ -162,9 +196,41 @@ return design. These remain prototype limitations, not verified recovery paths.
   256 conservation fuzz runs. Formatting check and build exited 0; the four
   existing timestamp warnings remain.
 
+### DONE — Milestone budgets and first activation
+
+- User approved goal = sum(milestone budgets); required bond = maximum budget.
+- Creation now accepts name, token, deadline and an ordered positive budget list.
+  Goal and bond are derived on-chain, and budgets cannot be amended.
+- Added milestone records, count/current-index reads, MilestoneConfigured and
+  MilestoneActivated events, and organizer-only activation of index 0 when FUNDED.
+- Activation moves no tokens. Skipping, repeated activation and starting another
+  milestone before settlement revert; full sequential settlement is not implemented.
+- Migrated 25 existing creation calls and added shared test budget fixtures.
+- Added 17 milestone tests, including a goal/exposure fuzz test with 256 runs.
+- Verification: forge test -vv reported 76 passed, 0 failed (8 suites); the refund
+  conservation fuzz test also passed 256 runs. Build exited 0 with four existing
+  timestamp warnings and one intentional per-budget validation-in-loop warning.
+
 ## IN_PROGRESS
 
-- Define the next milestone escrow slice and its accounting boundaries.
+- Challenge resolution and post-funded recovery. CHALLENGED currently has no
+  exit; absent evidence submission can still leave escrow and bond stuck.
+  No dispute/slash outcome or abandonment timeout has been invented.
+
+## Proposed integration checkpoints
+
+- FE/BE groundwork can proceed independently: campaign metadata API/schema,
+  wallet and transaction UI, and off-chain campaign content.
+- Before wiring campaign creation, stabilize the milestone configuration and
+  createCampaign ABI, including acceptance criteria and review-window policy.
+  The current API derives goal/bond from budgets but is not frozen yet.
+- Before wiring chain projections, generate shared ABI and deployment metadata,
+  confirm action/event semantics, and deploy the verified slice locally.
+- First vertical integration: create/publish, donate and cancellation/refund.
+  Each journey must distinguish receipt success from indexed application state.
+- Milestone evidence, challenge and settlement UI follows the corresponding
+  tested contract flows. MVP completion still requires full success and failure
+  journeys, rather than only a working funding screen.
 
 ## TODO
 
@@ -284,3 +350,139 @@ keeps the dated implementation history and its verification evidence.
 - Verified a clean recursive clone of that commit: all pinned submodules were
   fetched successfully; forge test -vv reported 59 passed, 0 failed, 0 skipped,
   including 256 fuzz runs. forge build exited 0 with four timestamp warnings.
+
+### 2026-10-03 — Milestone preparation and integration checkpoints
+
+- Reviewed approved protocol/accounting docs and the external v0.2 contract
+  hardening guidance before beginning milestone configuration.
+- Confirmed frontend remains starter UI and BlockchainService only reports
+  whether RPC configuration exists; domain integration is not implemented.
+- Recorded proposed FE/BE entry points and the remaining goal-versus-budget
+  decision. This is design preparation; no milestone implementation is marked DONE.
+
+### 2026-10-03 — Milestone budget commitments and activation
+
+- User confirmed goal equals the sum of milestone budgets.
+- Replaced manual goal/bond creation inputs with committed positive budgets;
+  derived required bond from the maximum budget, with atomic invalid/overflow rejection.
+- Added first-milestone activation after funding, with organizer, index and bond
+  coverage guards. No release or progression beyond ACTIVE is implemented yet.
+- Added 17 tests and updated 25 creation call sites using shared fixtures.
+- Evidence: new milestone suite failed before implementation; final full suite
+  reported 76 passed, 0 failed, including two fuzz tests with 256 runs each.
+  Build exited 0 with four timestamp warnings and the intentional input-validation
+  loop warning. Updated overview, README, protocol, state machine and financial rules.
+
+### 2026-10-03 — Commit milestone acceptance criteria before review
+
+- Added organizer-only draft criteria configuration, nonzero/index guards,
+  criteria completeness at approval and immutability after approval.
+- Added nine criteria tests; migrated funding/refund fixtures to commit criteria
+  before approval. Existing budget/state getter and financial flows are preserved.
+- Initial criteria tests failed against the missing implementation; final full
+  suite reported 85 passed, 0 failed, 0 skipped, including two 256-run fuzz tests.
+  Formatting check and build succeeded with four timestamp and two loop warnings.
+- Evidence submission, challenge, settlement and advancement are not implemented.
+  A review-duration question is pending because the external 72-hour value is an
+  example; no unapproved payout timing has been encoded.
+
+### 2026-10-03 — Fixed review and sequential unchallenged settlement
+
+- User accepted the proposed 72-hour review default and deferred admin changes.
+- Added immutable evidence hash/reviewEnd, contributing-donor challenge before
+  expiry, and permissionless unchallenged settlement at/after expiry.
+- Settlement pays the exact milestone budget to the organizer, records
+  totalReleased and advances the index. Last settlement returns bond and marks
+  COMPLETED atomically; transfer failure leaves the whole transition retryable.
+- Added cross-function reentrancy protection on activation/submission/challenge.
+  A token callback cannot activate the next milestone during release.
+- Added 22 settlement tests: initial 18 failed against missing functions; final
+  full suite reported 107 passed, 0 failed, 0 skipped across ten suites, including
+  three fuzz tests with 256 runs each. Build succeeded with six timestamp and
+  two intentional validation-loop warnings. Final formatting check passed.
+- Challenge resolution, slashing, post-funded refunds and evidence/resolver
+  timeout recovery remain IN_PROGRESS; no production deployment is claimed.
+
+### 2026-10-03 — Review layered verification and independent arbitration
+
+- Applied skills/AGENTSKILLS.md and reviewed the user-supplied proposal against
+  current contract/docs and v0.2 malicious-verifier/governance-inactivity guidance.
+- Recorded evidence/challenge admissibility, organizer response, re-verification
+  and final arbitration boundaries in verification-and-disputes.md.
+- Added timing safeguards for timely pending challenges and fresh review of new
+  evidence versions, plus required dismissal appeals and bounded waiting stages.
+- Recorded 2-of-3 committee as a candidate requiring an explicit MVP scope
+  decision; registry, AI, reputation, random assignment and fees remain deferred.
+- Verified documentation links and diff formatting. No source/test/ABI change;
+  no new runtime verification or completed-feature claim is made for this review.
+
+### 2026-10-03 — Correct design-document destination
+
+- User clarified that design updates belong in C:\Users\dell\Desktop\NCKH\v0.2.
+- Added FundTogether_Verification_and_Dispute_Design_2026-10-03.md there in
+  Vietnamese and linked it from the reading guide, Mốc 1, Mốc 6 and threat model.
+- Repository docs remain implementation-facing references. No runtime change.
+
+### 2026-10-03 — Select permissioned 2-of-3 verdict voting
+
+- User follow-up selects three verified resolvers and two matching verdicts
+  for the same dispute/evidence version/round, with individual reason commitments.
+- Added the Vietnamese Dispute Policy and Resolver Committee document in the
+  external v0.2 corpus; synchronized scope and implementation-facing references.
+- Situation classifications, including DEFAULT versus MISCONDUCT, are drafts;
+  slash/refund, deadlines/fallbacks and new monetary effects remain unapproved.
+- Checked documentation links and diff formatting; no source/ABI/test change.
+
+### 2026-10-03 — Approve limited verifier authority
+
+- User follow-up approves one VERIFIER_ROLE for evidence/challenge/remediation,
+  five procedural actions, version-specific decisions and no organizer-record edits.
+- Objective remediation enters a fresh 72-hour review. Ambiguous/contested claims
+  escalate; verifier cannot decide misconduct, slash, cancel on disputed merits
+  or transfer funds.
+- Added Verifier Specification v0.1 in the external v0.2 corpus, including a
+  draft objective checklist and required test invariants. Role assignment,
+  hold/appeal and deadlines/fallbacks remain open; no implementation marked DONE.
+- Verified documentation links/diff formatting. No contract, ABI or test changes.
+
+### 2026-10-03 — Select multiple verifier wallets
+
+- User accepted multiple wallets sharing VERIFIER_ROLE, initially two appointed
+  by the platform, with one assigned reviewer per submission and no vote threshold.
+- Recorded the decision in the source v0.2 verifier specification and repository
+  references. Real wallet addresses are not required for prototype tests.
+- Grant/revoke, case reassignment, deadlines and terminal financial policies
+  remain to be specified; verifier admission is not implemented yet.
+
+### 2026-10-03 — Implement verifier admission and evidence versions
+
+- User authorized admin grant/revoke, assignment and pending reassignment.
+- Added AccessControl, immutable submission versions and assigned verifier decisions.
+  Review starts on acceptance; rejection retains decision/reason and allows resubmission.
+- Added 22 verifier tests, including 256-run history fuzzing. Initial suite failed
+  11 cases against missing functions; final full suite: 129 passed, 0 failed,
+  0 skipped. Settlement tests now pass through admission before review.
+- Build/formatting check succeeded; six timestamp/two loop warnings remain.
+- Updated source v0.2 spec and repository protocol/state/accounting/overview.
+  EvidenceSubmitted was replaced by versioned creation/assignment/decision events;
+  ABI consumers must regenerate against the new build.
+- Challenge screening/remediation, resolver committee, admission deadlines,
+  resubmit limits, post-funded refunds and slash remain unimplemented.
+
+### 2026-10-03 — Specify evidence packages and upgradeable analysis reports
+
+- User confirmed the design corpus moved to repository `v0.2/`; this is now
+  the source location for design updates and GitHub publication.
+- DONE (documentation): Evidence Schema v0.1, Verification Report v0.1 and a
+  synthetic worked example, with repository integration guide and reading links.
+- Specified immutable manifests/file hashes, separate rerunnable report versions,
+  provenance, restricted originals/public redactions and manual fallback when
+  optional OCR/AI fails. No retrospective criteria changes or automatic financial
+  decisions from flags. Duplicate evidence and expenses require context/currency.
+- TODO (implementation): upload/storage validation, report engine and verifier UI.
+  Provider/model, upload limits, retention and waiting-stage recovery remain open.
+- Verified 58 local links in the updated document set and parsed both example
+  JSON blocks. Examples contain explicit placeholders, not validated real evidence.
+- Reran the full contract suite before publication: 129 passed, 0 failed,
+  0 skipped across 11 suites. No contract source changes in this documentation task;
+  publication includes the previously implemented local milestone/admission work.

@@ -2,12 +2,20 @@
 
 > **Status:** Approved MVP baseline for implementation
 > **Version:** 0.3-draft
-> **Updated:** 2026-10-02
+> **Updated:** 2026-10-03
 > **Related:** [Protocol specification](./protocol-spec.md), [State machine](./state-machine.md), [Financial rules](./financial-rules.md)
 
 ## 1. MVP goal
 
 The MVP proves that FundTogether can protect and account for charitable funds across a complete campaign lifecycle. It is complete only when both a normal path and a failure/refund path can be reproduced end-to-end.
+
+The reviewed [layered verification and dispute design](./verification-and-disputes.md)
+records the target evidence admission -> donor review -> organizer response ->
+re-verification -> unresolved-case arbitration flow. This is design work, not
+completed functionality. Exact verifier/appeal/timing APIs remain open.
+A permissioned 2-of-3 matching-verdict committee is selected for MVP in the
+user's follow-up. Individual votes are recorded by ResolverManager; not implemented.
+Registry, random assignment, resolver fees/reputation and AI remain deferred.
 
 ## 2. In scope
 
@@ -19,7 +27,7 @@ The MVP proves that FundTogether can protect and account for charitable funds ac
 - Maximum-exposure bond based on the largest milestone budget.
 - Evidence hash/version commitment.
 - Review window and donor-only challenge.
-- Trusted resolver outcome.
+- Permissioned 2-of-3 matching-verdict resolver outcome and individual vote audit trail.
 - Milestone settlement and campaign cancellation.
 - Refund pool snapshot and individual donor claim.
 - Bond return and bounded misconduct allocation.
@@ -60,7 +68,7 @@ multiple stablecoins
 direct bank-transfer donations and fiat-to-USDC conversion
 private evidence encryption
 EIP-712 verifier signatures
-multisig resolver governance
+Safe-based resolver execution and general multisig governance
 DAO/community voting
 on-chain reputation registry
 advanced reputation scoring and badges

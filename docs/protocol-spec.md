@@ -29,17 +29,24 @@ This specification defines the protocol boundary. UI details, search, notificati
 | Bond asset | Same MockUSDC as donations | APPROVED |
 | Milestones | Sequential; only the current milestone can be active | APPROVED |
 | Release | Release the current milestone budget after successful settlement | APPROVED |
-| Resolver | Trusted resolver/admin | APPROVED MVP LIMITATION |
+| Resolver | Current prototype: deployer role; target: independent final arbitration after verification/response | CURRENT LIMITATION; TARGET DESIGN REVIEWED |
 | Challenge eligibility | Donor of the campaign being challenged | APPROVED |
 | Challenge stake | None in MVP | APPROVED |
 | Failure classification | `NORMAL_FAILURE` and `MISCONDUCT` | APPROVED MVP SIMPLIFICATION |
 | Evidence | Public evidence only | APPROVED MVP LIMITATION |
-| Verifier | Optional input; resolver makes the final protocol decision | APPROVED |
+| Verifier | One VERIFIER_ROLE: submission admission/versioning implemented; challenge/remediation specified; no edits/adjudication/direct transfers | PARTIALLY IMPLEMENTED |
 | Refund | Snapshot-based unconsumed pool accounting | APPROVED |
 | Reputation | Off-chain projection from indexed events | APPROVED |
 | Timeout execution | Permissionless: anyone may call an eligible terminal action | APPROVED |
 
-Deferred features include native ETH, multiple stablecoins, private evidence encryption, EIP-712 verifier signatures, multisig resolver, on-chain reputation registry, cross-chain support and DAO governance.
+Deferred features include native ETH, multiple stablecoins, private evidence encryption, EIP-712 verifier signatures, Safe-based resolver execution, dynamic resolver registry, on-chain reputation registry, cross-chain support and DAO governance.
+
+The 2026-10-03 review records layered verification as the target direction in
+[Verification and dispute escalation](./verification-and-disputes.md). Current
+contract behavior remains unchanged. The user's follow-up selects a permissioned
+2-of-3 matching-verdict committee and individual vote recording for MVP.
+This is selected design, not a verified implementation. The policy draft is in
+[Dispute Policy and Resolver Committee](../v0.2/FundTogether_Dispute_Policy_and_Resolver_Committee_2026-10-03.md).
 
 ## 3. Actors and authority
 
@@ -47,7 +54,8 @@ Deferred features include native ETH, multiple stablecoins, private evidence enc
 |---|---|---|
 | Organizer | Create campaign, lock bond, activate milestone, submit evidence | Can act only for campaigns they own and only in valid states |
 | Donor | Donate, inspect evidence, challenge, claim refund | Can challenge only after contributing to that campaign |
-| Resolver | Review challenge, accept or reject misconduct, settle disputed milestone | Trusted MVP role; contract limits allowed outcomes |
+| Resolver | Final arbitration of unresolved cases in the target flow | Independent from organizer/challenger and prior case verifiers; predefined verdicts only; not implemented |
+| Evidence / challenge verifier | Target admissibility checking and recorded findings | Cannot establish misconduct merely by admitting a claim or arbitrarily distribute funds |
 | Protocol admin | Configure trusted roles and emergency controls | Must not arbitrarily edit campaign accounting |
 | Beneficiary / vendor | Evidence subjects or sources | No automatic financial authority |
 | Indexer | Read events and write projections | Cannot create financial truth or mutate contract state silently |
@@ -88,6 +96,28 @@ requiredBond
 
 Long descriptions, images and beneficiary profiles are off-chain metadata. If an off-chain field changes the meaning of a financial or acceptance rule, it must be versioned and committed before it is used.
 
+The current prototype exposes:
+
+```solidity
+createCampaign(string name, address donationToken, uint256 fundingDeadline, uint256[] milestoneBudgets)
+```
+
+It commits positive ordered budgets and derives `fundingGoal = sum(budgets)`
+and `requiredBond = max(budgets)`. `milestones(campaignId, index)` exposes the
+budget/state, and `milestoneCount(campaignId)` exposes the count. Creation emits
+`CampaignCreated` followed by one `MilestoneConfigured` per index.
+
+`configureMilestoneCriteria(campaignId, milestoneIndex, criteriaHash)` lets only
+the organizer commit or correct a nonzero hash while DRAFT. Approval requires
+all milestones to have criteria and freezes those commitments. The separate
+`milestoneCriteria(campaignId, milestoneIndex)` getter and
+`MilestoneCriteriaConfigured` event expose each hash. Criteria text/files remain
+off-chain; the hash proves a commitment, not delivery or correctness.
+
+Review is fixed at 72 hours for MVP, accepted by the user on 2026-10-03.
+Admin duration changes are deferred. The creation ABI is still a prototype and must be stabilized
+before frontend/backend campaign creation depends on it.
+
 ## 6. Core protocol actions
 
 | Action | Caller | Required guard | Main effect |
@@ -96,7 +126,7 @@ Long descriptions, images and beneficiary profiles are off-chain metadata. If an
 | Lock bond | Organizer | Correct token and amount; campaign not funded/active | Locks required bond |
 | Donate | Donor | Campaign is fundable; amount > 0; before deadline | Transfers ERC20 into escrow |
 | Finalize funding | Anyone | Deadline reached or goal reached according to rule | Moves campaign to funded or funding failed |
-| Activate milestone | Organizer or permitted caller | Previous milestone settled; bond coverage valid | Opens current milestone |
+| Activate first milestone | Organizer | Campaign FUNDED; index 0; bond coverage valid | Marks milestone ACTIVE without transferring funds |
 | Submit evidence | Organizer | Active milestone; valid evidence version | Commits evidence reference/hash |
 | Open challenge | Eligible donor | Review window open; evidence exists | Opens challenge |
 | Settle milestone | Resolver or permissionless timeout caller | Review/challenge conditions satisfied | Releases budget or applies approved outcome |
@@ -108,9 +138,43 @@ The API may prepare an action or publish intent. The contract receipt and indexe
 
 The current prototype exposes `approveCampaign` for the trusted resolver (the deployer) and `publishCampaign` for the organizer. Donations are accepted only during `FUNDING` before the deadline, capped at the remaining goal. Reaching the goal immediately enters `FUNDED`. Anyone may call `finalizeFundingFailure` at or after the deadline if the campaign is still `FUNDING`.
 
-Pre-funded cancellation/failure emits `RefundPoolSnapshotted` and, when a positive bond is returned, `BondReturned` in the terminal transaction. The organizer can cancel unpublished campaigns before or after the deadline; no token call is needed when no bond was locked. A donor's independent claim emits `RefundClaimed`. The pool excludes bond and unsolicited transfers, and each donor receives their full recorded contribution once. Post-funded settlement and slashing are still planned.
+Pre-funded cancellation/failure emits `RefundPoolSnapshotted` and, when a positive bond is returned, `BondReturned` in the terminal transaction. The organizer can cancel unpublished campaigns before or after the deadline; no token call is needed when no bond was locked. A donor's independent claim emits `RefundClaimed`. The pool excludes bond and unsolicited transfers, and each donor receives their full recorded contribution once. Post-funded refunds and slashing remain planned.
+
+Evidence admission now uses AccessControl: deployer initially has DEFAULT_ADMIN_ROLE;
+admin grants/revokes VERIFIER_ROLE and assigns/reassigns only pending submissions.
+Organizer cannot be assigned to verify their own campaign. submitEvidence creates
+a versioned SUBMITTED record. verifySubmission/rejectSubmission require the assigned
+active role holder and exact current version/hash. Rejection records reasonHash and
+allows a new version; acceptance starts the 72-hour review. History remains readable
+through evidenceSubmissions and submissionVersion. No verifier action transfers tokens.
+Events are EvidenceSubmissionCreated, VerifierAssigned, SubmissionVerified and
+SubmissionRejected, replacing the old EvidenceSubmitted event.
+
+`activateMilestone(campaignId, milestoneIndex)` activates the next pending
+milestone after funding or previous settlement. It emits MilestoneActivated
+without moving funds. Skipping and repeated activation revert.
+submitEvidence commits a nonzero immutable hash/version without a review deadline.
+milestoneEvidence exposes the latest hash and end timestamp after admission.
+openChallenge is limited to campaign contributors strictly before reviewEnd;
+it emits ChallengeOpened with donor and reason hash and blocks settlement.
+Dispute resolution is not implemented; CHALLENGED currently has no exit.
+settleMilestone is permissionless at/after reviewEnd for an unchallenged review.
+It pays the organizer, emits MilestoneSettled and advances the current index.
+Final settlement returns bond and emits CampaignCompleted atomically.
+totalReleased excludes bond. Transactions do not run automatically at deadlines.
 
 ## 7. Evidence and challenge
+
+User-approved verifier authority is specified in
+[Verifier Specification v0.1](../v0.2/FundTogether_Verifier_Specification_v0.1.md).
+Five specified procedural actions: verifySubmission, rejectSubmission, verifyChallenge,
+rejectChallenge and verifyRemediation. The same role may check all three stages,
+but cannot arbitrate the same case. Objective remediation starts a fresh 72-hour
+review; unresolved subjective disputes escalate. Multiple platform-appointed
+wallets share VERIFIER_ROLE, initially two; one assigned verifier handles a
+submission, without a voting threshold. Grant/revoke and pending submission
+reassignment are implemented. Challenge/remediation and hold/appeal
+semantics remain open. Verifiers never modify organizer records or transfer funds.
 
 Evidence has separate off-chain and on-chain stages:
 
@@ -122,6 +186,13 @@ uploaded → hashed/versioned → commitment submitted
 The hash proves integrity of the committed bytes. It does not prove that an invoice, photo or report is truthful in the physical world.
 
 In MVP, a challenge does not automatically slash the organizer. The resolver must select an allowed outcome, and the contract must enforce that outcome's financial limits.
+
+Target sequence: evidence admission -> 72-hour donor review -> timely challenge
+hold -> screening -> organizer response -> re-verification -> final arbitration
+only if unresolved. Revised evidence uses new immutable versions and fresh review.
+Pending timely challenges must block settlement before screening finishes.
+These target stages and dismissal appeals are not present in the prototype;
+see the linked design for authority boundaries and remaining decisions.
 
 ## 8. Liveness and timeout rules
 

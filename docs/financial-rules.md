@@ -42,8 +42,15 @@ Claim_i  = amount already claimed by donor i
 MVP baseline:
 
 ```text
+G = sum(milestone budgets)
 BondReq = max(milestone budgets)
 ```
+
+Approved on 2026-10-03: the organizer supplies a non-empty ordered budget list.
+Every budget must be positive. The contract derives goal and required bond from
+that list; neither amount is an independent organizer input. Budgets are fixed
+at creation and cannot be edited after approval or publication. Overflow or an
+invalid budget reverts the entire creation, including partial storage writes.
 
 This formula assumes sequential milestones and must be re-evaluated if the contract later allows overlapping milestones or multiple active spending requests.
 
@@ -59,6 +66,29 @@ This formula assumes sequential milestones and must be re-evaluated if the contr
 Approved funding rule: accept donations only in `FUNDING` and strictly before the deadline. Reject amounts above the remaining goal; reaching the goal immediately moves the campaign to `FUNDED`.
 
 ## 4. Milestone release
+
+`activateMilestone` requires the organizer, FUNDED or MILESTONE_SETTLED,
+the next sequential index and sufficient locked bond. Activation moves no tokens.
+On 2026-10-03 the user accepted the proposed 72-hour default; admin changes are
+deferred. submitEvidence stores a nonzero immutable commitment and sets
+The admission implementation now sets reviewEnd = verification timestamp + 72 hours.
+Submission alone creates a pending version with reviewEnd = 0 and moves no tokens.
+Admin assignment/reassignment and verifier accept/reject also move no tokens.
+Rejected versions retain their history; organizer may submit a new version.
+
+An eligible donor can challenge strictly before reviewEnd. A challenge blocks
+release; disputed outcomes, slashing and recovery remain unimplemented.
+Anyone can settle IN_REVIEW at or after reviewEnd if no challenge was opened.
+Settlement transfers exactly the committed budget to the organizer, marks the
+milestone SETTLED, increments totalReleased and advances currentMilestoneIndex.
+No caller reward or fees are deducted by the protocol.
+
+Final settlement marks COMPLETED and returns the full remaining bond in the
+same transaction. A failed release or bond transfer rolls back all transfers
+and state changes; the caller can retry. Repeated settlement is rejected.
+With exact-transfer tokens, remaining donor escrow = totalContributed - totalReleased;
+the bond is a separate obligation. No post-funded refund snapshot is created by
+normal settlement. Unsolicited transfers do not increase a milestone payout.
 
 For sequential milestone `m`:
 
@@ -155,6 +185,13 @@ INV-10  A challenge alone does not automatically slash funds.
 ```
 
 ## 10. Open items before financial freeze
+
+The [reviewed layered verification design](./verification-and-disputes.md) adds
+no new payout authority to organizers or verifiers. A timely pending challenge
+must hold settlement; only authenticated permitted verdicts can authorize later
+financial transitions. A backend "resolved" flag is insufficient. RESUBMIT moves
+no money, retains prior hashes and requires a new review round. Exact terminal
+slash/refund formulas and timeout effects remain unapproved and unimplemented.
 
 1. Refund composition for failures after funding or milestone releases.
 2. Recovery for persistent token transfer failures.
