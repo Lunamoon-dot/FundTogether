@@ -1,12 +1,37 @@
 # FundTogether Project Progress
 
-> **Updated:** 2026-10-03
+> **Updated:** 2026-10-04
 
 This file records verified implementation progress. A documented idea is not
 marked `DONE` until a command, test, transaction or projection provides
 evidence.
 
 ## Current milestone
+
+### 2026-10-04 — MVP review and next integration decisions
+
+- Planning estimate: approximately 40–45% of full MVP implementation. This is
+  not a measured completion metric or an end-to-end verification result.
+  No complete organizer/donor/failure journey is recorded as verified yet.
+- Indexer remains TODO: empty module, no log worker, durable checkpoint or
+  chain-derived public API. Proposed first slice is NestJS/Viem/Drizzle,
+  campaign publication and donation events, transactional deduplication,
+  restart/catch-up and chain-specific finality/reorg handling.
+- Wallet connection permissions are controlled by the wallet, application roles
+  by backend authorization, and financial caller permissions by contracts.
+- Initial ERC20 allowance UX uses the intended donation/bond amount and skips
+  approval when allowance is sufficient. Receipt success and confirmation are
+  required before proceeding; donate/bond and indexing remain separate stages.
+  This frontend transaction journey is not implemented.
+- Next dependency-ordered work: minimal organization/membership ownership,
+  campaign organization linkage and representative wallet, then shared
+  deployment/ABI and a publish/donate/indexer/public-read journey. Privy remains
+  deferred; uploads/freeze/verifier and challenge/refund integration follow.
+- This review inspected current code and documentation; it did not rerun builds
+  or tests. Earlier verification entries retain their original scope.
+
+See [Web3 conventions](./web3-conventions.md#15-wallet-connection-application-roles-and-erc20-approval)
+for the allowance and indexer plan.
 
 Arc update: local Anvil remains; Arc testnet is now the priority integration
 target and Arc is the preferred production candidate, pending acceptance.
@@ -20,8 +45,10 @@ Verifier authority is approved as admissibility/objective checks without edits,
 adjudication or direct transfers. Multiple platform-appointed verifier wallets,
 initially two, are selected. AccessControl grant/revoke and pending submission
 assignment/reassignment are implemented; event history records reviewer changes.
-Committee membership/conflict handling, appeals, stage
-deadlines and financial outcomes still need decisions before coding.
+Committee membership/conflict handling, appeals, challenge/resolver deadlines
+and financial outcomes still need decisions before coding. Evidence/activation
+timeout defaults were authorized on 2026-10-04 and implemented as a compiled,
+runtime-unverified slice; see the dated entry below.
 
 ```text
 Phase 1 — Contract prototype: IN_PROGRESS
@@ -31,8 +58,9 @@ The current prototype validates ERC20 donations, organizer bond custody,
 funding transitions, pre-funded cancellation/failure refunds, committed
 milestone budgets, criteria commitments frozen at approval, versioned evidence admission,
 fixed 72-hour review, donor challenge and sequential unchallenged settlement.
-Final completion returns bond atomically. Challenge resolution, organizer
-abandonment recovery, post-funded refunds and slashing remain unimplemented.
+Final completion returns bond atomically. Evidence/activation timeout recovery
+and unreleased-escrow proportional refunds now compile. Challenge resolution,
+slashing and permanent-transfer-failure recovery remain unimplemented.
 
 ### DONE — Milestone acceptance criteria commitments
 
@@ -45,6 +73,43 @@ abandonment recovery, post-funded refunds and slashing remain unimplemented.
   and two intentional validation-loop warnings.
 
 ## Verified progress
+
+### DONE — Independent account/session and optional external wallet linking (local development)
+
+- Email/password registration and login work without a wallet. Argon2id hashes
+  passwords; PostgreSQL stores opaque session token hashes, expiry and revocation.
+  Cookie is HttpOnly/SameSite=Lax, with Secure in production. Account identity is
+  `userId`; campaign/evidence guards no longer require a wallet in the session.
+- Additive migration `0003_bored_warlock` applied to local PostgreSQL. Existing
+  wallet-only users and ownership are preserved; old JWT cookies must sign in again.
+- External wallet linking uses persisted, expiring, session-bound SIWE nonces.
+  Consumption is atomic; replay and cross-account ownership conflicts are rejected.
+  Existing linked wallets retain SIWE login; unlinked wallets cannot auto-create users.
+- Register/login and wallet-management UI added. Wallet-only session changes do
+  not clear the existing account's workspace forms. Browser writes enforce Origin;
+  auth endpoints have process-local rate limits; session cookies are redacted in logs.
+- Current verification after provider removal: backend build passes; 23 tests
+  pass across nine suites. Local HTTP/PostgreSQL smoke passes 40 response checks:
+  registration, duplicate email, wrong password, draft without wallet, unauthorized
+  draft access, SIWE domain/URI/chain/expiry/signature, nonce replay/cross-session,
+  wallet conflict/idempotency, session expiry, logout/relogin and removed provider
+  endpoints returning 404. The wallet/account-boundary regression also passes.
+  Smoke rows were removed. Frontend build/lint pass; bundle-size warning remains.
+- Browser observation confirms email/password login controls on `/#/account`.
+  Browser control then timed out; interactive registration and wallet creation
+  are not claimed verified. No contract or on-chain financial behavior changed.
+- Scope is a development foundation. Email verification/recovery, production
+  deployment configuration, shared rate limits and expiry cleanup remain TODO.
+
+### Out of current scope — Embedded wallets
+
+- User chose full removal of Privy integration on 2026-10-04. SDK, provider UI,
+  token/JWKS bridge, configuration and development signing key are removed.
+  Earlier dated entries describe historical work and are superseded by this scope.
+- Internal account/session and signed external-wallet linking are the current
+  identity foundation. A future provider can reuse them; no adapter is scaffolded.
+- Verification of removal is recorded in the dated change log below. Setup and
+  current API: [accounts and wallets](./accounts-and-wallets.md).
 
 ### IN_PROGRESS — Campaign and evidence draft API (backend step 2)
 
@@ -61,10 +126,11 @@ abandonment recovery, post-funded refunds and slashing remain unimplemented.
 - Learning guide: [Backend Step 2](./backend-step-2-drafts.md).
 - Chain validation, file upload and package freeze/hash remain unimplemented.
 
-### IN_PROGRESS — Wallet authentication and organizer access (backend step 1)
+### DONE — Initial wallet authentication and organizer access (backend step 1)
 
-Local implementation work; backend source is committed separately from the
-documentation publication.
+The initial implementation below is historical. The 2026-10-04 account/session
+slice supersedes its JWT cookie and process-local nonce store. Backend source
+has been committed; account changes are currently local work.
 
 - Added SIWE nonce/verification routes, wallet-user linking, a 24-hour signed
   HttpOnly session cookie, session guard and campaign owner access example.
@@ -774,3 +840,138 @@ keeps the dated implementation history and its verification evidence.
   evidence-create test mocks were adapted; no new tests were added or run.
   Authenticated saves and concurrent-tab behavior remain unverified at runtime.
   Submission/review and evidence navigation remain TODO; bundle warning remains.
+
+### 2026-10-04 — Evidence/activation timeout defaults and bounded retries
+
+- User authorized reasonable prototype timing defaults. Implemented 7-day
+  activation, 30-day initial evidence, 72-hour admission from submission and
+  7-day corrections. Assignment/reassignment does not extend admission. Three
+  versions maximum per milestone, including expired admissions. Review remains
+  a separate 72-hour window from verifier acceptance.
+- Added permissionless expireSubmission for exact current pending version and
+  finalizeMilestoneTimeout for waiting activation or active evidence deadlines.
+  Actions require now < deadline; timeout paths require now >= deadline. Expiry
+  records EXPIRED without acceptance or fabricated verifier decisions. Final
+  rejection/expiry, or organizer inactivity, terminates campaign/milestone FAILED.
+- Failure snapshots totalContributed - totalReleased and returns bond atomically,
+  without slash or a caller bounty. Refund claims use OpenZeppelin Math.mulDiv,
+  proportional to original contributions, once only; zero-rounded claims skip the
+  token call. Pre-funded refunds remain exact. Rounding dust stays in custody.
+- Terminal failure never pays the current milestone or changes prior releases.
+  State guards, immutable snapshots, claim flags and ReentrancyGuard protect the
+  transitions. Failed bond transfers revert the entire terminal action; permanent
+  transfer failure remains an unresolved recovery limitation.
+- Verification: forge build --sizes succeeds with Solidity 0.8.24; FundTogether
+  runtime is 16,249 bytes and initcode is 16,477 bytes. Timestamp, loop-validation
+  and conservative reentrancy-event lint warnings remain. Diff whitespace check
+  passes. No tests were added/run; no deployment or runtime validation claimed.
+- Status: implementation compiled; runtime verification IN_PROGRESS. Historical
+  129-test result predates this slice and is not evidence for the changed code.
+  Challenge/resolver, appeal/quorum and misconduct/slash remain pending. Learning
+  notes and the required verification cases: contract-evidence-timeouts.md.
+
+### 2026-10-04 — Public feed shell and workspace entry
+
+- Default entry now renders Explore without requiring SIWE. Added compact public
+  header/navigation, account dropdown, search/status controls and explicit empty
+  state. Search/filter are disabled pending public campaign data.
+- Added hash routes for account, contributions, public campaign detail and
+  organizer workspace. Account reuses SIWE; unauthenticated workspace access shows
+  a compact sign-in page. Contributions/detail explicitly remain unavailable;
+  no synthetic campaigns, balances, funding progress or donation actions added.
+- The public surface does not call private draft listing. That query is enabled
+  only inside the authenticated workspace. Workspace stays mounted when browsing
+  public pages, preserving unsaved wizard input within the same session.
+- Verification: frontend build and lint pass. Browser inspection confirms default
+  feed, unauthenticated workspace sign-in and unavailable detail/back navigation.
+  No automated tests added/run; authenticated transitions and mobile interaction
+  still need verification. Existing bundle-size warning remains.
+- Public read model/API, indexed published campaigns, campaign cards/detail data,
+  contribution history, donate and refund transactions remain TODO. No backend or
+  contract behavior changed by this UI slice.
+
+### 2026-10-04 — Public sidebar navigation
+
+- Replaced the public top navigation/dropdown with a sticky 240px left sidebar.
+  Explore/Contributions sit above; workspace and account/sign-in links sit below.
+  Active routes are highlighted. Small screens use compact navigation above
+  content, preserving space for the feed. Existing routes and API scope unchanged.
+- Verification: frontend build/lint and diff whitespace check pass. Browser
+  screenshot confirms desktop sidebar/feed layout. No automated tests added/run;
+  mobile interaction and authenticated sidebar behavior remain unverified.
+
+### 2026-10-04 — Independent accounts and optional wallet linking
+
+- Replaced wallet-required application identity with email/password accounts and
+  DB-backed revocable sessions. Existing wallet accounts remain usable through
+  SIWE; wallet linking is authenticated, session-bound and single-use.
+- Added register/login/account wallet UI, and a configurable Privy JWT bridge
+  using the supplied public App ID. Dashboard/live provider setup remains pending;
+  the frontend integration flag is off. No smart-contract changes in this slice.
+- Verification: backend build, 23 tests and 41 HTTP/PostgreSQL smoke response
+  checks pass. Frontend build/lint/TypeScript pass. Local login form observed;
+  browser interaction later timed out. Test data removed; secrets ignored by Git.
+- See accounts-and-wallets.md for current API, local setup, dashboard steps and
+  production work. Preserve prior entries as historical records, not current auth.
+
+### 2026-10-04 — Defer Privy activation
+
+- User deferred Privy because enabling the selected integration requires payment.
+  Marked it TODO/deferred and kept the SDK flag false. Removed the inactive Privy
+  setup message from the account UI; retained integration code for future use.
+- Current scope: email/password account, revocable session and signed external
+  wallet linking. Updated overview, account guide and execution record.
+- Verification: frontend lint, TypeScript build and diff whitespace check pass.
+  No automated tests were added or run for this scope reduction.
+
+### 2026-10-04 — Distinguish browser wallet connection from account linking
+
+- Investigated a reported wallet appearing after email registration. The
+  configured local DB contains one email account with zero wallet links and one
+  legacy wallet account with one link. Registration writes account credentials
+  and session only; SIWE linking remains explicit and authenticated.
+- Installed Wagmi reconnects previous connectors by default and uses browser
+  localStorage. The ConnectButton reflects that browser connection, whereas the
+  account list comes from server-returned wallet links. Browser reconnection
+  does not write account ownership to PostgreSQL.
+- Renamed the account list and browser connection headings and added an explicit
+  explanation beside the link button. Updated the account guide.
+- Verification: frontend lint, TypeScript build and diff whitespace check pass.
+  No backend ownership behavior changed; no automated tests were added or run.
+
+### 2026-10-04 — Reset wallet connections at account boundaries
+
+- Follow-up to the reported account screen: changing labels alone did not stop
+  the previous browser wallet connection from appearing under a new account.
+  Disabled Wagmi automatic reconnection on page load.
+- Initial session loading and account changes now disconnect connections whose
+  address and chain do not match that account's linked wallets. Logout disconnects
+  all connections. Explicit connections within the same account remain available
+  while the user signs the wallet-linking message. Database links are unchanged.
+- Added a regression check against the frontend provider using the existing
+  Jest/TypeScript tooling. It failed before the fix and passes afterward, covering
+  an unlinked new account, same-account connection, linked account and logout.
+- Verification: 24 tests across 10 suites pass; frontend lint and TypeScript/Vite
+  build pass. Existing bundle-size warning remains. Vite on port 5173 serves the
+  updated account labels and no inactive Privy setup message.
+- Real browser/MetaMask interaction remains unverified: the browser tool rejected
+  access to the existing tab under its URL security policy.
+
+### 2026-10-04 — Remove Privy integration entirely
+
+- User replaced the prior defer/retain-code decision with full removal. Deleted
+  frontend provider/panel/config, backend JWT service/routes and the SDK-specific
+  regression test. Removed SDK, its direct Solana/Stripe peers, unused backend
+  jose dependency and the frontend legacy peer-resolution override.
+- Updated package locks; both contain zero Privy entries. Removed provider keys
+  from local/example environment files and deleted the unused development RSA
+  key. Existing account/session and signed external-wallet linking remain active.
+- Updated current overview/account guide and marked historical implementation
+  notes as superseded. No embedded-wallet adapter is scaffolded.
+- Verification: frontend lint and TypeScript/Vite build pass; backend build and
+  23 tests across nine suites pass. HTTP/PostgreSQL smoke passes 40 response checks,
+  including 404 for removed token/JWKS endpoints, then removes its own test rows.
+  Existing frontend bundle-size warning remains.
+- Restarted the local backend with the new build: health returns 200, both removed
+  routes return 404 and generated OpenAPI contains zero provider routes. Running
+  Vite serves the provider-free app wrapper. Live MetaMask interaction was not run.

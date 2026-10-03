@@ -53,7 +53,7 @@ export class EvidenceDraftsController {
     return this.draftsService.create(
       campaignId,
       parseMilestoneIndex(milestoneIndex),
-      request.wallet!.userId,
+      request.account!.userId,
       parsed.data.content,
     );
   }
@@ -72,7 +72,7 @@ export class EvidenceDraftsController {
     return this.draftsService.update(
       campaignId,
       parseMilestoneIndex(milestoneIndex),
-      request.wallet!.userId,
+      request.account!.userId,
       parsed.data.expectedRevision,
       parsed.data.content,
     );
@@ -87,7 +87,7 @@ export class EvidenceDraftsController {
     return this.draftsService.get(
       campaignId,
       parseMilestoneIndex(milestoneIndex),
-      request.wallet!.userId,
+      request.account!.userId,
     );
   }
 }

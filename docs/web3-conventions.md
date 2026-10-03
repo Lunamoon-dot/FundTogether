@@ -2,7 +2,7 @@
 
 > **Status:** Approved engineering baseline
 > **Version:** 0.3
-> **Updated:** 2026-10-03
+> **Updated:** 2026-10-04
 > **Purpose:** Shared conventions for contracts, backend, indexer and frontend
 
 This document defines shared technical conventions. It does not replace protocol rules in `protocol-spec.md`, `state-machine.md` or `financial-rules.md`.
@@ -309,4 +309,66 @@ These are documented requirements, not implemented Arc adapters or verified jour
 
 See [Arc sources and validation gates](../v0.2/FundTogether_Arc_Evaluation_v0.1.md).
 No generated chain adapter/configuration is claimed by these conventions.
+
+## 15. Wallet connection, application roles and ERC20 approval
+
+MetaMask owns the wallet connection permission prompt. The frontend requests
+account access; the user grants or rejects it. Connecting does not authenticate
+the FundTogether account, assign an organization role or grant token allowance.
+Wallet linking proves control with a signed message bound to the authenticated
+account. Backend membership checks and contract caller checks remain separate.
+
+The selected initial allowance UX is approval for the intended donation or bond
+amount, rather than unlimited approval. This journey remains TODO.
+
+```text
+Read allowance(owner, FundTogether contract)
+  -> sufficient: request donate/lockBond
+  -> insufficient: request token.approve(FundTogether contract, amount)
+     -> wait for successful receipt and required confirmations
+     -> refresh allowance, balances and applicable campaign state
+     -> request donate/lockBond
+```
+
+Approval targets the ERC20 token contract; the spender is the deployed
+FundTogether contract. Approval grants allowance without depositing funds into
+a campaign. The subsequent authorized protocol call uses transferFrom.
+Approve and donate/bond have separate hashes, rejection/revert states and fees.
+Backend/indexer must derive contributions from protocol events, never approvals
+or frontend success reports. Existing nonzero allowances may require a
+token-specific reset before replacement; verify the selected token's behavior.
+
+## 16. Incremental indexer plan — TODO
+
+An indexer is an application component, not a particular library. The proposed
+first implementation uses NestJS, the existing Viem dependency for RPC/log
+access, and Drizzle/PostgreSQL for durable state. No Ponder or The Graph
+integration is selected. Current IndexerModule is empty; BlockchainService only
+checks RPC configuration. No event worker or checkpoint exists yet.
+
+Inputs are versioned deployment metadata, generated ABI and protocol transition
+rules. Start with CampaignCreated, CampaignPublished and DonationReceived;
+expand to funding, milestones, evidence and refunds after this slice is verified.
+CampaignCreated currently omits organizer address: agree an event change or an
+explicit chain read before implementing organizer ownership projection.
+
+- Read bounded block ranges from deploymentBlock or a durable checkpoint;
+  process logs in blockNumber/transactionIndex/logIndex order.
+- Filter the configured chain and contract address. Retain emitter, block hash,
+  transaction hash and logIndex with each decoded event.
+- Atomically persist new events, update projections and advance the completed
+  range checkpoint. Duplicate events must not change totals twice.
+- Use a chain-specific finality policy and detect block-hash divergence; define
+  rollback/replay before claiming reorg recovery works.
+- Identify chain campaigns by chainId/contractAddress/onchainId. Link private
+  draft UUIDs through the verified publication workflow, never title matching.
+- Version local deployment identity; resetting Anvil can invalidate historical
+  checkpoints even if chainId and deployed addresses are reused.
+- Keep raw events and derived projections rebuildable. RPC/indexer outages
+  delay synchronization and do not undo successful chain transactions.
+
+First acceptance journey: publish and donate locally, record exactly one
+contribution, restart/replay without duplication, catch up events produced while
+the worker was stopped, and expose the result through a public read API.
+These are future verification requirements, not completed checks.
 

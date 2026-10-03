@@ -28,13 +28,16 @@ DRAFT
             └─ cancelCampaign (organizer) → CANCELLED
 
 FUNDED
-  └─ activateMilestone → MILESTONE_ACTIVE
+  ├─ activateMilestone before 7-day deadline → MILESTONE_ACTIVE
+  └─ finalizeMilestoneTimeout at/after deadline → FAILED
 
 MILESTONE_ACTIVE
-  └─ submitEvidence → EVIDENCE_PENDING
+  ├─ submitEvidence before evidence deadline → EVIDENCE_PENDING
+  └─ finalizeMilestoneTimeout at/after deadline → FAILED
 
 EVIDENCE_PENDING
-  ├─ rejectSubmission (assigned active verifier) → MILESTONE_ACTIVE; new version allowed
+  ├─ rejectSubmission before 72-hour admission deadline → MILESTONE_ACTIVE or FAILED
+  ├─ expireSubmission at/after admission deadline → MILESTONE_ACTIVE or FAILED
   └─ verifySubmission (assigned active verifier) → IN_REVIEW; 72 hours starts here
 
 IN_REVIEW
@@ -48,12 +51,17 @@ CHALLENGED
   └─ resolveChallenge → MILESTONE_SETTLED or CANCELLED
 
 MILESTONE_SETTLED
-  ├─ activate next milestone → MILESTONE_ACTIVE
+  ├─ activate next milestone before 7-day deadline → MILESTONE_ACTIVE
+  ├─ finalizeMilestoneTimeout at/after deadline → FAILED
   └─ last milestone settled → COMPLETED
 
 Pre-funded FUNDING_FAILED or CANCELLED
   └─ same transaction: snapshot refund pool + return bond
        └─ each donor calls claimRefund independently
+
+Post-funded FAILED
+  └─ snapshot unreleased donor escrow + return bond; no slash
+       └─ donors claim proportional shares independently
 ```
 
 The contract implements funding, pre-funded refunds, sequential activation,
@@ -61,7 +69,7 @@ versioned evidence admission/rejection, donor challenge and unchallenged settlem
 SETTLEABLE is a derived time condition, not a stored enum: campaign stays
 IN_REVIEW until settleMilestone executes. Last settlement directly enters
 COMPLETED and returns bond in the same transaction. Challenge resolution and
-post-funded cancellation remain planned; CHALLENGED currently has no exit.
+dispute-driven post-funded cancellation remain planned; CHALLENGED currently has no exit.
 Review is fixed at 72 hours from verifier acceptance; admin duration changes are deferred.
 Refund availability
 is stored separately from campaign state; the campaign remains `CANCELLED` or
@@ -115,8 +123,25 @@ and SUBMITTED. Submission transitions ACTIVE to SUBMITTED; acceptance transition
 to REVIEWING and starts the timer. Rejection returns ACTIVE and permits a new
 immutable version. Decisions/history are not overwritten. Activation moves no funds. Settlement pays exactly
 the budget once; next activation is organizer-only after settlement. Challenge
-resolution states in the diagram remain planned. There is no evidence-submission
-timeout or resolver timeout recovery implementation yet.
+resolution states in the diagram remain planned. Activation/evidence/admission
+timeouts and bounded resubmission now exist; resolver timeout recovery is pending.
+
+### Evidence timing defaults — 2026-10-04
+
+The user authorized reasonable prototype defaults. Activation has 7 days from
+funding completion or previous settlement; initial evidence has 30 days from
+activation. Every submission has 72 hours from creation for assignment/decision.
+Reassignment never changes that deadline. Rejection or expiry of versions 1/2
+opens a 7-day correction window; version 3 rejection/expiry terminates FAILED.
+All submissions, including expired admissions, count toward the limit of 3.
+Acceptance still starts the separate 72-hour donor challenge review window.
+
+Normal actions require `now < deadline`; permissionless timeout actions require
+`now >= deadline`. No timer automatically sends a transaction. Expiry records
+EXPIRED without verifier acceptance or a fabricated rejection reason. Prior
+hashes, decisions and admission deadlines remain stored. FAILED is terminal;
+it never releases the current budget or activates a later milestone.
+See [timeout and recovery defaults](./contract-evidence-timeouts.md).
 
 ## 5. Evidence states
 

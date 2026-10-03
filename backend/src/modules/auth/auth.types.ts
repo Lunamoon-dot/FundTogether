@@ -1,13 +1,14 @@
-export interface AuthenticatedWallet {
+export interface AuthenticatedAccount {
   userId: string;
-  address: string;
-  chainId: number;
+  email: string | null;
+  wallets: { address: string; chainId: number }[];
 }
 
 declare global {
   namespace Express {
     interface Request {
-      wallet?: AuthenticatedWallet;
+      account?: AuthenticatedAccount;
+      sessionToken?: string;
     }
   }
 }

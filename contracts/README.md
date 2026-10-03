@@ -16,8 +16,13 @@ organizers cannot review their own campaigns. Rejection permits a new version
 without deleting history. Acceptance starts a fixed 72-hour review. Donors can challenge before expiry;
 anyone can settle an unchallenged review at/after expiry. Settlement pays the
 milestone budget to the organizer, advances sequentially and returns bond on
-final completion. Dispute resolution, post-funded refunds and slashing remain
-planned; CHALLENGED, pending admission and organizer abandonment can still leave funds stuck.
+final completion. Activation has 7 days, initial evidence 30 days, admission
+72 hours and corrections 7 days, with at most 3 versions per milestone. Anyone
+can execute eligible timeouts. Rejection/expiry of the final version or organizer
+inactivity ends FAILED, refunds unreleased escrow proportionally and returns bond
+without slash. See [defaults and recovery](../docs/contract-evidence-timeouts.md).
+Dispute resolution/slashing remain planned; CHALLENGED still has no exit.
+Permanent token transfer failure is another unresolved recovery limitation.
 
 ## Toolchain
 

@@ -1,5 +1,10 @@
 # Backend Step 1 — Wallet session and organizer access
 
+> Historical learning guide: this describes the initial wallet-first prototype.
+> As of 2026-10-04, use [accounts and wallets](./accounts-and-wallets.md) for the
+> current account-first flow, persisted nonces and revocable sessions.
+> `AUTH_JWT_SECRET`, JWT cookies and `request.wallet` below are obsolete.
+
 This is the first backend implementation step. It adds wallet authentication
 and checks whether the signed-in account owns a campaign metadata record. It
 does not yet create campaigns or save evidence.

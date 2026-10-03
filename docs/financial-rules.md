@@ -153,7 +153,32 @@ Bond and unsolicited token transfers are excluded from the snapshot. Refunds go 
 
 This prototype assumes a standard ERC20 with exact transfers, as provided by MockUSDC. Fee-on-transfer and rebasing tokens are unsupported. A token that persistently rejects the organizer's bond transfer also prevents terminal finalization and donor claims; the approved same-transaction design has no separate bond recovery path yet.
 
-The proportional formula above remains design guidance for later post-funded outcomes, not implemented behavior.
+### Implemented evidence/activation failure refunds — 2026-10-04
+
+The user authorized prototype timeout defaults and their non-slashing fallback.
+Organizer activation/submission inactivity, or rejection/expiry of the final
+allowed evidence version, enters FAILED. The immutable snapshot is:
+
+```text
+P = T - R
+entitlement_i = floor(C_i * P / T)
+```
+
+`claimRefund` uses OpenZeppelin `Math.mulDiv` for full-precision integer
+calculation. With R = 0 this preserves exact pre-funded refunds. Contributions
+cannot increase after funding completes. Retained prior releases are not
+clawed back. Bond is returned separately in the terminal transaction; no slash,
+caller reward, verifier fee or unsolicited-token allocation is introduced.
+Refunds go only to each calling contributor, once, without expiry or a donor loop.
+Zero-rounded entitlements are marked claimed without a zero token transfer.
+Rounding dust stays in the contract; there is no admin sweep.
+
+All terminal state/snapshot/bond changes revert if the bond transfer fails.
+Each failed donor transfer also rolls back its claim flag. The existing
+limitation for permanently blocked organizer transfers remains: atomic bond
+return can prevent finalization. Dispute/misconduct allocation and an independent
+bond recovery path are still pending. These new paths are compiled, not yet
+runtime-tested; do not infer financial safety from compilation alone.
 
 ## 7. Bond allocation on misconduct
 
@@ -198,9 +223,11 @@ no new payout authority to organizers or verifiers. A timely pending challenge
 must hold settlement; only authenticated permitted verdicts can authorize later
 financial transitions. A backend "resolved" flag is insufficient. RESUBMIT moves
 no money, retains prior hashes and requires a new review round. Exact terminal
-slash/refund formulas and timeout effects remain unapproved and unimplemented.
+slash/refund formulas and timeout effects for disputes remain unresolved.
+Evidence/activation failure defaults and unreleased-escrow refunds are now
+implemented separately, without misconduct classification or slashing.
 
-1. Refund composition for failures after funding or milestone releases.
+1. Refund composition for dispute/misconduct failures after funding or releases.
 2. Recovery for persistent token transfer failures.
 3. Exact misconduct slash formula and resolver payload.
 4. Dust destination after proportional refund rounding.

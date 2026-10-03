@@ -1,7 +1,8 @@
 # Backend Step 2 — Campaign and evidence drafts
 
 This step adds private campaign drafts and one editable evidence draft per
-milestone. Authentication comes from the SIWE cookie created in Backend Step 1.
+milestone. Authentication now comes from the account session described in
+[accounts and wallets](./accounts-and-wallets.md); a wallet is optional for drafts.
 
 ## Routes
 
@@ -22,7 +23,7 @@ milestone with a title, planned-work description and at least one acceptance
 criterion. Text is trimmed; campaign/milestone titles are limited to 200
 characters. Criterion IDs must be nonempty, at most 128 characters and unique
 within each milestone. The service takes
-`organizerUserId` from `request.wallet`, which `AuthGuard` populated from the
+`organizerUserId` from `request.account`, which `AuthGuard` populated from the
 verified session. The API rejects unknown request fields, including a client
 supplied owner.
 

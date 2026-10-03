@@ -25,7 +25,7 @@ export class CampaignsController {
 
   @Get()
   list(@Req() request: Request) {
-    return this.campaignsService.listDrafts(request.wallet!.userId);
+    return this.campaignsService.listDrafts(request.account!.userId);
   }
 
   @Post()
@@ -39,7 +39,7 @@ export class CampaignsController {
       });
     }
     return this.campaignsService.createDraft(
-      request.wallet!.userId,
+      request.account!.userId,
       parsed.data,
     );
   }
@@ -49,7 +49,7 @@ export class CampaignsController {
     @Param("campaignId", new ParseUUIDPipe()) campaignId: string,
     @Req() request: Request,
   ) {
-    return this.campaignsService.getDraft(campaignId, request.wallet!.userId);
+    return this.campaignsService.getDraft(campaignId, request.account!.userId);
   }
 
   @Patch(":campaignId")
@@ -68,7 +68,7 @@ export class CampaignsController {
     }
     return this.campaignsService.updateDraft(
       campaignId,
-      request.wallet!.userId,
+      request.account!.userId,
       parsed.data,
     );
   }

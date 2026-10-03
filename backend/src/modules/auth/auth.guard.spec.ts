@@ -4,10 +4,10 @@ import { AuthGuard } from "./auth.guard";
 import { AuthService } from "./auth.service";
 
 describe("AuthGuard", () => {
-  const wallet = {
+  const account = {
     userId: "user-1",
-    address: "0x1111111111111111111111111111111111111111",
-    chainId: 31337,
+    email: "donor@example.com",
+    wallets: [],
   };
   const authService = {
     verifySession: jest.fn(),
@@ -22,8 +22,8 @@ describe("AuthGuard", () => {
 
   beforeEach(() => jest.clearAllMocks());
 
-  it("attaches verified wallet identity from the session cookie", async () => {
-    jest.mocked(authService.verifySession).mockResolvedValue(wallet);
+  it("authenticates an account without a wallet", async () => {
+    jest.mocked(authService.verifySession).mockResolvedValue(account as never);
     const request = { headers: { cookie: "other=x; ft_session=signed-token" } };
     const executionContext = {
       switchToHttp: () => ({ getRequest: () => request }),
@@ -31,7 +31,7 @@ describe("AuthGuard", () => {
 
     await expect(guard.canActivate(executionContext)).resolves.toBe(true);
     expect(authService.verifySession).toHaveBeenCalledWith("signed-token");
-    expect(request).toHaveProperty("wallet", wallet);
+    expect(request).toHaveProperty("account", account);
   });
 
   it("rejects requests without the session cookie", async () => {

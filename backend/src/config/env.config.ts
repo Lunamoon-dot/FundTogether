@@ -4,7 +4,6 @@ export const configuration = () => ({
   webOrigin: process.env.WEB_ORIGIN ?? "http://localhost:5173",
   authDomain: process.env.AUTH_DOMAIN ?? "localhost:5173",
   authChainId: Number.parseInt(process.env.AUTH_CHAIN_ID ?? "31337", 10),
-  authJwtSecret: process.env.AUTH_JWT_SECRET,
   databaseUrl:
     process.env.DATABASE_URL ??
     "postgresql://postgres:postgres@localhost:5432/fundtogether",

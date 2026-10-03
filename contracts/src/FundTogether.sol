@@ -4,6 +4,7 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract FundTogether is ReentrancyGuard, AccessControl {
     using SafeERC20 for IERC20;
@@ -20,7 +21,8 @@ contract FundTogether is ReentrancyGuard, AccessControl {
         CHALLENGED,
         MILESTONE_SETTLED,
         COMPLETED,
-        EVIDENCE_PENDING
+        EVIDENCE_PENDING,
+        FAILED
     }
 
     enum MilestoneState {
@@ -29,7 +31,8 @@ contract FundTogether is ReentrancyGuard, AccessControl {
         REVIEWING,
         CHALLENGED,
         SETTLED,
-        SUBMITTED
+        SUBMITTED,
+        FAILED
     }
 
     struct Milestone {
@@ -57,7 +60,8 @@ contract FundTogether is ReentrancyGuard, AccessControl {
         NONE,
         SUBMITTED,
         ACCEPTED,
-        REJECTED
+        REJECTED,
+        EXPIRED
     }
 
     struct EvidenceSubmission {
@@ -70,7 +74,26 @@ contract FundTogether is ReentrancyGuard, AccessControl {
     }
 
     uint256 public constant REVIEW_WINDOW = 72 hours;
+    uint256 public constant ACTIVATION_WINDOW = 7 days;
+    uint256 public constant EVIDENCE_WINDOW = 30 days;
+    uint256 public constant ADMISSION_WINDOW = 72 hours;
+    uint256 public constant RESUBMISSION_WINDOW = 7 days;
+    uint256 public constant MAX_SUBMISSIONS = 3;
     bytes32 public constant VERIFIER_ROLE = keccak256("VERIFIER_ROLE");
+
+    enum FailureReason {
+        ACTIVATION_TIMEOUT,
+        EVIDENCE_TIMEOUT,
+        REJECTIONS_EXHAUSTED,
+        ADMISSION_TIMEOUTS_EXHAUSTED
+    }
+
+    mapping(uint256 campaignId => uint256) public activationDeadlines;
+    mapping(uint256 campaignId => mapping(uint256 milestoneIndex => uint256)) public
+        evidenceDeadlines;
+    mapping(
+        uint256 campaignId => mapping(uint256 milestoneIndex => mapping(uint256 version => uint256))
+    ) public admissionDeadlines;
 
     uint256 public nextCampaignId;
     address public immutable resolver;
@@ -158,6 +181,24 @@ contract FundTogether is ReentrancyGuard, AccessControl {
         uint256 indexed campaignId, uint256 indexed milestoneIndex, uint256 amount
     );
     event CampaignCompleted(uint256 indexed campaignId);
+    event MilestoneActivationDeadlineSet(
+        uint256 indexed campaignId, uint256 indexed milestoneIndex, uint256 deadline
+    );
+    event EvidenceDeadlineSet(
+        uint256 indexed campaignId, uint256 indexed milestoneIndex, uint256 deadline
+    );
+    event AdmissionDeadlineSet(
+        uint256 indexed campaignId,
+        uint256 indexed milestoneIndex,
+        uint256 indexed version,
+        uint256 deadline
+    );
+    event EvidenceSubmissionExpired(
+        uint256 indexed campaignId, uint256 indexed milestoneIndex, uint256 indexed version
+    );
+    event CampaignFailed(
+        uint256 indexed campaignId, uint256 indexed milestoneIndex, FailureReason reason
+    );
 
     constructor() {
         resolver = msg.sender;
@@ -281,6 +322,7 @@ contract FundTogether is ReentrancyGuard, AccessControl {
 
         if (campaign.totalContributed == campaign.goal) {
             campaignState[campaignId] = CampaignState.FUNDED;
+            _setActivationDeadline(campaignId, 0);
             emit FundingFinalized(campaignId, CampaignState.FUNDED);
         }
     }
@@ -300,6 +342,7 @@ contract FundTogether is ReentrancyGuard, AccessControl {
             "invalid state"
         );
         require(milestoneIndex == currentMilestoneIndex[campaignId], "not next milestone");
+        require(block.timestamp < activationDeadlines[campaignId], "activation deadline passed");
 
         Milestone storage milestone = milestones[campaignId][milestoneIndex];
         require(
@@ -307,6 +350,8 @@ contract FundTogether is ReentrancyGuard, AccessControl {
         );
         milestone.state = MilestoneState.ACTIVE;
         campaignState[campaignId] = CampaignState.MILESTONE_ACTIVE;
+        activationDeadlines[campaignId] = 0;
+        _setEvidenceDeadline(campaignId, milestoneIndex, EVIDENCE_WINDOW);
         emit MilestoneActivated(campaignId, milestoneIndex, milestone.budget);
     }
 
@@ -319,6 +364,14 @@ contract FundTogether is ReentrancyGuard, AccessControl {
         require(campaignState[campaignId] == CampaignState.MILESTONE_ACTIVE, "invalid state");
         require(milestoneIndex == currentMilestoneIndex[campaignId], "not current milestone");
         require(evidenceHash != bytes32(0), "evidence required");
+        require(
+            block.timestamp < evidenceDeadlines[campaignId][milestoneIndex],
+            "evidence deadline passed"
+        );
+        require(
+            submissionVersion[campaignId][milestoneIndex] < MAX_SUBMISSIONS,
+            "submission limit reached"
+        );
         uint256 version = ++submissionVersion[campaignId][milestoneIndex];
         evidenceSubmissions[campaignId][milestoneIndex][version] = EvidenceSubmission({
             evidenceHash: evidenceHash,
@@ -331,7 +384,11 @@ contract FundTogether is ReentrancyGuard, AccessControl {
         milestoneEvidence[campaignId][milestoneIndex] = Evidence(evidenceHash, 0);
         milestones[campaignId][milestoneIndex].state = MilestoneState.SUBMITTED;
         campaignState[campaignId] = CampaignState.EVIDENCE_PENDING;
+        evidenceDeadlines[campaignId][milestoneIndex] = 0;
+        uint256 deadline = block.timestamp + ADMISSION_WINDOW;
+        admissionDeadlines[campaignId][milestoneIndex][version] = deadline;
         emit EvidenceSubmissionCreated(campaignId, milestoneIndex, version, evidenceHash);
+        emit AdmissionDeadlineSet(campaignId, milestoneIndex, version, deadline);
     }
 
     function assignVerifier(
@@ -342,6 +399,10 @@ contract FundTogether is ReentrancyGuard, AccessControl {
     ) external nonReentrant onlyRole(DEFAULT_ADMIN_ROLE) {
         EvidenceSubmission storage submission =
             _pendingSubmission(campaignId, milestoneIndex, version);
+        require(
+            block.timestamp < admissionDeadlines[campaignId][milestoneIndex][version],
+            "admission deadline passed"
+        );
         require(
             verifier != address(0) && hasRole(VERIFIER_ROLE, verifier), "verifier role required"
         );
@@ -359,6 +420,10 @@ contract FundTogether is ReentrancyGuard, AccessControl {
     ) external nonReentrant onlyRole(VERIFIER_ROLE) {
         EvidenceSubmission storage submission =
             _pendingSubmission(campaignId, milestoneIndex, version);
+        require(
+            block.timestamp < admissionDeadlines[campaignId][milestoneIndex][version],
+            "admission deadline passed"
+        );
         require(msg.sender == submission.assignedVerifier, "not assigned verifier");
         require(evidenceHash == submission.evidenceHash, "evidence mismatch");
         submission.status = SubmissionState.ACCEPTED;
@@ -382,6 +447,10 @@ contract FundTogether is ReentrancyGuard, AccessControl {
     ) external nonReentrant onlyRole(VERIFIER_ROLE) {
         EvidenceSubmission storage submission =
             _pendingSubmission(campaignId, milestoneIndex, version);
+        require(
+            block.timestamp < admissionDeadlines[campaignId][milestoneIndex][version],
+            "admission deadline passed"
+        );
         require(msg.sender == submission.assignedVerifier, "not assigned verifier");
         require(evidenceHash == submission.evidenceHash, "evidence mismatch");
         require(reasonHash != bytes32(0), "reason required");
@@ -389,9 +458,85 @@ contract FundTogether is ReentrancyGuard, AccessControl {
         submission.verifiedBy = msg.sender;
         submission.verifiedAt = block.timestamp;
         submission.reasonHash = reasonHash;
-        milestones[campaignId][milestoneIndex].state = MilestoneState.ACTIVE;
-        campaignState[campaignId] = CampaignState.MILESTONE_ACTIVE;
         emit SubmissionRejected(campaignId, milestoneIndex, version, msg.sender, reasonHash);
+        _resumeOrFail(campaignId, milestoneIndex, FailureReason.REJECTIONS_EXHAUSTED);
+    }
+
+    function expireSubmission(uint256 campaignId, uint256 milestoneIndex, uint256 version)
+        external
+        nonReentrant
+    {
+        EvidenceSubmission storage submission =
+            _pendingSubmission(campaignId, milestoneIndex, version);
+        require(
+            block.timestamp >= admissionDeadlines[campaignId][milestoneIndex][version],
+            "admission deadline not reached"
+        );
+        submission.status = SubmissionState.EXPIRED;
+        emit EvidenceSubmissionExpired(campaignId, milestoneIndex, version);
+        _resumeOrFail(campaignId, milestoneIndex, FailureReason.ADMISSION_TIMEOUTS_EXHAUSTED);
+    }
+
+    function finalizeMilestoneTimeout(uint256 campaignId, uint256 milestoneIndex)
+        external
+        nonReentrant
+    {
+        require(campaignId < nextCampaignId, "unknown campaign");
+        require(milestoneIndex == currentMilestoneIndex[campaignId], "not current milestone");
+        CampaignState state = campaignState[campaignId];
+        FailureReason reason;
+        if (state == CampaignState.FUNDED || state == CampaignState.MILESTONE_SETTLED) {
+            require(
+                block.timestamp >= activationDeadlines[campaignId],
+                "activation deadline not reached"
+            );
+            reason = FailureReason.ACTIVATION_TIMEOUT;
+        } else {
+            require(state == CampaignState.MILESTONE_ACTIVE, "invalid state");
+            require(
+                block.timestamp >= evidenceDeadlines[campaignId][milestoneIndex],
+                "evidence deadline not reached"
+            );
+            reason = FailureReason.EVIDENCE_TIMEOUT;
+        }
+        _failCampaign(campaignId, milestoneIndex, reason);
+    }
+
+    function _resumeOrFail(uint256 campaignId, uint256 milestoneIndex, FailureReason reason)
+        internal
+    {
+        if (submissionVersion[campaignId][milestoneIndex] == MAX_SUBMISSIONS) {
+            _failCampaign(campaignId, milestoneIndex, reason);
+        } else {
+            milestones[campaignId][milestoneIndex].state = MilestoneState.ACTIVE;
+            campaignState[campaignId] = CampaignState.MILESTONE_ACTIVE;
+            _setEvidenceDeadline(campaignId, milestoneIndex, RESUBMISSION_WINDOW);
+        }
+    }
+
+    function _setActivationDeadline(uint256 campaignId, uint256 milestoneIndex) internal {
+        uint256 deadline = block.timestamp + ACTIVATION_WINDOW;
+        activationDeadlines[campaignId] = deadline;
+        emit MilestoneActivationDeadlineSet(campaignId, milestoneIndex, deadline);
+    }
+
+    function _setEvidenceDeadline(uint256 campaignId, uint256 milestoneIndex, uint256 window)
+        internal
+    {
+        uint256 deadline = block.timestamp + window;
+        evidenceDeadlines[campaignId][milestoneIndex] = deadline;
+        emit EvidenceDeadlineSet(campaignId, milestoneIndex, deadline);
+    }
+
+    function _failCampaign(uint256 campaignId, uint256 milestoneIndex, FailureReason reason)
+        internal
+    {
+        campaignState[campaignId] = CampaignState.FAILED;
+        milestones[campaignId][milestoneIndex].state = MilestoneState.FAILED;
+        activationDeadlines[campaignId] = 0;
+        evidenceDeadlines[campaignId][milestoneIndex] = 0;
+        emit CampaignFailed(campaignId, milestoneIndex, reason);
+        _snapshotRefundAndReturnBond(campaignId);
     }
 
     function _pendingSubmission(uint256 campaignId, uint256 milestoneIndex, uint256 version)
@@ -444,6 +589,7 @@ contract FundTogether is ReentrancyGuard, AccessControl {
         bool completed = milestoneIndex + 1 == milestones[campaignId].length;
         campaignState[campaignId] =
             completed ? CampaignState.COMPLETED : CampaignState.MILESTONE_SETTLED;
+        if (!completed) _setActivationDeadline(campaignId, milestoneIndex + 1);
         IERC20(campaign.donationToken).safeTransfer(campaign.organizer, milestone.budget);
         emit MilestoneSettled(campaignId, milestoneIndex, milestone.budget);
         if (completed) {
@@ -486,19 +632,26 @@ contract FundTogether is ReentrancyGuard, AccessControl {
         require(refundSnapshotted[campaignId], "refund unavailable");
         require(!claimedRefund[campaignId][msg.sender], "refund already claimed");
 
-        uint256 amount = contributions[campaignId][msg.sender];
-        require(amount > 0, "no contribution");
+        uint256 contribution = contributions[campaignId][msg.sender];
+        require(contribution > 0, "no contribution");
+        uint256 amount = Math.mulDiv(
+            contribution, refundPool[campaignId], campaigns[campaignId].totalContributed
+        );
         claimedRefund[campaignId][msg.sender] = true;
-        IERC20(campaigns[campaignId].donationToken).safeTransfer(msg.sender, amount);
         emit RefundClaimed(campaignId, msg.sender, amount);
+        if (amount > 0) {
+            IERC20(campaigns[campaignId].donationToken).safeTransfer(msg.sender, amount);
+        }
     }
 
     function _snapshotRefundAndReturnBond(uint256 campaignId) internal {
         Campaign storage campaign = campaigns[campaignId];
-        // Pre-funded termination refunds accepted contributions exactly, excluding bond and unsolicited tokens.
-        refundPool[campaignId] = campaign.totalContributed;
+        // Only unreleased donor escrow enters the immutable pool; bond is returned separately.
+        require(!refundSnapshotted[campaignId], "refund already snapshotted");
+        uint256 amount = campaign.totalContributed - totalReleased[campaignId];
+        refundPool[campaignId] = amount;
         refundSnapshotted[campaignId] = true;
-        emit RefundPoolSnapshotted(campaignId, campaign.totalContributed);
+        emit RefundPoolSnapshotted(campaignId, amount);
         _returnBond(campaignId);
     }
 

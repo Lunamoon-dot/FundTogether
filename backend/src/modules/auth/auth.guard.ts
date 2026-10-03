@@ -20,7 +20,8 @@ export class AuthGuard implements CanActivate {
     const token = cookie?.slice("ft_session=".length);
     if (!token) throw new UnauthorizedException("Authentication required");
 
-    request.wallet = await this.authService.verifySession(token);
+    request.account = await this.authService.verifySession(token);
+    request.sessionToken = token;
     return true;
   }
 }

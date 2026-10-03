@@ -90,8 +90,15 @@ Domain assessments must disclose who performed them and what was checked.
 - Every waiting stage needs a deadline and permissionless fallback: evidence
   admission, challenge screening, organizer response, re-verification and resolver
   decision. Absence of response is not automatically proof of misconduct.
-- Exact durations, fallback outcomes, appeal finality and maximum resubmissions
-  remain OPEN. Previously suggested 7-day timeouts and slash formulas are not approved.
+- Evidence defaults were authorized on 2026-10-04: 30 days for initial evidence,
+  72 hours for admission from submission, 7 days for correction and 3 total
+  versions, including admissions that expire. A 7-day activation deadline also
+  prevents never-started milestones from holding funds indefinitely. Exhaustion
+  or organizer inactivity terminates FAILED with proportional refunds of
+  unreleased escrow and full bond return, without slash. See
+  [timeout defaults](./contract-evidence-timeouts.md).
+- Challenge/resolver durations, fallback outcomes and appeal finality remain
+  OPEN; misconduct/slash formulas are not inferred from these defaults.
 
 ## 5. Resolver composition
 

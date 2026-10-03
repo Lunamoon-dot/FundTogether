@@ -4,12 +4,13 @@ export function createSiweMessage(input: {
   nonce: string
   domain: string
   uri: string
+  statement?: string
 }) {
   return [
     `${new URL(input.uri).protocol}//${input.domain} wants you to sign in with your Ethereum account:`,
     input.address,
     '',
-    'Sign in to FundTogether to manage your campaign drafts.',
+    input.statement ?? 'Sign in to FundTogether to manage your campaign drafts.',
     '',
     `URI: ${input.uri}`,
     'Version: 1',

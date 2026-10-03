@@ -1,6 +1,7 @@
 import {
   boolean,
   pgTable,
+  text,
   timestamp,
   uniqueIndex,
   uuid,
@@ -9,6 +10,8 @@ import {
 
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
+  email: varchar('email', { length: 254 }).unique(),
+  passwordHash: text('password_hash'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .defaultNow()
     .notNull(),

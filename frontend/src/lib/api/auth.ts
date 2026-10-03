@@ -1,23 +1,59 @@
 import { http } from './http'
 
-export interface WalletSession {
+export interface AccountSession {
   userId: string
-  address: string
+  email: string | null
+  wallets: { address: string; chainId: number }[]
+}
+
+export interface WalletChallenge {
+  nonce: string
   chainId: number
+  domain: string
+  uri: string
 }
 
 export async function getSession() {
-  const { data } = await http.get<WalletSession>('/auth/session')
+  const { data } = await http.get<AccountSession>('/auth/session')
+  return data
+}
+
+export async function register(email: string, password: string) {
+  const { data } = await http.post<AccountSession>('/auth/register', {
+    email,
+    password,
+  })
+  return data
+}
+
+export async function login(email: string, password: string) {
+  const { data } = await http.post<AccountSession>('/auth/login', {
+    email,
+    password,
+  })
   return data
 }
 
 export async function getNonce() {
-  const { data } = await http.get<{ nonce: string }>('/auth/nonce')
-  return data.nonce
+  const { data } = await http.get<WalletChallenge>('/auth/nonce')
+  return data
+}
+
+export async function getLinkNonce() {
+  const { data } = await http.post<WalletChallenge>('/auth/wallets/nonce')
+  return data
 }
 
 export async function verifySiwe(message: string, signature: string) {
-  const { data } = await http.post<WalletSession>('/auth/verify', {
+  const { data } = await http.post<AccountSession>('/auth/verify', {
+    message,
+    signature,
+  })
+  return data
+}
+
+export async function linkWallet(message: string, signature: string) {
+  const { data } = await http.post<AccountSession>('/auth/wallets/link', {
     message,
     signature,
   })

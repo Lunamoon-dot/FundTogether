@@ -1,6 +1,6 @@
 # FundTogether Project Overview
 
-> Updated: 2026-10-03
+> Updated: 2026-10-04
 > Scope: current repository and verified contract prototype
 
 ## Repository boundaries
@@ -8,13 +8,13 @@
 | Directory | Responsibility | Current implementation |
 |---|---|---|
 | frontend/ | Forms, wallet interaction, transaction and indexed state | React/TypeScript Vite starter UI with API/Web3 boundaries |
-| backend/ | Authentication, metadata, storage and chain projections | NestJS foundation, health and metadata schema; evidence parser/metadata ownership service; no domain routes, SIWE or indexer |
+| backend/ | Authentication, metadata, storage and chain projections | NestJS, PostgreSQL/Drizzle, account/session auth, SIWE wallet linking and private campaign/evidence draft APIs; indexer remains scaffolded |
 | contracts/ | Financial rules and on-chain campaign state | Funding, bond, pre-funded refunds, sequential evidence/review and unchallenged settlement |
 | docs/ | Approved rules, current implementation and history | Protocol, financial rules, state machine and progress |
 
-The evidence parser/metadata ownership service is local work in progress and is
-not included in this documentation publication. Published backend code remains
-the foundation until that implementation is committed separately.
+Campaign/evidence draft APIs are committed backend code. Account credentials,
+revocable sessions and optional wallet linking are local implementation work;
+their verification status is recorded in PROJECT_PROGRESS.md.
 
 Blockchain is authoritative for custody, contributions, bond, refund entitlement
 and milestone state. PostgreSQL holds application metadata and derived chain
@@ -64,6 +64,8 @@ grantRole(bytes32 role, address account) / revokeRole(bytes32 role, address acco
 assignVerifier(uint256 campaignId, uint256 milestoneIndex, uint256 version, address verifier)
 verifySubmission(uint256 campaignId, uint256 milestoneIndex, uint256 version, bytes32 evidenceHash)
 rejectSubmission(uint256 campaignId, uint256 milestoneIndex, uint256 version, bytes32 evidenceHash, bytes32 reasonHash)
+expireSubmission(uint256 campaignId, uint256 milestoneIndex, uint256 version)
+finalizeMilestoneTimeout(uint256 campaignId, uint256 milestoneIndex)
 openChallenge(uint256 campaignId, uint256 milestoneIndex, bytes32 reasonHash)
 settleMilestone(uint256 campaignId, uint256 milestoneIndex)
 cancelCampaign(uint256 campaignId)
@@ -88,17 +90,23 @@ The deployer holds AccessControl DEFAULT_ADMIN_ROLE initially and can grant/revo
 VERIFIER_ROLE for multiple wallets. Admin assigns/reassigns only current pending
 submissions; organizer cannot review their own campaign. The assigned verifier
 must retain the role and accept the exact hash/version before review begins.
-Rejection records a reason and permits a new version while retaining history.
+Rejection records a reason and permits a new version while retaining history,
+up to three total submissions per milestone, including expired admissions.
 Review lasts a fixed 72 hours from acceptance, not the initial submission.
 Donors can challenge strictly before reviewEnd. Anyone can settle an unchallenged
 milestone at or after reviewEnd, paying its budget to the organizer. Settlement
 advances the index; final settlement completes the campaign and returns bond
 atomically. totalReleased records donor funds paid out, excluding bond.
 
-The interface is still evolving: challenge resolution and post-funded recovery
-are not implemented. Admission timeout and resubmit limits are absent. CHALLENGED
-has no exit and an organizer who never submits
-evidence can still leave funds stuck. There are no verified deployment addresses or generated
+The interface is still evolving. Activation/evidence/admission timeout recovery
+now uses defaults of 7 days / 30 days / 72 hours, with 7 days for corrections.
+Reassignment does not extend admission. Eligible permissionless timeout calls
+or a final rejection/expiry terminate FAILED, snapshot unreleased escrow for
+proportional donor claims and return the bond without slash. See
+[timeout defaults](./contract-evidence-timeouts.md). Challenge resolution and
+misconduct recovery remain pending; CHALLENGED still has no exit. Permanently
+failed organizer token transfers can still prevent terminal recovery.
+There are no verified deployment addresses or generated
 shared ABI artifacts for FE/BE yet.
 
 ## Integration checkpoints
@@ -121,16 +129,38 @@ receipt success and indexed application state must remain distinct.
 
 ## Verification and limits
 
-Current contract verification: 129 passing tests across eleven suites, including
-four fuzz tests with 256 runs each. Build succeeds with six timestamp lint warnings
-and two intentional input-validation loop warnings. This is a prototype, with
-standard exact-transfer ERC20 assumptions and incomplete post-funded recovery.
+Historical contract verification before the timeout slice: 129 passing tests
+across eleven suites, including four fuzz tests with 256 runs each. The
+2026-10-04 timeout slice compiles successfully; automated tests have not been
+added or run for it, and no deployment is claimed. Timestamp comparisons and
+intentional input-validation loops produce lint warnings. This is a prototype,
+with standard exact-transfer ERC20 assumptions and incomplete dispute recovery.
 FE/BE builds were not rerun for this contract task.
 
 See [progress and history](./PROJECT_PROGRESS.md) for dated evidence and
 [financial rules](./financial-rules.md) for approved accounting behavior.
 
 ## Private draft dashboard — 2026-10-04
+
+The default frontend entry is now a public Explore feed, accessible without
+authentication. Hash routes cover `/`, `/account`, `/contributions`,
+`/campaigns/:id` and `/workspace`, so refresh/back work without server rewrites.
+The public campaign detail route currently shows an unavailable state; it has
+no funding, milestone or evidence data yet. Search/filter are disabled until
+public data is connected. Contributions/refunds show an explicit pending state.
+Account now uses independent email/password registration and login, with optional
+external-wallet linking after login. SIWE login remains available for already
+linked wallets. Embedded wallet integration was removed by user decision on
+2026-10-04. Current code supports external browser wallets through signed linking;
+future providers can reuse the same account identity and linking flow. See
+[accounts and wallets](./accounts-and-wallets.md).
+Public navigation uses a left sidebar with
+Explore and Contributions above, and Account/Organizer workspace below; on small
+screens it becomes compact navigation above the content.
+No public campaign API, chain projection, donor transaction or mock dataset is
+introduced by this UI slice. Private drafts never become public feed content.
+Private list queries run only in the authenticated workspace, which stays mounted
+while browsing public pages to preserve entered wizard data within the session.
 
 The signed-in dashboard separates Overview, Recent campaigns and Evidence.
 Creation opens from a Create campaign button inside Recent campaigns; it has no
@@ -178,5 +208,6 @@ Arc Foundry, runtime/USDC validation, shared deployment artifacts, idempotent
 indexing and integrated journeys are TODO. Contract settings pin Solidity 0.8.24;
 an Arc-compatible compiler/EVM target has not been verified.
 
-Prototype CHALLENGED has no exit; admission/organizer inactivity recovery and
-post-funded refund/slash remain blockers before accepting real funds.
+Prototype CHALLENGED has no exit. Admission/organizer inactivity recovery and
+unreleased-escrow refunds now compile but need runtime verification; dispute
+resolution, slash and permanent transfer-failure recovery remain blockers.

@@ -73,7 +73,8 @@ Web2 authentication identifies a user. Wallet signatures and contract checks est
 | Milestone and challenge state | Smart contract | Index and expose projection |
 | Evidence file and metadata | Backend/storage | Store, version and expose according to visibility policy |
 | Evidence commitment hash | Smart contract | Link file version to transaction/event |
-| User account and wallet link | Backend with wallet proof | Authenticate and authorize API calls |
+| User account | Backend with application session | Authenticate API calls; draft access uses internal userId |
+| Wallet link | Backend with signed wallet proof | Prove wallet control; on-chain roles remain contract-authorized |
 | Search, notifications and presentation fields | PostgreSQL | Query and cache |
 | Reputation metrics | Indexed event projection | Compute and explain metric source |
 
