@@ -1,5 +1,34 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { PropsWithChildren } from 'react'
+import { connectorsForWallets, RainbowKitProvider } from '@rainbow-me/rainbowkit'
+import {
+  braveWallet,
+  injectedWallet,
+  metaMaskWallet,
+  rabbyWallet,
+} from '@rainbow-me/rainbowkit/wallets'
+import { WagmiProvider, createConfig, http } from 'wagmi'
+import { foundry } from 'wagmi/chains'
+
+const connectors = connectorsForWallets(
+  [
+    {
+      groupName: 'Browser wallets',
+      wallets: [braveWallet, metaMaskWallet, rabbyWallet, injectedWallet],
+    },
+  ],
+  {
+    appName: 'FundTogether',
+    // Required by RainbowKit's connector helper; WalletConnect is not enabled here.
+    projectId: 'fundtogether-local',
+  },
+)
+
+const wagmiConfig = createConfig({
+  chains: [foundry],
+  connectors,
+  transports: { [foundry.id]: http() },
+})
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -11,5 +40,11 @@ const queryClient = new QueryClient({
 })
 
 export function AppProviders({ children }: PropsWithChildren) {
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  return (
+    <WagmiProvider config={wagmiConfig}>
+      <QueryClientProvider client={queryClient}>
+        <RainbowKitProvider>{children}</RainbowKitProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
+  )
 }

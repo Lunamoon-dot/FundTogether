@@ -46,6 +46,36 @@ abandonment recovery, post-funded refunds and slashing remain unimplemented.
 
 ## Verified progress
 
+### IN_PROGRESS — Campaign and evidence draft API (backend step 2)
+
+- Added authenticated campaign draft create/read routes and evidence draft
+  create/read/update routes, with organizer checks through the session identity.
+- Draft content uses Evidence Schema v0.1 validation and JSONB persistence;
+  `schemaVersion`, `updatedAt`, and integer `revision` are stored. A unique
+  campaign/milestone constraint allows one current draft. Stale updates return
+  409. Freeze remains a separate future immutable entity.
+- Applied Drizzle migration `0001_loving_jane_foster` to the connected local DB.
+- Verification: backend build succeeds; 12 unit tests pass. Local API smoke flow
+  completed SIWE, campaign create, draft create/read/update and stale revision
+  rejection. Test campaign/user rows were removed afterward.
+- Learning guide: [Backend Step 2](./backend-step-2-drafts.md).
+- Chain validation, file upload and package freeze/hash remain unimplemented.
+
+### IN_PROGRESS — Wallet authentication and organizer access (backend step 1)
+
+Local implementation work; backend source is committed separately from the
+documentation publication.
+
+- Added SIWE nonce/verification routes, wallet-user linking, a 24-hour signed
+  HttpOnly session cookie, session guard and campaign owner access example.
+- SIWE checks configured domain, URI, chain and a one-time five-minute nonce.
+- Nonce storage is process-local; campaign authorization uses DB metadata and
+  does not verify organizer ownership from chain state.
+- Verification: backend build succeeds; five unit tests pass for the guard and
+  campaign owner/forbidden/not-found cases. Local app smoke check returned a
+  nonce and rejected `/auth/session` without a cookie (401).
+- Learning guide: [Backend Step 1](./backend-auth-step-1.md).
+
 ### IN_PROGRESS — Evidence schema validation and organizer access foundation
 
 Local implementation work; backend source is not included in this documentation
@@ -57,10 +87,9 @@ publication and will be committed separately.
 - Added an authorization service that checks an authenticated user ID against
   the campaign metadata owner.
 - Verification: `npm.cmd run build` in `backend/` succeeded.
-- Not implemented yet: SIWE challenge/session verification, endpoint integration,
-  evidence persistence, on-chain campaign/organizer/criteria/version checks and
-  automated tests. Current ownership check covers only the existing metadata
-  owner relation; it does not claim on-chain authorization.
+- Not implemented yet: evidence persistence, on-chain campaign/organizer/
+  criteria/version checks and evidence API integration. Current ownership check
+  covers only the existing metadata owner relation.
 
 ### DONE — Verifier roles and evidence admission/versioning
 
@@ -561,3 +590,187 @@ keeps the dated implementation history and its verification evidence.
 - No runtime test/build, Arc installation, deployment or transaction broadcast.
   Existing backend changes are preserved. CHALLENGED exit, waiting-stage recovery
   and post-funded refunds/slash remain unimplemented.
+
+### 2026-10-03 — Connect organizer FE to wallet auth and draft APIs
+
+- IN_PROGRESS (FE): configured Wagmi/RainbowKit for local chain 31337 and added
+  SIWE sign-in/session UI, campaign draft create/load, and evidence draft
+  create/load/update using the backend revision field.
+- The evidence form currently edits report summary and performed dates. File
+  upload, expense/outcome editors, freeze/hash, and chain submission remain TODO
+  until their backend APIs and rules are ready.
+- Verification: `npm run build` and `npm run lint` pass; local FE returns 200,
+  backend health returns 200, and unauthenticated `/auth/session` returns 401.
+  Build reports a 913 kB main JS chunk due to the wallet UI dependencies.
+- Manual wallet signature and persisted draft journey have not yet been run.
+
+### 2026-10-04 — Fix SIWE scheme mismatch
+
+- Fixed the FE SIWE message authority to include the `http` scheme expected by
+  backend verification for the local `localhost:5173` origin.
+- Added a regression test that parses the generated message and checks scheme
+  and domain. It failed before the fix (`scheme` was undefined) and passes now.
+- Verification: all six backend test suites (13 tests), backend build, FE build,
+  FE lint, and `git diff --check` pass. The user wallet signature flow still
+  needs a fresh manual sign-in after the page reloads.
+
+### 2026-10-04 — Organizer dashboard navigation
+
+- Implemented a signed-in dashboard with Overview, Campaigns and Evidence
+  navigation, compact account/sign-out controls, and responsive navigation.
+- Campaign creation is explicitly labelled private draft storage. It uses the
+  existing authenticated metadata API; it does not publish on chain. Organizer
+  approval, milestone setup, bond locking and publishing remain TODO.
+- Moved create-draft forms behind a New draft action and reference-based loading
+  into a secondary disclosure. A campaign listing API is still TODO; the UI
+  shows only the currently opened draft, without invented totals or history.
+- Evidence messages now distinguish editable draft saving from review submission
+  and hide schema/revision details. Milestone indices remain explicit until real
+  milestone definitions exist. Upload, freeze and review submission remain TODO.
+- Cleared evidence selection when creating/loading another campaign and cleared
+  workspace state on sign-in/sign-out to keep account data separate.
+- Verification: FE build and lint pass. Local FE starts and backend health returns
+  200. Browser inspection confirms the signed-out screen renders without a
+  network error. Signed-in navigation still needs a manual wallet session check;
+  the preview browser has no authenticated wallet session. Existing large bundle
+  warning remains.
+
+### 2026-10-04 — Account campaign draft list
+
+- Implemented `GET /campaigns` under AuthGuard. The service filters by session
+  user ID and draft status, returning newest-first metadata with a deterministic
+  ID tie-breaker. There is no client-supplied owner and no public read model.
+- Campaigns now loads the account draft list with TanStack Query, including
+  loading, empty, error/retry and refresh states. Creation refreshes the list;
+  opening a draft fetches its owner-protected detail and switches to Evidence.
+  Removed manual UUID entry and scoped query cache by account.
+- Fixed Nest build output drift caused by a spec importing frontend source:
+  `tsconfig.build.json` excludes specs and pins the backend root, restoring
+  `dist/src/main.js` used by the existing start scripts. Restarted the dev API.
+- Verification: backend build, frontend build/lint and diff whitespace check
+  pass. Backend health returns 200; campaign list without a session returns 401,
+  including requests with an owner query parameter. Compiled controller and dev
+  startup both contain the new route. Authenticated list/navigation and isolation
+  between two real accounts still need manual session verification. No automated
+  tests were added or run in this slice. Pagination remains a later step.
+
+### 2026-10-04 — Separate campaign list and creation pages
+
+- Split sidebar navigation into Recent campaigns and Create campaign. The list
+  no longer contains the creation form. List actions navigate to the creation
+  page; successful creation returns to the refreshed list with its save notice.
+- Kept the private draft distinction and existing API behavior. Mobile navigation
+  scrolls horizontally to accommodate the additional page.
+- Verification: frontend build and lint pass. Signed-in browser interaction still
+  needs checking with the user's wallet session; existing bundle warning remains.
+
+### 2026-10-04 — Campaign milestone draft database model
+
+- Added `campaign_milestone_drafts`: campaign foreign key, stable local UUID,
+  zero-based index, title/description, JSONB draft acceptance criteria and
+  timestamps. Enforced unique campaign/index, nonnegative index and JSON array.
+- Added campaign revision defaulting to 1 for future aggregate edit locking.
+  Runtime validation and optimistic locking APIs remain TODO; the column and
+  JSON TypeScript type alone do not implement either behavior.
+- Generated and applied additive migration `0002_campaign_milestone_drafts`
+  to the configured local PostgreSQL. Existing evidence is unchanged and not
+  yet constrained to milestone definitions; legacy references must be reconciled
+  before that integration. No financial or chain placeholders were added.
+- Verification: backend build succeeds; migration command succeeds; live DB
+  catalog inspection confirms columns, defaults, foreign key, check constraints
+  and unique index. No automated tests were added or run. Milestone API/editor
+  remain TODO. See `backend-step-3-milestone-model.md` for the learning notes.
+
+### 2026-10-04 — Remove duplicate campaign creation button
+
+- Removed the creation button from the Recent campaigns page heading. The
+  separate Create campaign sidebar page remains available.
+- Verification: frontend build and lint pass.
+
+### 2026-10-04 — Remove campaign creation page
+
+- Removed the Create campaign page, sidebar entry, form handler/state and unused
+  creation API client function. Removed the empty-list creation action and
+  adjusted copy to match the remaining saved-draft workspace.
+- Verification: frontend build and lint pass. Backend APIs and saved data were
+  not changed by this UI removal.
+
+### 2026-10-04 — Compact dashboard and staged campaign creation UI
+
+- Removed repeated page-heading brand/title/subtitle blocks and the large
+  Overview hero. Reduced content/topbar spacing; page context stays in the topbar.
+- Added Create campaign exclusively in the campaign list. It opens an in-place
+  wizard: details -> milestones -> review/confirmation, without a sidebar page.
+- Milestones start at one; Add milestone validates existing entries before adding
+  another. Earlier cards collapse, with edit/delete controls and criteria fields.
+  Inline validation, Back and section editing keep entered content.
+- Review shows all entered data and an acknowledgment checkbox. Submission stays
+  disabled with an explicit unavailable notice; there is no simulated success,
+  pending-review state or financial action. Wizard data stays in memory across
+  workspace navigation and is cleared by reload/sign-out, not persisted to DB.
+- Verification: frontend build/lint and diff whitespace check pass. Browser
+  interaction with the authenticated wizard still needs a user wallet session.
+  No automated tests were added/run. Milestone persistence and submission APIs
+  remain TODO; existing bundle-size warning remains.
+
+### 2026-10-04 — Campaign gallery layout from the user's reference
+
+- Changed Campaigns to a gallery: a shaded creation area with one blank Create
+  campaign tile, followed by a responsive Recent campaigns card grid.
+- Saved cards preview their actual title/description and show draft status and
+  creation date. Clicking the whole card uses the existing protected detail API.
+  Creation still opens the existing three-step wizard; no template data added.
+- Verification: frontend build/lint and diff whitespace check pass. Authenticated
+  visual interaction still needs the user's wallet session.
+
+### 2026-10-04 — Remove the legacy manual evidence selector
+
+- Removed the milestone index input, manual evidence load button, and the editor
+  that depended on that index. Removed its component state/handlers to avoid
+  silently saving evidence against a default milestone.
+- Evidence now shows campaign context and a pending milestone-list notice until
+  persisted milestone APIs provide an explicit selection. Existing backend
+  evidence APIs and saved data are preserved.
+- Verification: frontend build and lint pass. Milestone-based evidence navigation
+  is still TODO.
+
+### 2026-10-04 — Save and read campaign with milestone planning
+
+- POST /campaigns now validates required campaign details, at least one milestone
+  and nonempty acceptance criteria with unique IDs per milestone. Unknown fields
+  are rejected; owner comes from the verified session and indices from array order.
+- Campaign and milestone inserts share one transaction. Create/detail responses
+  include ordered milestones, revision and timestamps. Detail remains owner-only;
+  older campaigns without milestones return an empty array.
+- The wizard review now offers Lưu nháp, disables editing while saving and retains
+  input on an API error. Success refreshes Recent campaigns; selecting a card opens
+  persisted campaign/milestone details. Logout aborts an in-flight client request.
+- Nộp campaign remains disabled. Aggregate editing/revision locking, review,
+  evidence selection and chain publishing remain TODO. No new migration required.
+- Verification: backend build, frontend build/lint and diff whitespace check pass.
+  Running backend health returns 200; unauthenticated GET /campaigns returns 401.
+  Authenticated save/reload still needs verification with a real wallet session.
+  No automated tests were run; the existing owner unit-test mock was adapted to
+  the new service signature. Existing frontend bundle-size warning remains.
+
+### 2026-10-04 — Edit campaign planning with revision locking
+
+- Added organizer-only PATCH /campaigns/:id with full planning validation,
+  expectedRevision, and optional existing milestone IDs. Duplicate IDs and IDs
+  belonging to another campaign are rejected. Retained milestone IDs/creation
+  dates and criterion IDs survive normal edits; new milestone IDs are generated.
+- Conditional update checks owner, draft status, revision and absent chain fields.
+  Campaign revision/timestamp and ordered milestone replacement share one
+  transaction. Stale or ineligible writes return 409 and all failures roll back.
+- Existing evidence blocks planning edits until legacy index references are
+  reconciled. Evidence creation now locks the parent row in its transaction,
+  serializing it with campaign edits. No migration or chain transaction needed.
+- Campaign details now has Chỉnh sửa. It preloads the staged wizard and offers
+  Lưu thay đổi. Saving updates the cached card without duplicating it and returns
+  to details. Conflict preserves input, disables save and offers a separate latest
+  version comparison plus an explicit discard-and-use action; no automatic retry.
+- Verification: backend/frontend builds, frontend lint and whitespace check pass.
+  Running health returns 200 and unauthenticated PATCH returns 401. The existing
+  evidence-create test mocks were adapted; no new tests were added or run.
+  Authenticated saves and concurrent-tab behavior remain unverified at runtime.
+  Submission/review and evidence navigation remain TODO; bundle warning remains.

@@ -130,6 +130,38 @@ FE/BE builds were not rerun for this contract task.
 See [progress and history](./PROJECT_PROGRESS.md) for dated evidence and
 [financial rules](./financial-rules.md) for approved accounting behavior.
 
+## Private draft dashboard — 2026-10-04
+
+The signed-in dashboard separates Overview, Recent campaigns and Evidence.
+Creation opens from a Create campaign button inside Recent campaigns; it has no
+sidebar entry. Its frontend wizard covers campaign details, incremental milestone
+entry, and review/confirmation. Review offers a Save draft action that persists
+the campaign and all milestones atomically. Unsaved input stays in React state;
+submission is disabled until its separate workflow exists. The private
+`GET /campaigns` endpoint lists only drafts owned by the authenticated account,
+newest first; selecting a draft opens its campaign and milestone details. The list has no
+pagination yet. Campaign creation still stores off-chain metadata; publishing,
+evidence upload and submission are separate pending journeys.
+
+Backend builds use `tsconfig.build.json` to exclude specs (including the SIWE
+spec importing frontend source) and keep the runtime at `dist/src/main.js`.
+
+Milestone planning storage now uses `campaign_milestone_drafts`, linked to
+`campaign_metadata`, with unique zero-based positions and JSONB draft criteria.
+Migration `0002_campaign_milestone_drafts` also adds campaign revision. The
+create/detail APIs now validate and persist the planning aggregate. Owner comes
+from the authenticated session, and milestone indices come from array order.
+Aggregate editing now requires the last-read revision and saves the full plan in
+one transaction. A stale writer gets 409; the UI preserves input and offers a
+read-only latest-version comparison before an explicit discard/reload action.
+Edits are limited to unlinked private drafts without existing evidence until
+legacy evidence references are reconciled. Evidence creation shares the campaign
+row lock. Evidence-to-milestone existence checks remain TODO.
+
+The legacy index-based evidence editor has been removed from the UI. Evidence
+shows a placeholder until saved milestones can be selected explicitly; existing
+backend evidence endpoints and stored evidence are unchanged.
+
 ## Evidence preparation — 2026-10-03
 
 The user moved the design corpus into repository `v0.2/`. The

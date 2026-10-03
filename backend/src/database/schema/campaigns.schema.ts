@@ -1,4 +1,5 @@
 import {
+  integer,
   pgTable,
   text,
   timestamp,
@@ -12,6 +13,7 @@ export const campaignMetadata = pgTable('campaign_metadata', {
   title: varchar('title', { length: 200 }).notNull(),
   description: text('description'),
   status: varchar('status', { length: 32 }).default('draft').notNull(),
+  revision: integer('revision').default(1).notNull(),
   chainId: varchar('chain_id', { length: 32 }),
   contractAddress: varchar('contract_address', { length: 42 }),
   onchainCampaignId: varchar('onchain_campaign_id', { length: 128 }),

@@ -50,17 +50,22 @@ mandatory safety/integrity checks remain required.
 
 ## Backend implementation checkpoint — 2026-10-03
 
-This checkpoint describes local implementation work. Backend source is not
-included in the documentation publication; commit it separately before treating
-the parser/ownership service as available from a fresh GitHub clone.
+This checkpoint describes local implementation work. Backend source is committed
+separately from the documentation publication.
+
+- Added private campaign and evidence draft routes with JSONB content,
+  schema-version storage, organizer authorization and optimistic revisions; see
+  [Backend Step 2](./backend-step-2-drafts.md).
+- Added wallet-based SIWE session endpoints and a protected campaign ownership
+  example; see [Backend Step 1](./backend-auth-step-1.md).
 
 - Added a strict Zod parser for Evidence Schema v0.1, including supported
   document MIME types, EVM addresses/hashes, integer strings, unique IDs and
   document/expense references.
 - Added a campaign metadata ownership guard service for authenticated user IDs.
-- SIWE authentication/session issuance, campaign chain ownership projection,
-  evidence routes/persistence, criteria hash/version verification, upload,
-  freeze and manifest hashing are not implemented by this checkpoint.
+- Campaign chain ownership projection, evidence routes/persistence, criteria
+  hash/version verification, upload, freeze and manifest hashing are not
+  implemented by this checkpoint. SIWE nonce storage is in process memory.
 - Verification: backend Nest build succeeds. Automated evidence schema and
   access tests have not yet been added.
 
