@@ -317,6 +317,33 @@
   justify-content: space-between;
   gap: 18px;
 }
+.linked-wallets {
+  display: grid;
+  gap: 12px;
+  margin: 20px 0;
+  padding: 0;
+  list-style: none;
+}
+.linked-wallet {
+  padding: 16px;
+  border: 1px solid #dfe9df;
+  border-radius: 10px;
+}
+.linked-wallet__address,
+.linked-wallet__balance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.linked-wallet__address code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.linked-wallet .wallet-note {
+  margin-top: 12px;
+}
 .signin-row {
   display: flex;
   align-items: center;

@@ -14,6 +14,7 @@ import {
 import type { AccountSession } from '../../lib/api/auth'
 import { createSiweMessage } from '../../lib/web3/siwe'
 import { getErrorMessage } from '../../lib/api/error'
+import { LinkedWalletCard } from './LinkedWalletCard'
 
 interface AccountAccessProps {
   session: AccountSession | null
@@ -102,11 +103,10 @@ export function AccountAccess({
               một ví đã liên kết.
             </p>
             {session.wallets.length ? (
-              <ul>
+              <ul className="linked-wallets">
                 {session.wallets.map((wallet) => (
-                  <li key={`${wallet.chainId}:${wallet.address}`}>
-                    <code>{wallet.address}</code> · mạng {wallet.chainId}
-                  </li>
+                  <LinkedWalletCard key={`${session.userId}:${wallet.chainId}:${wallet.address}`}
+                    {...wallet} userId={session.userId} />
                 ))}
               </ul>
             ) : (

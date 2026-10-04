@@ -2,6 +2,23 @@
 
 > **Updated:** 2026-10-04
 
+### 2026-10-04 — Linked wallet information in account page
+
+- DONE: each verified account wallet displays its full address, copy action,
+  configured network/chain ID and native balance. Reads use the stored address
+  and chain, independently of the connected browser wallet. No signing required.
+- DONE: RPC loading/error, unsupported-chain and clipboard-error states; manual
+  balance refresh and 30-second polling. Errors are not displayed as zero.
+  Account-scoped query keys and component keys isolate cached data/UI state.
+- Local Foundry transport explicitly uses IPv4 loopback with an eight-second
+  timeout and no transport retry. Anvil reports chain 31337 and native balances.
+- Verification: frontend build/lint pass. Component render checks cover address,
+  network, loading, live RPC balance, zero, error, unsupported chain and account
+  cache isolation. Interactive browser refresh/copy remains unverified; existing
+  bundle-size warning remains. Backend and financial contract code unchanged.
+- MockUSDC balances await a configured token deployment. Donation/refund history
+  remains a separate journey. This wallet view does not display organizer bond.
+
 ### 2026-10-04 — Organization representative wallet
 
 - DONE: optional stored wallet link on organizations, additive migration 0006

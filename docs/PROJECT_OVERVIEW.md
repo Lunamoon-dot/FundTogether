@@ -260,3 +260,14 @@ an Arc-compatible compiler/EVM target has not been verified.
 Prototype CHALLENGED has no exit. Admission/organizer inactivity recovery and
 unreleased-escrow refunds now compile but need runtime verification; dispute
 resolution, slash and permanent transfer-failure recovery remain blockers.
+
+## Linked wallet information — 2026-10-04
+
+The account page now displays cards for verified linked wallets: full address,
+copy action, configured network/chain ID and native balance read from the RPC.
+Each card reads the stored address and chain independently of the current browser
+connection. Loading/error/unsupported-network states, manual refresh and 30-second
+polling are present; RPC errors do not imply a zero balance. Cache keys include
+account identity. The local RPC is http://127.0.0.1:8545 with an eight-second timeout.
+MockUSDC balance display awaits configured token deployment. Bond information
+belongs to organizer campaign management; it is not part of this personal view.

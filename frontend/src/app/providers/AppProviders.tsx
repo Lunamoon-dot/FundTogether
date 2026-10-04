@@ -31,7 +31,7 @@ const connectors = connectorsForWallets(
 const wagmiConfig = createConfig({
   chains: [foundry],
   connectors,
-  transports: { [foundry.id]: http() },
+  transports: { [foundry.id]: http('http://127.0.0.1:8545', { timeout: 8_000, retryCount: 0 }) },
 })
 
 const queryClient = new QueryClient({
