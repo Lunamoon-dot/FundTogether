@@ -45,4 +45,22 @@ describe("EvidenceAccessService", () => {
       service.assertCampaignOrganizer("missing", "owner-1"),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
+
+  it("allows an organization OWNER independently of the campaign creator", async () => {
+    limit
+      .mockResolvedValueOnce([{ organizerUserId: null, organizationId: "org-1" }])
+      .mockResolvedValueOnce([{ userId: "owner-2" }]);
+    const service = new EvidenceAccessService(database as never);
+    await expect(service.assertCampaignOrganizer("campaign-1", "owner-2"))
+      .resolves.toBeUndefined();
+  });
+
+  it("does not use a legacy creator field to bypass organization membership", async () => {
+    limit
+      .mockResolvedValueOnce([{ organizerUserId: "owner-1", organizationId: "org-1" }])
+      .mockResolvedValueOnce([]);
+    const service = new EvidenceAccessService(database as never);
+    await expect(service.assertCampaignOrganizer("campaign-1", "owner-1"))
+      .rejects.toBeInstanceOf(ForbiddenException);
+  });
 });

@@ -62,10 +62,12 @@ export function CampaignWizard({
   onClose,
   onSaved,
   initialCampaign,
+  organizationId,
 }: {
   onClose: () => void
   onSaved: (campaign: CampaignDraftDetail) => void
   initialCampaign?: CampaignDraftDetail
+  organizationId?: string
 }) {
   const [baseline, setBaseline] = useState(initialCampaign)
   const [step, setStep] = useState(0)
@@ -123,7 +125,7 @@ export function CampaignWizard({
             },
             controller.signal,
           )
-        : await createCampaignDraft(input, controller.signal)
+        : await createCampaignDraft(input, controller.signal, organizationId)
       if (controller.signal.aborted) return
       setStep(0)
       setTitle('')

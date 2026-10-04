@@ -1,0 +1,15 @@
+name: fundtogether-storage
+services:
+  minio:
+    build: ./infra/minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:?Run backend/scripts/setup-local-storage.cjs first}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:?Run backend/scripts/setup-local-storage.cjs first}
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - minio-data:/data
+volumes:
+  minio-data:

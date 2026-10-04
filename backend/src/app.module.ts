@@ -9,6 +9,7 @@ import { IndexerModule } from "./indexer/indexer.module";
 import { EvidenceModule } from "./modules/evidence/evidence.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { CampaignsModule } from "./modules/campaigns/campaigns.module";
+import { OrganizationsModule } from "./modules/organizations/organizations.module";
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { CampaignsModule } from "./modules/campaigns/campaigns.module";
     EvidenceModule,
     AuthModule,
     CampaignsModule,
+    OrganizationsModule,
   ],
 })
 export class AppModule {}

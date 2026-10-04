@@ -17,7 +17,7 @@ import { EvidenceDraftsService } from "./evidence-drafts.service";
 import { evidenceDraftContentSchema } from "./evidence.schema";
 
 const createDraftSchema = z
-  .object({ content: evidenceDraftContentSchema })
+  .object({ milestoneId: z.uuid(), content: evidenceDraftContentSchema })
   .strict();
 
 const updateDraftSchema = z
@@ -55,6 +55,7 @@ export class EvidenceDraftsController {
       parseMilestoneIndex(milestoneIndex),
       request.account!.userId,
       parsed.data.content,
+      parsed.data.milestoneId,
     );
   }
 

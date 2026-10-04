@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -16,7 +17,8 @@ import type {
 } from "./campaign-draft.schema";
 import { evidenceDrafts } from "../../database/schema/evidence-drafts.schema";
 import * as schema from "../../database/schema";
-import { EvidenceAccessService } from "../evidence/evidence-access.service";
+import { campaignAccessCondition, EvidenceAccessService } from "../evidence/evidence-access.service";
+import { organizationMembers } from "../../database/schema/organizations.schema";
 
 @Injectable()
 export class CampaignsService {
@@ -26,10 +28,21 @@ export class CampaignsService {
     private readonly evidenceAccess: EvidenceAccessService,
   ) {}
 
-  async listDrafts(organizerUserId: string) {
+  async listDrafts(organizerUserId: string, organizationId?: string) {
+    if (organizationId) {
+      const [membership] = await this.database.select({ userId: organizationMembers.userId })
+        .from(organizationMembers).where(and(
+          eq(organizationMembers.organizationId, organizationId),
+          eq(organizationMembers.userId, organizerUserId),
+          eq(organizationMembers.role, "OWNER"),
+        )).limit(1);
+      if (!membership) throw new ForbiddenException("Organization OWNER membership required");
+    }
     return this.database
       .select({
         id: campaignMetadata.id,
+        organizationId: campaignMetadata.organizationId,
+        createdByUserId: campaignMetadata.createdByUserId,
         title: campaignMetadata.title,
         description: campaignMetadata.description,
         status: campaignMetadata.status,
@@ -38,24 +51,38 @@ export class CampaignsService {
       .from(campaignMetadata)
       .where(
         and(
-          eq(campaignMetadata.organizerUserId, organizerUserId),
+          campaignAccessCondition(organizerUserId),
+          organizationId ? eq(campaignMetadata.organizationId, organizationId) : isNull(campaignMetadata.organizationId),
           eq(campaignMetadata.status, "draft"),
         ),
       )
       .orderBy(desc(campaignMetadata.createdAt), desc(campaignMetadata.id));
   }
 
-  async createDraft(organizerUserId: string, input: CreateCampaignDraftInput) {
+  async createDraft(organizerUserId: string, input: CreateCampaignDraftInput, organizationId?: string) {
     return this.database.transaction(async (transaction) => {
+      if (organizationId) {
+        const [membership] = await transaction.select({ userId: organizationMembers.userId })
+          .from(organizationMembers).where(and(
+            eq(organizationMembers.organizationId, organizationId),
+            eq(organizationMembers.userId, organizerUserId),
+            eq(organizationMembers.role, "OWNER"),
+          )).for("share");
+        if (!membership) throw new ForbiddenException("Organization OWNER membership required");
+      }
       const [campaign] = await transaction
         .insert(campaignMetadata)
         .values({
-          organizerUserId,
+          organizerUserId: organizationId ? null : organizerUserId,
+          organizationId: organizationId ?? null,
+          createdByUserId: organizerUserId,
           title: input.title,
           description: input.description,
         })
         .returning({
           id: campaignMetadata.id,
+          organizationId: campaignMetadata.organizationId,
+          createdByUserId: campaignMetadata.createdByUserId,
           title: campaignMetadata.title,
           description: campaignMetadata.description,
           status: campaignMetadata.status,
@@ -114,7 +141,7 @@ export class CampaignsService {
         .where(
           and(
             eq(campaignMetadata.id, campaignId),
-            eq(campaignMetadata.organizerUserId, organizerUserId),
+            campaignAccessCondition(organizerUserId),
             eq(campaignMetadata.status, "draft"),
             eq(campaignMetadata.revision, input.expectedRevision),
             isNull(campaignMetadata.chainId),
@@ -124,6 +151,8 @@ export class CampaignsService {
         )
         .returning({
           id: campaignMetadata.id,
+          organizationId: campaignMetadata.organizationId,
+          createdByUserId: campaignMetadata.createdByUserId,
           title: campaignMetadata.title,
           description: campaignMetadata.description,
           status: campaignMetadata.status,
@@ -212,6 +241,8 @@ export class CampaignsService {
         const [campaign] = await transaction
           .select({
             id: campaignMetadata.id,
+            organizationId: campaignMetadata.organizationId,
+            createdByUserId: campaignMetadata.createdByUserId,
             title: campaignMetadata.title,
             description: campaignMetadata.description,
             status: campaignMetadata.status,
@@ -223,7 +254,7 @@ export class CampaignsService {
           .where(
             and(
               eq(campaignMetadata.id, campaignId),
-              eq(campaignMetadata.organizerUserId, organizerUserId),
+              campaignAccessCondition(organizerUserId),
             ),
           )
           .limit(1);

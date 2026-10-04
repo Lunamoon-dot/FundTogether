@@ -4,10 +4,11 @@ import { AuthGuard } from "../auth/auth.guard";
 import { EvidenceModule } from "../evidence/evidence.module";
 import { CampaignsController } from "./campaigns.controller";
 import { CampaignsService } from "./campaigns.service";
+import { OrganizationCampaignsController } from "./organization-campaigns.controller";
 
 @Module({
   imports: [AuthModule, EvidenceModule],
-  controllers: [CampaignsController],
+  controllers: [CampaignsController, OrganizationCampaignsController],
   providers: [AuthGuard, CampaignsService],
 })
 export class CampaignsModule {}

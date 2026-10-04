@@ -1,0 +1,2 @@
+ALTER TABLE "organizations" ADD COLUMN "representative_wallet_link_id" uuid;--> statement-breakpoint
+ALTER TABLE "organizations" ADD CONSTRAINT "organizations_representative_wallet_link_id_wallet_links_id_fk" FOREIGN KEY ("representative_wallet_link_id") REFERENCES "public"."wallet_links"("id") ON DELETE no action ON UPDATE no action;

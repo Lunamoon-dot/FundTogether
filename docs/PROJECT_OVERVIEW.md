@@ -3,6 +3,10 @@
 > Updated: 2026-10-04
 > Scope: current repository and verified contract prototype
 
+For local onboarding, dependencies, PostgreSQL, MinIO, Anvil and FE/BE startup,
+follow the root [README](../README.md). It also separates runnable draft journeys
+from the pending on-chain integration.
+
 ## Repository boundaries
 
 | Directory | Responsibility | Current implementation |
@@ -15,6 +19,51 @@
 Campaign/evidence draft APIs are committed backend code. Account credentials,
 revocable sessions and optional wallet linking are local implementation work;
 their verification status is recorded in PROJECT_PROGRESS.md.
+
+Organization creation/list APIs are implemented as a separate account-owned
+metadata slice: POST/GET /organizations, transactional OWNER membership and
+unverified profile status. Migration 0004 applied locally and backend build
+passed; organization creation/list and campaign authorization were exercised by
+the 22-check HTTP/PostgreSQL smoke script. On-chain organizer
+addresses are unchanged. See
+[organization backend step](./backend-step-3-organizations.md).
+
+Organizations now have an optional representative wallet selected from the
+creator's SIWE-verified links. PUT /organizations/:id/wallet requires creator
+identity and current OWNER membership. Initial selection is persisted and fixed;
+MetaMask connection changes cannot replace it. Migration 0006 is applied locally.
+The organization list/profile shows and selects the wallet; no publication or
+money movement is added. See [organization wallet](./backend-step-6-organization-wallet.md).
+
+The #/organizations frontend route provides account-scoped organization listing
+and a create form, with sidebar/workspace links and an anonymous login prompt.
+Frontend build/lint passed; authenticated runtime and visual verification remain
+pending. Backend organization campaign ownership and frontend create/list
+integration and detail/edit routes are implemented. Authenticated API save/read
+checks pass; browser save/read interactions remain unverified.
+
+My organizations and #/organizations/:id profile views stay in the user tab.
+Organization cards/profile pages open #/organizations/:id/workspace/campaigns
+in a separate tab for campaign operations. Workspace has campaign/milestone/
+evidence navigation, with no profile overview. Campaign create/list is connected
+to organization-scoped APIs. Detail/edit includes ordered milestone plans;
+the Milestones view selects a campaign. Evidence navigation selects campaign and
+saved milestone, with a report draft editor using the existing evidence APIs.
+Report fields, dates and criterion outcomes are editable. Private upload/download
+uses local MinIO and the saved draft revision; expense editing, public redaction
+and freeze remain pending. The authenticated HTTP/PostgreSQL/MinIO journey passes
+63 checks including authorization, persistence and revision races; browser form
+interactions remain unverified. Evidence creation requires the current milestoneId
+and checks its campaign/index binding under a transaction lock.
+See [private evidence upload setup](./backend-step-5-evidence-upload.md).
+The personal #/workspace retains access to legacy user-owned drafts.
+
+Organization OWNERs can create/list drafts at /organizations/:id/campaigns.
+Campaign detail/update and evidence authorization honor organization membership;
+createdByUserId is audit metadata. Migration 0005 applied locally and backend
+build passed; 9 focused unit tests and 22 HTTP/PostgreSQL checks pass, including
+membership enforcement, persisted edits and stale revision rejection. Existing personal drafts
+retain null organizationId. See [campaign ownership](./backend-step-4-organization-campaigns.md).
 
 Blockchain is authoritative for custody, contributions, bond, refund entitlement
 and milestone state. PostgreSQL holds application metadata and derived chain

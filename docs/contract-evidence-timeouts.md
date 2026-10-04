@@ -58,8 +58,13 @@ finalization; claim flags prevent repeated refunds.
 
 ## Verification scope
 
-Foundry compilation is the verification for this slice. No automated tests are
-added/run and no runtime financial-safety claim is made. Before integration,
+The initial slice was verified by compilation only. A subsequent 2026-10-04
+readiness review ran the existing suite: 128 tests passed and one failed. The
+failing test, `testFuzzRejectedVersionsRetainHistory`, assumes up to eight
+rejections and unchanged escrow/bond balances, conflicting with the new
+three-submission limit and terminal failure/bond return. No timeout-specific
+tests were added during the review; runtime financial safety remains unverified.
+Before integration,
 verify deadline-minus-one/exact/plus-one boundaries; all three rejection/expiry
 rounds; reassignment without extension; old-version decisions; partial-release
 refunds across multiple donors; rounding; failed transfers; callbacks; repeated

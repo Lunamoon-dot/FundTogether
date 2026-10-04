@@ -1,5 +1,7 @@
 import { AccountAccess } from '../auth/AccountAccess'
 import type { AccountSession } from '../../lib/api/auth'
+import { OrganizationsPage } from '../organizations/OrganizationsPage'
+import { OrganizationProfile } from '../organizations/OrganizationProfile'
 import './PublicArea.css'
 
 interface PublicAreaProps {
@@ -20,6 +22,8 @@ export function PublicArea({
   const feed = path === '/'
   const account = path === '/account' || path === '/workspace'
   const contributions = path === '/contributions'
+  const organizationProfile = /^\/organizations\/([^/]+)$/.exec(path)
+  const organizations = path === '/organizations' || Boolean(organizationProfile)
   const detail = /^\/campaigns\/[^/]+$/.test(path)
 
   return (
@@ -41,12 +45,17 @@ export function PublicArea({
           </a>
         </nav>
         <div className="public-sidebar-account">
+          <a className="public-sidebar-action" href="#/organizations"
+            aria-current={organizations ? 'page' : undefined}>
+            Tổ chức của tôi
+          </a>
           <a
             className="public-sidebar-action"
             href="#/workspace"
+            target="_blank" rel="noopener noreferrer"
             aria-current={path === '/workspace' ? 'page' : undefined}
           >
-            <span aria-hidden="true">↗</span> Organizer workspace
+            <span aria-hidden="true">↗</span> Workspace cá nhân
           </a>
           <a
             className="public-sidebar-action"
@@ -62,6 +71,11 @@ export function PublicArea({
       </aside>
 
       <main className="public-content">
+        {organizations && (
+          <a className="public-back" href={organizationProfile ? '#/organizations' : '#/'}>
+            {organizationProfile ? '← Tổ chức của tôi' : '← Về khu vực người dùng'}
+          </a>
+        )}
         {feed && (
           <>
             <section className="feed-toolbar" aria-label="Tìm campaign">
@@ -185,7 +199,22 @@ export function PublicArea({
           </div>
         )}
 
-        {!feed && !account && !contributions && !detail && (
+        {organizations && (sessionLoading ? (
+          <p role="status" className="muted">Đang kiểm tra phiên đăng nhập…</p>
+        ) : session ? (
+          organizationProfile ? (
+            <OrganizationProfile organizationId={organizationProfile[1]} userId={session.userId} />
+          ) : <OrganizationsPage key={session.userId} userId={session.userId} />
+        ) : (
+          <section className="public-empty">
+            <h1>Tổ chức của tôi</h1>
+            <p>Đăng nhập để tạo và xem tổ chức của bạn.</p>
+            {error && <p role="alert">{error}</p>}
+            <a className="button button--primary" href="#/account">Đăng nhập</a>
+          </section>
+        ))}
+
+        {!feed && !account && !contributions && !detail && !organizations && (
           <section className="panel public-empty">
             <h1>Không tìm thấy trang</h1>
             <a className="button button--secondary" href="#/">

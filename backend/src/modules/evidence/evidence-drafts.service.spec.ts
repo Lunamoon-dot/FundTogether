@@ -34,6 +34,7 @@ describe("EvidenceDraftsService", () => {
             .fn()
             .mockReturnValue({
               for: jest.fn().mockResolvedValue([{ id: "campaign-1" }]),
+              limit: jest.fn().mockResolvedValue([{ id: "milestone-1" }]),
             }),
         }),
       }),
@@ -47,7 +48,7 @@ describe("EvidenceDraftsService", () => {
     const service = new EvidenceDraftsService(database as never, access);
 
     await expect(
-      service.create("campaign-1", "0", "user-1", content),
+      service.create("campaign-1", "0", "user-1", content, "milestone-1"),
     ).resolves.toMatchObject({ evidenceSchemaVersion: "0.1", revision: 1 });
     expect(values).toHaveBeenCalledWith({
       campaignMetadataId: "campaign-1",
@@ -75,7 +76,9 @@ describe("EvidenceDraftsService", () => {
   });
 
   it("turns a duplicate campaign/milestone draft into a conflict", async () => {
-    const error = Object.assign(new Error("duplicate"), { code: "23505" });
+    const error = Object.assign(new Error("Drizzle query failed"), {
+      cause: Object.assign(new Error("duplicate"), { code: "23505" }),
+    });
     const returning = jest.fn().mockRejectedValue(error);
     const values = jest.fn().mockReturnValue({ returning });
     const transaction = {
@@ -86,6 +89,7 @@ describe("EvidenceDraftsService", () => {
             .fn()
             .mockReturnValue({
               for: jest.fn().mockResolvedValue([{ id: "campaign-1" }]),
+              limit: jest.fn().mockResolvedValue([{ id: "milestone-1" }]),
             }),
         }),
       }),
@@ -99,7 +103,7 @@ describe("EvidenceDraftsService", () => {
     const service = new EvidenceDraftsService(database as never, access);
 
     await expect(
-      service.create("campaign-1", "0", "user-1", content),
+      service.create("campaign-1", "0", "user-1", content, "milestone-1"),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 });

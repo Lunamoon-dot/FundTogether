@@ -8,6 +8,11 @@ export const configuration = () => ({
     process.env.DATABASE_URL ??
     "postgresql://postgres:postgres@localhost:5432/fundtogether",
   blockchainRpcUrl: process.env.BLOCKCHAIN_RPC_URL,
+  s3Endpoint: process.env.S3_ENDPOINT,
+  s3Region: process.env.S3_REGION ?? "us-east-1",
+  s3Bucket: process.env.S3_BUCKET,
+  s3AccessKeyId: process.env.S3_ACCESS_KEY_ID,
+  s3SecretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
   chainId: process.env.CHAIN_ID
     ? Number.parseInt(process.env.CHAIN_ID, 10)
     : undefined,

@@ -29,6 +29,27 @@
       "when": 1791061078470,
       "tag": "0003_bored_warlock",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791098434843,
+      "tag": "0004_organizations",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791100294192,
+      "tag": "0005_campaign_organization_ownership",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791108174260,
+      "tag": "0006_organization_wallet",
+      "breakpoints": true
     }
   ]
 }

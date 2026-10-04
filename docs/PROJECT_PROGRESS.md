@@ -2,11 +2,251 @@
 
 > **Updated:** 2026-10-04
 
+### 2026-10-04 — Organization representative wallet
+
+- DONE: optional stored wallet link on organizations, additive migration 0006
+  applied locally. Existing organizations stay unbound; creation needs no wallet.
+  Creator plus current OWNER membership may select a verified wallet owned by
+  that creator on the specified chain.
+- DONE: PUT /organizations/:id/wallet validates body/session/Origin. Row locking
+  serializes initial picks; same selection is idempotent and replacement is 409.
+  Foreign/unverified wallets, other OWNERs and revoked membership are denied.
+  No on-chain authority or funds move; publication/campaign binding is pending.
+- FE: list/profile displays the stored wallet; profile provides explicit selection
+  from verified account wallets, account-link shortcut and refresh/error states.
+  Current MetaMask connection is not the saved value.
+- Verification: smoke failed before implementation; after migration backend build
+  and 32 tests/10 suites pass. New wallet smoke: 32 HTTP checks; campaign smoke: 22;
+  evidence/PostgreSQL/MinIO smoke: 63. All fixtures removed. Frontend lint/build
+  and diff whitespace check pass; bundle warning remains. Live OpenAPI exposes
+  the new route. Interactive browser/MetaMask selection remains unverified.
+- Wallet replacement, unlink/recovery and on-chain campaign binding are outside
+  this slice. Details: backend-step-6-organization-wallet.md. Next: contract
+  timeout, rejection/retry and terminal-refund verification.
+
+### 2026-10-04 — Root onboarding README
+
+- Added root README with dependencies/submodules, env setup, Windows PostgreSQL
+  service/database/migrations, Docker MinIO/bucket initialization, manual WSL
+  Anvil, FE/BE startup, current UI journeys and development verification commands.
+- Included ports, common errors and stopping services while retaining storage.
+  Explicitly states no automatic contract deployment, no completed donor/indexer
+  journey and no need for Anvil for metadata flows.
+- Commands cross-checked against current package scripts/configuration; WSL --cd
+  resolves the repository contracts directory correctly. No dependencies
+  reinstalled or implementation tests rerun; clean-machine onboarding has not
+  been performed.
+
+### 2026-10-04 — Contract return readiness review
+
+- Rechecked the milestone identity transaction lock and upload verification
+  script. Fresh backend build, 25 tests/nine suites and 63 HTTP/PostgreSQL/MinIO
+  checks pass. The smoke script confirms removal of its temporary objects/rows.
+- Returning to contract work is appropriate for bounded timeout/rejection/retry
+  verification. Browser evidence interaction is still unverified; package freeze,
+  commitment hashing, on-chain identity/version mapping and indexing remain
+  separate integration work.
+- Fresh existing Foundry suite: 128 passed, one failed across eleven suites.
+  testFuzzRejectedVersionsRetainHistory bounds rejection rounds to 1–8 and expects
+  unchanged escrow/bond balances, conflicting with MAX_SUBMISSIONS=3 and terminal
+  failure/bond return. No contract source or tests changed during this review.
+- Next: update that test to cover approved bounded retries and terminal outcomes,
+  add deadline boundary/expiry/reassignment tests, then verify proportional refunds,
+  rounding, failed transfers, repeat calls and campaign isolation after releases.
+  Timeout financial runtime verification remains IN_PROGRESS. No deployment or
+  full BE/FE/contract integration is claimed.
+
+### 2026-10-04 — Evidence journey verification and milestone identity
+
+- DONE: evidence creation requires milestoneId from campaign detail and validates
+  campaign/index/ID under the parent campaign lock. Missing milestone returns 404;
+  stale/foreign ID returns 409 MILESTONE_CHANGED. FE sends the ID and offers an
+  explicit campaign reload on identity conflicts while retaining entered input.
+- Fixed duplicate evidence creation: the PostgreSQL 23505 code is wrapped in
+  DrizzleQueryError.cause, which previously escaped as 500; it now maps to 409.
+- DONE: evidence-upload-smoke.cjs passes 63 real HTTP/PostgreSQL/MinIO checks with
+  two accounts. It verifies permissions/revocation, exact PNG bytes/hash, MIME and
+  size rejection, file quota, metadata integrity, persisted edits/login, stale
+  milestone IDs and races between plan edits/creation, report saves and uploads.
+  Losing upload objects and all test-created objects/accounts/rows are removed.
+- DONE: backend build and 25 unit tests across 9 suites; frontend build/lint pass.
+  Browser interactions and PDF/JPEG acceptance remain unverified. Process-crash
+  reconciliation remains TODO. Financial state/contracts were unchanged.
+- Next: review and complete the remaining contract state transitions before
+  freeze/submission/indexer integration.
+
+### 2026-10-04 — Local MinIO and private evidence upload
+
+- User selected local MinIO. Docker Desktop started; unavailable registry images
+  were replaced by a local image built from the pinned official source commit.
+  MinIO runs on loopback ports 9000/9001 with persistent volume, non-root process
+  and generated credentials stored only in ignored backend/.env.
+- Implemented authenticated multipart upload and original download. Limits:
+  PDF/JPEG/PNG, 10 MiB/file, 20 files/draft. File signature, size and SHA-256 are
+  checked/computed server-side. Originals use private storage and opaque IDs.
+- Upload appends a document and increments the draft revision conditionally on
+  revision/access. Failed append attempts object cleanup. Draft create rejects
+  supplied document metadata; PATCH cannot replace immutable uploaded metadata.
+- Connected upload/download controls to saved milestone evidence. Unsaved report
+  changes block upload to prevent form loss; revision conflicts require reload.
+- MinIO build/start and live health 200 verified. Private bucket initialized with
+  no anonymous policy. Backend/frontend builds and frontend lint pass; live
+  OpenAPI lists both routes. No tests were added/run in this slice.
+- IN_PROGRESS: authenticated upload/download and negative/race verification.
+  Public redaction, storage reconciliation after crashes, expense/link editors,
+  freeze and submission remain TODO. Setup is documented in backend step 5.
+
+### 2026-10-04 — Organization milestone evidence UI
+
+- Implemented campaign/milestone selection in the evidence section and direct
+  evidence links from campaign detail. URLs use saved milestone IDs; the API
+  index is taken from that milestone, with no manual index input.
+- Report editor loads existing drafts or starts a new draft on the explicit
+  draft-not-found response. It supports report summary, work dates and criterion
+  outcomes, preserving existing expense/document metadata and references.
+- Saves use POST/PATCH and expectedRevision. Errors retain input; 409 blocks
+  another save until the user explicitly loads the latest saved version, with
+  confirmation before replacing input. Account changes clear evidence cache.
+- Frontend build/lint passed. No tests were added/run in this slice. Authenticated
+  browser create/edit/reload and conflict behavior remain IN_PROGRESS.
+- Upload, expense editing, freeze and submission remain separate next slices.
+  Backend milestone identity validation during concurrent campaign-plan edits
+  before the first evidence save also remains pending.
+
+### 2026-10-04 — Organization campaign detail/edit and API verification
+
+- DONE: organization campaign list/create/detail/edit routes reuse the campaign
+  wizard. Detail includes ordered milestones and acceptance criteria; the
+  Milestones view selects a campaign. URL routes retain the selected campaign
+  on reload. Save errors preserve input and edits use expectedRevision.
+- DONE: frontend build/lint and backend build pass. Three focused unit suites
+  pass nine tests. The organization campaign smoke script passes 22 real
+  HTTP/PostgreSQL checks with two accounts, covering OWNER access, outsider
+  denial, creator denial after membership removal, persisted edits, stable
+  milestone IDs and stale revision rejection. Its temporary rows were removed.
+- DONE: git diff --check passes. No contract or financial behavior changed.
+- IN_PROGRESS: authenticated browser interaction verification and organization
+  evidence UI. API checks do not establish browser behavior or concurrent lock
+  behavior. Next connect evidence drafts to the selected campaign milestone.
+
 This file records verified implementation progress. A documented idea is not
 marked `DONE` until a command, test, transaction or projection provides
 evidence.
 
 ## Current milestone
+
+### 2026-10-04 — Organization profiles in user area; campaign operations in workspace
+
+- Corrected UX boundary: My organizations and #/organizations/:id profile stay
+  in the user area/current tab. Cards offer View profile and Manage campaign;
+  only the management action opens a separate organization workspace tab.
+- Removed profile overview from workspace navigation. Bare workspace routes open
+  Campaign by default; profile links return to the user-area profile route.
+- Connected organization campaign listing/creation to organization-scoped APIs
+  using the existing title/milestone/review wizard. Personal creation behavior
+  is preserved. Organization campaign cache keys include user and organization
+  IDs and are cleared on account changes.
+- Frontend build/lint and git diff --check passed. No tests added/run; live
+  authenticated profile display and campaign save/reload remain unverified.
+  Campaign detail/edit and milestone/evidence management remain next slices.
+
+### 2026-10-04 — Local backend route reload
+
+- Diagnosed Cannot GET/POST /organizations: the listening backend process was
+  serving a previously loaded dist build without organization routes.
+- Restarted that backend as npm run start:dev from backend/. Nest compiled with
+  zero errors and registered organization and organization-campaign routes.
+- Health returned 200; unauthenticated organization and organization-campaign
+  reads now return 401 Authentication required rather than 404. OpenAPI includes
+  both routes. Authenticated organization creation remains unverified.
+
+### 2026-10-04 — IN_PROGRESS: Organization campaign ownership backend
+
+- Added campaign organizationId/createdByUserId FKs and organization index.
+  Migration 0005 preserves personal ownership, copies known personal creators
+  for audit history and does not assign existing drafts to an organization.
+- Added authenticated POST/GET /organizations/:organizationId/campaigns using
+  the existing strict planning schema. OWNER membership is required; creation
+  checks/locks membership and inserts campaign/milestones in one transaction.
+- Personal listing excludes organization drafts. Campaign detail/update and
+  evidence create/read/update use organization membership for organization
+  campaigns and legacy personal ownership for null organizationId. Creator
+  audit fields never bypass membership. Revision/edit restrictions remain.
+- Migration generated, additive SQL reviewed and applied to local PostgreSQL;
+  backend build and git diff --check passed. No tests were added/run and HTTP
+  authorization, rollback and concurrent ownership behavior remain unverified.
+- Frontend campaign integration, representative wallet, publication and indexer
+  remain pending. See [backend step 4](./backend-step-4-organization-campaigns.md).
+
+### 2026-10-04 — Corrected organization workspace navigation
+
+- My organizations now stays in the current tab. Each organization card opens
+  its own #/organizations/:id/workspace in a separate tab, preserving the source.
+- Added OrganizationWorkspace shell: membership-scoped profile lookup, selected
+  organization name, sign-in/nonmember/error states and URL-based navigation for
+  overview, campaigns, milestones and evidence. Native Back/Forward operates on
+  these hash routes; no history blocking is introduced.
+- Organization financial/draft sections are explicit pending capabilities.
+  Existing user-owned campaigns are not shown as organization-owned data;
+  personal #/workspace remains accessible until backend linkage is implemented.
+- Frontend build/lint and git diff --check passed. No automated tests or live
+  authenticated organization workspace interaction were run for this slice.
+
+### 2026-10-04 — Resolved local Vite blank-page startup
+
+- Reproduced blank root/organization pages: Vite connected and served source
+  modules with HTTP 200, but React did not render and no startup error appeared.
+  Existing dependency optimizer metadata retained the removed Privy package.
+- Restarted the verified frontend Vite process with npm run dev -- --force
+  --host localhost --port 5173 --strictPort, rebuilding dependency cache.
+- Browser reload then rendered the public feed and anonymous organization page,
+  including sidebar, login prompt and return link. Earlier visual verification
+  blocker for these anonymous pages is resolved. Authenticated organization
+  creation/listing and mobile layout remain unverified.
+- WalletConnect emitted a connection-interrupted rejection; it did not prevent
+  page rendering and wallet interaction was not exercised in this fix.
+- No product-code changes or automated tests were needed for cache recovery.
+
+### 2026-10-04 — Organization navigation in a separate browser tab
+
+- Public and workspace organization links now use target=_blank with
+  noopener/noreferrer and a visible new-tab indicator. The original user tab
+  stays open; the organization route has a return link to the user feed.
+- Native Back remains scoped to the current tab's history; no cross-tab history
+  is fabricated and no browser navigation is blocked.
+- Frontend build/lint and git diff --check passed. No browser interaction or
+  automated tests were run for this navigation change.
+
+### 2026-10-04 — IN_PROGRESS: My organizations frontend
+
+- Added #/organizations and links in public/workspace navigation. Authenticated
+  accounts load organization lists and submit name/description via existing
+  cookie-authenticated Axios; anonymous accounts see a login prompt.
+- Added client validation, pending/error/empty states, retry for list failures,
+  input preservation on failure and cache update/refetch after successful create.
+  Query keys include userId and account changes clear organization queries.
+- Frontend build and lint passed; git diff --check passed. Vite returned HTTP
+  200, but in-app browser visual inspection showed a blank page without console
+  errors. Authenticated create/list and mobile UI remain unverified.
+- No tests added/run. Campaign linkage, invitations and wallet representation
+  remain outside this frontend slice.
+
+### 2026-10-04 — IN_PROGRESS: Minimal organizations and OWNER membership
+
+- Added organizations and organization_members tables, composite membership
+  primary key, user lookup index and OWNER-only role constraint. Existing
+  accounts, wallet links and campaigns remain unchanged.
+- Added authenticated POST /organizations and GET /organizations. Creation
+  accepts strict validated name/description only, derives creator from session,
+  and atomically inserts the organization and its OWNER membership. Profiles
+  start unverified. Listing filters by authenticated account membership.
+- Generated 0004_organizations migration, inspected its additive SQL, applied
+  it successfully to local PostgreSQL and completed npm run build successfully.
+  git diff --check passed. No tests were added/run and authenticated HTTP
+  requests were not exercised; runtime authorization/rollback remains unverified.
+- Frontend, invitations, editing, further roles, verification, representative
+  wallets and campaign organization linkage are outside this slice.
+- Learning guide: [Organization backend step](./backend-step-3-organizations.md).
 
 ### 2026-10-04 — MVP review and next integration decisions
 
@@ -975,3 +1215,17 @@ keeps the dated implementation history and its verification evidence.
 - Restarted the local backend with the new build: health returns 200, both removed
   routes return 404 and generated OpenAPI contains zero provider routes. Running
   Vite serves the provider-free app wrapper. Live MetaMask interaction was not run.
+
+### 2026-10-04 — IN_PROGRESS: Local wallet connection and balance diagnosis
+
+- User reports RainbowKit waiting at Opening MetaMask and MetaMask showing zero
+  ETH. Local Anvil RPC 127.0.0.1:8545 confirms chain 31337 and 10 ETH at the
+  supplied address ending d7619. The earlier balance update left block number 0.
+- Mined one local block without restarting/resetting Anvil; block number is now
+  1 and the address balance remains 10 ETH. This provides a new block for wallet
+  polling; MetaMask's displayed balance has not been confirmed afterward.
+- Vite serves the current account labels without Privy text; the reported screen
+  still contains historical labels/provider text. IPv4 RPC via localhost and
+  127.0.0.1 responds with CORS enabled; IPv6 loopback is not listening.
+- Requested the wallet's configured RPC URL/chain ID. Exact connection failure
+  and wallet refresh remain unverified; no speculative connector change applied.

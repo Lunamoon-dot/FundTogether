@@ -1,0 +1,23 @@
+.organizations-page { max-width: 900px; margin: 0 auto; }
+.organizations-page > .feed-heading { margin-top: 0; flex-wrap: wrap; }
+.organization-create { margin-bottom: 20px; }
+.organization-form { display: grid; gap: 10px; margin-top: 20px; }
+.organization-form label { font-size: 14px; font-weight: 600; }
+.organization-form select { min-height: 44px; padding: 0 12px; border: 1px solid #dfe6df; border-radius: 7px; background: white; }
+.organization-form .muted { font-size: 13px; margin: 0; }
+.organization-form-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+.organization-list { list-style: none; padding: 0; margin: 20px 0 0; display: grid; gap: 16px; }
+.organization-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.organization-card h2 { overflow-wrap: anywhere; }
+.organization-role { flex-shrink: 0; padding: 5px 9px; border-radius: 6px; background: #eaf1e9; color: #267450; font-size: 12px; }
+.organization-description { white-space: pre-wrap; overflow-wrap: anywhere; color: #65736b; font-size: 14px; line-height: 1.7; }
+.organization-card-meta { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; color: #718076; }
+.organization-list-error { margin: 16px 0; }
+.organization-list-error a { margin-left: 12px; color: #267450; }
+.organization-workspace-link { display: inline-flex; margin-top: 16px; text-decoration: none; }
+.organization-workspace-name { display: block; margin-top: 14px; overflow-wrap: anywhere; font-size: 14px; }
+.dashboard-nav a.nav-item { text-decoration: none; }
+.organization-milestones { padding-left: 24px; }
+.organization-milestones > li { padding: 12px 0; border-bottom: 1px solid #e2e8e2; }
+.organization-milestones h4 { margin: 12px 0 8px; font-size: 14px; }
+.organization-milestones ul { padding-left: 20px; overflow-wrap: anywhere; }

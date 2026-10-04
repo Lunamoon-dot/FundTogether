@@ -3,3 +3,4 @@ export * from './campaign-milestones.schema';
 export * from './evidence-drafts.schema';
 export * from './users.schema';
 export * from './auth.schema';
+export * from './organizations.schema';

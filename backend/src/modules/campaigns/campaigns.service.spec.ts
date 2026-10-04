@@ -36,6 +36,8 @@ describe("CampaignsService", () => {
     ).resolves.toEqual({ ...saved, milestones: [] });
     expect(values).toHaveBeenCalledWith({
       organizerUserId: "user-1",
+      organizationId: null,
+      createdByUserId: "user-1",
       title: "Clean water",
       description: "Provide water",
     });

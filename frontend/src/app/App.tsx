@@ -5,6 +5,7 @@ import { AccountAccess } from '../features/auth/AccountAccess'
 import { useAccountSession } from '../features/auth/AccountSessionProvider'
 import { CampaignWizard } from '../features/campaigns/CampaignWizard'
 import { PublicArea } from '../features/explore/PublicArea'
+import { OrganizationWorkspace } from '../features/organizations/OrganizationWorkspace'
 import type { AccountSession } from '../lib/api/auth'
 import { getCampaignDraft, listCampaignDrafts } from '../lib/api/campaigns'
 import type { CampaignDraft, CampaignDraftDetail } from '../lib/api/campaigns'
@@ -88,6 +89,10 @@ function App() {
       return
     }
     queryClient.removeQueries({ queryKey: ['campaigns'] })
+    queryClient.removeQueries({ queryKey: ['organizations'] })
+    queryClient.removeQueries({ queryKey: ['organization-campaigns'] })
+    queryClient.removeQueries({ queryKey: ['organization-campaign'] })
+    queryClient.removeQueries({ queryKey: ['organization-evidence'] })
     setSession(next)
     setCreatingCampaign(false)
     setEditingCampaign(false)
@@ -119,6 +124,13 @@ function App() {
       {error || notice}
     </div>
   )
+
+  const organizationWorkspace = /^\/organizations\/([^/]+)\/workspace(\/.*)?$/.exec(path)
+  if (organizationWorkspace) {
+    return <OrganizationWorkspace key={`${session?.userId ?? 'anonymous'}:${organizationWorkspace[1]}`}
+      organizationId={organizationWorkspace[1]} section={organizationWorkspace[2] ?? ''}
+      session={session} sessionLoading={sessionLoading} onSession={changeSession} />
+  }
 
   if (!session) {
     return (
@@ -154,7 +166,7 @@ function App() {
         <aside className="sidebar">
           <div className="sidebar-brand">
             {brand}
-            <span className="workspace-label">Organizer workspace</span>
+            <span className="workspace-label">Workspace cá nhân</span>
           </div>
           <nav className="dashboard-nav" aria-label="Workspace navigation">
             {(['overview', 'campaigns', 'evidence'] as const).map(
@@ -203,6 +215,9 @@ function App() {
               ),
             )}
           </nav>
+          <a className="workspace-explore-link" href="#/organizations">
+            Tổ chức của tôi
+          </a>
           <a className="workspace-explore-link" href="#/">
             ← Khám phá campaign
           </a>

@@ -27,6 +27,13 @@ within each milestone. The service takes
 verified session. The API rejects unknown request fields, including a client
 supplied owner.
 
+As of 2026-10-04, organization-owned drafts use
+POST/GET /organizations/:organizationId/campaigns. The personal list excludes
+organization-owned records. Campaign detail/update and evidence authorization
+use organization OWNER membership for these records; creator identity alone is
+insufficient. Personal drafts retain their existing owner check. See
+[organization campaign ownership](./backend-step-4-organization-campaigns.md).
+
 Campaign and milestones are inserted in one database transaction. If either
 insert fails, neither is committed. The server generates milestone UUIDs and
 assigns contiguous zero-based indices from request array order; client-supplied
@@ -77,10 +84,15 @@ an owner supplied through query parameters does not change that filter. Only
 rows with status `draft` are returned, ordered by `createdAt` then `id`
 descending. This first slice returns the full draft list without pagination.
 
-Evidence draft requests contain only `content`:
+Evidence draft creation requires `milestoneId` from the current campaign detail,
+along with `content`. The server checks the campaign/index/ID under the campaign
+row lock before inserting. A missing milestone returns 404; a changed ID/index
+returns 409 MILESTONE_CHANGED. Milestone identity cannot be supplied through an
+owner field. Existing draft updates retain expectedRevision plus content.
 
 ```json
 {
+  "milestoneId": "00000000-0000-4000-8000-000000000001",
   "content": {
     "report": {
       "summary": "Delivery completed",

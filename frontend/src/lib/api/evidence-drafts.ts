@@ -58,10 +58,13 @@ export async function createEvidenceDraft(
   campaignId: string,
   milestoneIndex: string,
   content: EvidenceDraftContent,
+  milestoneId: string,
+  signal?: AbortSignal,
 ) {
   const { data } = await http.post<EvidenceDraft>(
     path(campaignId, milestoneIndex),
-    { content },
+    { milestoneId, content },
+    { signal },
   )
   return data
 }
@@ -69,9 +72,11 @@ export async function createEvidenceDraft(
 export async function getEvidenceDraft(
   campaignId: string,
   milestoneIndex: string,
+  signal?: AbortSignal,
 ) {
   const { data } = await http.get<EvidenceDraft>(
     path(campaignId, milestoneIndex),
+    { signal },
   )
   return data
 }
@@ -81,10 +86,33 @@ export async function updateEvidenceDraft(
   milestoneIndex: string,
   expectedRevision: number,
   content: EvidenceDraftContent,
+  signal?: AbortSignal,
 ) {
   const { data } = await http.patch<EvidenceDraft>(
     path(campaignId, milestoneIndex),
     { expectedRevision, content },
+    { signal },
   )
+  return data
+}
+
+export async function uploadEvidenceDocument(campaignId: string, milestoneIndex: string,
+  expectedRevision: number, kind: EvidenceDraftContent['documents'][number]['kind'], file: File,
+  signal?: AbortSignal) {
+  const form = new FormData()
+  form.append('expectedRevision', String(expectedRevision))
+  form.append('kind', kind)
+  form.append('file', file)
+  const { data } = await http.post<EvidenceDraft>(`${path(campaignId, milestoneIndex)}/documents`, form, {
+    signal, headers: { 'Content-Type': undefined },
+  })
+  return data
+}
+
+export async function downloadEvidenceDocument(campaignId: string, milestoneIndex: string, documentId: string,
+  signal?: AbortSignal) {
+  const { data } = await http.get<Blob>(`${path(campaignId, milestoneIndex)}/documents/${documentId}`, {
+    signal, responseType: 'blob',
+  })
   return data
 }

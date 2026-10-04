@@ -2,6 +2,8 @@ import { http } from './http'
 
 export interface CampaignDraft {
   id: string
+  organizationId: string | null
+  createdByUserId: string | null
   title: string
   description: string | null
   status: string
@@ -33,8 +35,10 @@ export async function createCampaignDraft(
     }[]
   },
   signal?: AbortSignal,
+  organizationId?: string,
 ) {
-  const { data } = await http.post<CampaignDraftDetail>('/campaigns', input, {
+  const route = organizationId ? `/organizations/${organizationId}/campaigns` : '/campaigns'
+  const { data } = await http.post<CampaignDraftDetail>(route, input, {
     signal,
   })
   return data
@@ -42,6 +46,11 @@ export async function createCampaignDraft(
 
 export async function listCampaignDrafts() {
   const { data } = await http.get<CampaignDraft[]>('/campaigns')
+  return data
+}
+
+export async function listOrganizationCampaignDrafts(organizationId: string) {
+  const { data } = await http.get<CampaignDraft[]>(`/organizations/${organizationId}/campaigns`)
   return data
 }
 
