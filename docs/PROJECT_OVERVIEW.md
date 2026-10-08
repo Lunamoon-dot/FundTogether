@@ -1,9 +1,25 @@
 # FundTogether Project Overview
 
-> Updated: 2026-10-07
+> Updated: 2026-10-09
 > Scope: current repository and local MVP deployment
 
 ## Current direction — 2026-10-06
+
+**First read, user-directed on 2026-10-08:** [research direction](./research-direction.md)
+records the proposed NCKH title, objectives, six research activities, expected
+outputs and flexible business scope. Read it before reasoning or finalizing a
+project decision; then verify the relevant baseline and source. On 2026-10-08 the
+user selected staged funding before execution, with review before subsequent
+funding (flow B), and evidence-verification workflow as the core design focus.
+Detailed financial conditions and implementation remain pending. Bond removal
+remains a proposal; the deployed reimbursement baseline has not changed.
+
+On 2026-10-09 the user clarified that buying/distributing gifts is the first
+campaign type, not the definition of all FundTogether campaigns. Keep activity
+type separate from recipient/distribution channel and the number of funding
+stages. Gift-specific criteria/evidence belong to that type; future types need
+their own reviewed business rules. This is a documented design boundary, not
+an implemented multi-type workflow or authorization to add speculative machinery.
 
 The user has chosen MVP consolidation and business validation before expanding
 post-MVP. The [working plan](./business-validation-and-mvp-hardening.md) records

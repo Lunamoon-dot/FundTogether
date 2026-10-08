@@ -1,3 +1,12 @@
+# Mandatory first read — FundTogether research direction
+
+Before reasoning about FundTogether, proposing a change or finalizing a decision,
+read `docs/research-direction.md` from the repository root first. The user made
+this the priority research reference on 2026-10-08. Follow it with relevant
+specifications, progress and code; distinguish research proposals from approved
+rules and verified behavior. Later explicit user decisions take precedence.
+The research direction does not itself authorize changing funds or permissions.
+
 # 1. Think Before Coding
 
 Think before acting, but prefer execution over discussion when the user is asking for implementation.

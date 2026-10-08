@@ -7,6 +7,13 @@
 
 ## 1. Quyết định hiện tại
 
+**Ưu tiên đọc từ 2026-10-08:** [Định hướng NCKH](./research-direction.md) là tài liệu
+đọc trước khi phân tích hoặc chốt quyết định. Tài liệu đó lưu tên đề tài, mục tiêu,
+sáu nội dung nghiên cứu, kết quả dự kiến và phạm vi điều chỉnh nghiệp vụ. Các câu
+hỏi dưới đây phục vụ định hướng này. Người dùng đã chọn hướng B cấp vốn trước
+theo từng đợt, nghiệm thu trước khi cấp tiếp và tập trung vào workflow xác minh.
+Điều kiện tài chính chi tiết/triển khai vẫn cần chốt; baseline đang chạy chưa đổi.
+
 Tạm hoãn mở rộng post-MVP. Ưu tiên hiểu cách một chiến dịch từ thiện vận hành
 ngoài đời, kiểm chứng giả định của protocol, sửa các điểm không phù hợp và làm
 cho MVP dễ sử dụng, có thể phục hồi và có kết quả kiểm tra tái lập được.

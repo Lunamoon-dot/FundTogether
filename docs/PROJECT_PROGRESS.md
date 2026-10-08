@@ -1,6 +1,6 @@
 # FundTogether Project Progress
 
-> **Updated:** 2026-10-07
+> **Updated:** 2026-10-09
 
 ## Current direction — MVP consolidation and business validation
 
@@ -26,6 +26,44 @@ See [the working plan](./business-validation-and-mvp-hardening.md).
 The dated entries below are evidence for their stated slice and environment.
 Historical DONE entries do not mark the entire MVP, business validation or
 production readiness DONE; old next-step notes are superseded by this direction.
+
+### 2026-10-09 — DONE recording gift distribution as the first campaign type
+
+- User explicitly clarified that buying/distributing gifts is one charitable
+  campaign type and other types may be supported later. Recorded this in the
+  first-read research direction, gift-workflow proposal and project overview.
+- Distinguished activity type, individual/institution distribution and one/many
+  funding stages. Gift-specific checklists must not define every campaign;
+  adding a type needs evidence/completion rules and any financial effects reviewed.
+- MVP still focuses on gifts. No application, contract, schema, dependencies or
+  generic workflow engine changed. Checked document consistency and whitespace;
+  no builds or test suites were run for this documentation update.
+
+### 2026-10-08 — DONE recording user choice of staged funding (flow B)
+
+- User chose staged funding before execution and evidence review before releasing
+  the next stage, prioritizing organizer usability over the capital burden of
+  reimbursement. The user identified verification business rules/workflow as core.
+- Recorded this design direction, remaining decisions and fund limitations in
+  research-direction.md; aligned overview and the business-validation pointer.
+  It is not a complete financial specification or proof of optimal risk/usability.
+- Contracts, financial baseline, deployed state and application code are unchanged.
+  Bond removal, payout size, admission/review/challenge conditions and recovery
+  details remain to be specified. No builds or test suites were run.
+
+### 2026-10-08 — DONE recording NCKH direction and first-read instructions
+
+- User explicitly asked to retain the discussed research direction and prioritize
+  reading it before reasoning or deciding. Added `research-direction.md` with the
+  proposed title/objectives, the complete six-item form content, expected outputs,
+  flexible scope and open business decisions.
+- Root AGENTS.md and skills/AGENTSKILLS.md now require that first read. Overview
+  and the business-validation plan point to the direction. Existing baseline
+  bond/accounting/payout rules, contracts and application behavior are unchanged.
+- Verified document content, links and Git whitespace checks. This records the
+  direction only; user studies, labelled datasets, comparative experiments and
+  browser acceptance remain TODO. No builds or test suites were run for this
+  documentation-only update.
 
 ### 2026-10-07 — DONE authorized test campaign/chain reset and MVP deployment
 

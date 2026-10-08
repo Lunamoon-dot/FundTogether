@@ -1,5 +1,20 @@
 # FundTogether — Project Instructions
 
+## Mandatory first read — research direction
+
+Before reasoning about FundTogether, proposing a change or finalizing a decision,
+read `docs/research-direction.md` first. The user explicitly made this the primary
+research-direction reference on 2026-10-08. Then read relevant overview/progress,
+business-validation documents, specifications and source code.
+
+Align decisions with its research goals, flexible scope and evaluation criteria.
+Distinguish research proposals, approved financial rules and verified implementation.
+This direction does not automatically authorize changes to funds, authority or
+existing campaign obligations. Later explicit user decisions take precedence;
+update the direction and affected specifications when the user changes the scope.
+Historical bond, delivery-order and scaffold statements below must be interpreted
+against the current direction and verified project documentation.
+
 ## Project context
 
 FundTogether is a donation-based charitable crowdfunding protocol. Its core model is:
@@ -111,6 +126,7 @@ The UI must distinguish upload success, transaction success, and indexed/confirm
 The v0.2 reference documents describe proposals and learning material; they do not prove that code exists. When this repository gains project documentation, keep these concerns separate:
 
 - `docs/PROJECT_OVERVIEW.md`: current architecture, verified stack, repository map, setup instructions, and approved decisions.
+- `docs/research-direction.md`: first-read research goals, proposed form content, flexible scope, open business decisions and evaluation requirements.
 - `docs/PROJECT_PROGRESS.md`: implementation status, evidence of verification, blockers, next actions, and a dated change log.
 - `docs/protocol-spec.md`: MVP protocol actors, authority, data ownership, actions and events.
 - `docs/state-machine.md`: campaign, milestone, evidence, challenge and refund transitions.
@@ -120,7 +136,7 @@ The v0.2 reference documents describe proposals and learning material; they do n
 
 When working on a task:
 
-1. Read the relevant overview or progress section if it exists.
+1. Read `docs/research-direction.md` first, then the relevant overview or progress section.
 2. Update progress only after checking the repository, command output, tests, or other concrete evidence.
 3. Use `TODO`, `IN_PROGRESS`, `BLOCKED`, and `DONE` consistently.
 4. Do not mark a feature `DONE` because it is documented or visually mocked.
