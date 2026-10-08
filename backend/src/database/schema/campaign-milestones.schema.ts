@@ -4,6 +4,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  numeric,
   text,
   timestamp,
   uniqueIndex,
@@ -27,6 +28,7 @@ export const campaignMilestoneDrafts = pgTable(
     milestoneIndex: integer("milestone_index").notNull(),
     title: varchar("title", { length: 200 }).notNull(),
     description: text("description"),
+    budgetUnits: numeric("budget_units", { precision: 78, scale: 0 }),
     acceptanceCriteria: jsonb("acceptance_criteria")
       .$type<DraftAcceptanceCriterion[]>()
       .notNull()
@@ -43,6 +45,7 @@ export const campaignMilestoneDrafts = pgTable(
       table.campaignMetadataId,
       table.milestoneIndex,
     ),
+    check("campaign_milestone_drafts_budget_positive", sql`${table.budgetUnits} > 0 AND ${table.budgetUnits} <= 115792089237316195423570985008687907853269984665640564039457584007913129639935`),
     check(
       "campaign_milestone_drafts_index_nonnegative",
       sql`${table.milestoneIndex} >= 0`,

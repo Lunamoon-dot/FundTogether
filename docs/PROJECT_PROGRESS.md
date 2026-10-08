@@ -1,6 +1,675 @@
 # FundTogether Project Progress
 
-> **Updated:** 2026-10-04
+> **Updated:** 2026-10-07
+
+## Current direction — MVP consolidation and business validation
+
+User-confirmed on 2026-10-06: stay with the MVP, research real charitable
+operations and strengthen existing journeys before adding post-MVP features.
+See [the working plan](./business-validation-and-mvp-hardening.md).
+
+- IN_PROGRESS: consolidate the implementation and its user experience. A/B have
+  local/manual evidence; C1–C6 real-wallet acceptance remains TODO on a separately
+  prepared MVP application environment. Automated smoke fixtures are not that
+  environment. On 2026-10-07 the user authorized discarding local test campaigns
+  and replacing the application prototype with FundTogetherMvp; browser acceptance
+  on that fresh deployment remains TODO.
+- TODO: validate organizer working capital, no-slash bond purpose, evidence
+  standards, resolver capacity/conflicts, donor participation and operational
+  responsibilities. No interviews or real-world pilot are claimed as completed.
+- TODO: complete browser failures, coordinated backup/restore and continuous
+  liveness acceptance; prioritize demonstrated blockers before measured optimization.
+- Deferred: separate verifier, committee, appeals, slash, reputation, AI and
+  public-network expansion. Existing approved rules remain the test baseline;
+  changes to authority/funds/obligations require explicit decisions.
+
+The dated entries below are evidence for their stated slice and environment.
+Historical DONE entries do not mark the entire MVP, business validation or
+production readiness DONE; old next-step notes are superseded by this direction.
+
+### 2026-10-07 — DONE authorized test campaign/chain reset and MVP deployment
+
+- User explicitly permitted discarding test campaign/chain data without a new
+  data backup and required keeping accounts. Application services were already
+  stopped. Removed only active old chain snapshot files and created fresh local
+  Anvil 31337; old recovery directories were not used or modified.
+- Deployed MockUSDC and FundTogetherMvp on 8545 using current Foundry artifacts.
+  Generated manifest/ABI now include MVP milestone/recovery policies, a new
+  random deployment ID, genesis and mined deployment anchor. Contract addresses
+  happen to repeat because the fresh Anvil uses the same deployer/nonces; identity
+  is new. No campaign rights or balances were migrated from the discarded chain.
+- Explicitly truncated the 13 campaign/evidence/projection/indexer tables without
+  CASCADE. Compared complete row-content hashes inside the transaction and after:
+  all 4 users, 1 organization/member, 1 platform-role row, 6 wallet links, 1 auth
+  session and auth challenge state remain unchanged. No identity table was cleared.
+- Minted exactly 10,000 MockUSDC to each of the 6 linked local wallets. Verified
+  after clean save/restart: every balance matches, nextCampaignId is 0, escrow is
+  0, and code hashes/genesis/policy/deployment ID match the new manifest. Native
+  supervisor validated autosaves through block 78; saved state has 8 transactions
+  and is approximately 5.7 MB. Interval mining remains 5 seconds.
+- Foundry build and backend build succeeded; Foundry emitted existing lint
+  warnings. FE returns 200; backend /health returns 200 and /public/campaigns
+  returns an empty list with indexer ready at 117/117 and error null. Backend runs
+  compiled output in the background; FE and supervised Anvil run in the background.
+  No test suites or MetaMask workflow acceptance were run.
+- TODO infrastructure: Docker Desktop fails at its Secrets Engine stale socket;
+  official start/restart/stop attempts did not restore its engine. Automatic
+  review rejected manual process termination/socket deletion. MinIO is offline:
+  4 old evidence objects remain unreferenced, with their IDs recorded in ignored
+  `.local/mvp-reset-20261007/evidence-objects-to-remove.json`. DB evidence is empty;
+  new evidence upload cannot be accepted until MinIO is running. No Docker volume
+  was reset and no Docker secrets were deleted.
+- Updated current deployment statements and manual-test prerequisites. Historical
+  A/B and isolated C results do not prove browser acceptance of this deployment.
+
+### 2026-10-07 — DONE snapshot EOF recovery; autosave latency remains TODO
+
+- Reproduced startup rejection: native `state.json` ended mid-string at byte
+  426,259,324 in `historical_states`. No Anvil was listening on 8545. Preserved
+  the exact original in native `recovery-20261007-eof/truncated.json` before
+  recovery; the old port-conflict diagnostic did not describe this failure.
+- Recovered the complete latest core at block 2996 with 39 saved transactions.
+  Retained 1,703 complete current historical entries and recovered 1,162 more
+  from the validated block-2688 backup. The resulting 2,865 historical entries
+  are incomplete history; recovery does not establish that unsaved work survived.
+- Verified the candidate on isolated port 9546 with mining disabled: chain ID,
+  genesis and both deployment code hashes match; all 39 saved receipt block
+  hashes/numbers and all 88 stored contract/token slots match. Stopped only that
+  temporary node, atomically installed the recovered snapshot and started the
+  normal launcher on 8545 in the background. No reset, redeploy, transaction,
+  manifest change or clock synchronization was performed.
+- Startup now uses a Python supervisor in Ubuntu: Anvil writes a pending file;
+  an independent, fully parsed copy is fsynced and atomically promoted, retaining
+  the previous valid snapshot. Files changing during copy, truncated files and
+  snapshots with older/mismatched heads are rejected. A supervisor lock prevents
+  concurrent launchers. Missing/corrupt saved state fails closed with a useful
+  diagnostic. Windows backup copying also uses a temporary file.
+- Nine focused Python tests pass, including truncated input, interrupted
+  replacement, concurrent source writes and chunk boundaries. PowerShell parses
+  successfully. No application or contract test suite was run for this recovery.
+- Observed two live validated promotions at blocks 3008 and 3021; `.previous`
+  retains the preceding complete snapshot. On the production local port, all
+  18 saved account balances/nonces and 39 receipt block hashes also match.
+- Live API, frontend and MinIO return 200. Indexer resumed at 3004/3004 with
+  error null; canonical events remain 43 and campaign projections remain 4.
+  Chain time is about eight hours behind host time; deadline acceptance and
+  new wallet transactions were not tested or asserted ready.
+- TODO: reduce full-history autosave latency without sacrificing historical
+  reads. During a later dump, 5-second RPC checks timed out; the node recovered
+  without intervention and indexer reached 3029/3029 with error null. Atomic
+  saves protect the canonical file from partial writes, but do not eliminate
+  Anvil's serialization stalls. Historical state has not been pruned.
+
+### 2026-10-07 — DONE local startup clock warning and authorized forward sync
+
+- Startup now distinguishes clock drift from RPC/deployment/mining failure.
+  After identity and advancing blocks are verified, the mining helper returns
+  exit code 2 for drift over 60 seconds; the PowerShell launcher warns and
+  successfully reuses the node. Actual verification failures still stop startup.
+  Clock synchronization remains explicit; startup does not silently change time.
+- Verified the launcher with the restored clock about 15 hours behind the host:
+  it warned, preserved chain time and exited successfully. User then explicitly
+  approved forward synchronization. Ran the existing --sync-clock action and
+  verified the launcher again without a drift warning. Final measured drift was
+  1.316 seconds. Existing deadline values remain unchanged; elapsed deadlines
+  become eligible, but their state transitions still require contract calls.
+- Deployment genesis and contract/token code hashes match the manifest. All 4
+  campaigns' contributions, bond amounts and states match the recovery inventory.
+  No reset, redeploy or financial transaction was performed.
+- Backend was no longer listening on port 3000 during the final check. Started
+  one backend watch process in the background; API /health and /public/campaigns
+  return 200. Indexer is ready at block 2787/2787 with error null; canonical events
+  remain 43 and campaign projections remain 4.
+- JavaScript syntax and PowerShell parsing checked; both startup paths and live
+  API/RPC state verified. No test suites or browser workflow tests were run.
+  README explains the warning versus startup failure behavior.
+
+### 2026-10-07 — DONE runtime recovery: empty Anvil caused indexer identity failure
+
+- Diagnosed the running Anvil command without --state: RPC responded but head
+  was block 0, genesis differed from the manifest, and contract/token code was
+  empty. Backend startup succeeded; indexer correctly retained its old checkpoint
+  instead of treating the new node as the existing deployment.
+- Native Ubuntu state remained intact at saved block 2688 (620,123,987 bytes).
+  Copied it to `~/.local/state/fundtogether/anvil/recovery-20261007-indexer/state.json`
+  and verified matching SHA-256 before recovery. Recorded pre-recovery indexer
+  inventory in ignored `.local/indexer-recovery-20261007/before.json`.
+- Rechecked the empty node and exact process command, stopped it gracefully,
+  then launched the existing state-aware PowerShell script in the background.
+  Active state stays on native Linux; 60-second autosave and 5-second mining.
+  No manifest/ABI change, redeploy, DB reset, clock synchronization or financial
+  transaction was performed. Backend recovered without restart.
+- Verified restored chain ID/genesis and contract/token code hashes against
+  the manifest; all 4 campaigns' financial fields/states match the pre-recovery
+  projections. All 21 transactions referenced by canonical indexed events have
+  successful canonical receipts. Canonical event count stays 43; projections 4.
+- API /health and /public/campaigns return 200; indexer is ready at block
+  2704/2704 with error cleared. Native autosave updated successfully before the
+  final API check. This is runtime recovery evidence, not a new browser workflow
+  test or a claim that unsaved transactions can always be recovered.
+- README now explains the empty-node identity warning and saved-state recovery.
+
+### 2026-10-06 — DONE documentation: consolidation direction and research plan
+
+- Added business questions B01–B08, concrete expected outputs, a decision-record
+  template, hardening work H01–H05 and evidence-based exit criteria.
+- Compared the v0.2 pre-verification exposure/bond rationale to current
+  post-evidence settlement: organizer working capital and the purpose of a
+  no-slash bond are explicit research issues, not proven business benefits.
+- Aligned README, overview, scope, protocol/state/financial/verification docs
+  and v0.2 entry points. Clarified prototype versus separately tested MVP,
+  legacy verifier/atomic-bond behavior and outstanding browser/operations checks.
+- Corrected the documentation-only custody equation to avoid counting refund
+  obligations and the tokens backing them twice; corrected the donation event
+  name to DonationReceived. No financial rule or implementation was changed.
+- Inspected source/config and existing verification records. No test suites,
+  service restarts, database/storage edits, chain reset/deploy or transaction
+  were performed. Business research and operational acceptance remain TODO.
+- Documentation checks: 131 local file/heading links across 11 edited/new
+  documents resolve; UTF-8 and code fences checked; scoped git diff --check passes.
+
+### 2026-10-06 — Local Anvil/WSL RPC recovery
+
+- DONE: diagnosed unresponsive Ubuntu execution, Windows RPC timeouts and
+  MinIO timeouts. Kernel logs include Anvil OOM termination at roughly 7 GiB RSS
+  with exhausted swap. Restarted only Ubuntu after copying and hash-checking
+  the 544,261,641-byte state into ignored
+  `.local/anvil/recovery-20261006-193432/`; Docker storage recovered.
+- Restoring the complete state recovered RPC and receipts, but a historical
+  autosave to `/mnt/c` stalled RPC again for tens of seconds. Gracefully stopped
+  Anvil and migrated the latest complete state to native Ubuntu storage:
+  `/home/dell/.local/state/fundtogether/anvil/state.json`. No snapshots, accounts,
+  blocks, transactions, contract storage or deployment metadata were removed.
+- DONE: `start-local-chain.ps1` now imports the Windows backup on first native
+  start, keeps active snapshots on Linux, saves every 60 seconds, and copies
+  back to `.local/anvil/state.json` after a clean exit when the launcher continues.
+  Mining remains every 5 seconds with mixed mining; the native file is the
+  authoritative active state. README records the new path and backup semantics.
+- Verified chain ID/genesis and contract/token code hashes match the existing
+  manifest. All 39 saved transaction receipts and 88 contract/token storage slots
+  at saved block 2495 match the pre-migration copy. All four campaigns remain;
+  backend, MinIO and public campaign API return 200 and indexer is ready.
+  Across 80 seconds spanning a native autosave, all 40 RPC probes succeeded
+  (maximum latency 64 ms) and head advanced from 2500 to 2514.
+  PowerShell syntax parsing passes. Recovery measurements are in the ignored
+  recovery directory; no application transaction or deployment was sent.
+- The restored chain clock is about 9 h 51 min behind the host. Recovery did
+  not call `evm_setTime` or change campaign deadlines; deliberate clock sync
+  remains a separate action because advancing time changes deadline eligibility.
+
+### 2026-10-06 — DONE source and isolated verification: MVP milestone lifecycle
+
+- Connected the approved resolver-only, no-slash policy through FundTogetherMvp,
+  canonical indexing, authenticated API/storage and FE actions. Existing
+  prototype/8545 manifest and campaign obligations remain unchanged; no live
+  reset/redeploy or financial test transaction was performed.
+- Immutable public evidence requires explicit organizer redaction confirmation,
+  complete locked criteria and separate uploads. Download/admission validates
+  manifest/file SHA-256; restricted originals require an independent SIWE-linked
+  resolver and create access logs. Canonical submitted version history is readable.
+  Migration 0012 adds publication/record/access tables and was applied locally.
+- Version-bound submission, challenge and settlement entrypoints reject an old
+  wallet confirmation after evidence/version changes. Existing contract entrypoints
+  preserve prototype behavior. FE checks call targets, receipt signer, canonical
+  block and exact action events, including challenge version/hash plus donor/reason.
+  Indexed completion is separate from receipt; pending/replaced hashes survive reload.
+- Resolver reuses `#/internal/milestones`. Campaign/workspace panels show next
+  actor, required wallet, chain deadlines, budget/bond and blocking reasons.
+  Preparation enforces current state/version, account relationships and SIWE links.
+  Old deployment plans cannot break the current queue; failed RPC/indexer/identity
+  or corrupt evidence is an explicit error, not signing authorization.
+- Verified: 200 Foundry tests in 15 suites, including 31 MVP tests, fuzz 1024
+  and stateful invariant 128 runs x 128 calls; backend 96 tests in 16 suites;
+  frontend 88 tests, build/typecheck and oxlint; timeout worker 8 unit tests.
+  Builds pass. Vite still reports large wallet/entry chunks; no bundle optimization
+  or production performance claim is made in this slice.
+- Isolated MVP smoke passes 467 real HTTP/SIWE/PostgreSQL/MinIO/receipt/index
+  checks: sequential settlement, CONTINUE/RESUBMIT/STOP/timeout, role/version
+  denial, private-original isolation, immutable public packages, damaged storage
+  and manifest, partial refund with retained dust, pull bond, replay and reorg.
+  Actual local worker survives injected RPC outage; an unknown-send intent is
+  retained without resending; restart does not duplicate; wrong identity halts.
+- Prototype regression was rerun after the version guards: publication/indexer
+  202 checks and refund 377 checks pass. Read-only verification confirms active
+  genesis/contract/token code hashes still match the original 8545 manifest;
+  milestone smoke accounts are fully removed (count 0). No user accounts or
+  campaigns were deleted.
+- Remaining: real MetaMask popup/rejection/account-change/reload verification;
+  continuous or multiple keeper operation; a separately planned application MVP
+  deployment after inventory of prototype escrow/data. Current prototype campaigns
+  do not gain MVP case recovery. This is not Arc or real-funds readiness.
+  See [milestone lifecycle](./milestone-lifecycle.md) and the updated
+  [manual testing guide](./manual-test-from-campaign.md).
+
+### 2026-10-06 — DONE real Case B funding failure and refund verification
+
+- Read the user's actual campaign 3 (`real case b`) without sending transactions:
+  chain state is FUNDING_FAILED, contributions/pool 134 MockUSDC, released 0,
+  donor claimed flag true, remaining organizer bond 0.
+- Claim receipt at block 373 is successful and canonical; its hash matches the
+  screenshot (`0x9c6a2884b7c9eed0f0be3b71912f1f58862aa8558526ab224a87a19265052a86`).
+  Matching ERC20 transfer pays exactly 134 to the contributing donor. Historical
+  token balance increases 9644 -> 9778; entitlement and aggregate refund paid
+  both equal the pool (134), leaving no unclaimed amount/dust in this campaign.
+- Chain and DB each contain one canonical RefundClaimed event for campaign 3.
+  Indexed finalization/snapshot/bond return are at block 369, claim at 373;
+  projection has chainState 4 and bondAmountUnits 0. No live replay was issued.
+- Read-only simulations reject claimRefund again (`refund already claimed`),
+  repeat finalization and additional donation (`invalid state`). These are
+  contract-call simulations, not second signed transactions with gas spent.
+- This verifies the actual single-donor Case B journey. It does not establish
+  multi-donor rounding/replay stress coverage or complete the pending Case C
+  milestone/evidence integration.
+
+### 2026-10-06 — DONE expired funding label on campaign detail/journey
+
+- Detail header and next-step panel now display `Đã hết hạn · chờ chốt thất bại`
+  for FUNDING when the verified workflow timestamp reaches its deadline.
+  Labels before expiry and terminal labels are unchanged; no machine-clock
+  eligibility, financial state override, DB update or transaction is introduced.
+- Live API for real case B returns FUNDING with expired workflow and ready sync.
+  Finalization remains an explicit wallet transaction in the refund panel.
+- Frontend build/typecheck, oxlint and whitespace checks pass. Browser rendering
+  and the user's signed finalization/claim have not been verified in this slice.
+
+### 2026-10-06 — DONE local clock recovery; Case B transaction verification pending
+
+- Real campaign `b55ade53-f865-42d3-accf-64a28ea81834` is FUNDING with
+  134/166 MockUSDC. Funding deadline is 2026-10-05 20:21 UTC; chain block 37
+  was only 19:28:29 UTC. Its donation logs were before that chain deadline.
+  Windows and WSL agree on UTC; no post-deadline contract acceptance was proven.
+- Existing Anvil was running the old command with automining and no interval.
+  Enabled 5-second interval mining in place after validating deployment identity;
+  no node restart, reset, balance update, deadline update or financial transaction.
+  Block advancement resumed, but block 109 was still 19:41:03 UTC while the
+  machine was 20:36:57 UTC. Interval mining alone does not fix this clock drift.
+- Added identity-checked local repair script and reuse of the existing RPC in
+  startup. Default repair detects clock drift and fails explicitly. Forward-only
+  synchronization to machine UTC requires `--sync-clock`, because elapsed
+  deadlines become effective. User approved forward synchronization; it was run
+  without reset. Block 173 was 20:42:46 UTC against machine 20:42:47 UTC.
+- Campaign journey warns about a local clock over a minute behind the machine;
+  donation expiry explains the finalization/refund step. Financial eligibility
+  remains based on chain timestamps. Underfunded expiry needs a successful
+  finalizeFundingFailure transaction and indexing before FUNDING_FAILED/claims.
+- Backend/frontend builds, frontend typecheck/oxlint, JS/PowerShell syntax and
+  whitespace checks pass. Read-only simulation at block 179, after the deadline,
+  rejects donate with `deadline passed`; finalizeFundingFailure simulates
+  successfully from a donor address. Active API returns HTTP 200 with expired
+  workflow and ready checkpoint 179/179. No financial transaction was sent.
+  Donor `0x9965507d1a55bcc2695c58ba16fb37d819b0a4dc` has contributed 134 MockUSDC;
+  expected funding-failure pool/claim is 134, organizer bond 166 handled separately.
+  Actual signed finalization, receipt/indexed terminal state and claims remain
+  pending; the complete Case B journey is not marked DONE.
+
+### 2026-10-05 — IN_PROGRESS active API restart: donation blocked by stale response
+
+- Read the real TEST-A campaign (`e35891f7-a793-4d0c-8a2a-85841b0b018e`):
+  API 3000 returns HTTP 200 with campaign/sync only, ready at block 19/19.
+  Missing workflow was incorrectly presented as indexer waiting and disabled
+  donation despite the funded donor wallet. This is a running API version mismatch.
+- Current compiled backend was opened on a temporary port with its indexer
+  disabled, read the same data and returned campaign/workflow/sync, HTTP 200,
+  FUNDING, contributed 0, goal 220 MockUSDC and a chain time before the deadline.
+  Temporary API and its DB client were closed; no donation or projection write.
+- Public detail now rejects the old response with an explicit backend restart
+  message. DonatePanel also distinguishes missing workflow from actual syncing.
+  The active API on 3000 still needs a restart; no current deployment/DB reset is
+  needed. This verification does not claim extension approve/donate succeeded.
+
+### 2026-10-05 — IN_PROGRESS browser verification: wallet linking wait recovery
+
+- Prepared connector client is read under an 8-second bound before reporting a
+  signing request; nonce reads have a 20-second bound. SIWE uses the prepared,
+  explicitly selected connector/account rather than repeating connector reads
+  inside the signing wait. The 90-second signature wait now shows a countdown.
+- Added stop-waiting/unmount abort, disconnect/change-wallet and session linkage
+  recheck. Abort/timeout does not cancel an extension request or release its
+  duplicate-request lock early; a late signature cannot advance wallet linking.
+- Removed the generic default Browser Wallet option; named Brave/MetaMask/Rabby
+  options and discovered wallets remain. Existing generic connections have a
+  notice explaining how to select the intended provider. Another-account errors
+  no longer incorrectly instruct every user to choose a resolver wallet.
+- Frontend build/typecheck, oxlint and whitespace check pass. Behavioral tests
+  were not added/run in this slice; actual extension popup, rejection, crash and
+  cancel/retry behavior still require browser verification. No wallet link, DB
+  data, deployment or live service was modified by these checks.
+
+### 2026-10-05 — IN_PROGRESS verification: difficult financial failure cases
+
+- New MVP terminal transitions credit organizer bond without a token call; only
+  that organizer claims separately. Bond rejection cannot block donor snapshots.
+  SafeERC20 false/revert preserves bond/refund rights and counters. New source
+  requires a public deployment ID; different IDs change runtime code identity.
+- Added O(1) paid/claimed-contribution counters and refundAccounting. Remaining
+  escrow is not final dust until every contributor consumes their claim; zero
+  payouts count, no expiry/last-claim bonus/sweep/recipient reassignment.
+- Added bounded local timeout worker with chain time, state/version guards,
+  simulation, durable intent/hash and canonical confirmed receipt/event checks.
+  It uses unlocked Anvil callers, no private key/resolver authority. Dry run is
+  default; no worker was launched or signing enabled.
+  Local startup adds 5-second interval plus immediate transaction mining, so idle
+  chain timestamps progress; watch mode retries outages and halts on identity drift.
+- New manifests/plans/streams/wallet checks bind the mined deployment block;
+  indexer rechecks identity before commit. Legacy stream/pending keys remain
+  compatible. Deployment tooling archives old metadata and refuses to replace
+  escrow still holding tokens; isolated MVP output uses .local, not app config.
+- Prepared false/revert, independent rights, deposit rollback, deployment identity,
+  large-value/one-unit dust fuzz, anchor mismatch, timeout-boundary and full-reset/
+  pre-commit drift regressions. No behavioral suite/smoke was run; the user requested
+  combined verification after the four items.
+- Contract and all 28 prepared MVP test cases compile (runtime 21,942 bytes,
+  below the 24,576-byte limit). Backend/frontend builds, frontend oxlint,
+  backend typecheck including spec files, JS/PowerShell syntax and whitespace
+  checks pass. Compiler timestamp/event-analysis and Vite chunk warnings remain;
+  this is not an audit or behavioral test pass. No DB migration, live chain
+  reset/deployment or service restart was performed. This is not Arc readiness.
+- Remaining: bond-credit/claim UI/indexed history, item 3 evidence/case integration,
+  live worker failure/restart checks and real-token issuer freeze/recovery
+  qualification. See [financial recovery](./financial-recovery.md).
+
+### 2026-10-05 — DONE policy / IN_PROGRESS integration: MVP milestone completion
+
+- User approved option A in [the completion specification](./mvp-milestone-completion.md):
+  the existing resolver admits evidence and handles one final case per version;
+  no separate verifier, appeals or slashing in MVP. Response is 7 days, resolution
+  another 7 days. CONTINUE preserves the original review; RESUBMIT requires a new
+  version/admission/72-hour review; STOP/timeout refunds unreleased donor escrow
+  and returns bond separately without penalty.
+- Added `FundTogetherMvp` for a new deployment. Legacy assigned-verifier entrypoints
+  revert even with role grants; case identity, material/response hashes, fixed
+  deadlines and decisions are on-chain. Resolver cannot be organizer or a wallet
+  with contributions in that campaign. Existing sequential release, snapshot,
+  individual claims and atomic transfer rollback are reused.
+- Prepared contract regression cases for admission, role bypass, deadline equality,
+  case replay, version bounds, all outcomes, partial-release refunds, single
+  settlement and transfer rollback. `forge build` compiles source and prepared
+  tests; frontend build/oxlint and whitespace checks pass. Runtime bytecode is
+  20,927 bytes (below EVM's 24,576-byte limit). Compiler timestamp/event-analysis
+  warnings remain; this is not a security audit. Behavioral execution is deferred
+  until the user's combined verification run.
+- TODO: readable redacted evidence packages, resolver storage access and organization
+  conflict checks, decision/response records, generated ABI/deployment capability,
+  case indexing and signing UI. This entry does not mark the full journey DONE.
+- No deployment, database migration, live ABI replacement or chain reset in this
+  slice. Current prototype campaigns do not acquire the new contract behavior.
+
+### 2026-10-05 — DONE: Campaign state guidance and refund transaction UX
+
+- Added public workflow facts at one canonical indexed block and checked its hash
+  before/after reads. Projection mismatch, missing checkpoint and orphaned blocks
+  fail explicitly. Public responses contain no linked-wallet refund entitlements.
+- Public and organizer campaign pages show the next actor/action, required wallet,
+  chain deadline and remaining time, checkpoint clock and snapshotted refund pool.
+  Active evidence, review and challenge states explicitly describe current MVP
+  limitations instead of offering unsupported actions. Internal scroll buttons
+  preserve the hash router.
+- Donation, milestone activation and refund buttons use specific eligibility
+  reasons: account/wallet link, chain, organizer authority, deadline, amount,
+  token/gas balance, snapshot, contributor entitlement, prior claim and cancellation
+  acknowledgement. Each wallet's refundable amount stays account-scoped. A funded
+  campaign disables donation input/button with its state reason even before login.
+- Added the four-stage transaction tracker: wallet request, submitted hash,
+  verified receipt and indexed event. Approval is shown separately from donation.
+  Activation completion also matches the canonical indexed activation hash.
+  Receipt/index lag offers an explicit read-only recheck without another signature;
+  existing pending-hash persistence and on-chain preflight checks are preserved.
+- Verified 79 backend tests, 79 frontend tests, both builds, frontend oxlint and
+  `git diff --check`. Refund smoke passes 377 real HTTP/transaction/accounting
+  checks; publication/indexer regression passes 197. Tests use disposable Anvil
+  9545 and scoped fixtures; no deployed contract, ABI or schema change is required.
+- Browser checked the real funded campaign anonymously using a temporary API on
+  3100 (indexer disabled) and frontend on 5175: correct organizer, milestone 1,
+  chain deadline and disabled donation reason. Layout checked at 1280px and 390px;
+  neither exceeded viewport width. Preview processes/tab were stopped and viewport
+  restored afterward. Authenticated extension signing remains manual.
+- The existing API on 3000 still needs a restart to load the new build. Automatic
+  approval review rejected stopping/restarting its process (`blocked by policy`),
+  so the user was asked to restart it. Preview verification does not imply that the
+  original API process has loaded the changes. Application Anvil 8545 remains at
+  block 11 with its original hash and campaign in `FUNDED`.
+
+### 2026-10-05 — DONE: Refund accounting and replay hardening checks
+
+- Added a stateful Foundry harness with 16 contributing wallets and three
+  campaigns sharing one token. Interleaved claims, duplicate/non-donor rejection,
+  failed-transfer retry, another campaign's donations/cancellation/refunds and
+  unsolicited tokens preserve per-wallet entitlement bounds, immutable snapshots,
+  recorded contribution/claim flags and escrow conservation after every action.
+- Added randomized proportional-refund checks for 2–32 contributing wallets,
+  arbitrary claim order, partial releases, outstanding obligations and dust.
+  Added a full-precision overflowing-product case and a 2-versus-128 donor claim
+  gas regression. Existing rollback, callback/reentrancy and timeout tests remain.
+- Strengthened the isolated refund smoke: rewind its own checkpoint and reread
+  logs three times at each of three lifecycle stages; compare event identities,
+  canonical contribution/refund counts and sums, financial projections, donor
+  history and refund rights. Covers two independent workers, restart, orphaned
+  claim removal/reclaim and an injected failure after event upserts that rolls
+  back writes/checkpoint before retry. Projection observation blocks may advance
+  during replay; that is not a financial or history change.
+- Fixed the MVP documentation policy: floor in base units, no claim expiry,
+  no last-claimant bonus and no admin sweep; dust stays in escrow indefinitely.
+  `P = successful payouts + unclaimed entitlements + rounding dust`. UI explains
+  this distinction and no longer describes a zero entitlement as depletion by
+  other donors. No numerical dust field, donor loop or on-chain counter was added.
+- Verified the full Foundry suite: 169 tests across 14 suites, 1,024 runs per fuzz
+  test; stateful invariants ran 128 sequences of depth 128 (16,384 handler calls),
+  zero unexpected reverts. The disposable Anvil 9545 smoke passes 199 real
+  HTTP/SIWE/PostgreSQL/transaction/accounting checks. Backend 73 tests and frontend
+  67 tests pass; both builds and frontend oxlint pass. Vite's existing large-chunk
+  warning remains.
+- Production contract bodies, ABI, deployment and database schema were unchanged.
+  Read-only before/after checks confirm the application chain 8545 stays at block
+  11 with the same hash and public campaign response (`FUNDED`). Test fixtures were
+  cleaned up and the isolated chain stopped. No redeploy/reset or application
+  transaction was performed. Browser extension signing remains a manual check;
+  these results are regression coverage, not production certification.
+
+### 2026-10-05 — Campaign list grouped by workflow stage
+
+- Campaign management now has three sections with counts and empty states: Bản nháp, Đã chốt hồ sơ, Đang công khai. Legacy unassigned drafts appear inside Bản nháp and contribute to its count. Milestone navigation and campaign detail/edit routes are unchanged.
+- Public grouping reads the existing account-scoped publication query, shared with campaign cards and refreshed every ten seconds. Human approval alone does not move a campaign to Public. Loading/errors explicitly explain that publication classification is still being checked; frozen entries remain accessible for retry and continuation.
+- Published cards include a link to the public campaign page. Create, delete, submission, approval and financial authorization continue using the existing APIs and wallet flows.
+- Verified frontend TypeScript/Vite build and oxlint. No behavioral tests or authenticated browser interactions were performed in this change.
+
+### 2026-10-05 — Unified fundraising management dashboard
+
+- Replaced the separate personal dashboard with the same shell used for organization management. `#/workspace`, organization list/profile and existing organization workspace URLs share Campaign/Milestones/Evidence navigation, a current-organization selector and same-tab links.
+- New campaign creation uses the selected organization. Existing personal drafts remain visible under “Bản nháp chưa gắn tổ chức” in Campaign, with read/edit/delete and the existing explicit organization-copy/submission path. Opening these drafts keeps the selected organization context; no database records, ownership, wallet links or funds were changed.
+- Removed the hidden personal dashboard mounted behind public pages. Shared query keys stay account-scoped and the management component remounts on account changes. A deleted legacy draft clears its new detail cache as well as the list.
+- Prepared-but-unsubmitted campaigns now have an explicit frozen-dossier label rather than the ambiguous “Chưa tạo trên chain”. Updated navigation/onboarding documentation.
+- Verified frontend TypeScript/Vite production build and oxlint. Authenticated browser navigation, organization switching and legacy edit/delete remain unverified; no behavioral tests were added or run for this change.
+
+### 2026-10-05 — Private draft deletion (browser confirmation pending)
+
+- Added `DELETE /campaigns/:campaignId` with strict expected-revision validation, personal-organizer/current-OWNER authorization, campaign row locking, membership recheck and atomic soft deletion. The shared access predicate hides deleted drafts and blocks subsequent campaign/evidence/private-file access.
+- Lists/details expose revision and `canDelete`; the same SQL predicate protects status, chain identifiers, immutable submissions, projections, reviews, linked replacement history and frozen evidence. No migration, contract change or storage purge.
+- Personal and organization lists/details show an explicit title-specific confirmation. Duplicate clicks, changed revisions/accounts and uncertain HTTP outcomes are handled; successful deletion refreshes scoped lists and clears detail/evidence caches.
+- Verified backend/frontend builds and frontend lint; read-only service queries against the current database return `canDelete: false` for `dfa` (published) and `dsadfa`/`cxzc` (submission-prepared). Existing user data and files were preserved. Behavioral tests and authenticated browser deletion were not run in this slice. See [draft deletion](./draft-deletion.md).
+- Restarted the local backend with the new build: health is `ok`, OpenAPI exposes the DELETE route and the existing public campaign remains `FUNDED`.
+
+### 2026-10-05 — IN_PROGRESS: Refund lifecycle (browser signing pending)
+
+- Added authenticated `/refunds` and `/refunds/:metadataId` reads scoped to SIWE-linked account wallets. Pool, entitlement and claimed status are checked against one canonical indexed block and matching snapshot/claim events. No database migration, ABI change or contract accounting change is required.
+- Public campaign detail now supports donor `claimRefund`, organizer cancellation while funding, permissionless funding-failure finalization and current activation/evidence-timeout finalization. `#/contributions` shows wallet-specific rights and canonical refund history. Zero-rounded payouts, separate bond return and native gas requirements are explained.
+- Wallet actions verify fresh session links, connector/address/network, both RPC deployment identities, live campaign/deadline and simulation. Pending/replacement/late hashes survive reloads; cancellation/revert, confirmation and indexing are distinct. A receipt must match its campaign, wallet/amount or milestone; indexed completion also matches the canonical transaction. Account changes cannot reuse cancellation acknowledgement or fetch private rights into the previous account cache.
+- Verified: 141 real HTTP/SIWE/PostgreSQL/transaction checks in `backend/scripts/refund-lifecycle-smoke.cjs` on disposable Anvil 9545. Covers two donors, repeated donations, cancellation/bond separation, expiry, receipt/index lag, ownership, double/non-donor rejection, replay, backend restart, reorg recovery, partial refunds after release, zero rounding and dust. The fixture used existing verifier contract methods only for prior-settlement accounting; separate verifier UX remains post-MVP.
+- Verified: 43 existing Foundry refund/timeout tests (including transfer-revert rollback and fuzz cases), 73 backend tests and 65 frontend tests pass. Backend/frontend builds and frontend lint pass. Updated the frontend SSR test harness to include the required account provider and refreshed two old text assertions; production review/workspace behavior is unchanged by those test adjustments.
+- Regression check: the existing publication/indexer smoke also passes 197 HTTP/transaction checks on its disposable chain, including roles, approval/publication, replay, concurrent indexing, restart, RPC/database failures and reorgs.
+- Restarted local API; `/health` succeeds and `/refunds` rejects unauthenticated access with 401. Read-only public API still reports the user's campaign as FUNDED, 12 MockUSDC, indexed block 11, ready. Existing application chain, deployment and data were preserved.
+- TODO: actual browser extension signing/reload/replacement interactions. Dust destination, persistent token-transfer recovery and challenge/misconduct financial outcomes remain unresolved. See [refund lifecycle](./refund-lifecycle.md) for the manual check; use a new partially funded campaign rather than the current funded campaign.
+
+### 2026-10-05 — IN_PROGRESS: Freeze before milestone activation
+
+- Fixed the evidence freeze gate: a funded campaign's current pending milestone may freeze its private package before activation. An active current milestone may also freeze before its evidence deadline; stale, completed or mismatched milestones remain rejected by the backend.
+- The user deferred the separate verifier workflow to post-MVP. The current contract still requires an assigned `VERIFIER_ROLE` wallet to admit submitted evidence, so the MVP on-chain milestone completion path needs a separate fund-safety decision. No contract transition or fund custody rule changed in this fix.
+- Backend and frontend builds and frontend lint pass. The restarted API reports healthy. Read-only chain inspection confirms campaign 0 is `FUNDED` (3), current milestone 0 is `PENDING` (0), version 0 and no evidence deadline; its saved draft has 2 documents and 2 outcomes for 2 criteria. A signed-in browser freeze has not yet been performed.
+
+### 2026-10-05 — IN_PROGRESS: Frozen evidence package
+
+- Added an authenticated organizer-only freeze action for a saved milestone evidence draft. It checks the approved campaign plan, live milestone state and deadline, and every private original's stored SHA-256 before storing the exact UTF-8 manifest bytes and hash in `campaign_evidence_packages`.
+- The organization evidence page now shows missing inputs, the indexed milestone state, and the latest frozen revision/hash. The organizer can download the exact manifest bytes after authorization and stored-hash verification. The freeze action does not send a blockchain transaction or expose private originals publicly.
+- Applied additive migration `0011_dashing_kabuki.sql`. Backend and frontend builds and frontend lint pass; the restarted API responds to `/health`, the new table exists, and the protected package and manifest routes return 401 without a session. Authenticated browser freeze remains unverified. On-chain evidence submission remains TODO while the MVP completion path is unresolved.
+
+### 2026-10-05 — Live funding completion and milestone activation
+
+- Confirmed campaign `26738756-8093-49d2-a9e6-50332d4cc7ba` reached its 12 MockUSDC goal on chain in block 11. One transaction emitted `DonationReceived` and `FundingFinalized`; the public API is indexed through block 11 and reports `FUNDED`. The contract holds 24 MockUSDC: 12 contributed and 12 locked bond.
+- Milestone 0 remains `PENDING`, and its activation deadline is 2026-10-12 08:58:47 UTC. The organization campaign page now offers organizer-signed `activateMilestone` with deployment, wallet, plan, chain-state and deadline checks, transaction recovery, receipt-event matching, and indexed-state confirmation.
+- Frontend production build, TypeScript and lint pass. A read-only simulation of `activateMilestone(0, 0)` from the organizer wallet succeeds against the live local chain. Organizer wallet signing and the live activation transaction are still pending; activation does not release funds.
+
+### 2026-10-05 — Explicit evidence upload action
+
+- DONE: choosing a file now validates and selects it locally. The organizer
+  clicks `Thêm chứng cứ` to upload with the selected document kind. A failed
+  upload retains the selection; success clears it and refreshes the saved list.
+  Existing PDF/JPEG/PNG, 10 MiB and 20-document limits remain enforced.
+- Verified frontend TypeScript/Vite build and oxlint pass. Vite still reports
+  large bundle chunks. Live browser upload was not exercised in this change.
+
+### 2026-10-05 — Contract source modules
+
+- DONE: extracted `FundTogetherBase`, `FundTogetherFunding`,
+  `FundTogetherMilestones` and `FundTogetherEvidence` under `contracts/src/modules`.
+  `FundTogether.sol` now composes these modules; `FundTogetherConfigured` stays
+  the token-restricted deployment boundary. One deployed escrow, shared storage,
+  AccessControl and ReentrancyGuard preserve custody and authority.
+- DONE: retained all 28 existing function/constructor bodies verbatim. Updated
+  eight test files for enum declaration paths and three instance-based
+  `abi.encodeCall` references; assertions and scenarios are unchanged.
+- DONE: Solidity 0.8.24 build and all 165 tests across 13 suites pass before and
+  after extraction (256 runs per fuzz test). Compared both targets against
+  artifacts captured from the working tree immediately before the refactor:
+  ABI encoding/selectors, storage slots/offsets/types (20/21 entries), immutable
+  offsets and runtime bytecode excluding compiler metadata are unchanged.
+- Enum ABI `internalType` labels now reference `FundTogetherBase`; compiler
+  metadata and therefore full bytecode hashes change. No deployment, manifest,
+  generated integration ABI, database or financial policy change was performed.
+  Existing lint warnings, CHALLENGED recovery and permanent token transfer
+  failure limitations remain. FE/BE builds were outside this verification.
+
+### 2026-10-05 — MockUSDC donor flow
+
+- Added donation controls to indexed public campaign detail: linked donor wallet, token/gas balance, exact allowance, `approve` only when needed, `donate`, receipt/event check, pending hash recovery, and canonical indexed confirmation. The UI rechecks deployment, wallet identity, campaign state, deadline, and remaining goal before signing.
+- Added authenticated `/contributions` history for SIWE-linked wallets from canonical `DonationReceived` events. The page now displays indexed donations; refunds remain TODO.
+- Frontend build, TypeScript and lint pass; backend build passes. Restarted backend and confirmed `/health` 200, anonymous `/contributions` 401, and published campaign API remains ready at block 8. Native donor wallet signing and a live donation have not yet been performed.
+
+### 2026-10-05 — Approved campaign visibility
+
+- Confirmed local campaign `26738756-8093-49d2-a9e6-50332d4cc7ba` is indexed as APPROVED at block 7, with bond locked and no publication transaction. The public feed correctly remains empty until organizer publication is indexed.
+- Personal workspace now lists submitted organization campaigns with their indexed review/publication state and a direct campaign link. The organization list shows "Đã duyệt · chờ công bố" and "Mở để công bố" instead of stale `awaiting_review` metadata; detail explains that its on-chain status is checked in the publication panel.
+- Frontend build and lint pass. No organizer publication transaction was sent by this change.
+
+### 2026-10-05 — Confirmation recovery audit
+
+- A newly submitted campaign had a saved human approval (reviewer abc@gmail.com)
+  and on-chain campaign 0 in bonded DRAFT, while the resolver account had no
+  SIWE-linked wallet. The review page now exposes the missing link step as an
+  action with an explicit recheck button; detail refetches on return. This is a
+  required authorization precondition for signing `approveCampaign`, not a
+  missing contract action. The user must still sign the SIWE message and later
+  the approval transaction in MetaMask.
+- Account guidance now flags when the connected browser wallet differs from the
+  configured resolver and offers a disconnect button before choosing MetaMask.
+  The cross-account wallet-link error is explained in Vietnamese. Confirmed in
+  the current DB that the organizer owns 0x7099...79c8 and the resolver wallet
+  0xf39F...92266 is not linked to the new resolver account. Frontend build and
+  lint pass; the user still must approve the MetaMask connection and SIWE signature.
+- Replaced unbounded transaction/network-switch wallet waits with a 90-second
+  UI timeout and a connector lock that lasts until the extension request settles.
+  Late transaction hashes are persisted; they require explicit reconciliation
+  rather than automatically continuing to another wallet prompt.
+- Recheck the active account, address, chain and connector before each prompt;
+  leaving the screen stops later prompts and stale session updates. Verify the
+  wallet's own RPC genesis and contract/token code, in addition to the app RPC.
+- Preserve cancellation replacement markers with pending hashes across receipt
+  timeouts/reloads. Account UI disables repeated linking of an already linked
+  wallet; submission plan query cache is scoped to the application account.
+- Frontend build and lint pass. Live backend health is OK and indexer is ready
+  at block 2/2. Native MetaMask confirmation and these recovery cases still need
+  verification through the user's extension; no user transaction was signed.
+
+### 2026-10-05 — New local deployment after database cleanup
+
+- Deployed freshly built MockUSDC and FundTogetherConfigured on the reset Anvil
+  chain; both deployment receipts succeeded. Generated shared ABI/manifest now
+  advertise atomic submission. Resolver remains the Anvil address ending 92266.
+- Addresses repeat because the local deployer nonce restarted, but deployment
+  identity is new: genesis is `0x5c9db063266c0e809a48728aa5ec67c86edd9b4985eea071b6bd804f4bccdf5f`
+  and the contract runtime hash changed. No old submission was rebound; count
+  before deployment was zero after user-authorized cleanup.
+- Added `backend/scripts/start-local-chain.ps1`: load/save ignored
+  `.local/anvil/state.json`, autosave every five seconds, preserve historical
+  states, quiet output. Updated the startup command in README.
+- Verified a real Anvil stop/restart after deployment: genesis, block 2 hash,
+  deployment receipt, contract/token code hashes and resolver were preserved.
+- Rebuilt/restarted backend. `/health` and `/public/campaigns` return 200;
+  indexer is ready at block 2/2. Read-only review service check grants
+  `abc@gmail.com` access with RESOLVER and returns an empty queue; organizer has
+  no resolver access. Resolver signing still requires the new account's SIWE
+  wallet link and the user's explicit transaction signature.
+- Frontend TypeScript/Vite build also passes with the refreshed shared deployment;
+  the existing bundle-size warning remains.
+
+### 2026-10-05 — User-authorized local database cleanup
+
+- Backed up the configured local PostgreSQL database's `public` and `drizzle`
+  schemas to `C:\Users\dell\.codex\backups\FundTogether\before-db-reset-2026-10-05T06-00-50.769Z.dump`;
+  custom archive is readable by pg_restore (43,835 bytes).
+- Cleared all 16 inspected FundTogether application tables in one transaction.
+  Schema and all 11 migration rows remain. Accounts, sessions, roles, linked
+  wallets, organizations, drafts, submissions, reviews and old chain projections
+  were removed at the user's explicit request.
+- Restarted backend; `/health` returns 200. Follow-up counts confirm all user,
+  organization and campaign/event tables remain empty. The indexer regenerated
+  one operational stream row for the configured deployment.
+- The current Anvil chain has no deployed application contracts. Deployment
+  manifest and blockchain state were not modified by this database cleanup;
+  creating a new deployment remains required before submitting new campaigns.
+
+### 2026-10-05 — Wallet-link waiting feedback
+
+- The link form now shows nonce loading, the named wallet asked to sign, and
+  backend verification. It pins the selected connector when requesting a
+  signature and explains resource-unavailable wallet responses.
+- Verification: frontend build/lint and 57 existing tests pass, including the
+  stage-order assertion; isolated auth HTTP/PostgreSQL smoke passes 40 checks.
+- Native MetaMask signature popup remains unverified. Live user challenges are
+  present; no user signature was fabricated or user wallet link inserted.
+- Follow-up read confirms `abc@gmail.com` now has the verified wallet link for
+  `0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266` on chain 31337 alongside its prior
+  linked wallet. The agent did not create this link; the native popup was not
+  observed directly.
+- Application Anvil is now block 0 with a changed genesis and absent deployment
+  bytecode. Deployment recovery is pending the user's decision; the database and
+  manifest remain unchanged by this diagnostic/fix.
+
+### 2026-10-04 — Staff roles and minimal internal campaign review
+
+- DONE: user explicitly moves committee 2/3 to post-MVP. Current scope/spec and v0.2 learning material record this decision; older progress entries below preserve history.
+- DONE: migration 0010 applied. ADMIN/RESOLVER are separate application permissions; existing account `huyteenpast10@gmail.com` provisioned with both via the local operator script. Its configured resolver wallet is not yet SIWE-linked, so review access remains denied until that proof exists.
+- DONE: `#/internal/campaigns` queue/detail/history, technical checklist, human acknowledgement/reason, immutable approval/request-changes/reject record with reviewer/version/dossier hash/checked block. Approval intent alone does not change chain or publication state; fresh authorization precedes signing. Self/organization review and revoked roles are denied.
+- DONE: organizer sees decision/reason. Any submitted unpublished DRAFT/APPROVED campaign can be cancelled by its organizer using the existing contract, including expired or unwanted submissions. A confirmed, indexed cancellation with zero bond enables one linked replacement draft; retries reuse it. Old submission remains unchanged and the next draft has a distinct on-chain key. Saved approval cannot authorize a new signature after chain-time expiry.
+- Verification: backend build; 13 suites / 65 tests; frontend build/lint and 33 tests; 180 isolated Anvil/HTTP/PostgreSQL checks, including role vs wallet authority, ADMIN-only denial, revocation, conflicts, reason/hash validation, concurrent duplicate review, expired approval denial, actual bond return, pre-index cancellation denial, idempotent revision, frozen-plan preservation, reject authorization and existing indexer failure/reorg cases.
+- Isolated test data and owned port-9545 chain cleaned up. User port-8545 chain preserved. Existing frontend bundle-size warning remains. Manual MetaMask signing is not yet verified.
+- TODO: donor donation/refund UI and indexed history; evidence/challenge response/re-verification and a financially defined resolver dispute exit. This campaign review slice is complete; the full MVP remains IN_PROGRESS.
+
+### 2026-10-04 — Confirm resolver responsibilities and verification before review
+
+- DONE (design/docs): user confirms resolver participation in MVP. Authorized staff may review campaign dossiers after system checks/corrections; approval is required before organizer publication. System eligibility alone is not campaign approval.
+- DONE (design/docs): evidence and challenge each pass verification. Organizer response/corrections and re-verification precede resolver arbitration of unresolved or deadline-escalated cases. A challenge does not automatically route straight to arbitration.
+- Updated protocol, scope, authority/workflow, state-machine targets, financial authority, integration guides and v0.2 source/learning examples. The earlier 2-of-3 direction is for dispute arbitration; it is not automatically campaign admission. Appointment, stage deadlines, appeal/fallback and verdict financial rules remain open.
+- Current code remains unchanged: local campaign approval/publication/indexing exist, but complete dossier verification/reporting, campaign request-changes/rejection/resubmission and the disputed milestone path remain TODO. Earlier implementation entries below are historical evidence, not proof of the whole confirmed workflow.
+- Verification: documentation consistency, Markdown local-link targets and diff whitespace checked. No application tests/builds run for this documentation-only change.
+
+### 2026-10-04 — Resolver approval, organizer publication and durable local indexer
+
+- DONE: SIWE-linked resolver authorization, bonded DRAFT queue/detail, wallet approval at #/review, organizer publication in campaign detail, and public indexed feed/detail. Backend never signs these transactions.
+- DONE: migration 0009 applied locally. Deployment-scoped checkpoints, canonical/orphan event ledger, campaign projections, bounded confirmed-block polling, PostgreSQL advisory locking, atomic writes, duplicate replay, restart/catch-up and hash-based reorg rebuild.
+- DONE: public visibility requires a canonical CampaignPublished event and verified frozen metadata/key association. Unpublished cancellation stays private; published cancellation remains public history. Errors/rebuilds return 503; frontend hides stale cached rows.
+- Review found and fixed: unbonded direct review access, rebuild suppression lost after transient errors, stale campaign IDs after reorg, and orphaned pending-hash recovery. Wallet authorization compares the complete fresh identity; current block-pinned mapping/financial fields/budgets/criteria/bond and block hash are checked before signing.
+- Verification: backend build and 12 suites / 55 tests; frontend build/lint and 26 tests; 134 real isolated-Anvil/HTTP/PostgreSQL checks; existing campaign submission smoke rerun with 32 checks. Includes two independent workers, database/RPC rollback, mid-batch fork, interrupted multi-batch rebuild, privacy/mismatch cases and restart. Whitespace checks pass. Existing frontend bundle-size warning remains.
+- Isolated port-9545 test process stopped and temporary data/functions removed. The port-8545 application chain was not reset. Existing submission smoke leaves cancelled test campaigns as on-chain history. Live API returned 200 with a ready checkpoint at block 52 and no published application campaigns.
+- TODO: real MetaMask signing through the full journey, donor donation/refund and indexed history, evidence freeze/on-chain submission/review/challenge, and outstanding financial recovery cases. Full MVP remains IN_PROGRESS; production finality/Arc deployment are outside this slice. See [publication/indexer](./campaign-publication-indexer.md).
 
 ### 2026-10-04 — Linked wallet information in account page
 
@@ -18,6 +687,37 @@
   bundle-size warning remains. Backend and financial contract code unchanged.
 - MockUSDC balances await a configured token deployment. Donation/refund history
   remains a separate journey. This wallet view does not display organizer bond.
+
+### 2026-10-04 — Contract timeout, bounded retries and terminal refunds
+
+- DONE: reproduced the old testFuzzRejectedVersionsRetainHistory failure, then
+  replaced its 1-8 rejection assumption with MAX_SUBMISSIONS. It now verifies
+  retained history, intermediate escrow/bond custody and the final FAILED state,
+  refund snapshot and separate bond return. Production contract code is unchanged.
+- DONE: added 24 timeout tests in FundTogetherTimeout.t.sol, including ten fuzz
+  tests. Covers deadline-minus-one/exact/plus-one for activation, initial evidence,
+  admission and correction; delayed/unassigned expiry; reassignment without
+  extending admission; fresh assignments; all mixed rejection/expiry sequences
+  across three versions; stale versions; terminal and repeated-call guards.
+- DONE: financial checks cover all four failure paths after an earlier release,
+  proportional claims for two donors in either order, rounding including zero
+  entitlements, unchanged snapshots, unsolicited tokens and campaign isolation.
+  Failed bond transfers roll back termination/last decisions; failed refund
+  transfers preserve the claim for retry. Callback tests reject nested timeout
+  and refund calls during bond return.
+- Verification: focused verifier/timeout run passed 44 tests before the final
+  two additions. Full forge test --summary --fuzz-runs 1024 passed all 153 tests
+  across 12 suites, zero failures/skips. All 14 fuzz tests ran 1,024 cases each.
+  Time advances use deadline getters and vm.warp; production durations unchanged.
+  forge build, focused forge fmt --check and git diff --check pass; existing
+  production timestamp/loop/event lint warnings remain.
+- BLOCKED RECOVERY CASE CONFIRMED: if the organizer permanently cannot receive
+  the bond token, atomic termination reverts and donor refunds cannot open.
+  Separate bond recovery remains TODO; this test slice does not change that rule.
+- Challenge/resolver recovery, deployment, shared ABI, campaign binding, evidence
+  freeze and indexing remain TODO. No FE/BE code changed or tests rerun in this
+  slice. Next: decide and implement bond recovery independently of donor refunds,
+  then complete the pending dispute path before claiming full MVP readiness.
 
 ### 2026-10-04 — Organization representative wallet
 
@@ -1246,3 +1946,85 @@ keeps the dated implementation history and its verification evidence.
   127.0.0.1 responds with CORS enabled; IPv6 loopback is not listening.
 - Requested the wallet's configured RPC URL/chain ID. Exact connection failure
   and wallet refresh remain unverified; no speculative connector change applied.
+
+### 2026-10-04 — Milestone budgets and bond confirmation popup
+
+- DONE: private campaign draft API stores budgetUnits as integer strings, with positive uint256 and total-goal validation. Database migration 0007 applied locally; existing drafts retain null budgets until edited.
+- DONE: wizard accepts USDC budgets with up to six decimals, computes goal and maximum-budget bond using bigint, and shows a confirmation popup after Milestones Next. Returning to edit milestones requires confirmation again. Review includes budgets, goal and bond.
+- Verification: backend/frontend builds, frontend lint, campaign tests (11 passed) and diff whitespace check passed. Browser interaction and authenticated save/reload have not been manually verified.
+- TODO: configured token enforcement on chain, shared deployment/ABI, campaign submission, wallet bond locking, approval/publication and indexing. Popup confirmation transfers no tokens; Nop campaign remains unavailable.
+
+### 2026-10-04 — Local campaign submission and bond custody integration
+
+- DONE: configured MockUSDC/FundTogetherConfigured deployment and one generated ABI/manifest shared by FE/BE; keyed creation blocks duplicate campaigns per organizer.
+- DONE: atomic frozen submission plans, organization OWNER and verified representative checks, stale-revision protection, chain readback and submitted campaigns retained in organization listing. Migration 0008 applied locally.
+- DONE: wallet create -> criteria commitments -> exact allowance -> lockBond journey, receipt/confirmation gates, pending-hash retry, resumed on-chain progress, and explicit user-rejection handling. Status is derived from chain reads; not labelled indexed.
+- Verification: 6 configured-contract tests and focused configured/bond/milestone suites passed. 32 real HTTP/PostgreSQL/Anvil checks passed, including a backend restart and wallet-drain scenarios. FE/BE builds and FE lint passed; final changes are checked before completion.
+- Manual MetaMask journey remains unverified. No organization representative wallet is currently bound in the local database. Local funding helper is available once a wallet is selected.
+- TODO: resolver approval UI, organizer publication UI, donor integration, durable indexer and full MVP verification. Frozen-plan unfreeze and cancellation UI are not included. See docs/campaign-submission.md.
+
+- Final verification for the submission slice: all 11 backend suites / 42 tests passed; configured contract tests 6/6 passed; local deployment reuse and funding helper also verified. Manual MetaMask signing remains pending.
+
+### 2026-10-05 — DONE: Recover local deployment after Anvil reset
+
+- Live RPC was chain 31337 with a different genesis block and no code at either saved deployment address. The database contained zero frozen campaign submissions.
+- Redeployed MockUSDC/FundTogetherConfigured to the running local chain, updated the shared manifest and restarted the backend with the rebuilt application. Kept historical indexer streams and application data.
+- Verified deployment reuse, backend build, public campaign API HTTP 200 and current indexer stream ready at block 2 with no synchronization error. Authenticated resolver UI has not been inspected in the browser.
+- Updated the startup guide to include deployment verification/recovery. Indexer warnings now include safe deployment failure details without exposing raw RPC/database errors.
+
+### 2026-10-05 — Campaign confirmation visibility
+
+- Fixed submission visibility for organization campaigns reopened through the general dashboard by using the saved organization ID when the wizard prop is absent.
+- Personal drafts now explain that submission requires creating the campaign in an organization workspace as OWNER, with a link to organizations. Existing personal drafts are not reassigned.
+- Frontend lint passed; wallet submission has not been exercised in the browser for this change.
+
+### 2026-10-05 — DONE: Submit from the general workspace
+
+- Review step now lists the authenticated user's organizations and allows selecting one without re-entering campaign content. Existing organization campaigns retain their organization.
+- On submission, an existing personal draft is copied through the authorized organization creation API; the personal draft is preserved. The new organization draft is retained in wizard state for retries, then the existing wallet/receipt/bond flow runs. Completion opens the organization campaign detail.
+- The submit button is visible but disabled until an organization is selected; the review explains the prerequisite. The organization selector remains locked during saving/chain work through the existing fieldset.
+- Verification: frontend build, final TypeScript check and lint passed. Live wallet signing was not performed.
+
+### 2026-10-05 — Submission prerequisites in the wizard
+
+- Organization selection uses the existing authenticated organization query/cache, shows loading/empty/error states and supports refresh after organization creation. A single owned organization is selected by default; multiple organizations require a choice.
+- Reused the organization representative-wallet confirmation panel directly before submission. Its explicit confirmation still calls the server's verified-wallet/OWNER authorization path; no wallet is bound automatically.
+- Live diagnosis found one organization without a representative, plus one linked local wallet with zero ETH and zero new-deployment MockUSDC. Supplied that local wallet with 1000 test MockUSDC and gas using the development funding helper; no campaign was submitted on the user's behalf.
+- Verification: frontend build and lint passed. Existing disposable submission smoke passed 32 real API/transaction checks covering freeze, authorization, retry identity, criteria and exact bond custody. Browser MetaMask signing remains unverified.
+
+### 2026-10-05 — Correct account-specific wallet diagnosis
+
+- Prior wallet availability statements used a database-wide count and were incorrect for the organization creator. The organization account has zero linked wallets; the address ending 3d7619 belongs to a separate wallet-only account.
+- Organization wallet empty state now has a prominent account-link action and explains connected versus signed linked wallets, refresh, and cross-account ownership. Existing signature/ownership checks remain enforced.
+- Frontend TypeScript and lint passed. The in-app browser is not authenticated; the user's attached authenticated screenshot and scoped database queries establish the empty state. No wallet ownership was moved.
+
+### 2026-10-05 — Atomic campaign submission implementation
+
+- DONE: submitCampaignForDraft atomically creates the organizer-scoped campaign, writes every criterion and locks max-budget bond. It uses the existing token policy, events and authorization and guards the entire call with OpenZeppelin nonReentrant. Invalid criteria, missing allowance or insufficient balance roll back campaign/key/events; approval remains a separate transaction.
+- DONE: frontend checks the bond balance before any new signature, uses exact approval then one submission on manifests with atomicSubmission: true, and retains the legacy continuation path for the running old deployment and already-created campaigns. Every receipt and backend sync still must confirm success.
+- DONE: shared generated ABI, deployment helper capability flag and current submission/overview docs updated. No schema migration or changes to financial settlement rules.
+- Verification: full Foundry suite passes, including 12 configured-contract tests (atomic rollback/retry, criteria validation, duplicate transfer prevention, token callback reentrancy). The isolated publication/indexer smoke passes 197 real HTTP/transaction checks, including atomic reverted receipt/no events, successful combined events, review queue inclusion and duplicate submission rejection. Backend/frontend builds and frontend lint pass.
+- IN_PROGRESS: active local deployment cutover. The existing contract at 0xe7f1725e7734ce288f8367e1bb143e90bb3f0512 still holds 122000000 MockUSDC base units for an existing campaign. Its chain state, funds and immutable submission plans have not been reset or rebound. The current UI advertises the legacy path until cutover is decided; live MetaMask atomic signing is unverified.
+
+### 2026-10-05 — DONE: Review decision layout and blocked-state explanation
+
+- Self-review now displays a clear restriction and account-management link instead of an editable form with permanently disabled actions. Existing review history remains visible, and conflicted accounts cannot sign approvals. A different wallet on the same account does not remove the account/organization conflict.
+- Technical checks have separate pass/fail rows. Eligible reviewers see reason length, acknowledgement guidance, saving feedback and a compact 18 by 18 pixel checkbox. Approval stays disabled when a technical check fails; the existing correction/rejection path and backend authorization remain enforced.
+- Verification: frontend build and lint pass; all 36 frontend tests and 10 backend review-service tests pass. Browser interaction on a temporary mocked-API fixture verified reason/acknowledgement gating, all three decision outcomes, compact checkbox dimensions and approval blocking when a check fails. The temporary fixture was removed. No live campaign was reviewed or approved during this UI verification.
+
+### 2026-10-05 — DONE: Organization publication navigation from personal workspace
+
+- Personal workspace now links the current account to its organization's campaigns on every workspace view, with loading/error/empty handling and an organization navigation link. The personal-draft list remains scoped to personal drafts.
+- Removed the stale overview claim that milestones and publishing are unavailable. The overview distinguishes submission/bond, human review, resolver chain approval and organizer publication.
+- Campaign publication now explicitly explains human approval with a chain DRAFT: the resolver still needs to link its configured wallet and sign; the publish action is gated by indexed chain approval as before.
+- Live diagnosis: sadas (metadata 42835f5f-008f-474e-a0b8-f984f9be0160, on-chain ID 2) belongs to huydeptrai. Its approve review belongs to abc@gmail.com, which currently has no wallet links. RPC at block 22 confirmed campaignState 0 (DRAFT) and resolver 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266. No chain transaction or wallet-link record was written.
+- Verification: frontend build/lint and all 41 tests pass, including organization-link account isolation, failed-authorization hiding, human approval without publish, and indexed approval exposing publish. The new navigation was visually checked on a temporary preview using the organization list; the preview was removed. Live account sign-in and wallet signing remain user actions.
+
+### 2026-10-05 — Account-to-publication workflow audit and recovery fixes
+
+- DONE: bounded SIWE signing with explicit account and account/address/chain rechecks; late signatures cannot continue linking. Synchronous action guards prevent duplicate clicks. Account UI identifies the connected address and configured resolver, and review history distinguishes reviewing account from configured signing wallet.
+- DONE: API timeout recovery messages, submission replacement/cancellation receipt handling, a second wallet check after simulation, and canonical-block verification before submission status writes. Corrected the auth smoke fixture's missing milestone budget.
+- Verification: 57 frontend tests, 73 backend tests across 14 suites, 185 contract tests across 13 suites, 197 isolated-chain integration checks, 40 auth response checks and 32 organization-wallet checks pass. Frontend/backend builds and frontend lint pass. Browser fixture confirms an unanswered signature request releases link/logout controls after 90 seconds without a linking API call; fixture and tab removed.
+- Live backend was restarted with the updated build, health returns 200, one process listens on port 3000 and the indexer is ready at block 22. sadas remains bonded/human-approved but chain DRAFT; abc@gmail.com still needs a verified resolver wallet. Existing organizer spendable balance is 878 MockUSDC.
+- IN_PROGRESS: native MetaMask stability and user-signed browser walkthrough. Standalone extension crashes cannot be certified fixed by application tests. Atomic submission remains tested on the isolated deployment only; active deployment cutover is pending existing escrow recovery/decision.
+- Repeatable workflow, current-state snapshot and limitations: [workflow audit](./workflow-audit-2026-10-05.md).

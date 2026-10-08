@@ -372,3 +372,20 @@ contribution, restart/replay without duplication, catch up events produced while
 the worker was stopped, and expose the result through a public read API.
 These are future verification requirements, not completed checks.
 
+## 17. Deadline clocks — 2026-10-06
+
+- Contract deadlines and `block.timestamp` use Unix seconds. Eligibility is
+  checked at transaction execution, not at wallet signing or HTTP submission.
+  A transaction signed before a cutoff can still revert if included after it.
+- UI may animate a millisecond countdown, but it is an estimate anchored to a
+  verified block. Multiplying a block timestamp by 1000 changes units, not its
+  precision. Financial rights remain based on the canonical chain checkpoint.
+- Expiry prevents new donations by the contract guard. Changing stored state
+  and opening a refund snapshot still requires a finalization transaction.
+- Production operational work remains TODO: monitor RPC head age and indexer
+  lag, retry RPC reads safely, and run a funded keeper for permissionless timeout
+  calls. Do not deploy the unlocked-account Anvil worker as a production signer.
+  Receipt/finality/indexing must be verified before showing completion.
+
+Timestamp units: [Solidity documentation](https://docs.soliditylang.org/en/latest/units-and-global-variables.html#block-and-transaction-properties).
+

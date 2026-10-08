@@ -1,13 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import type { FormEvent } from 'react'
 import axios from 'axios'
+import { parseUnits, formatUnits } from 'viem'
 import {
   createCampaignDraft,
   getCampaignDraft,
   updateCampaignDraft,
 } from '../../lib/api/campaigns'
 import type { CampaignDraftDetail } from '../../lib/api/campaigns'
+import { CampaignSubmission } from './CampaignSubmission'
 import { getErrorMessage } from '../../lib/api/error'
+import { listOrganizations } from '../../lib/api/organizations'
+import { useAccountSession } from '../auth/AccountSessionProvider'
+import { OrganizationWallet } from '../organizations/OrganizationWallet'
 
 interface Criterion {
   id: string
@@ -17,12 +23,14 @@ interface Milestone {
   id: string
   title: string
   description: string
+  budget: string
   criteria: Criterion[]
 }
 
 function newMilestone(): Milestone {
   return {
     id: crypto.randomUUID(),
+    budget: '',
     title: '',
     description: '',
     criteria: [{ id: crypto.randomUUID(), description: '' }],
@@ -33,6 +41,7 @@ function campaignMilestones(campaign?: CampaignDraftDetail): Milestone[] {
   return campaign?.milestones.length
     ? campaign.milestones.map((milestone) => ({
         id: milestone.id,
+        budget: milestone.budgetUnits ? formatUnits(BigInt(milestone.budgetUnits), 6) : '',
         title: milestone.title,
         description: milestone.description ?? '',
         criteria: milestone.acceptanceCriteria.length
@@ -45,8 +54,15 @@ function campaignMilestones(campaign?: CampaignDraftDetail): Milestone[] {
     : [newMilestone()]
 }
 
+function budgetUnits(value: string): bigint | null {
+  if (!/^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$/.test(value) || value.length > 85) return null
+  const units = parseUnits(value, 6)
+  return units > 0n && units <= (1n << 256n) - 1n ? units : null
+}
+
 function milestoneErrors(milestone: Milestone) {
   const errors: Record<string, string> = {}
+  if (budgetUnits(milestone.budget) === null) errors[`${milestone.id}.budget`] = 'Nhập ngân sách USDC lớn hơn 0, tối đa 6 chữ số thập phân.'
   if (!milestone.title.trim())
     errors[`${milestone.id}.title`] = 'Nhập tên milestone.'
   if (!milestone.description.trim())
@@ -70,7 +86,15 @@ export function CampaignWizard({
   organizationId?: string
 }) {
   const [baseline, setBaseline] = useState(initialCampaign)
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState('')
+  const { session } = useAccountSession()
   const [step, setStep] = useState(0)
+  const organizationQuery = useQuery({ queryKey: ['organizations', session?.userId], queryFn: listOrganizations,
+    enabled: step === 2 && Boolean(session), retry: false })
+  const organizations = organizationQuery.data ?? []
+  const submissionOrganizationId = organizationId ?? baseline?.organizationId ??
+    (selectedOrganizationId || (organizations.length === 1 ? organizations[0].id : ''))
+  const submissionOrganization = organizations.find(item => item.id === submissionOrganizationId)
   const [title, setTitle] = useState(initialCampaign?.title ?? '')
   const [description, setDescription] = useState(
     initialCampaign?.description ?? '',
@@ -80,7 +104,13 @@ export function CampaignWizard({
   )
   const [active, setActive] = useState(0)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [bondPopup, setBondPopup] = useState(false)
+  const amounts = milestones.map((item) => budgetUnits(item.budget) ?? 0n)
+  const goal = amounts.reduce((sum, amount) => sum + amount, 0n)
+  const bond = amounts.reduce((max, amount) => amount > max ? amount : max, 0n)
   const [confirmed, setConfirmed] = useState(false)
+  const [chainBusy, setChainBusy] = useState(false)
+  const frozen = Boolean(baseline && baseline.status !== 'draft')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [conflict, setConflict] = useState(false)
@@ -89,7 +119,8 @@ export function CampaignWizard({
 
   useEffect(() => () => saveController.current?.abort(), [])
 
-  async function saveDraft() {
+  async function saveDraft(forSubmission = false) {
+    if (forSubmission && frozen) return baseline
     if (saveController.current) return
     const controller = new AbortController()
     saveController.current = controller
@@ -100,6 +131,7 @@ export function CampaignWizard({
         title,
         description,
         milestones: milestones.map((milestone) => ({
+          budgetUnits: budgetUnits(milestone.budget)!.toString(),
           title: milestone.title,
           description: milestone.description,
           acceptanceCriteria: milestone.criteria.map((criterion) => ({
@@ -108,7 +140,8 @@ export function CampaignWizard({
           })),
         })),
       }
-      const saved = baseline
+      const copyToOrganization = forSubmission && baseline && !baseline.organizationId && submissionOrganizationId
+      const saved = baseline && !copyToOrganization
         ? await updateCampaignDraft(
             baseline.id,
             {
@@ -125,8 +158,9 @@ export function CampaignWizard({
             },
             controller.signal,
           )
-        : await createCampaignDraft(input, controller.signal, organizationId)
+        : await createCampaignDraft(input, controller.signal, forSubmission ? submissionOrganizationId : organizationId)
       if (controller.signal.aborted) return
+      if (forSubmission) { setBaseline(saved); return saved }
       setStep(0)
       setTitle('')
       setDescription('')
@@ -214,7 +248,8 @@ export function CampaignWizard({
         (item) => Object.keys(milestoneErrors(item)).length > 0,
       )
       if (invalid >= 0) setActive(invalid)
-      else setStep(2)
+      else if (goal > (1n << 256n) - 1n) setErrors({ goal: 'Tổng ngân sách vượt giới hạn cho phép.' })
+      else setBondPopup(true)
     }
   }
 
@@ -260,7 +295,7 @@ export function CampaignWizard({
           type="button"
           className="button button--quiet"
           onClick={onClose}
-          disabled={saving}
+          disabled={saving || chainBusy}
         >
           ← Campaigns
         </button>
@@ -286,8 +321,31 @@ export function CampaignWizard({
           ),
         )}
       </ol>
-      <form onSubmit={next} noValidate>
-        <fieldset className="wizard-fieldset" disabled={saving}>
+      {bondPopup && (
+        <div className="bond-overlay">
+          <section className="panel bond-dialog" role="dialog" aria-modal="true" aria-labelledby="bond-title"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setBondPopup(false)
+              if (event.key === 'Tab') {
+                const buttons = event.currentTarget.querySelectorAll('button')
+                const target = event.target
+                if (event.shiftKey && target === buttons[0]) { event.preventDefault(); buttons[1].focus() }
+                else if (!event.shiftKey && target === buttons[1]) { event.preventDefault(); buttons[0].focus() }
+              }
+            }}>
+            <h2 id="bond-title">Xác nhận bond</h2>
+            <p>Bond cần khóa: <strong>{formatUnits(bond, 6)} USDC</strong></p>
+            <p>Bằng ngân sách milestone lớn nhất. Tổng goal: {formatUnits(goal, 6)} USDC.</p>
+            <p>Bond sẽ được khóa trong escrow bằng giao dịch ví trước khi publish campaign. Việc xác nhận ở đây chưa chuyển token. Bond được hoàn trả theo kết quả campaign và quy tắc giao thức.</p>
+            <div className="wizard-actions">
+              <button autoFocus type="button" className="button button--secondary" onClick={() => setBondPopup(false)}>Quay lại</button>
+              <button type="button" className="button button--primary" onClick={() => { setBondPopup(false); setStep(2) }}>Xác nhận & tiếp tục</button>
+            </div>
+          </section>
+        </div>
+      )}
+      <form onSubmit={next} noValidate inert={bondPopup}>
+        <fieldset className="wizard-fieldset" disabled={saving || chainBusy}>
           {step === 0 && (
             <section className="panel wizard-panel form-grid">
               <label>
@@ -411,6 +469,13 @@ export function CampaignWizard({
                         />
                         {fieldError(`${milestone.id}.description`)}
                       </label>
+                      <label>
+                        Ngân sách (USDC)
+                        <input inputMode="decimal" value={milestone.budget}
+                          onChange={(event) => updateMilestone(milestone.id, { budget: event.target.value })}
+                          placeholder="Ví dụ: 100.50" aria-invalid={Boolean(errors[`${milestone.id}.budget`])} />
+                        {fieldError(`${milestone.id}.budget`)}
+                      </label>
                       <fieldset className="criteria-editor">
                         <legend>Tiêu chí hoàn thành</legend>
                         {milestone.criteria.map((criterion, criterionIndex) => (
@@ -481,6 +546,7 @@ export function CampaignWizard({
                   )}
                 </section>
               ))}
+              {fieldError('goal')}
               <button
                 type="button"
                 className="add-milestone"
@@ -499,6 +565,7 @@ export function CampaignWizard({
                   <button
                     type="button"
                     className="text-button"
+                    disabled={frozen || chainBusy}
                     onClick={() => {
                       setStep(0)
                       setConfirmed(false)
@@ -516,6 +583,7 @@ export function CampaignWizard({
                   <button
                     type="button"
                     className="text-button"
+                    disabled={frozen || chainBusy}
                     onClick={() => {
                       setStep(1)
                       setConfirmed(false)
@@ -532,6 +600,7 @@ export function CampaignWizard({
                     <p className="review-description">
                       {milestone.description}
                     </p>
+                    <p>Ngân sách: {milestone.budget} USDC</p>
                     <ul>
                       {milestone.criteria.map((criterion) => (
                         <li key={criterion.id}>{criterion.description}</li>
@@ -540,6 +609,22 @@ export function CampaignWizard({
                   </article>
                 ))}
               </section>
+              <section className="panel wizard-panel"><p>Tổng goal: {formatUnits(goal, 6)} USDC</p><p>Bond cần khóa: {formatUnits(bond, 6)} USDC</p></section>
+              {!organizationId && !baseline?.organizationId && <section className="panel wizard-panel">
+                <label>Tổ chức nộp campaign
+                  <select value={submissionOrganizationId} onChange={event => setSelectedOrganizationId(event.target.value)}>
+                    <option value="">Chọn tổ chức của bạn</option>
+                    {organizations.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                  </select>
+                </label>
+                {organizationQuery.isPending && <p role="status">Đang tải tổ chức…</p>}
+                {organizationQuery.isError && <p role="alert">{getErrorMessage(organizationQuery.error)}</p>}
+                {organizationQuery.isSuccess && organizations.length === 0 && <p>Bạn chưa có tổ chức. Tạo tổ chức rồi bấm tải lại; nội dung campaign vẫn được giữ tại đây.</p>}
+                <button type="button" className="button button--secondary" disabled={organizationQuery.isFetching}
+                  onClick={() => void organizationQuery.refetch()}>Tải lại tổ chức</button>
+                <p>Chọn tổ chức để nộp nội dung bên trên. Nếu đã lưu nháp cá nhân, hệ thống tạo một bản cho tổ chức khi bạn bấm nộp và giữ bản cá nhân.</p>
+                <a href="#/organizations">Tạo hoặc quản lý tổ chức</a>
+              </section>}
               <label className="confirmation-check">
                 <input
                   type="checkbox"
@@ -551,8 +636,9 @@ export function CampaignWizard({
                 </span>
               </label>
               <p className="submission-unavailable" id="submission-status">
-                Bạn có thể lưu nháp để mở lại sau. Nộp hồ sơ để xét duyệt chưa
-                khả dụng; lưu nháp không phải nộp campaign.
+                {submissionOrganizationId
+                  ? 'Bạn có thể lưu nháp để mở lại sau. Xác nhận thông tin bên trên để nộp campaign và khóa bond qua ví.'
+                  : 'Chọn tổ chức bên trên và xác nhận thông tin để mở phần nộp campaign & khóa bond.'}
               </p>
             </div>
           )}
@@ -607,6 +693,7 @@ export function CampaignWizard({
             <button
               type="button"
               className="button button--secondary"
+              disabled={frozen || chainBusy}
               onClick={() => {
                 if (step > 0) setStep(step - 1)
                 else onClose()
@@ -624,7 +711,7 @@ export function CampaignWizard({
                   type="button"
                   className="button button--secondary"
                   onClick={() => void saveDraft()}
-                  disabled={conflict}
+                  disabled={conflict || frozen}
                 >
                   {saving
                     ? 'Đang lưu…'
@@ -632,19 +719,18 @@ export function CampaignWizard({
                       ? 'Lưu thay đổi'
                       : 'Lưu nháp'}
                 </button>
-                <button
-                  type="button"
-                  className="button button--primary"
-                  disabled
-                  aria-describedby="submission-status"
-                >
-                  Nộp campaign
-                </button>
+                {!submissionOrganizationId && <button type="button" className="button button--primary" disabled aria-describedby="submission-status">Nộp campaign & khóa bond</button>}
+
               </div>
             )}
           </div>
         </fieldset>
       </form>
+      {step === 2 && (confirmed || frozen) && submissionOrganization && session && <OrganizationWallet
+        key={`${session.userId}:${submissionOrganization.id}`} organization={submissionOrganization} userId={session.userId} />}
+      {step === 2 && (confirmed || frozen) && submissionOrganizationId && <CampaignSubmission campaign={baseline?.organizationId ? baseline : undefined}
+        ensureCampaign={() => saveDraft(true)} onBusyChange={setChainBusy} onPrepared={setBaseline}
+        onComplete={(id) => { window.location.hash = `/organizations/${submissionOrganizationId}/workspace/campaigns/${id}` }} />}
     </section>
   )
 }

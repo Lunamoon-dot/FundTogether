@@ -19,6 +19,7 @@ export function EvidenceDocuments({ campaignId, draft, draftKey, disabled, onBus
   onConflict: () => void
 }) {
   const [kind, setKind] = useState<EvidenceDraftContent['documents'][number]['kind']>('REPORT')
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const controllerRef = useRef<AbortController | null>(null)
@@ -26,21 +27,32 @@ export function EvidenceDocuments({ campaignId, draft, draftKey, disabled, onBus
   const queryClient = useQueryClient()
   useEffect(() => () => controllerRef.current?.abort(), [])
 
-  async function upload(file?: File) {
-    if (!file || disabled || controllerRef.current) return
+  function selectFile(file?: File) {
     setError('')
+    setSelectedFile(null)
+    if (!file) return
     if (!file.size || file.size > 10 * 1024 * 1024 || !['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) {
       setError('Chọn PDF, JPEG hoặc PNG, tối đa 10 MiB/file.')
       if (inputRef.current) inputRef.current.value = ''
       return
     }
+    setSelectedFile(file)
+  }
+
+  async function upload() {
+    if (!selectedFile || disabled || controllerRef.current || draft.content.documents.length >= 20) return
+    setError('')
     const controller = new AbortController()
     controllerRef.current = controller
     setBusy(true)
     onBusy(true)
     try {
-      const saved = await uploadEvidenceDocument(campaignId, draft.milestoneIndex, draft.revision, kind, file, controller.signal)
-      if (!controller.signal.aborted) queryClient.setQueryData(draftKey, saved)
+      const saved = await uploadEvidenceDocument(campaignId, draft.milestoneIndex, draft.revision, kind, selectedFile, controller.signal)
+      if (!controller.signal.aborted) {
+        setSelectedFile(null)
+        if (inputRef.current) inputRef.current.value = ''
+        queryClient.setQueryData(draftKey, saved)
+      }
     } catch (cause) {
       if (!controller.signal.aborted) {
         if (axios.isAxiosError(cause) && cause.response?.status === 409) onConflict()
@@ -50,7 +62,6 @@ export function EvidenceDocuments({ campaignId, draft, draftKey, disabled, onBus
       if (!controller.signal.aborted) {
         setBusy(false)
         onBusy(false)
-        if (inputRef.current) inputRef.current.value = ''
       }
       controllerRef.current = null
     }
@@ -90,10 +101,17 @@ export function EvidenceDocuments({ campaignId, draft, draftKey, disabled, onBus
           onChange={(event) => setKind(event.target.value as typeof kind)}>
           {Object.entries(kinds).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
-        <label htmlFor="evidence-document-file">Thêm tài liệu</label>
+        <label htmlFor="evidence-document-file">Chọn tài liệu</label>
         <input ref={inputRef} id="evidence-document-file" type="file" accept="application/pdf,image/jpeg,image/png"
           disabled={disabled || busy || draft.content.documents.length >= 20}
-          onChange={(event) => void upload(event.target.files?.[0])} />
+          aria-describedby="evidence-upload-help"
+          onChange={(event) => selectFile(event.target.files?.[0])} />
+        <p id="evidence-upload-help" className="muted">Chọn loại và file, rồi bấm “Thêm chứng cứ” để tải lên. Có thể thêm lần lượt tối đa 20 tài liệu.</p>
+        <div className="organization-form-actions">
+          <button type="button" className="button button--primary"
+            disabled={!selectedFile || disabled || busy || draft.content.documents.length >= 20}
+            onClick={() => void upload()}>Thêm chứng cứ</button>
+        </div>
         {disabled && <p className="muted">Lưu thay đổi hoặc tải bản mới nhất trước khi thêm tài liệu.</p>}
         {busy && <p role="status">Đang xử lý tài liệu…</p>}
         {error && <p className="form-error" role="alert">{error}</p>}

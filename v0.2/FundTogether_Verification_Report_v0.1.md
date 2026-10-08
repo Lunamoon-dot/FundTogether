@@ -10,7 +10,10 @@ Report là kết quả phân tích off-chain, không phải verdict tài chính.
 Rules/OCR/AI không giữ VERIFIER_ROLE và không tự gọi accept, slash hoặc settlement.
 Assigned verifier đọc bản gốc và report để thực hiện action được phép.
 Request more evidence dùng rejectSubmission + reasonHash như flow hiện tại.
-Resolver xử lý tranh chấp chưa rõ; đủ checklist không có nghĩa đã chứng minh thật.
+Trong luồng evidence/challenge, kiểm tra hồ sơ và giải trình/kiểm tra lại diễn ra
+trước khi tranh chấp chưa rõ hoặc đến hạn escalation được chuyển resolver.
+Resolver còn duyệt campaign sau lớp kiểm tra/sửa hồ sơ trước publish; report
+không thay quyết định đó. Đủ checklist không có nghĩa đã chứng minh thật.
 
 ## 2. Schema
 

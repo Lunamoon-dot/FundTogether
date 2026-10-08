@@ -7,18 +7,18 @@ import {
 } from '@rainbow-me/rainbowkit'
 import {
   braveWallet,
-  injectedWallet,
   metaMaskWallet,
   rabbyWallet,
 } from '@rainbow-me/rainbowkit/wallets'
 import { WagmiProvider, createConfig, http } from 'wagmi'
 import { foundry } from 'wagmi/chains'
+import deployment from '../../../../backend/src/blockchain/generated/deployment.local.json'
 
 const connectors = connectorsForWallets(
   [
     {
       groupName: 'Browser wallets',
-      wallets: [braveWallet, metaMaskWallet, rabbyWallet, injectedWallet],
+      wallets: [braveWallet, metaMaskWallet, rabbyWallet],
     },
   ],
   {
@@ -31,7 +31,7 @@ const connectors = connectorsForWallets(
 const wagmiConfig = createConfig({
   chains: [foundry],
   connectors,
-  transports: { [foundry.id]: http('http://127.0.0.1:8545', { timeout: 8_000, retryCount: 0 }) },
+  transports: { [foundry.id]: http(deployment.rpcUrl, { timeout: 8_000, retryCount: 0 }) },
 })
 
 const queryClient = new QueryClient({

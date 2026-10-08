@@ -2,20 +2,51 @@
 
 > **Status:** Approved MVP baseline for implementation
 > **Version:** 0.3-draft
-> **Updated:** 2026-10-03
+> **Updated:** 2026-10-06
 > **Related:** [Protocol specification](./protocol-spec.md), [State machine](./state-machine.md), [Financial rules](./financial-rules.md)
+
+## Current priority — MVP consolidation and business validation
+
+The user-approved direction on 2026-10-06 is to stay with the MVP, study real
+charitable campaign operations and improve existing journeys before extending
+post-MVP. Follow [business validation and MVP hardening](./business-validation-and-mvp-hardening.md)
+for the research questions, acceptance evidence and exit criteria.
+
+Existing approved financial/authority rules remain the test baseline. They are
+not evidence of real-world suitability. Business findings may justify revising
+them after an explicit decision and an assessment of existing campaign obligations.
+Separate verifier, committee, appeals, slashing, reputation and AI remain deferred;
+public-network integration is not the automatic next step. No duration is fixed:
+progress depends on evidence and bounded decisions, not indefinite perfection.
 
 ## 1. MVP goal
 
 The MVP proves that FundTogether can protect and account for charitable funds across a complete campaign lifecycle. It is complete only when both a normal path and a failure/refund path can be reproduced end-to-end.
 
 The reviewed [layered verification and dispute design](./verification-and-disputes.md)
-records the target evidence admission -> donor review -> organizer response ->
-re-verification -> unresolved-case arbitration flow. This is design work, not
-completed functionality. Exact verifier/appeal/timing APIs remain open.
-A permissioned 2-of-3 matching-verdict committee is selected for MVP in the
-user's follow-up. Individual votes are recorded by ResolverManager; not implemented.
+records two user-confirmed MVP flows: campaign system checks/corrections ->
+submitted dossier -> resolver approval -> organizer publication, and evidence
+checks/admission -> donor review -> challenge checks -> organizer response ->
+re-verification -> resolver arbitration only if unresolved/escalated. Authorized
+platform staff may perform resolver work. These are target workflows, not claims
+that all stages exist. The later minimal milestone policy below governs MVP;
+separate verifier/appeal proposals remain deferred research.
+The user's latest 2026-10-04 decision moves the 2-of-3 committee to post-MVP.
+MVP uses a permissioned resolver and individual decision records. This supersedes
+the earlier committee selection; layered verification remains required.
 Registry, random assignment, resolver fees/reputation and AI remain deferred.
+
+The approved 2026-10-05 [milestone completion policy](./mvp-milestone-completion.md)
+uses the existing resolver for admission and final case decisions. Separate
+verifiers, appeals, committee voting and misconduct slashing are post-MVP.
+One case per evidence version has 7 days for response and 7 days for resolution:
+CONTINUE, RESUBMIT or STOP; STOP/timeout refunds unreleased donor escrow and
+returns bond separately without penalty. Earlier slash/appeal proposals below
+are superseded for MVP. `FundTogetherMvp` implements the new contract boundary;
+after the authorized local test reset on 2026-10-07 the application deploys MVP.
+The BE/storage/indexer/FE journey has isolated integration evidence on 9545;
+real wallet browser acceptance on the fresh application deployment is pending.
+Earlier entries retain their original scope.
 
 ## 2. In scope
 
@@ -23,14 +54,15 @@ Registry, random assignment, resolver fees/reputation and AI remain deferred.
 
 - ERC20 MockUSDC donations and organizer bond.
 - Campaign configuration and funding goal/deadline.
+- Campaign dossier/integrity/criteria checks, correction and mandatory resolver approval before organizer publication.
 - Sequential milestones.
 - Maximum-exposure bond based on the largest milestone budget.
 - Evidence hash/version commitment.
 - Review window and donor-only challenge.
-- Permissioned 2-of-3 matching-verdict resolver outcome and individual vote audit trail.
+- Permissioned resolver outcome and decision audit trail; 2-of-3 voting is post-MVP.
 - Milestone settlement and campaign cancellation.
 - Refund pool snapshot and individual donor claim.
-- Bond return and bounded misconduct allocation.
+- Bond return without misconduct allocation; slashing is post-MVP.
 - Events required by the indexer.
 - Unit, negative, fuzz and invariant tests for financial boundaries.
 
@@ -42,15 +74,18 @@ Registry, random assignment, resolver fees/reputation and AI remain deferred.
 - Campaign metadata and milestone metadata.
 - Evidence metadata and public upload flow.
 - Challenge metadata and resolver records.
+- Versioned verification findings and campaign resolver decisions; screening, response and re-verification before dispute escalation.
 - Blockchain projection tables.
 - Idempotent event synchronization with checkpoint data.
-- OpenAPI documentation and generated frontend client boundary.
+- OpenAPI documentation and a typed frontend API boundary; client generation
+  remains a target, not a claim that the current client is generated.
 
 ### Frontend
 
 - Wallet connection and network guard.
 - Campaign list and campaign detail.
 - Organizer campaign draft flow.
+- System-check findings, campaign corrections and authorized resolver review after submission.
 - Milestone and evidence views.
 - Donor contribution flow.
 - Challenge flow for eligible donors.
@@ -92,10 +127,14 @@ donor attribution, refund payout and failure recovery before implementation.
 ### Organizer
 
 ```text
-Connect wallet / SIWE
+Register/login to application account
+→ link external wallet with SIWE
 → create draft
 → define sequential milestones
+→ system dossier/integrity/criteria checks and corrections
+→ submit completed campaign dossier
 → lock bond
+→ resolver campaign approval
 → publish campaign
 → activate milestone
 → submit evidence
@@ -130,6 +169,7 @@ Funding failure or valid cancellation
 A feature is not done because its page renders. It is done when the relevant checks below pass:
 
 ```text
+[ ] Business need, actor and accepted trust assumption documented
 [ ] Protocol rule documented
 [ ] State transition documented
 [ ] Contract guard implemented
@@ -142,6 +182,8 @@ A feature is not done because its page renders. It is done when the relevant che
 [ ] Backend authorization enforced
 [ ] Frontend pending/success/failure/indexed states shown
 [ ] Refresh reconstructs state from backend/chain data
+[ ] Real wallet browser journey verified on the intended deployment
+[ ] Relevant outage/restart/recovery verified and limitations recorded
 ```
 
 ## 6. Delivery phases
@@ -157,11 +199,21 @@ Phase 6  Frontend vertical journeys
 Phase 7  End-to-end MVP and security review
 ```
 
-Do not move a phase to `DONE` because a later phase has a mock or because documentation exists. Record the command, test, transaction or projection that proves completion.
+The phases describe dependencies, not a requirement to keep adding features.
+Current work returns to business assumptions and consolidation across phases
+0–7. The [consolidation exit criteria](./business-validation-and-mvp-hardening.md#7-điều-kiện-kết-thúc-giai-đoạn-này)
+apply before selecting the next expansion. Do not move a phase to `DONE` because
+a later phase has a mock or documentation. Record the evidence and environment.
 
 ## 7. MVP risks and accepted limitations
 
-- Prototype approval uses one trusted resolver; selected MVP arbitration uses a 2-of-3 committee, not implemented yet.
+- Resolver is in MVP: system checks precede campaign approval. The existing
+  resolver admits evidence and decides bounded cases under the approved 7+7-day,
+  CONTINUE/RESUBMIT/STOP, no-slash policy. Real-world independence, staffing and
+  suitable durations still need validation; a separate verifier/committee is deferred.
+- Milestone activation pays nothing; settlement follows evidence/review. Organizer
+  working capital and the purpose/cost of a no-slash bond need business validation.
+- Refunds cover only snapshotted unreleased escrow; bond is not donor insurance.
 - Public evidence does not provide privacy.
 - Evidence hashes prove integrity, not real-world truth.
 - An indexer can lag the chain; the UI must show pending/indexed distinction.
@@ -170,7 +222,8 @@ Do not move a phase to `DONE` because a later phase has a mock or because docume
 
 ## Arc acceptance gate
 
-Anvil remains local development; Arc testnet is prioritized for public integration.
+Anvil remains local development. Arc retains its earlier candidate priority if
+public integration is subsequently selected; it is deferred during consolidation.
 Production Arc deployment requires validated native/ERC20 accounting and gas UX,
 ABI/address/start-block artifacts, finality-aware indexing, complete success and
 failure/recovery journeys, and fund-safety review. A passing local suite does not

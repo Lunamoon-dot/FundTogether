@@ -1,6 +1,6 @@
 # Accounts and wallets — development implementation
 
-Updated: 2026-10-04
+Updated: 2026-10-05
 
 ## One account, optional wallets
 
@@ -19,6 +19,30 @@ A wallet is not required to register, sign in or save metadata drafts. Wallet
 ownership and application account identity are separate. Wallet linking does not
 grant an on-chain role, prove organizer approval or publish a campaign. The
 contract remains authoritative for financial state and permissions.
+
+Wallet linking signs with the selected address and rechecks account, address and
+chain around the nonce and signature requests. A wallet that does not answer
+within 90 seconds releases the form and displays a recovery message. A signature
+arriving after that timeout cannot continue to the linking endpoint. Close the
+old extension request before retrying. The selected connector remains locked until
+that request settles, so timeout does not start a duplicate signature request.
+Switching connector, account or chain invalidates the proof. Leaving the form
+prevents a late result from changing the application's active session. A wallet
+already linked on the selected chain displays “Ví đã liên kết”. The account page shows the configured
+resolver address for staff; a PostgreSQL RESOLVER role does not grant that
+address's contract permissions.
+
+The linking form reads the selected connector client under an 8-second bound
+before reporting a signature request, then bounds nonce loading to 20 seconds.
+Signing uses that prepared client and a 90-second countdown. Stop waiting aborts
+the local proof before backend verification; it does not cancel an extension
+request. Disconnect/change-wallet and session linkage recheck provide recovery.
+The generic default Browser Wallet option was removed to avoid ambiguity with
+named Brave/MetaMask/Rabby providers; discovered wallets remain available.
+Backend verification is a separate stage. Signing is bound to the connector
+selected at the start of the request. A resource-unavailable wallet response explains how to
+resolve pending extension requests. These messages do not prove that an extension
+popup opened; native MetaMask signing still needs manual confirmation.
 
 The account UI separates linked wallets returned by `/auth/session` from the
 browser's currently connected wallet. Automatic reconnect on page load is

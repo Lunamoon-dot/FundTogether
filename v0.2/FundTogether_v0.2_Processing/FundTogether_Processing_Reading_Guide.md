@@ -1,15 +1,29 @@
 # FundTogether v0.2 — Mục lục giải thích các Mốc
 
+> **Quyết định phạm vi mới nhất (2026-10-04):** MVP dùng resolver được cấp quyền,
+> sau các bước kiểm tra hệ thống. Hội đồng 2/3 và ResolverManager để post-MVP.
+> Các đoạn chọn 2/3 cho MVP bên dưới thuộc quyết định cũ, đã được thay thế;
+> phần cơ chế hội đồng chỉ còn là tài liệu tham khảo cho post-MVP.
+
 > Giữ cấu trúc theo `Explain_Details_MocN` để bạn có thể mở từng phần độc lập. File gốc [Development Process & MVP Roadmap](./FundTogether_v0.2_Development_Process_and_MVP_Roadmap.md) vẫn là nguồn tiến trình; các file dưới đây giải nghĩa để học và thực hiện, không thay thế quyết định protocol đã được team chốt.
 
 ## Mục lục
+
+### Xác nhận workflow ngày 2026-10-04
+
+Resolver thuộc MVP và có thể là nhân viên được cấp quyền. Campaign qua kiểm tra
+hồ sơ/toàn vẹn/tiêu chí và sửa lỗi trước khi nộp cho resolver duyệt rồi publish.
+Evidence và challenge có kiểm tra ở cả hai đầu; giải trình/kiểm tra lại trước
+khi tranh chấp còn chưa giải quyết hoặc đến hạn escalation tới resolver.
+Hai nhiệm vụ có checklist/quyền riêng trong cùng vai trò; hướng 2/3 trước đây
+dành cho phân xử tranh chấp. Đọc [workflow đã cập nhật](../FundTogether_Verification_and_Dispute_Design_2026-10-03.md).
 
 ### Cập nhật thiết kế ngày 2026-10-03
 
 Đọc [Kiểm tra evidence và xử lý tranh chấp theo tầng](../FundTogether_Verification_and_Dispute_Design_2026-10-03.md)
 cùng Mốc 1 và Mốc 6. Bản cập nhật phân biệt hướng thiết kế với code hiện có,
 giữ review 72 giờ và ghi rõ quyền verifier, phản hồi organizer, arbitration,
-timeout và các quyết định còn mở. Nội dung tiếp theo người dùng chọn 2/3 cho MVP:
+timeout và các quyết định còn mở. Quyết định mới nhất của người dùng hoãn 2/3 đến post-MVP:
 đọc [Dispute Policy và hội đồng resolver](../FundTogether_Dispute_Policy_and_Resolver_Committee_2026-10-03.md).
 Đã chọn hướng thiết kế; committee và các nhánh tài chính chưa được triển khai.
 

@@ -1,5 +1,10 @@
 # FundTogether — Giải thích Mốc 8: MVP Definition
 
+> **Quyết định phạm vi mới nhất (2026-10-04):** MVP dùng resolver được cấp quyền,
+> sau các bước kiểm tra hệ thống. Hội đồng 2/3 và ResolverManager để post-MVP.
+> Các đoạn chọn 2/3 cho MVP bên dưới thuộc quyết định cũ, đã được thay thế;
+> phần cơ chế hội đồng chỉ còn là tài liệu tham khảo cho post-MVP.
+
 > Đây là hướng dẫn xác định phạm vi MVP, không phải xác nhận các mục dưới đây đã được implement. Quyết định protocol còn mở vẫn cần được chốt trước khi vận hành tiền thật.
 
 ## 1. MVP là gì trong Process?
@@ -118,7 +123,7 @@ Nguồn: [Process — Mốc 8, những thứ không cần cho MVP, Definition of
 
 ## MVP baseline alignment
 
-MVP: milestone tuần tự, donor-only challenge, mandatory admission/versioning, originals hạn chế và public redactions. Committee 2/3 đã chọn nhưng chưa có code. Refund trước FUNDED có snapshot/pull claim; post-FUNDED còn OPEN. Safe, EIP-712, mã hóa end-to-end, cross-chain, nhiều token và reputation nâng cao vẫn hoãn.
+MVP: milestone tuần tự, donor-only challenge, mandatory admission/versioning, originals hạn chế và public redactions. Committee 2/3 để post-MVP và chưa có code. Refund trước FUNDED có snapshot/pull claim; post-FUNDED còn OPEN. Safe, EIP-712, mã hóa end-to-end, cross-chain, nhiều token và reputation nâng cao vẫn hoãn.
 
 ## Rà soát mốc và hướng Arc — 2026-10-03
 

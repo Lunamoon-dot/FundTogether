@@ -1,8 +1,30 @@
 # FundTogether v0.2 — Development Process & MVP Roadmap
 
+> **Điều chỉnh ưu tiên 2026-10-06 — đã được người dùng chốt:** nán lại MVP để
+> nghiên cứu nghiệp vụ và củng cố workflow. Roadmap bên dưới giữ giá trị về thứ
+> tự phụ thuộc; không yêu cầu lập tức làm reputation, verifier riêng, committee,
+> slash, AI hay Arc sau khi test local chạy được. Đọc
+> [kế hoạch củng cố và cổng chuyển giai đoạn](../../docs/business-validation-and-mvp-hardening.md)
+> và [policy milestone MVP mới nhất](../../docs/mvp-milestone-completion.md).
+> Các giả định dòng tiền/bond trong tư liệu phải được đối chiếu với mô hình
+> giải ngân sau evidence của code hiện tại trước khi dùng làm kết luận thực tế.
+
+> **Quyết định phạm vi mới nhất (2026-10-04):** MVP dùng resolver được cấp quyền,
+> sau các bước kiểm tra hệ thống. Hội đồng 2/3 và ResolverManager để post-MVP.
+> Các đoạn chọn 2/3 cho MVP bên dưới thuộc quyết định cũ, đã được thay thế;
+> phần cơ chế hội đồng chỉ còn là tài liệu tham khảo cho post-MVP.
+
 > **Goal:** Xây FundTogether theo đúng dependency của hệ thống, ưu tiên protocol correctness và financial safety trước UI.  
 > **Project type:** Donation-based charitable crowdfunding  
 > **Core model:** Milestone Escrow + Maximum-Exposure Bond + Evidence Verification + Challenge Governance + Refund + Reputation
+
+> **Workflow xác nhận 2026-10-04:** Campaign qua hệ thống kiểm tra hồ sơ/toàn
+> vẹn/tiêu chí và sửa trước khi nộp cho resolver/nhân viên có quyền duyệt rồi
+> publish. Evidence/challenge có kiểm tra ở cả hai đầu, giải trình và kiểm tra
+> lại; chỉ tranh chấp còn chưa giải quyết hoặc đến hạn escalation mới tới
+> resolver phân xử. Resolver thuộc MVP; hướng hội đồng 2/3 dành cho phân xử.
+> Đối chiếu [workflow cập nhật](../FundTogether_Verification_and_Dispute_Design_2026-10-03.md)
+> khi đọc các ví dụ prototype phía dưới.
 
 ---
 
@@ -490,17 +512,20 @@ Option B an toàn hơn nhưng implementation phức tạp hơn.
 
 ## Q4 — Resolver
 
-Ai resolve dispute trong MVP?
+Ai duyệt campaign sau kiểm tra và ai phân xử dispute được chuyển lên trong MVP?
 
 Có thể chọn:
 
 ```text
-Admin / trusted verifier
+Nhân viên được cấp quyền resolver theo policy
 ```
 
 cho MVP.
 
-Không nhất thiết phải decentralized ngay.
+Campaign luôn qua kiểm tra/sửa hồ sơ trước resolver. Dispute qua kiểm tra
+challenge, giải trình và re-verification trước escalation. Người verify vụ việc
+không phân xử chính vụ đó. Hướng hội đồng 2/3 và các policy chưa chốt xem tài liệu
+Dispute Policy; không tự đổi threshold bằng ví dụ một ví của prototype.
 
 ---
 
@@ -1321,7 +1346,7 @@ chuẩn bị song song; journey tài chính chỉ tích hợp slice đã thống
 | Reputation/research | Sau MVP | Chưa triển khai |
 
 Safe execution, EIP-712, mã hóa end-to-end, bank conversion, cross-chain và nhiều
-token vẫn hoãn. Committee 2/3 không phải Safe và không bị đẩy sau MVP.
+token vẫn hoãn. Committee 2/3 không phải Safe và đã chuyển sang post-MVP.
 
 Đọc [bảng rà 10 mốc](../FundTogether_Milestone_Review_2026-10-03.md) và
 [Arc evaluation](../FundTogether_Arc_Evaluation_v0.1.md). Trạng thái triển khai

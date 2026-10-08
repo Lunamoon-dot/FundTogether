@@ -95,7 +95,7 @@ export function OrganizationEvidence({ organizationId, userId, section }: {
           <button className="button button--secondary" disabled={draft.isFetching}
             onClick={() => void draft.refetch()}>Thử lại</button></section>
       ) : <EvidenceDraftEditor key={`${milestone.id}:${draft.data?.revision ?? 'new'}`}
-        campaignId={campaignId} milestone={milestone} initialDraft={draft.data}
+        organizationId={organizationId} campaignId={campaignId} milestone={milestone} initialDraft={draft.data}
         draftKey={draftKey} />}
     </>
   )

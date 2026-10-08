@@ -1,6 +1,7 @@
 pragma solidity 0.8.24;
 
 import { FundTogether } from "../../../src/FundTogether.sol";
+import { FundTogetherBase } from "../../../src/modules/FundTogetherBase.sol";
 import { MockUSDC } from "../../mocks/MockUSDC.sol";
 import { CampaignFixtures } from "../../helpers/CampaignFixtures.sol";
 import { Test } from "forge-std/Test.sol";
@@ -64,9 +65,9 @@ contract FundTogetherMilestoneTest is Test {
         assertEq(goal, 9_000_000);
         assertEq(bond, 5_000_000);
         assertEq(fundTogether.milestoneCount(id), 3);
-        (uint256 first, FundTogether.MilestoneState state) = fundTogether.milestones(id, 0);
+        (uint256 first, FundTogetherBase.MilestoneState state) = fundTogether.milestones(id, 0);
         assertEq(first, 3_000_000);
-        assertTrue(state == FundTogether.MilestoneState.PENDING);
+        assertTrue(state == FundTogetherBase.MilestoneState.PENDING);
         (uint256 last,) = fundTogether.milestones(id, 2);
         assertEq(last, 5_000_000);
     }
@@ -133,14 +134,14 @@ contract FundTogetherMilestoneTest is Test {
         emit MilestoneActivated(id, 0, 3_000_000);
         vm.prank(organizer);
         fundTogether.activateMilestone(id, 0);
-        (, FundTogether.MilestoneState firstState) = fundTogether.milestones(id, 0);
-        (, FundTogether.MilestoneState secondState) = fundTogether.milestones(id, 1);
-        assertTrue(firstState == FundTogether.MilestoneState.ACTIVE);
-        assertTrue(secondState == FundTogether.MilestoneState.PENDING);
+        (, FundTogetherBase.MilestoneState firstState) = fundTogether.milestones(id, 0);
+        (, FundTogetherBase.MilestoneState secondState) = fundTogether.milestones(id, 1);
+        assertTrue(firstState == FundTogetherBase.MilestoneState.ACTIVE);
+        assertTrue(secondState == FundTogetherBase.MilestoneState.PENDING);
         assertEq(fundTogether.currentMilestoneIndex(id), 0);
         assertEq(
             uint256(fundTogether.campaignState(id)),
-            uint256(FundTogether.CampaignState.MILESTONE_ACTIVE)
+            uint256(FundTogetherBase.CampaignState.MILESTONE_ACTIVE)
         );
         assertEq(token.balanceOf(address(fundTogether)), 14_000_000);
         assertEq(token.balanceOf(organizer), 0);
@@ -216,10 +217,10 @@ contract FundTogetherMilestoneTest is Test {
         vm.prank(organizer);
         fundTogether.activateMilestone(first, 0);
         assertEq(
-            uint256(fundTogether.campaignState(second)), uint256(FundTogether.CampaignState.FUNDED)
+            uint256(fundTogether.campaignState(second)), uint256(FundTogetherBase.CampaignState.FUNDED)
         );
-        (, FundTogether.MilestoneState state) = fundTogether.milestones(second, 0);
-        assertTrue(state == FundTogether.MilestoneState.PENDING);
+        (, FundTogetherBase.MilestoneState state) = fundTogether.milestones(second, 0);
+        assertTrue(state == FundTogetherBase.MilestoneState.PENDING);
         assertEq(token.balanceOf(address(fundTogether)), 28_000_000);
     }
 

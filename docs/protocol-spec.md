@@ -2,8 +2,25 @@
 
 > **Status:** Approved MVP baseline for implementation
 > **Version:** 0.3-draft
-> **Updated:** 2026-10-03
+> **Updated:** 2026-10-06
 > **Source:** FundTogether v0.2 Process, Tech Stack and Threat Model
+
+**2026-10-05 approved amendment:** [MVP milestone completion](./mvp-milestone-completion.md)
+supersedes separate verifier/appeal/slash proposals below for MVP. The existing
+resolver admits evidence and decides CONTINUE / RESUBMIT / STOP; one final case
+per evidence version, 7-day response plus 7-day resolution. STOP/timeout refunds
+unreleased donor escrow and returns bond without penalty. New contract source
+is separate from the old prototype. Storage/indexer/signing UI have isolated
+integration evidence. After the authorized test reset on 2026-10-07, the application
+deploys MVP; real browser acceptance remains pending. See [milestone lifecycle](./milestone-lifecycle.md).
+
+**2026-10-06 development decision:** prioritize
+[business validation and MVP consolidation](./business-validation-and-mvp-hardening.md).
+Approved baseline rules remain in force for testing. Their practical suitability,
+including reimbursement working capital and the no-slash bond's purpose, needs
+evidence. Post-MVP and public-network expansion are deferred. Historical
+prototype interfaces and verifier/slash proposals below do not override the
+newer MVP policy or create rights on the existing deployment.
 
 ## 1. Purpose
 
@@ -12,8 +29,12 @@ FundTogether is a donation-based charitable crowdfunding protocol. Donors fund a
 The MVP must prove one complete success path and one failure path:
 
 ```text
-Create → Fund → Activate milestone → Submit evidence
-→ Review / Challenge → Settle → Continue → Complete
+Draft → System checks / corrections → Submit → Resolver campaign approval
+→ Publish (bond locked; contract guards satisfied) → Fund → Activate milestone
+→ Evidence checks / admission → Donor review
+  no challenge → Settle → Continue → Complete
+  challenge → Checks → Response → Re-verification
+    unresolved/escalated → Resolver arbitration → Permitted protocol outcome
 
 Funding failure or cancellation → Refund → Bond settlement
 ```
@@ -24,32 +45,39 @@ This specification defines the protocol boundary. UI details, search, notificati
 
 | Decision | MVP value | Status |
 |---|---|---|
-| Blockchain | EVM; Anvil local; Arc testnet priority for integration; Sepolia optional fallback | APPROVED LOCAL; ARC TRIAL TODO |
+| Blockchain | EVM; Anvil local; later public-network evaluation subject to consolidation gate | APPROVED LOCAL; PUBLIC TRIAL DEFERRED |
 | Donation asset | ERC20 MockUSDC | APPROVED |
 | Bond asset | Same MockUSDC as donations | APPROVED |
 | Local gas asset | Anvil native test ETH, separate from donation and bond | APPROVED DEV BASELINE |
-| Priority target | Arc testnet; USDC native gas and ERC20 share one balance | SELECTED TRIAL; NOT DEPLOYED |
+| Public-network candidate | Earlier Arc evaluation proposal; Sepolia optional fallback | DEFERRED; NOT DEPLOYED |
 | Production chain / sponsorship | Arc preferred candidate; production acceptance and sponsorship still open | CANDIDATE; NOT IMPLEMENTED |
 | Milestones | Sequential; only the current milestone can be active | APPROVED |
 | Release | Release the current milestone budget after successful settlement | APPROVED |
-| Resolver | Current prototype: deployer role; target: independent final arbitration after verification/response | CURRENT LIMITATION; TARGET DESIGN REVIEWED |
+| Resolver | Existing authorized resolver: campaign approval, evidence admission and bounded case decisions | APPROVED; NEW MVP ISOLATED INTEGRATION; BROWSER ACCEPTANCE TODO |
 | Challenge eligibility | Donor of the campaign being challenged | APPROVED |
 | Challenge stake | None in MVP | APPROVED |
-| Failure classification | Draft: `CANCEL_WITHOUT_FAULT`, `DEFAULT`, `MISCONDUCT`; taxonomy/slash mapping not frozen | OPEN; NOT IMPLEMENTED |
-| Evidence | Restricted originals/manifests; public redacted derivatives; immutable versions | DOCUMENTED; STORAGE TODO |
-| Verifier | One VERIFIER_ROLE: submission admission/versioning implemented; challenge/remediation specified; no edits/adjudication/direct transfers | PARTIALLY IMPLEMENTED |
-| Refund | Pre-FUNDED full contribution snapshot/pull claims implemented; post-FUNDED composition open | PARTIALLY IMPLEMENTED |
-| Reputation | Off-chain projection from indexed events | APPROVED |
-| Timeout execution | Permissionless funding failure and unchallenged settlement; waiting-stage recovery still open | PARTIALLY IMPLEMENTED |
+| Failure policy | MVP STOP/timeout without misconduct finding or slash; expanded taxonomy deferred | APPROVED MVP; PRACTICAL VALIDATION TODO |
+| Evidence | Restricted originals, public redacted immutable package, resolver access audit | NEW MVP ISOLATED INTEGRATION; BROWSER ACCEPTANCE TODO |
+| Separate verifier | Prototype has assigned VERIFIER_ROLE; new MVP disables legacy admission and uses resolver | POST-MVP ACTOR DEFERRED |
+| Refund | Unreleased escrow snapshot; proportional one-time claims; bond separate, no slash | APPROVED; REGRESSION EVIDENCE IN PROGRESS LOG |
+| Reputation | Future projection proposal from indexed events | DEFERRED; NOT AN MVP DELIVERY REQUIREMENT |
+| Timeout execution | Permissionless funding/milestone/admission/case recovery and local worker | NEW MVP ISOLATED VERIFICATION; CONTINUOUS OPERATIONS TODO |
 
 Deferred features include native ETH, multiple stablecoins, private evidence encryption, EIP-712 verifier signatures, Safe-based resolver execution, dynamic resolver registry, on-chain reputation registry, cross-chain support and DAO governance.
 
 The 2026-10-03 review records layered verification as the target direction in
 [Verification and dispute escalation](./verification-and-disputes.md). Current
-contract behavior remains unchanged. The user's follow-up selects a permissioned
-2-of-3 matching-verdict committee and individual vote recording for MVP.
-This is selected design, not a verified implementation. The policy draft is in
+contract behavior remains unchanged. The latest 2026-10-04 user decision defers
+the permissioned 2-of-3 committee to post-MVP. MVP uses the configured resolver
+and records individual decisions. Expanded post-MVP financial policy remains open in
 [Dispute Policy and Resolver Committee](../v0.2/FundTogether_Dispute_Policy_and_Resolver_Committee_2026-10-03.md).
+
+The 2026-10-04 clarification keeps resolver participation in MVP. Campaigns
+always undergo dossier/integrity/criteria checks and organizer corrections before
+resolver review; system eligibility alone cannot open a campaign. The resolver
+may be authorized platform staff. Evidence and challenge verification precede
+dispute arbitration. The earlier 2-of-3 direction concerns arbitration only,
+not every campaign approval; the latest follow-up explicitly defers that threshold to post-MVP.
 
 ## 3. Actors and authority
 
@@ -57,9 +85,9 @@ This is selected design, not a verified implementation. The policy draft is in
 |---|---|---|
 | Organizer | Create campaign, lock bond, activate milestone, submit evidence | Can act only for campaigns they own and only in valid states |
 | Donor | Donate, inspect evidence, challenge, claim refund | Can challenge only after contributing to that campaign |
-| Resolver | Final arbitration of unresolved cases in the target flow | Independent from organizer/challenger and prior case verifiers; predefined verdicts only; not implemented |
-| Evidence / challenge verifier | Target admissibility checking and recorded findings | Cannot establish misconduct merely by admitting a claim or arbitrarily distribute funds |
-| Protocol admin | Configure trusted roles and emergency controls | Must not arbitrarily edit campaign accounting |
+| Resolver MVP | Approve campaign dossiers, admit evidence and decide CONTINUE/RESUBMIT/STOP after bounded response/rechecking | Exact SIWE wallet and contract authority; conflict checks; reasons/version records; no arbitrary money/recipient choice |
+| Separate evidence / challenge verifier | Deferred design; prototype-only assigned verifier admission remains | No separate verifier workflow required by new MVP; not an active MVP actor |
+| Protocol admin | Prototype verifier-role administration; no arbitrary escrow withdrawal or emergency payout authority | Cannot overwrite campaign accounting or replace the immutable resolver through a DB role |
 | Beneficiary / vendor | Evidence subjects or sources | No automatic financial authority |
 | Indexer | Read events and write projections | Cannot create financial truth or mutate contract state silently |
 
@@ -122,11 +150,18 @@ Review is fixed at 72 hours for MVP, accepted by the user on 2026-10-03.
 Admin duration changes are deferred. The creation ABI is still a prototype and must be stabilized
 before frontend/backend campaign creation depends on it.
 
-## 6. Core protocol actions
+## 6. Core protocol actions — prototype reference
+
+This section describes the older contract interface. For the new MVP's
+resolver admission, version-bound actions, case exits and pull bond credit, use
+[milestone lifecycle](./milestone-lifecycle.md) and
+[financial recovery](./financial-recovery.md). Source existence does not enable
+those actions on prototype campaigns.
 
 | Action | Caller | Required guard | Main effect |
 |---|---|---|---|
 | Create campaign | Organizer | Valid configuration; no financial state yet | Creates campaign configuration |
+| Approve campaign | Authorized resolver/staff | Target: completed dossier and prior system checks; current contract checks resolver/state/criteria | Allows organizer publication subject to bond/deadline guards; requests/rejections not yet implemented |
 | Lock bond | Organizer | Correct token and amount; campaign not funded/active | Locks required bond |
 | Donate | Donor | Campaign is fundable; amount > 0; before deadline | Transfers ERC20 into escrow |
 | Finalize funding | Anyone | Deadline reached or goal reached according to rule | Moves campaign to funded or funding failed |
@@ -136,13 +171,13 @@ before frontend/backend campaign creation depends on it.
 | Settle milestone | Resolver or permissionless timeout caller | Review/challenge conditions satisfied | Releases budget or applies approved outcome |
 | Cancel campaign before funding | Organizer | Campaign in DRAFT, APPROVED or FUNDING | Creates immutable full-contribution refund snapshot and returns any locked bond atomically |
 | Claim refund | Donor | Refund pool snapshot exists; entitlement > claimed | Transfers claimable amount once |
-| Return/slash bond | Protocol outcome | Terminal settlement rule satisfied | Returns or allocates bond according to financial rules |
+| Return bond | Terminal protocol transition | Terminal settlement rule satisfied | Prototype transfers bond; new MVP credits a separate organizer claim; no slash |
 
 The API may prepare an action or publish intent. The contract receipt and indexed event determine whether the action actually happened.
 
-The current prototype exposes `approveCampaign` for the trusted resolver (the deployer) and `publishCampaign` for the organizer. Donations are accepted only during `FUNDING` before the deadline, capped at the remaining goal. Reaching the goal immediately enters `FUNDED`. Anyone may call `finalizeFundingFailure` at or after the deadline if the campaign is still `FUNDING`.
+The current prototype exposes `approveCampaign` for the trusted resolver (the deployer) and `publishCampaign` for the organizer. Local review eligibility checks criteria, frozen plan identity and bond; this is not the complete target dossier verification/correction workflow. Target campaign approval remains a human resolver decision after those checks. Donations are accepted only during `FUNDING` before the deadline, capped at the remaining goal. Reaching the goal immediately enters `FUNDED`. Anyone may call `finalizeFundingFailure` at or after the deadline if the campaign is still `FUNDING`.
 
-Pre-funded cancellation/failure emits `RefundPoolSnapshotted` and, when a positive bond is returned, `BondReturned` in the terminal transaction. The organizer can cancel unpublished campaigns before or after the deadline; no token call is needed when no bond was locked. A donor's independent claim emits `RefundClaimed`. The pool excludes bond and unsolicited transfers, and each donor receives their full recorded contribution once. Post-funded refunds and slashing remain planned.
+Pre-funded cancellation/failure emits `RefundPoolSnapshotted` and, when a positive bond is returned, `BondReturned` in the prototype terminal transaction. The organizer can cancel unpublished campaigns before or after the deadline; no token call is needed when no bond was locked. A donor's independent claim emits `RefundClaimed`. The pool excludes bond and unsolicited transfers, and each donor receives their full recorded contribution once. Prototype activation/evidence timeouts also support unreleased-escrow refunds; challenge exits require the separate MVP. Slashing is deferred.
 
 Evidence admission now uses AccessControl: deployer initially has DEFAULT_ADMIN_ROLE;
 admin grants/revokes VERIFIER_ROLE and assigns/reassigns only pending submissions.
@@ -167,7 +202,13 @@ It pays the organizer, emits MilestoneSettled and advances the current index.
 Final settlement returns bond and emits CampaignCompleted atomically.
 totalReleased excludes bond. Transactions do not run automatically at deadlines.
 
-## 7. Evidence and challenge
+## 7. Evidence and challenge — historical verifier proposal
+
+The assigned-verifier/challenge-screening/appeal proposal below is retained as
+design history. The later approved MVP uses the existing resolver for admission
+and final decisions, with a 72-hour donor review and fixed 7+7-day case window;
+separate verifier and appeals are deferred. Admission proves neither delivery
+nor truth; an unchallenged review is not proof that all donors read the evidence.
 
 User-approved verifier authority is specified in
 [Verifier Specification v0.1](../v0.2/FundTogether_Verifier_Specification_v0.1.md).
@@ -191,9 +232,10 @@ The hash proves integrity of the committed bytes. It does not prove that an invo
 
 In MVP, a challenge does not automatically slash the organizer. The resolver must select an allowed outcome, and the contract must enforce that outcome's financial limits.
 
-Target sequence: evidence admission -> 72-hour donor review -> timely challenge
-hold -> screening -> organizer response -> re-verification -> final arbitration
-only if unresolved. Revised evidence uses new immutable versions and fresh review.
+Target sequence: system evidence checks -> assigned verifier admission -> 72-hour
+donor review -> timely challenge hold -> system challenge checks/screening ->
+organizer response -> re-verification -> resolver arbitration only if unresolved
+or handling deadlines require escalation. Revised evidence uses new immutable versions and fresh review.
 Pending timely challenges must block settlement before screening finishes.
 These target stages and dismissal appeals are not present in the prototype;
 see the linked design for authority boundaries and remaining decisions.
@@ -253,11 +295,24 @@ AccessControl also emits inherited role events. Slashing and committee verdict e
 
 ## 11. Open items before contract freeze
 
-These items are intentionally still open for the detailed documents:
+Already decided for the current MVP: STOP/timeout refunds unreleased escrow,
+case handling is fixed at 7+7 days, bond is not slashed, claims round down with
+retained dust and no expiry/sweep. They are not unresolved implementation policy.
 
-1. Post-funded cancellation and refund outcomes after milestone releases.
-2. Exact resolver timeout duration and fallback outcome.
-3. Exact bond slash amount and allocation cap.
-4. Rounding and dust handling for refund claims.
-5. Confirmation depth and reorg policy for the first validation network.
+Remaining decisions/evidence before a practical freeze:
+
+1. Target campaign type, organizer working capital and justified no-slash bond
+   purpose; evidence from research questions B01–B03.
+2. Evidence standards, resolver responsibilities/conflicts/capacity and donor
+   participation; practical adequacy of the approved deadline defaults.
+3. Operational ownership, backup/restore, timeout execution and limits of recovery
+   for lost wallets, unavailable evidence or issuer-blocked token transfers.
+4. Real browser MVP acceptance on a separate, consistent deployment and any
+   later migration plan preserving existing prototype obligations.
+5. Confirmation depth, token qualification and finality/reorg policy if a public
+   validation network is subsequently selected.
+
+Expanded misconduct taxonomy, slash allocation and appeals remain post-MVP
+research. The [consolidation plan](./business-validation-and-mvp-hardening.md)
+defines exit criteria; passing tests alone does not close these questions.
 

@@ -8,10 +8,13 @@ export interface CampaignDraft {
   description: string | null
   status: string
   createdAt: string
+  revision: number
+  canDelete: boolean
 }
 
 export interface CampaignMilestoneDraft {
   id: string
+  budgetUnits: string | null
   milestoneIndex: number
   title: string
   description: string | null
@@ -19,9 +22,15 @@ export interface CampaignMilestoneDraft {
 }
 
 export interface CampaignDraftDetail extends CampaignDraft {
-  revision: number
   updatedAt: string
   milestones: CampaignMilestoneDraft[]
+}
+
+export async function deleteCampaignDraft(campaignId: string, expectedRevision: number) {
+  const { data } = await http.delete<{ id: string; status: 'deleted' }>(`/campaigns/${campaignId}`, {
+    data: { expectedRevision },
+  })
+  return data
 }
 
 export async function createCampaignDraft(
@@ -29,6 +38,7 @@ export async function createCampaignDraft(
     title: string
     description: string
     milestones: {
+      budgetUnits: string
       title: string
       description: string
       acceptanceCriteria: { criterionId: string; description: string }[]
@@ -62,6 +72,7 @@ export async function updateCampaignDraft(
     description: string
     milestones: {
       id?: string
+      budgetUnits: string
       title: string
       description: string
       acceptanceCriteria: { criterionId: string; description: string }[]

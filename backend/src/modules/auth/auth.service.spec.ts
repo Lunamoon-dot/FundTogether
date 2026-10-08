@@ -42,6 +42,7 @@ describe("account authentication", () => {
         "from",
         "where",
         "limit",
+        "leftJoin",
         "innerJoin",
         "returning",
         "onConflictDoNothing",
@@ -82,6 +83,7 @@ describe("account authentication", () => {
     expect(result.account).toEqual({
       userId: user.id,
       email: user.email,
+      roles: [],
       wallets: [],
     });
     expect(result.token).toMatch(/^[a-f0-9]{64}$/);
@@ -95,6 +97,16 @@ describe("account authentication", () => {
       "long-test-password",
       expect.objectContaining({ type: 2, memoryCost: 19456, timeCost: 2 }),
     );
+  });
+
+  it("returns platform roles with the authenticated account", async () => {
+    rows.push([{ ...user, roles: ["RESOLVER"] }], []);
+    await expect((service as any).getAccount(user.id)).resolves.toEqual({
+      userId: user.id,
+      email: user.email,
+      roles: ["RESOLVER"],
+      wallets: [],
+    });
   });
 
   it("rejects duplicate email rather than merging accounts", async () => {

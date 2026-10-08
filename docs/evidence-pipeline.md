@@ -1,7 +1,13 @@
 # Evidence Pipeline v0.1
 
-> Updated: 2026-10-03
-> Status: Specifications documented; schema/metadata ownership foundation exists; upload, storage, auth and report workflow not implemented.
+> Updated: 2026-10-05
+> Status: Private draft/upload and frozen manifest are implemented locally. On-chain evidence submission remains pending; the separate verifier workflow is deferred to post-MVP.
+
+The user approved [resolver-led MVP completion](./mvp-milestone-completion.md)
+on 2026-10-05. The new `FundTogetherMvp` source has admission and bounded disputes;
+the current deployed prototype still uses assigned verifier admission. Public
+redacted packages, resolver original-file access and case/API/indexer/UI wiring
+are required before exposing the new signing journey.
 
 ## Source documents
 
@@ -18,13 +24,19 @@ The design corpus now lives in this repository at `v0.2/`.
 Organizer draft -> mandatory file/schema checks -> frozen package/manifest
   -> authenticated wallet commitment -> confirmed event -> indexed projection
 Frozen package -> rule checks -> optional OCR/AI -> versioned report
-Assigned verifier -> on-chain admission -> 72-hour donor review
+MVP resolver -> on-chain admission -> 72-hour donor review
+Donor case -> 7-day response -> 7-day resolver decision / permissionless timeout
 ```
 
 Original files and manifests are immutable after freeze. Reports can be rerun
 with a new pipeline version without changing the package hash. New organizer
 evidence creates a new package/version. Reports cannot overwrite chain decisions.
-Rule/AI flags do not authorize funds movement; disputed merits go to resolver.
+Logic/system integrity and criteria checks precede admission. Evidence and
+challenge each have verification; organizer response and re-verification should
+resolve correctable issues before unresolved/deadline-escalated disputes go to
+the resolver. Rule/AI flags do not authorize funds movement. Resolver also
+approves campaign dossiers after prior system checks; that campaign workflow is
+specified in [Verification and resolver workflow](./verification-and-disputes.md).
 
 Use integer strings with explicit currency/units. Do not mix VND and USDC or
 infer release amounts from expense totals. Duplicate documents are warnings
@@ -42,11 +54,16 @@ mandatory safety/integrity checks remain required.
 
 ## Next implementation steps
 
-1. ~~Typed DTO/schema validation~~ (schema parser implemented; route-level API
-   integration and automated test coverage remain).
-2. Authorized upload, immutable storage and manifest hashing with access tests.
-3. Rule report generation and manual verifier workflow; optional analysis later.
-4. Link decisions to the exact chain version and index events idempotently.
+1. Authenticated browser verification of the private upload and frozen-manifest flow.
+2. Add donor-readable redacted packages and authorized resolver access to restricted originals, with immutable version/hash binding.
+3. Integrate the approved new contract, organizer-signed submission, resolver admission/cases, version matching and idempotent indexing before enabling transactions.
+4. Post-MVP: authorized verifier access, report generation and manual verifier decisions.
+
+## Local implementation checkpoint — 2026-10-05
+
+- The organizer can save a private draft, upload restricted originals, and freeze a package for the current milestone while the campaign is funded, or after activation before the evidence deadline. Freeze validates the live campaign identity, approved criteria, current draft revision, and stored file hashes.
+- PostgreSQL stores the exact manifest UTF-8 bytes and SHA-256 commitment. The organizer-only download returns those bytes after checking the stored hash; no public evidence or on-chain submission is created by freeze.
+- At this checkpoint the published campaign was `FUNDED` with milestone 0 pending. Freeze works before activation; authenticated browser use still needs confirmation. Evidence admission/challenge/settlement integration remains pending. Refund lifecycle has its own implementation checkpoint in [Refund lifecycle](./refund-lifecycle.md).
 
 ## Backend implementation checkpoint — 2026-10-03
 

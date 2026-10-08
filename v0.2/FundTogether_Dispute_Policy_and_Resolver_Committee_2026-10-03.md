@@ -1,12 +1,24 @@
-# FundTogether — Dispute Policy và hội đồng resolver MVP
+# FundTogether — Dispute Policy và hội đồng resolver post-MVP
 
-> Cập nhật: 2026-10-03
+> Cập nhật: 2026-10-04
 > Nguồn: Lựa chọn 2/3 và mô hình ResolverManager trong nội dung người dùng gửi
-> Trạng thái: Chọn hướng 2/3; policy chi tiết và hệ quả tài chính chưa chốt; chưa triển khai
+> Trạng thái: Quyết định mới nhất 2026-10-04 hoãn 2/3 đến post-MVP. MVP dùng resolver được cấp quyền; policy tài chính tranh chấp chưa chốt.
 
 ## 1. Lựa chọn thiết kế
 
-MVP dùng hội đồng có ba resolver được xác minh danh tính và xét xung đột lợi ích.
+Xác nhận workflow 2026-10-04: resolver thuộc MVP, có thể là nhân viên nền tảng
+được cấp quyền. Campaign luôn qua hệ thống kiểm tra hồ sơ/toàn vẹn/tiêu chí và
+organizer sửa trước khi nộp cho resolver duyệt; đạt xác thực mới được publish
+khi đủ bond và điều kiện contract. Evidence/challenge đều qua kiểm tra, giải
+trình và kiểm tra lại; chỉ vụ việc vẫn chưa giải quyết hoặc cần escalation theo
+deadline mới tới resolver phân xử.
+
+Hướng hội đồng 2/3 trong tài liệu này dành cho phân xử tranh chấp được chuyển lên,
+không áp mặc định vào duyệt campaign và không bỏ các lớp kiểm tra trước đó.
+Quyết định mới nhất hoãn threshold 2/3 đến post-MVP. Hai nhiệm vụ có
+checklist/quyền/kết quả riêng trong cùng vai trò resolver được cấp quyền ở MVP.
+
+Thiết kế post-MVP dùng hội đồng có ba resolver được xác minh danh tính và xét xung đột lợi ích.
 Cần hai phiếu cùng verdict cho cùng case/version/round để hoàn tất phân xử.
 Ghi từng phiếu và reasonHash để truy vết. Đây là threshold voting cho verdict;
 không dùng một giao dịch Safe làm toàn bộ hồ sơ phân xử.

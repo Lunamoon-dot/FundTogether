@@ -127,9 +127,8 @@ export function OrganizationsPage({ userId }: { userId: string }) {
                 href={`#/organizations/${organization.id}`}>Xem hồ sơ</a>
               <a className="button button--primary organization-workspace-link"
                 href={`#/organizations/${organization.id}/workspace/campaigns`}
-                target="_blank" rel="noopener noreferrer"
-                aria-label={`Mở Organization workspace của ${organization.name} (tab mới)`}>
-                Quản lý campaign ↗
+                aria-label={`Quản lý campaign của ${organization.name}`}>
+                Quản lý campaign
               </a>
               </div>
             </li>

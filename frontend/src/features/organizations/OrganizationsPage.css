@@ -7,7 +7,12 @@
 .organization-form .muted { font-size: 13px; margin: 0; }
 .organization-form-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
 .organization-list { list-style: none; padding: 0; margin: 20px 0 0; display: grid; gap: 16px; }
+.campaign-group { margin-top: 32px; padding-top: 24px; border-top: 1px solid #dfe6df; }
+.campaign-group h2 { margin: 0; font-size: 20px; color: #263b2d; }
+.campaign-group > .muted { margin-bottom: 12px; }
+.campaign-group-empty { padding: 16px 0; color: #718076; }
 .organization-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.organization-list > .panel > a.button + a.button { margin-left: 10px; }
 .organization-card h2 { overflow-wrap: anywhere; }
 .organization-role { flex-shrink: 0; padding: 5px 9px; border-radius: 6px; background: #eaf1e9; color: #267450; font-size: 12px; }
 .organization-description { white-space: pre-wrap; overflow-wrap: anywhere; color: #65736b; font-size: 14px; line-height: 1.7; }
@@ -15,9 +20,15 @@
 .organization-list-error { margin: 16px 0; }
 .organization-list-error a { margin-left: 12px; color: #267450; }
 .organization-workspace-link { display: inline-flex; margin-top: 16px; text-decoration: none; }
+.workspace-organization-links .organization-workspace-link { align-items: center; margin-top: 0; }
 .organization-workspace-name { display: block; margin-top: 14px; overflow-wrap: anywhere; font-size: 14px; }
+.workspace-organization-selector { display: grid; gap: 8px; margin-top: 22px; color: #65736b; font-size: 12px; }
+.workspace-organization-selector select { width: 100%; min-height: 44px; padding: 8px; border: 1px solid #dfe6df; border-radius: 7px; background: #fff; color: #263b2d; }
 .dashboard-nav a.nav-item { text-decoration: none; }
 .organization-milestones { padding-left: 24px; }
 .organization-milestones > li { padding: 12px 0; border-bottom: 1px solid #e2e8e2; }
 .organization-milestones h4 { margin: 12px 0 8px; font-size: 14px; }
 .organization-milestones ul { padding-left: 20px; overflow-wrap: anywhere; }
+
+.bond-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 1rem; background: #0008; }
+.bond-dialog { width: min(100%, 480px); max-height: 90vh; overflow: auto; background: var(--color-surface, #fff); padding: 1.5rem; }

@@ -122,6 +122,7 @@ async function main() {
           {
             title: "First",
             description: "First milestone",
+            budgetUnits: "1000000",
             acceptanceCriteria: [
               { criterionId: "C1", description: "Completed" },
             ],

@@ -1,5 +1,10 @@
 # FundTogether Threat Model v0.2
 
+> **Quyết định phạm vi mới nhất (2026-10-04):** MVP dùng resolver được cấp quyền,
+> sau các bước kiểm tra hệ thống. Hội đồng 2/3 và ResolverManager để post-MVP.
+> Các đoạn chọn 2/3 cho MVP bên dưới thuộc quyết định cũ, đã được thay thế;
+> phần cơ chế hội đồng chỉ còn là tài liệu tham khảo cho post-MVP.
+
 ## 1. System Definition
 
 > **Bổ sung đánh giá 2026-10-03:** [Verification và dispute theo tầng](./FundTogether_Verification_and_Dispute_Design_2026-10-03.md)

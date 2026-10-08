@@ -1,6 +1,7 @@
 pragma solidity 0.8.24;
 
 import { FundTogether } from "../../../src/FundTogether.sol";
+import { FundTogetherBase } from "../../../src/modules/FundTogetherBase.sol";
 import { MockUSDC } from "../../mocks/MockUSDC.sol";
 import { CampaignFixtures } from "../../helpers/CampaignFixtures.sol";
 import { Test } from "forge-std/Test.sol";
@@ -102,7 +103,7 @@ contract FundTogetherVerifierTest is Test {
         assertEq(verifier.submissionVersion(id, 0), 1);
         (
             bytes32 hash,
-            FundTogether.SubmissionState status,
+            FundTogetherBase.SubmissionState status,
             address assigned,
             address checkedBy,
             uint256 checkedAt,
@@ -164,7 +165,7 @@ contract FundTogetherVerifierTest is Test {
         _accept();
         (, uint256 end) = target.milestoneEvidence(id, 0);
         assertEq(end, block.timestamp + 72 hours);
-        (, FundTogether.SubmissionState status,, address checkedBy, uint256 checkedAt,) =
+        (, FundTogetherBase.SubmissionState status,, address checkedBy, uint256 checkedAt,) =
             verifier.evidenceSubmissions(id, 0, 1);
         assertEq(uint256(status), 2);
         assertEq(checkedBy, reviewer);
@@ -194,7 +195,7 @@ contract FundTogetherVerifierTest is Test {
         verifier.rejectSubmission(id, 0, 1, HASH, REASON);
         (
             bytes32 oldHash,
-            FundTogether.SubmissionState status,,
+            FundTogetherBase.SubmissionState status,,
             address checkedBy,,
             bytes32 reason
         ) = verifier.evidenceSubmissions(id, 0, 1);
@@ -214,7 +215,7 @@ contract FundTogetherVerifierTest is Test {
         verifier.assignVerifier(id, 0, 2, reviewer);
         vm.prank(reviewer);
         verifier.verifySubmission(id, 0, 2, HASH2);
-        (bytes32 retainedHash, FundTogether.SubmissionState retainedStatus,,,,) =
+        (bytes32 retainedHash, FundTogetherBase.SubmissionState retainedStatus,,,,) =
             verifier.evidenceSubmissions(id, 0, 1);
         assertEq(retainedHash, HASH);
         assertEq(uint256(retainedStatus), 3);
@@ -361,7 +362,7 @@ contract FundTogetherVerifierTest is Test {
     }
 
     function testFuzzRejectedVersionsRetainHistory(uint8 rounds) public {
-        rounds = uint8(bound(rounds, 1, 8));
+        rounds = uint8(bound(rounds, 1, target.MAX_SUBMISSIONS()));
         verifier.grantRole(ROLE, reviewer);
         for (uint256 version = 1; version <= rounds; ++version) {
             bytes32 hash = keccak256(abi.encode(version));
@@ -374,7 +375,7 @@ contract FundTogetherVerifierTest is Test {
         for (uint256 version = 1; version <= rounds; ++version) {
             (
                 bytes32 hash,
-                FundTogether.SubmissionState status,,
+                FundTogetherBase.SubmissionState status,,
                 address checkedBy,,
                 bytes32 reason
             ) = verifier.evidenceSubmissions(id, 0, version);
@@ -383,8 +384,22 @@ contract FundTogetherVerifierTest is Test {
             assertEq(checkedBy, reviewer);
             assertEq(reason, REASON);
         }
-        assertEq(token.balanceOf(address(target)), 6_000_000);
-        assertEq(token.balanceOf(organizer), 0);
+        bool exhausted = rounds == target.MAX_SUBMISSIONS();
+        assertEq(token.balanceOf(address(target)), exhausted ? 4_000_000 : 6_000_000);
+        assertEq(token.balanceOf(organizer), exhausted ? 2_000_000 : 0);
+        assertEq(
+            uint256(target.campaignState(id)),
+            uint256(
+                exhausted
+                    ? FundTogetherBase.CampaignState.FAILED
+                    : FundTogetherBase.CampaignState.MILESTONE_ACTIVE
+            )
+        );
+        assertEq(target.refundSnapshotted(id), exhausted);
+        assertEq(target.refundPool(id), exhausted ? 4_000_000 : 0);
+        (,,,,, bool locked, uint256 bond,) = target.campaigns(id);
+        assertEq(locked, !exhausted);
+        assertEq(bond, exhausted ? 0 : 2_000_000);
         assertEq(target.totalReleased(id), 0);
     }
 }

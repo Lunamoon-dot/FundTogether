@@ -5,6 +5,8 @@
 **/coverage/
 **/out/
 **/cache/
+**/__pycache__/
+*.py[cod]
 
 # Local environment and secrets
 .env
@@ -17,6 +19,7 @@
 **/keystore/
 
 # Logs and local tooling
+.local/
 *.log
 .DS_Store
 .idea/

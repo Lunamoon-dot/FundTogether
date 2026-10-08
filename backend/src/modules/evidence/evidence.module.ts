@@ -7,11 +7,16 @@ import { EvidenceDraftsService } from "./evidence-drafts.service";
 import { EvidenceFilesController, EvidenceFileAccessGuard } from "./evidence-files.controller";
 import { EvidenceFilesService } from "./evidence-files.service";
 import { EvidenceStorageService } from "./evidence-storage.service";
+import { EvidencePackagesService } from './evidence-packages.service';
+import { BlockchainModule } from '../../blockchain/blockchain.module';
+import { IndexerModule } from '../../indexer/indexer.module';
+import { MilestoneWorkflowService } from './milestone-workflow.service';
+import { MilestoneWorkflowController } from './milestone-workflow.controller';
 
 @Module({
-  imports: [AuthModule],
-  controllers: [EvidenceDraftsController, EvidenceFilesController],
-  providers: [AuthGuard, EvidenceAccessService, EvidenceDraftsService, EvidenceFileAccessGuard, EvidenceFilesService, EvidenceStorageService],
+  imports: [AuthModule, BlockchainModule, IndexerModule],
+  controllers: [EvidenceDraftsController, EvidenceFilesController, MilestoneWorkflowController],
+  providers: [AuthGuard, EvidenceAccessService, EvidenceDraftsService, EvidencePackagesService, EvidenceFileAccessGuard, EvidenceFilesService, EvidenceStorageService, MilestoneWorkflowService],
   exports: [EvidenceAccessService, EvidenceDraftsService],
 })
 export class EvidenceModule {}

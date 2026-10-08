@@ -25,6 +25,7 @@ describe("CampaignsService", () => {
         description: "Provide water",
         milestones: [
           {
+            budgetUnits: "1000000",
             title: "Install filter",
             description: "Install and operate the filter",
             acceptanceCriteria: [

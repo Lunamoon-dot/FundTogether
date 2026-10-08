@@ -1,0 +1,2 @@
+ALTER TABLE "campaign_milestone_drafts" ADD COLUMN "budget_units" numeric(78, 0);--> statement-breakpoint
+ALTER TABLE "campaign_milestone_drafts" ADD CONSTRAINT "campaign_milestone_drafts_budget_positive" CHECK ("campaign_milestone_drafts"."budget_units" > 0 AND "campaign_milestone_drafts"."budget_units" <= 115792089237316195423570985008687907853269984665640564039457584007913129639935);

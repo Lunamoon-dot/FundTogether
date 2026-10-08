@@ -1,16 +1,30 @@
 # FundTogether — Kiểm tra evidence và xử lý tranh chấp theo tầng
 
-> Cập nhật: 2026-10-03
+> **Quyết định phạm vi mới nhất (2026-10-04):** MVP dùng resolver được cấp quyền,
+> sau các bước kiểm tra hệ thống. Hội đồng 2/3 và ResolverManager để post-MVP.
+> Các đoạn chọn 2/3 cho MVP bên dưới thuộc quyết định cũ, đã được thay thế;
+> phần cơ chế hội đồng chỉ còn là tài liệu tham khảo cho post-MVP.
+
+> Cập nhật: 2026-10-04
 > Trạng thái: Hướng thiết kế đã đánh giá; chưa triển khai toàn bộ
 > Nguồn: Đề xuất người dùng gửi và đối chiếu Threat Model v0.2
 
 ## 1. Kết luận đánh giá
 
-Hướng tách kiểm tra hồ sơ, donor review, organizer giải trình, kiểm tra lại và
-phân xử cuối cùng là hợp lý. Organizer có cơ hội khắc phục; resolver chỉ nhận
-những vụ việc chưa giải quyết được. Kiểm tra campaign trước khi public và kiểm
-tra evidence của từng milestone là hai bước riêng: duyệt campaign không chứng
-minh công việc trong tương lai đã hoàn thành.
+Người dùng xác nhận resolver có hai nhiệm vụ trong MVP: duyệt campaign sau các
+lớp kiểm tra và phân xử tranh chấp còn chưa giải quyết được sau kiểm tra, giải
+trình, kiểm tra lại. Resolver có thể là nhân viên nền tảng được cấp quyền.
+Hai nhiệm vụ có checklist và kết quả riêng; không bắt buộc hai đội nhân sự riêng.
+
+Campaign luôn qua kiểm tra hồ sơ, tính toàn vẹn, ngân sách và tiêu chí bằng logic/
+hệ thống; organizer sửa theo kết quả rồi nộp hồ sơ hoàn chỉnh cho resolver.
+Đạt kiểm tra hệ thống chưa đồng nghĩa được mở campaign. Resolver xác thực đạt
+mới cho phép organizer publish khi đủ bond và các điều kiện contract. Duyệt
+campaign chưa chứng minh công việc trong tương lai đã hoàn thành.
+
+Evidence và challenge đều có lớp kiểm tra trước. Nhánh phân xử chỉ chuyển tới
+resolver khi vẫn bất đồng hoặc quy trình xử lý có giới hạn thời gian cần
+escalation. Resolver thuộc MVP; không hoãn toàn bộ vai trò sang post-MVP.
 
 Đây là bản ghi đánh giá thiết kế, không tự phê duyệt toàn bộ ví dụ trong đề xuất.
 Chưa có số liệu chứng minh tỷ lệ “90% happy path” hay thời gian hoàn thành dự án.
@@ -22,10 +36,27 @@ provider và không phải điều kiện bắt buộc để MVP chạy. Xem
 
 ## 2. Luồng mục tiêu
 
+### Campaign trước khi công bố
+
+```text
+Organizer tạo nháp -> hệ thống kiểm tra hồ sơ/toàn vẹn/ngân sách/tiêu chí
+  lỗi -> ghi kết quả -> organizer sửa -> kiểm tra lại
+  đủ điều kiện -> nộp hồ sơ hoàn chỉnh -> resolver/nhân viên có quyền xem xét
+    yêu cầu sửa -> ghi lý do -> revision mới -> kiểm tra lại
+    từ chối -> chưa được công bố
+    duyệt -> organizer publish khi đủ bond và điều kiện contract
+```
+
+Không sửa đè phiên bản đã commit. Quyết định gắn người xử lý, phiên bản và lý do.
+Luồng yêu cầu sửa/từ chối/nộp lại campaign còn cần đặc tả và triển khai; không
+tự suy ra quyền unfreeze hoặc enum on-chain mới từ sơ đồ này.
+
+### Evidence và challenge
+
 ```text
 ORGANIZER nộp evidence theo phiên bản
                   ↓
-EVIDENCE VERIFIER kiểm tra đủ điều kiện
+HỆ THỐNG kiểm tra tính toàn vẹn/tiêu chí; EVIDENCE VERIFIER kiểm tra đủ điều kiện
   REJECTED → ghi lý do → organizer sửa và nộp phiên bản mới
   ADMISSIBLE → ghi nhận admission trên chain
                   ↓
@@ -33,13 +64,13 @@ DONOR REVIEW — 72 giờ
   Không có phản đối đang chờ/được nhận → đủ điều kiện settlement
   Donor gửi phản đối đúng hạn → tạm khóa settlement
                   ↓
-CHALLENGE VERIFIER kiểm tra phản đối
+HỆ THỐNG kiểm tra challenge; CHALLENGE VERIFIER kiểm tra phản đối
   INVALID → ghi lý do; có đường phản đối kết quả loại bỏ
   ADMISSIBLE → ORGANIZER RESPONSE
                   ↓
 RE-VERIFY theo tiêu chí đã khóa
   Khắc phục đạt → evidence phiên bản mới → review mới 72 giờ
-  Chưa giải quyết / vẫn tranh chấp → RESOLVER độc lập
+  Chưa giải quyết / vẫn tranh chấp / đến hạn escalation → RESOLVER có quyền
                   ↓
 PASS / RESUBMIT / CANCEL_WITHOUT_FAULT / MISCONDUCT
 ```
@@ -60,12 +91,12 @@ trong spec; challenge/remediation, committee và deadline/appeal vẫn chưa tri
 
 | Vai trò | Được làm | Giới hạn |
 |---|---|---|
-| Campaign reviewer | Kiểm tra campaign trước khi public | Không mặc nhiên là resolver tranh chấp milestone |
+| Resolver khi duyệt campaign | Xem hồ sơ hoàn chỉnh và kết quả kiểm tra; duyệt/yêu cầu sửa/từ chối trước publish | Luôn có hệ thống kiểm tra trước; không chứng nhận việc thực hiện trong tương lai |
 | Evidence verifier | Kiểm tra đủ hồ sơ, đọc được, đúng phiên bản, khớp tiêu chí | ADMISSIBLE chưa chứng minh evidence thật; không được tùy ý chuyển tiền |
 | Challenge verifier | Kiểm tra donor, thời hạn, phạm vi, trùng lặp, tài liệu hỗ trợ | Nhận phản đối chưa đồng nghĩa organizer sai phạm; nội dung chưa rõ cần escalation |
 | Organizer | Giải trình, bổ sung, khắc phục | Không tự bác challenge, đổi tiêu chí đã duyệt hoặc mở khóa giải ngân |
 | Re-verifier | Kiểm tra phản hồi và ghi kết quả | Kết quả bị tranh chấp cần có đường đưa lên resolver |
-| Resolver | Kết luận vụ việc chưa giải quyết được | Chỉ chọn verdict cho phép; không nhập tùy ý người nhận, số tiền hay phần trăm slash |
+| Resolver khi phân xử | Kết luận tranh chấp được chuyển lên sau kiểm tra/giải trình/kiểm tra lại | Tránh xung đột theo case; chỉ verdict cho phép; không nhập tùy ý người nhận/số tiền/slash |
 | Smart contract | Kiểm tra quyền, trạng thái, thời hạn và thực thi tài chính | Không tự xác minh được sự thật ngoài đời |
 
 Hệ thống verifier vẫn là điểm cần tin cậy. Gọi nó là “hệ thống” hoặc dùng AI
@@ -89,6 +120,11 @@ hạn kết luận. Chữ ký/hash không biến một thông tin thành sự th
 
 ## 5. Ai làm resolver?
 
+Theo xác nhận 2026-10-04, nhân viên nền tảng được cấp quyền có thể làm resolver.
+Hướng hội đồng 2/3 dưới đây áp dụng cho phân xử tranh chấp được chuyển lên;
+không tự áp threshold đó vào duyệt campaign. Cách bổ nhiệm, nhân sự và quyền
+cụ thể còn cần chốt; cập nhật workflow không tự đổi threshold đã chọn trước.
+
 Hội đồng ba người độc lập, cần hai người cùng kết luận, là phương án đáng cân nhắc.
 Đây là cơ chế có thành viên được lựa chọn, không tự chứng minh tính phi tập trung.
 Ba ví có thể thuộc một người; quan hệ tổ chức/lợi ích phải được kiểm tra ngoài chain.
@@ -101,7 +137,7 @@ evidence/response, vòng xử lý và ngữ cảnh contract. Hai kết luận kh
 tạo quorum. Mỗi thành viên bỏ phiếu một lần/vòng; cần quy tắc cho bất đồng,
 rút khỏi vụ việc, mất quyền truy cập và thay thành viên.
 
-**Cập nhật lựa chọn:** Nội dung tiếp theo người dùng gửi chọn hội đồng 2/3 cho MVP
+**Cập nhật lựa chọn:** Quyết định mới nhất của người dùng hoãn hội đồng 2/3 đến post-MVP
 và ResolverManager ghi từng verdict, không dùng Safe thay toàn bộ quá trình vote.
 Xem [Dispute Policy và hội đồng resolver](./FundTogether_Dispute_Policy_and_Resolver_Committee_2026-10-03.md).
 Lựa chọn này thay đề xuất ban đầu và bổ sung phạm vi threshold voting; registry

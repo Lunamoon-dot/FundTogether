@@ -1,5 +1,10 @@
 # FundTogether — Giải thích Mốc 2: Smart Contract Core
 
+> **Quyết định phạm vi mới nhất (2026-10-04):** MVP dùng resolver được cấp quyền,
+> sau các bước kiểm tra hệ thống. Hội đồng 2/3 và ResolverManager để post-MVP.
+> Các đoạn chọn 2/3 cho MVP bên dưới thuộc quyết định cũ, đã được thay thế;
+> phần cơ chế hội đồng chỉ còn là tài liệu tham khảo cho post-MVP.
+
 > Hướng dẫn học và prototype. Các tên file/hàm là ví dụ, chưa khẳng định đã có trong repo hoặc đã được duyệt. Xem [Mục lục các mốc](../FundTogether_Processing_Reading_Guide.md).
 
 ## Mốc 2 nhằm làm gì?
@@ -198,7 +203,7 @@ Nguồn: [Process — Mốc 2](../FundTogether_v0.2_Development_Process_and_MVP_
 
 ## MVP baseline alignment
 
-Prototype contract nên bắt đầu với ERC20 MockUSDC, milestone tuần tự, bond bằng cùng token và các đường `fund → milestone → settlement → refund`. Committee 2/3 đã chọn cho MVP nhưng chưa có code; Safe và EIP-712 là cơ chế riêng còn hoãn. Restricted originals/public redactions đã được đặc tả; storage chưa có. Reputation on-chain sau MVP.
+Prototype contract nên bắt đầu với ERC20 MockUSDC, milestone tuần tự, bond bằng cùng token và các đường `fund → milestone → settlement → refund`. Committee 2/3 để post-MVP và chưa có code; Safe và EIP-712 là cơ chế riêng còn hoãn. Restricted originals/public redactions đã được đặc tả; storage chưa có. Reputation on-chain sau MVP.
 
 ## Rà soát mốc và hướng Arc — 2026-10-03
 

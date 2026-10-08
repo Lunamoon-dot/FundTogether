@@ -15,6 +15,7 @@ import * as schema from "../../database/schema";
 import {
   authChallenges,
   authSessions,
+  platformRoles,
   users,
   walletLinks,
 } from "../../database/schema";
@@ -236,8 +237,9 @@ export class AuthService {
 
   private async getAccount(userId: string) {
     const [user] = await this.database
-      .select({ id: users.id, email: users.email })
+      .select({ id: users.id, email: users.email, roles: platformRoles.roles })
       .from(users)
+      .leftJoin(platformRoles, eq(platformRoles.userId, users.id))
       .where(eq(users.id, userId))
       .limit(1);
     if (!user) throw new UnauthorizedException("Account no longer exists");
@@ -248,6 +250,7 @@ export class AuthService {
     return {
       userId: user.id,
       email: user.email,
+      roles: user.roles ?? [],
       wallets: wallets.map((wallet) => ({
         address: wallet.address,
         chainId: Number(wallet.chainId),

@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { and, eq, isNull, or, sql } from "drizzle-orm";
+import { and, eq, isNull, ne, or, sql } from "drizzle-orm";
 import { DRIZZLE_DB } from "../../database/database.constants";
 import { campaignMetadata } from "../../database/schema/campaigns.schema";
 import * as schema from "../../database/schema";
@@ -13,7 +13,7 @@ import { organizationMembers } from "../../database/schema/organizations.schema"
 
 // Organization membership owns access; creator identity is audit data only.
 export function campaignAccessCondition(userId: string) {
-  return or(
+  return and(ne(campaignMetadata.status, "deleted"), or(
     and(isNull(campaignMetadata.organizationId), eq(campaignMetadata.organizerUserId, userId)),
     sql<boolean>`exists (
       select 1 from ${organizationMembers}
@@ -21,7 +21,7 @@ export function campaignAccessCondition(userId: string) {
         and ${organizationMembers.userId} = ${userId}
         and ${organizationMembers.role} = 'OWNER'
     )`,
-  )!;
+  ))!;
 }
 
 @Injectable()
@@ -38,7 +38,7 @@ export class EvidenceAccessService {
     const [campaign] = await this.database
       .select({ organizerUserId: campaignMetadata.organizerUserId, organizationId: campaignMetadata.organizationId })
       .from(campaignMetadata)
-      .where(eq(campaignMetadata.id, campaignId))
+      .where(and(eq(campaignMetadata.id, campaignId), ne(campaignMetadata.status, "deleted")))
       .limit(1);
 
     if (!campaign) throw new NotFoundException("Campaign not found");

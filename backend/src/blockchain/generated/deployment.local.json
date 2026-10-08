@@ -1,0 +1,18 @@
+{
+  "chainId": 31337,
+  "rpcUrl": "http://127.0.0.1:8545",
+  "contractAddress": "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
+  "tokenAddress": "0x5fbdb2315678afecb367f032d93f642f64180aa3",
+  "tokenDecimals": 6,
+  "confirmations": 1,
+  "resolver": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+  "genesisHash": "0xa4930e284a2b03b3f1ec1f51d3d63d7c80bd0110aa28dc84f6260760aa458e37",
+  "contractCodeHash": "0x9d3693f1afb167ffb65b9bc5dee0efb9824ccdc2142406b54ee69f2f4cfaf092",
+  "tokenCodeHash": "0xa25e434671bc6b7187b36364eaee44f6c2c126be9e23d18ca356152d8a77fd7a",
+  "atomicSubmission": true,
+  "deploymentBlockNumber": "9",
+  "deploymentBlockHash": "0x8a104ef04333c81436c416952e046744cd1a1fad46ac30eb89c787b3a015c192",
+  "deploymentId": "0x323cfb730ab46209878ab793bc14057741b121185175ecdcc4b1b27035a814ef",
+  "milestonePolicy": "0x1cf6a7151391a884dbd42fb29e3c7210b02e8154ce6c29038b5bf3a981bfaf27",
+  "recoveryPolicy": "0xaa6fda21b125e426448dcf9869729b3284f83fb0eb7dea25261fada48c483612"
+}

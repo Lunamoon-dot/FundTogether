@@ -5,7 +5,20 @@ chứng và escrow/bond trên blockchain. Dự án đang phát triển theo từ
 campaign draft lưu ở backend chưa đồng nghĩa campaign đã được công bố trên chain.
 
 Hướng dẫn này dùng **Windows + PowerShell**, với **Foundry/Anvil trong WSL Ubuntu**.
-Cập nhật: **04/10/2026**.
+Cập nhật: **06/10/2026**.
+
+**Ưu tiên hiện tại:** củng cố MVP và nghiên cứu nghiệp vụ từ thiện thực tế trước
+khi mở rộng post-MVP. Dòng tiền để organizer thực hiện milestone, mục đích bond
+không slash, tiêu chí bằng chứng, trách nhiệm resolver và khả năng donor theo dõi
+còn cần kiểm chứng. Xem [kế hoạch và điều kiện chuyển giai đoạn](docs/business-validation-and-mvp-hardening.md).
+Đây là định hướng đã chốt; không phải tuyên bố hệ thống sẵn sàng với tiền thật.
+
+Workflow đã chốt: campaign qua hệ thống kiểm tra hồ sơ, tính toàn vẹn, ngân sách
+và tiêu chí; organizer sửa rồi nộp cho resolver (có thể là nhân viên có quyền)
+duyệt trước publish. Evidence/challenge đều có lớp kiểm tra, giải trình và kiểm
+tra lại; chỉ vụ việc chưa giải quyết hoặc đến hạn escalation tới resolver phân
+xử. Resolver thuộc MVP. Xem [workflow và quyền hạn](docs/verification-and-disputes.md)
+để phân biệt thiết kế mục tiêu với các phần đã triển khai.
 
 ## 1. Những phần đang chạy được
 
@@ -17,10 +30,14 @@ Cập nhật: **04/10/2026**.
 | Campaign | Lưu/sửa bản nháp, milestones và tiêu chí hoàn thành |
 | Evidence | Lưu/sửa báo cáo theo milestone; upload/tải bản gốc riêng tư qua MinIO |
 | Contract | Prototype Foundry; xem trạng thái và giới hạn trong contracts/README.md |
-| Feed/donation/indexer | Chưa nối thành journey FE/BE/chain hoàn chỉnh |
+| Publish/feed/indexer | Internal review có role, checklist, lý do và lịch sử; duyệt bằng ví resolver, publish bằng ví tổ chức, feed/detail từ event đã index; kiểm tra tích hợp local đã chạy |
+| Donate/refund | Đã nối wallet/API/indexer và lịch sử donor; A/B có kiểm chứng local, xem progress để biết phạm vi |
+| Milestone MVP mới | Contract/BE/storage/indexer/FE đã có kiểm tra tích hợp riêng; chưa nghiệm thu MetaMask C1–C6 trên môi trường ứng dụng MVP |
 
-Freeze/hash, public redaction, nộp evidence lên contract và phần tranh chấp còn
-cần hoàn thiện. Không có deployment address/ABI dùng chung đã xác nhận cho FE/BE.
+Freeze/hash và public redaction đã nối cùng luồng evidence/case của MVP mới,
+kiểm tra trên Anvil riêng 9545. Cấu hình ứng dụng 8545 vẫn là prototype; campaign
+cũ không tự có capability mới. FE/BE dùng chung ABI và deployment local trong
+backend/src/blockchain/generated. Xem [publish và indexer](docs/campaign-publication-indexer.md).
 
 ```text
 Frontend (5173) -> NestJS API (3000) -> PostgreSQL (5432)
@@ -30,7 +47,8 @@ Wallet / blockchain service -------> Anvil RPC (8545, chain 31337)
 ```
 
 PostgreSQL lưu tài khoản, quyền, metadata và hồ sơ. MinIO lưu nội dung file.
-Contract quản lý trạng thái tài chính khi journey on-chain được nối.
+Contract quản lý trạng thái tài chính; event được index vào PostgreSQL để API
+và giao diện đọc. Receipt thành công và dữ liệu đã index là hai mốc riêng.
 
 ## 2. Chuẩn bị công cụ
 
@@ -277,7 +295,7 @@ khi 5173 đã bị process khác chiếm.
 Chạy đúng **một lệnh**, giữ terminal này mở:
 
 ```powershell
-wsl -d Ubuntu-24.04 -- bash -lc '~/.foundry/bin/anvil --host 0.0.0.0 --port 8545 --chain-id 31337'
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\backend\scripts\start-local-chain.ps1
 ```
 
 | Network setting | Giá trị |
@@ -288,12 +306,67 @@ wsl -d Ubuntu-24.04 -- bash -lc '~/.foundry/bin/anvil --host 0.0.0.0 --port 8545
 | Currency symbol | ETH |
 
 Tài khoản và khóa do Anvil cung cấp chỉ dùng cho local. Dùng ví thử nghiệm riêng.
-Anvil khởi động mới mặc định không giữ state phiên trước; địa chỉ deployment và
-balance cũ có thể không còn hợp lệ.
+Script cần Python 3 trong Ubuntu và lưu state trên ổ Linux, tại
+`~/.local/state/fundtogether/anvil/state.json`. Anvil ghi vào `state.json.pending`
+mỗi 60 giây và khi dừng bình thường; supervisor kiểm tra một bản sao JSON đầy đủ
+rồi thay file chính bằng thao tác atomic, giữ bản trước ở `state.json.previous`.
+File pending có thể bị ghi dở nếu máy tắt đột ngột; không dùng nó để khởi động.
+Lần đầu, script nhập bản `.local/anvil/state.json` trên Windows nếu có. Các lần
+sau ưu tiên file trong Ubuntu; snapshot lớn ghi trực tiếp qua `/mnt/c` có thể
+làm RPC bị timeout. Script bật lưu lịch sử; file có thể lớn dần theo thời gian.
+Việc kiểm tra/thay file bảo vệ bản lưu khỏi ghi dở; Anvil vẫn có thể tạm timeout
+khi tạo snapshot lịch sử lớn. Nếu gặp lỗi trong lúc autosave, kiểm tra lại RPC
+và trạng thái đồng bộ sau khi ghi xong; không mở thêm node hoặc reset chain.
+Nếu không có state đã lưu hoặc JSON không hợp lệ, script dừng với chẩn đoán,
+không tự tạo chain trống. Với lỗi `EOF while parsing`, giữ nguyên file hỏng và
+các bản backup để kiểm tra, khôi phục; không xóa state hoặc redeploy để thử.
+Sau khi Anvil thoát sạch và script chạy tiếp, file được sao chép về
+`.local/anvil/state.json` làm backup; bản Windows có thể cũ hơn bản Ubuntu đang chạy.
+Dùng Ctrl+C để dừng; giữ file state khi chạy lại. Các file này không nằm trong Git.
+Chạy Anvil trực tiếp không có `--state` sẽ mở chain mới trống, không khôi phục
+deployment/balance cũ dù cùng chain ID 31337. File state cũ có thể vẫn còn;
+không redeploy hoặc xóa DB để xử lý tình huống này. Indexer sẽ báo
+`Configured local blockchain is unavailable or its deployment identity changed`
+và giữ checkpoint. Kiểm tra RPC/genesis/code; nếu xác nhận node mới trống,
+dừng node đó rồi chạy script trên để nạp state đã lưu. Giữ nguyên manifest.
+Việc tắt máy đột ngột có thể mất thay đổi sau lần lưu gần nhất.
 
-**Anvil chỉ tạo local blockchain, không tự deploy FundTogether/MockUSDC.** Repo
-chưa có flow deploy local/ABI dùng chung cho journey FE/BE hoàn chỉnh. Không có
-lệnh publish/donate qua UI đã hoàn thiện trong hướng dẫn này.
+Script dùng block mỗi 5 giây và mine ngay khi gửi giao dịch, để thời gian chain
+vẫn tiến khi không có người thao tác. Deadline cần giao dịch chốt; không tự chạy
+chỉ vì đồng hồ hết hạn. Worker local đọc điều kiện bằng
+`node backend/scripts/local-timeout-worker.cjs` từ repo root (mặc định chỉ đọc).
+Xem [timeout worker và recovery](docs/financial-recovery.md) trước khi bật ký.
+
+Nếu cổng 8545 đã có Anvil đúng deployment, script tái sử dụng node đó và bật
+mining mỗi 5 giây; giao dịch trên node cũ có thể phải chờ tới block tiếp theo.
+Script kiểm tra block thực sự tiến và phát hiện clock lệch hơn một phút.
+Clock lệch chỉ tạo cảnh báo khi deployment đúng và mining vẫn tiến; script giữ
+nguyên giờ chain. RPC/deployment sai hoặc mining không tiến vẫn báo lỗi.
+Nếu chủ động muốn đồng bộ **tiến về giờ máy hiện tại** trên local, chạy:
+
+```powershell
+node .\backend\scripts\configure-local-mining.cjs --sync-clock
+```
+
+Lệnh này không reset state hoặc sửa deadline. Các hạn đã qua sẽ có hiệu lực;
+không dùng để tua nhanh bài test. Nó từ chối chỉnh lùi nếu chain đang ở tương lai.
+Đồng bộ giờ không tự chốt thất bại hay claim hoàn tiền.
+
+**Anvil chỉ tạo local blockchain, không tự deploy FundTogether/MockUSDC.** Sau khi
+Anvil chạy, từ `backend` chạy `node scripts/deploy-local.cjs` để kiểm tra deployment.
+Nếu Anvil đã reset, kiểm tra hồ sơ đã nộp của deployment cũ trước khi chạy
+`node scripts/deploy-local.cjs --redeploy`, rồi restart backend và tải lại frontend.
+Manifest/ABI dùng chung nằm ở `backend/src/blockchain/generated`.
+
+Cập nhật 2026-10-07: dữ liệu campaign/chain test cũ đã được reset theo yêu cầu
+người dùng. Cấu hình ứng dụng 8545 hiện dùng FundTogetherMvp; tài khoản, tổ chức,
+quyền và liên kết ví được giữ. Tạo campaign mới; dữ liệu cũ không được migrate.
+Luồng MetaMask trên deployment mới vẫn cần nghiệm thu; MinIO phải chạy để upload.
+
+Tool deploy giữ bản manifest/ABI cũ và chặn thay cấu hình nếu escrow đã xác minh
+còn token. Test source MVP mới trên Anvil 9545 với `--mvp --isolated`; output nằm
+ở `.local/mvp-deployment`, không ghi đè cấu hình ứng dụng. Đổi deployment không
+tự chuyển campaign, bond hay quyền refund từ chain cũ sang chain mới.
 
 Luồng email/tổ chức/campaign draft/evidence không cần chạy Anvil. Khi dùng ví
 trên network Foundry, để Anvil chạy cho ví đọc network/balance; lỗi Unable to
@@ -305,15 +378,16 @@ connect to Foundry phải kiểm tra Anvil/network. Chữ ký SIWE là thao tác
 
 1. Mở http://localhost:5173/#/account, đăng ký bằng email và mật khẩu 12–128 ký tự.
 2. Vào Tổ chức của tôi, tạo tổ chức. Tài khoản tạo tổ chức nhận OWNER.
-3. Xem hồ sơ tổ chức trong tab người dùng; bấm Quản lý campaign để mở workspace
-   của tổ chức trong tab riêng.
+3. Mở Quản lý gây quỹ (`#/workspace`). Chọn tổ chức trong bộ chọn ở sidebar;
+   hồ sơ tổ chức và Campaign/Milestones/Bằng chứng dùng chung dashboard, cùng tab.
 4. Vào Campaign → Tạo campaign. Điền tên/mô tả, Next sang milestones.
 5. Điền từng milestone và tiêu chí; dùng Add milestone khi cần thêm.
 6. Xem lại và lưu. Mở campaign để xem hoặc sửa bản nháp đã lưu.
 
 Tổ chức mới có trạng thái chưa xác minh. Campaign được lưu ở DB, chưa công bố
 trên chain. Quyền dựa trên membership tổ chức; người tạo không giữ quyền riêng
-nếu đã mất membership. Workspace cá nhân vẫn dành cho các draft cá nhân cũ.
+nếu đã mất membership. Bản nháp cá nhân cũ nằm ở mục “Bản nháp chưa gắn tổ chức”
+ngay dưới danh sách Campaign. Campaign mới được tạo trực tiếp trong tổ chức đã chọn.
 
 ### Campaign → milestone → evidence → file
 
@@ -336,7 +410,11 @@ chiếu milestones. Lưu hồ sơ/upload thành công chưa phải freeze hay n�
 SIWE. Chữ ký chứng minh quyền kiểm soát địa chỉ; thao tác liên kết không gửi
 transaction. Liên kết ví không tự cấp quyền tổ chức hoặc quyền contract.
 
-Feed, đóng góp/refund và quyết định verifier chưa có journey UI/on-chain đầy đủ.
+Feed và đóng góp/refund đã nối API/indexer/UI. Luồng hoàn tất milestone MVP dùng
+resolver hiện có, không verifier riêng; chỉ mở trên FundTogetherMvp đã xác minh.
+Prototype hiện tại không tự nhận quyền mới. Xem
+[milestone lifecycle](docs/milestone-lifecycle.md) và
+[test từ tạo campaign](docs/manual-test-from-campaign.md) trước khi chạy Case C.
 
 ## 9. Build và kiểm tra dành cho người phát triển
 
@@ -348,16 +426,24 @@ npm.cmd test -- --runInBand
 node scripts/auth-smoke.cjs
 node scripts/organization-campaign-smoke.cjs
 node scripts/evidence-upload-smoke.cjs
+node --test scripts/local-timeout-worker.test.cjs
+node scripts/publish-indexer-smoke.cjs
+node scripts/refund-lifecycle-smoke.cjs
+node scripts/milestone-lifecycle-smoke.cjs
 ```
 
 Smoke scripts cần DB local đã migrate; evidence smoke cần MinIO/bucket. Chạy trên
 DB phát triển, lần lượt từng script. Chúng mở Nest trên cổng tạm, tạo accounts và
 dữ liệu thử rồi xóa dữ liệu thuộc lần chạy đó. Build trước khi chạy vì scripts
 đọc code trong dist/. Kết quả HTTP không thay thế kiểm tra thao tác trình duyệt.
+Ba smoke publication/refund/milestone cần build contract bên dưới trước và cổng
+9545 rảnh; milestone cần MinIO và migration 0012. Chúng sở hữu chain thử riêng,
+không reset/redeploy chain ứng dụng 8545. Không chạy các smoke song song.
 
 Từ frontend/:
 
 ```powershell
+npm.cmd test
 npm.cmd run build
 npm.cmd run lint
 ```
@@ -402,9 +488,11 @@ mỗi lần chạy. Sau khi pull thay đổi lockfile, chạy lại npm ci trong
 
 ## Tài liệu
 
+- [Củng cố MVP, nghiên cứu nghiệp vụ và điều kiện mở rộng](docs/business-validation-and-mvp-hardening.md)
 - [Kiến trúc hiện tại](docs/PROJECT_OVERVIEW.md)
 - [Tiến độ và bằng chứng kiểm tra](docs/PROJECT_PROGRESS.md)
 - [Account và wallet](docs/accounts-and-wallets.md)
+- [Luồng hoàn tiền và cách kiểm tra](docs/refund-lifecycle.md)
 - [Campaign/evidence draft API](docs/backend-step-2-drafts.md)
 - [Tổ chức sở hữu campaign](docs/backend-step-4-organization-campaigns.md)
 - [Upload và storage](docs/backend-step-5-evidence-upload.md)

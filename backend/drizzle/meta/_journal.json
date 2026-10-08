@@ -50,6 +50,48 @@
       "when": 1791108174260,
       "tag": "0006_organization_wallet",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791112356727,
+      "tag": "0007_salty_kang",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791115082620,
+      "tag": "0008_swift_sue_storm",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791117697067,
+      "tag": "0009_striped_shocker",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791129196598,
+      "tag": "0010_internal_campaign_review",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791198128792,
+      "tag": "0011_dashing_kabuki",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791237566521,
+      "tag": "0012_romantic_lady_deathstrike",
+      "breakpoints": true
     }
   ]
 }

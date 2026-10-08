@@ -1,5 +1,10 @@
 # FundTogether — Verifier Specification v0.1
 
+> **Quyết định phạm vi mới nhất (2026-10-04):** MVP dùng resolver được cấp quyền,
+> sau các bước kiểm tra hệ thống. Hội đồng 2/3 và ResolverManager để post-MVP.
+> Các đoạn chọn 2/3 cho MVP bên dưới thuộc quyết định cũ, đã được thay thế;
+> phần cơ chế hội đồng chỉ còn là tài liệu tham khảo cho post-MVP.
+
 > Cập nhật: 2026-10-03
 > Trạng thái: Quyền đã chốt; evidence admission/versioning đã triển khai và kiểm thử; các action challenge/remediation chưa triển khai
 > Liên quan: [Verification/dispute](./FundTogether_Verification_and_Dispute_Design_2026-10-03.md), [Dispute Policy/2-of-3](./FundTogether_Dispute_Policy_and_Resolver_Committee_2026-10-03.md)
@@ -7,8 +12,12 @@
 ## 1. Định nghĩa đã chốt
 
 Verifier là trusted procedural reviewer: kiểm tra admissibility và objective
-validation theo tiêu chí định trước. Resolver phân xử tranh chấp chưa giải quyết
-được. Organizer tạo hồ sơ/claim; verifier đánh giá hồ sơ/claim, không sửa chúng.
+validation theo tiêu chí định trước, dựa trên các lớp kiểm tra logic/hệ thống.
+Theo xác nhận 2026-10-04, resolver có thể là nhân viên nền tảng có quyền, thực hiện
+hai nhiệm vụ: duyệt campaign sau kiểm tra/sửa hồ sơ và phân xử tranh chấp chưa
+giải quyết được sau kiểm tra challenge, giải trình, kiểm tra lại. Trong luồng
+evidence, hệ thống kiểm tra cả đầu evidence và đầu challenge trước escalation.
+Organizer tạo hồ sơ/claim; verifier đánh giá hồ sơ/claim, không sửa chúng.
 
 MVP dùng một loại quyền VERIFIER_ROLE cho kiểm tra evidence, challenge và
 remediation. Cùng người có thể thực hiện ba bước. Chưa cần tách registry hoặc
@@ -51,7 +60,7 @@ Tranh chấp chưa rõ:
   inflated pricing / fabricated delivery
     -> organizer giải trình
     -> chưa thể kết luận khách quan hoặc donor vẫn phản đối
-    -> UNRESOLVED -> hội đồng resolver 2/3
+    -> UNRESOLVED / đến hạn escalation -> resolver phân xử (hướng hội đồng 2/3)
 ```
 
 Không dùng verifyRemediation để xóa một dispute về sự thật chỉ vì organizer

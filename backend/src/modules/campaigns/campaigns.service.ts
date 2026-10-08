@@ -19,6 +19,25 @@ import { evidenceDrafts } from "../../database/schema/evidence-drafts.schema";
 import * as schema from "../../database/schema";
 import { campaignAccessCondition, EvidenceAccessService } from "../evidence/evidence-access.service";
 import { organizationMembers } from "../../database/schema/organizations.schema";
+import { campaignSubmissions } from "../../database/schema/campaign-submissions.schema";
+import { campaignChainProjection } from "../../database/schema/indexer.schema";
+import { campaignReviews, campaignRevisions } from "../../database/schema/campaign-reviews.schema";
+import { evidencePackages } from "../../database/schema/evidence-packages.schema";
+
+// A saved submission may already have a wallet transaction, even before indexing.
+function deletableDraftCondition() {
+  return and(
+    eq(campaignMetadata.status, "draft"),
+    isNull(campaignMetadata.chainId),
+    isNull(campaignMetadata.contractAddress),
+    isNull(campaignMetadata.onchainCampaignId),
+    sql<boolean>`not exists (select 1 from ${campaignSubmissions} where ${campaignSubmissions.campaignMetadataId} = ${campaignMetadata.id})`,
+    sql<boolean>`not exists (select 1 from ${campaignChainProjection} where ${campaignChainProjection.metadataId} = ${campaignMetadata.id})`,
+    sql<boolean>`not exists (select 1 from ${campaignReviews} where ${campaignReviews.campaignMetadataId} = ${campaignMetadata.id})`,
+    sql<boolean>`not exists (select 1 from ${campaignRevisions} where ${campaignRevisions.parentId} = ${campaignMetadata.id} or ${campaignRevisions.childId} = ${campaignMetadata.id})`,
+    sql<boolean>`not exists (select 1 from ${evidencePackages} where ${evidencePackages.campaignMetadataId} = ${campaignMetadata.id})`,
+  )!;
+}
 
 @Injectable()
 export class CampaignsService {
@@ -47,13 +66,14 @@ export class CampaignsService {
         description: campaignMetadata.description,
         status: campaignMetadata.status,
         createdAt: campaignMetadata.createdAt,
+        revision: campaignMetadata.revision,
+        canDelete: deletableDraftCondition(),
       })
       .from(campaignMetadata)
       .where(
         and(
           campaignAccessCondition(organizerUserId),
           organizationId ? eq(campaignMetadata.organizationId, organizationId) : isNull(campaignMetadata.organizationId),
-          eq(campaignMetadata.status, "draft"),
         ),
       )
       .orderBy(desc(campaignMetadata.createdAt), desc(campaignMetadata.id));
@@ -89,6 +109,7 @@ export class CampaignsService {
           createdAt: campaignMetadata.createdAt,
           updatedAt: campaignMetadata.updatedAt,
           revision: campaignMetadata.revision,
+          canDelete: deletableDraftCondition(),
         });
 
       const milestones = await transaction
@@ -99,6 +120,7 @@ export class CampaignsService {
             milestoneIndex,
             title: milestone.title,
             description: milestone.description,
+            budgetUnits: milestone.budgetUnits,
             acceptanceCriteria: milestone.acceptanceCriteria,
           })),
         )
@@ -107,6 +129,7 @@ export class CampaignsService {
           milestoneIndex: campaignMilestoneDrafts.milestoneIndex,
           title: campaignMilestoneDrafts.title,
           description: campaignMilestoneDrafts.description,
+          budgetUnits: campaignMilestoneDrafts.budgetUnits,
           acceptanceCriteria: campaignMilestoneDrafts.acceptanceCriteria,
         });
       return {
@@ -159,6 +182,7 @@ export class CampaignsService {
           revision: campaignMetadata.revision,
           createdAt: campaignMetadata.createdAt,
           updatedAt: campaignMetadata.updatedAt,
+          canDelete: deletableDraftCondition(),
         });
       if (!campaign)
         throw new ConflictException({
@@ -207,6 +231,7 @@ export class CampaignsService {
             milestoneIndex,
             title: milestone.title,
             description: milestone.description,
+            budgetUnits: milestone.budgetUnits,
             acceptanceCriteria: milestone.acceptanceCriteria,
             createdAt: milestone.id
               ? existingById.get(milestone.id)!.createdAt
@@ -219,6 +244,7 @@ export class CampaignsService {
           milestoneIndex: campaignMilestoneDrafts.milestoneIndex,
           title: campaignMilestoneDrafts.title,
           description: campaignMilestoneDrafts.description,
+          budgetUnits: campaignMilestoneDrafts.budgetUnits,
           acceptanceCriteria: campaignMilestoneDrafts.acceptanceCriteria,
         });
       return {
@@ -227,6 +253,41 @@ export class CampaignsService {
           (a, b) => a.milestoneIndex - b.milestoneIndex,
         ),
       };
+    });
+  }
+
+  async deleteDraft(campaignId: string, organizerUserId: string, expectedRevision: number) {
+    await this.evidenceAccess.assertCampaignOrganizer(campaignId, organizerUserId);
+    return this.database.transaction(async (transaction) => {
+      const [current] = await transaction.select({ organizationId: campaignMetadata.organizationId })
+        .from(campaignMetadata).where(and(
+          eq(campaignMetadata.id, campaignId), campaignAccessCondition(organizerUserId),
+        )).for("update");
+      if (!current) throw new NotFoundException("Campaign not found");
+      if (current.organizationId) {
+        const [membership] = await transaction.select({ userId: organizationMembers.userId })
+          .from(organizationMembers).where(and(
+            eq(organizationMembers.organizationId, current.organizationId),
+            eq(organizationMembers.userId, organizerUserId),
+            eq(organizationMembers.role, "OWNER"),
+          )).for("share");
+        if (!membership) throw new ForbiddenException("Organization OWNER membership required");
+      }
+      const [deleted] = await transaction.update(campaignMetadata).set({
+        status: "deleted",
+        revision: sql`${campaignMetadata.revision} + 1`,
+        updatedAt: new Date(),
+      }).where(and(
+        eq(campaignMetadata.id, campaignId),
+        campaignAccessCondition(organizerUserId),
+        eq(campaignMetadata.revision, expectedRevision),
+        deletableDraftCondition(),
+      )).returning({ id: campaignMetadata.id, status: campaignMetadata.status });
+      if (!deleted) throw new ConflictException({
+        code: "CAMPAIGN_NOT_DELETABLE_OR_STALE",
+        message: "Bản nháp đã thay đổi hoặc đã chốt nộp. Tải lại danh sách trước khi xóa; hồ sơ nộp và lịch sử blockchain phải được giữ lại.",
+      });
+      return deleted;
     });
   }
 
@@ -249,6 +310,7 @@ export class CampaignsService {
             createdAt: campaignMetadata.createdAt,
             updatedAt: campaignMetadata.updatedAt,
             revision: campaignMetadata.revision,
+            canDelete: deletableDraftCondition(),
           })
           .from(campaignMetadata)
           .where(
@@ -266,6 +328,7 @@ export class CampaignsService {
             milestoneIndex: campaignMilestoneDrafts.milestoneIndex,
             title: campaignMilestoneDrafts.title,
             description: campaignMilestoneDrafts.description,
+            budgetUnits: campaignMilestoneDrafts.budgetUnits,
             acceptanceCriteria: campaignMilestoneDrafts.acceptanceCriteria,
           })
           .from(campaignMilestoneDrafts)

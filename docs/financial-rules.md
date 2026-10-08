@@ -2,8 +2,30 @@
 
 > **Status:** Approved MVP baseline for implementation
 > **Version:** 0.3-draft
-> **Updated:** 2026-10-03
+> **Updated:** 2026-10-06
 > **Related:** [Protocol specification](./protocol-spec.md), [State machine](./state-machine.md)
+
+**2026-10-05 approved amendment:** [MVP case STOP/timeout](./mvp-milestone-completion.md)
+uses `refundPool = totalContributed - totalReleased`; bond returns separately to
+the organizer, with no slash, fee or caller reward. Each donor claims
+`floor(contribution * refundPool / totalContributed)` once; no donor loop or claim
+expiry, rounding dust remains in escrow without an administrative sweep. Earlier
+misconduct/bond allocation formulas below are deferred post-MVP design.
+
+**Recovery implementation:** new MVP source credits bond to the same organizer
+instead of transferring it during terminal transitions. Donor refund availability
+does not depend on organizer transfer success. [Financial recovery](./financial-recovery.md)
+describes retry, local timeout worker, deployment-reset identity and dust counters.
+Combined isolated behavior verification and claim UI/indexing are recorded in
+[milestone lifecycle](./milestone-lifecycle.md) and progress. Real browser acceptance
+and a separate application MVP deployment remain pending.
+
+**2026-10-06 priority:** [business validation and MVP consolidation](./business-validation-and-mvp-hardening.md).
+Baseline accounting is unchanged. The organizer's working capital, the purpose
+of retaining a no-slash bond, and the practical costs/limits of refunds need
+validation before expansion. MVP bond is not donor compensation or insurance;
+STOP/timeout cannot claw back previously released budgets. Atomic bond-return
+descriptions below concern the prototype; new MVP uses independent pull credit.
 
 ## 1. Accounting principles
 
@@ -16,18 +38,25 @@ a deduction from recorded donation or refund entitlement. Direct transactions
 need fee reserve; operator gas funds remain separate from escrow/bond. See
 [Arc accounting and validation requirements](../v0.2/FundTogether_Arc_Evaluation_v0.1.md).
 
-The contract must preserve conservation of funds:
+For the new no-slash MVP, exact-transfer token accounting must preserve funds
+per token across all campaigns. Define each campaign's remaining donor custody
+as `totalContributed - totalReleased - refundPaid`. Before refund it is future
+milestone escrow; after snapshot it is unclaimed entitlements plus retained dust.
+The immutable refund pool must not be added again as separate cash custody:
 
 ```text
-escrow balance
-+ released amount
-+ refund obligations
-+ bond balance
-+ approved slash allocation
-= token inflows - token outflows
+contract token balance >= sum across campaigns using that token of:
+  remaining donor custody + locked bond + unclaimed organizer bond credit
+
+at a refund snapshot:
+  refundPool = totalContributed - totalReleased
+  refundPool = successful refund payouts + unclaimed entitlements + rounding dust
 ```
 
-The exact bookkeeping representation may differ between contract modules, but every transfer must belong to one explicit obligation.
+With no unsolicited inflows, exact transfers and no other obligations, the
+custody inequality is equality. Unsolicited transfers do not create donor,
+organizer or administrator withdrawal rights. Every outflow must consume one
+explicit obligation; funds of another campaign cannot cover an accounting deficit.
 
 ## 2. Variables
 
@@ -67,24 +96,36 @@ This formula assumes sequential milestones and must be re-evaluated if the contr
 - The campaign must be in a fundable state.
 - The donation token must be the configured ERC20 token.
 - Contributions after the funding deadline are rejected unless the finalization rule explicitly permits them.
-- The contract records the contribution and emits `ContributionReceived`.
+- The contract records the contribution and emits `DonationReceived`.
 - A contribution cannot be silently changed by backend metadata.
 
 Approved funding rule: accept donations only in `FUNDING` and strictly before the deadline. Reject amounts above the remaining goal; reaching the goal immediately moves the campaign to `FUNDED`.
 
 ## 4. Milestone release
 
+**Business interpretation:** activation pays no budget. The organizer performs
+work and supplies evidence before settlement pays the committed budget. An
+organizer who relies on this escrow to finance that work needs a separately
+justified cash-flow model. No advance or vendor payment is authorized by this
+document. The v0.2 pre-verification exposure/bond argument must be reassessed
+against this reimbursement model; see research questions B02/B03.
+
+The following assigned-verifier and atomic final-bond details describe the
+prototype. New MVP uses resolver admission, bounded case recovery and bond
+credit; donor budget settlement still requires a successful token transfer.
+
 `activateMilestone` requires the organizer, FUNDED or MILESTONE_SETTLED,
 the next sequential index and sufficient locked bond. Activation moves no tokens.
 On 2026-10-03 the user accepted the proposed 72-hour default; admin changes are
-deferred. submitEvidence stores a nonzero immutable commitment and sets
-The admission implementation now sets reviewEnd = verification timestamp + 72 hours.
+deferred. submitEvidence stores a nonzero immutable commitment. Admission sets
+reviewEnd = verification timestamp + 72 hours.
 Submission alone creates a pending version with reviewEnd = 0 and moves no tokens.
 Admin assignment/reassignment and verifier accept/reject also move no tokens.
 Rejected versions retain their history; organizer may submit a new version.
 
 An eligible donor can challenge strictly before reviewEnd. A challenge blocks
-release; disputed outcomes, slashing and recovery remain unimplemented.
+release; the prototype has no challenge exit. New MVP permits only the approved
+CONTINUE/RESUBMIT/STOP and timeout paths; slashing remains deferred.
 Anyone can settle IN_REVIEW at or after reviewEnd if no challenge was opened.
 Settlement transfers exactly the committed budget to the organizer, marks the
 milestone SETTLED, increments totalReleased and advances currentMilestoneIndex.
@@ -111,9 +152,13 @@ The MVP baseline uses release after successful settlement. Controlled withdrawal
 
 The organizer locks `BondReq` in the same ERC20 token used for donations. The bond is separate from donor escrow and must be tracked separately in accounting and events.
 
-Normal completion or an approved normal failure returns the remaining bond according to the terminal rule. Misconduct may allocate an explicitly bounded slash amount to the refund pool.
+Normal completion or an approved failure returns the remaining bond according
+to the deployment's terminal rule. MVP never allocates bond to donor refunds;
+misconduct slashing is a deferred proposal, not an available remedy.
 
-The exact slash formula is still an open item. Until it is specified, no implementation may infer a slash amount from a UI status or from an arbitrary resolver input.
+The exact future slash formula is open. No implementation may infer a slash
+from a UI status, timeout or arbitrary resolver input. Holding bond alone does
+not prove deterrence, compensate donors or establish the truth of evidence.
 
 For cancellation or funding failure before `FUNDED`, the full locked bond returns to the organizer in the same transaction that creates the refund snapshot. Set the recorded bond amount to zero and clear `bondLocked` before transferring. A failed transfer reverts the entire terminal transition, allowing a retry once the token transfer can succeed. No bond slash applies to this path. A terminal campaign cannot lock bond again.
 
@@ -134,7 +179,13 @@ entitlement_i = floor(C_i × P / sum(C_j))
 claimable_i    = entitlement_i - Claim_i
 ```
 
-The contract must define how any rounding dust is retained or allocated. MVP default: dust remains in the contract and is visible as unallocated dust; it is not silently transferred to an admin.
+MVP policy: round down in token base units, keep dust in escrow indefinitely,
+allow claims without expiry, and provide no admin sweep or last-claimant bonus.
+Let S be successful payouts and U unclaimed entitlements. Then
+`P = S + U + D`, where `D = P - sum(entitlement_i)` across all contributors.
+`P - S` is not dust while U remains. For N contributing wallets, `0 <= D < N`
+base units; a zero-contributor pool is zero. The UI explains this policy without
+claiming the overall contract balance is a measured dust amount.
 
 The donor claims only `claimable_i`. A second claim cannot transfer additional funds.
 
@@ -177,10 +228,12 @@ All terminal state/snapshot/bond changes revert if the bond transfer fails.
 Each failed donor transfer also rolls back its claim flag. The existing
 limitation for permanently blocked organizer transfers remains: atomic bond
 return can prevent finalization. Dispute/misconduct allocation and an independent
-bond recovery path are still pending. These new paths are compiled, not yet
-runtime-tested; do not infer financial safety from compilation alone.
+bond recovery path are still pending in this prototype. These paths have later
+regression evidence recorded in progress; this does not remove the atomic-bond
+limitation. New MVP separates bond credit from refund availability, with isolated
+verification in financial recovery.
 
-## 7. Bond allocation on misconduct
+## 7. Bond allocation on misconduct — post-MVP
 
 The contract must distinguish:
 
@@ -190,7 +243,11 @@ bond allocated to refund pool
 bond retained as unresolved obligation, if explicitly allowed
 ```
 
-MVP recommendation: any slash amount selected by an authorized resolver is transferred to the campaign refund pool, capped by the remaining bond. The exact cap and resolver outcome encoding must be approved before contract freeze.
+Deferred proposal: a permitted resolver verdict triggers a predefined slash
+formula/allocation to the campaign refund pool, capped by the remaining bond.
+Resolver input must not arbitrarily choose the amount, percentage or recipient.
+MVP has no slash. Future formula/verdict approval is required before introducing
+that post-MVP mechanism.
 
 ## 8. Rounding and token decimals
 
@@ -216,22 +273,31 @@ INV-09  A slash cannot exceed remaining bond.
 INV-10  A challenge alone does not automatically slash funds.
 ```
 
-## 10. Open items before financial freeze
+## 10. Recovery decisions and remaining verification before financial freeze
 
 The [reviewed layered verification design](./verification-and-disputes.md) adds
 no new payout authority to organizers or verifiers. A timely pending challenge
 must hold settlement; only authenticated permitted verdicts can authorize later
 financial transitions. A backend "resolved" flag is insufficient. RESUBMIT moves
-no money, retains prior hashes and requires a new review round. Exact terminal
-slash/refund formulas and timeout effects for disputes remain unresolved.
-Evidence/activation failure defaults and unreleased-escrow refunds are now
-implemented separately, without misconduct classification or slashing.
+no money, retains prior hashes and requires a new review round. User-approved
+STOP/timeout uses pool C - R, separate bond return and no misconduct slash.
 
-1. Refund composition for dispute/misconduct failures after funding or releases.
-2. Recovery for persistent token transfer failures.
-3. Exact misconduct slash formula and resolver payload.
-4. Dust destination after proportional refund rounding.
-5. Treatment of unexpected token transfers into the contract.
+| Case | New MVP implementation | Remaining gate |
+|---|---|---|
+| Bond transfer refused | Pull credit; donor snapshot independent; false/revert tests and claim UI/indexing pass | Token issuer must permit eventual payout |
+| Refund transfer refused | Claim right/counters revert; independent retry/receipt/index tests pass | Issuer restrictions and exact-transfer token qualification |
+| No caller at deadline | Permissionless timeout; worker RPC outage/unknown-send/restart tests pass on isolated chain | Fund/run caller continuously; production keeper |
+| Chain reset/reorg | Anchored streams and canonical replay/reset/reorg tests pass; fresh MVP instance ID | Restore saved application chain or explicitly plan new deployment |
+| Rounding/unclaimed escrow | Floor, O(1) counters; fuzz/claim-order/dust regression passes | Retain unclaimed obligations and dust; no sweep |
+| Unexpected inventory | No new rights/sweep; inventory/replacement-guard regression passes | Operator inventory before any deployment replacement |
+
+Verification as of 2026-10-06: 200 contract tests and isolated publication,
+refund and [milestone lifecycle](./milestone-lifecycle.md) smokes pass. This
+does not upgrade the current prototype or establish real-token/Arc readiness.
+
+Any future dust destination or recipient reassignment needs a separate protocol
+decision. Persistent issuer-wide freezes cannot be fixed by a backend flag.
+Exact-transfer token qualification remains required.
 
 ## 11. Arc financial readiness — TODO
 
@@ -240,9 +306,12 @@ ERC20 accounting for donations/bond/refunds; native USDC fees are caller costs
 even though the two interfaces share a balance. Unexpected native inflows and
 sub-token-unit dust do not create contributor rights.
 
-Token blocklist/failed transfers can prevent settlement/refund. Current atomic
-rollback protects recorded state on a revert but does not provide eventual
-recovery. Define and validate a recovery policy before real funds; do not add an
-admin sweep over donor escrow or bond. See
+New MVP separates bond credit from donor refund availability and preserves rights
+on failed claims. An issuer can still block a beneficiary/escrow; milestone budget
+payout still needs a successful transfer. Compile checks do not establish eventual
+liquidity. Local combined tests and claim UI/indexing have recorded evidence;
+issuer recovery/custody, target-network and production keeper validation remain
+gates before real funds. No admin sweep or substitute
+recipient is added. See
 [Arc validation plan](../v0.2/FundTogether_Arc_Evaluation_v0.1.md).
 

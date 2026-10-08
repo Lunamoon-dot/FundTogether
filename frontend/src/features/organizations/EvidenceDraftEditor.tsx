@@ -7,8 +7,10 @@ import { createEvidenceDraft, getEvidenceDraft, updateEvidenceDraft } from '../.
 import type { EvidenceDraft, EvidenceDraftContent } from '../../lib/api/evidence-drafts'
 import { getErrorMessage } from '../../lib/api/error'
 import { EvidenceDocuments } from './EvidenceDocuments'
+import { EvidenceFreezePanel } from './EvidenceFreezePanel'
 
-export function EvidenceDraftEditor({ campaignId, milestone, initialDraft, draftKey }: {
+export function EvidenceDraftEditor({ organizationId, campaignId, milestone, initialDraft, draftKey }: {
+  organizationId: string
   campaignId: string
   milestone: CampaignMilestoneDraft
   initialDraft: EvidenceDraft | null
@@ -172,6 +174,8 @@ export function EvidenceDraftEditor({ campaignId, milestone, initialDraft, draft
         setConflict(true)
         setError('Hồ sơ đã thay đổi. Tải bản mới nhất trước khi tiếp tục.')
       }} /> : <section className="panel"><h2>Tài liệu</h2><p className="muted">Lưu hồ sơ trước khi thêm tài liệu.</p></section>}
+    <EvidenceFreezePanel organizationId={organizationId} campaignId={campaignId} milestone={milestone}
+      draft={initialDraft} draftKey={draftKey} dirty={dirty} disabled={busy || fileBusy || conflict} />
     </>
   )
 }

@@ -193,6 +193,39 @@
   white-space: nowrap;
   border: 0;
 }
+.public-campaign-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 16px;
+  padding: 0;
+  list-style: none;
+}
+.public-campaign-grid h2 { margin-top: 12px; }
+.public-campaign-grid .organization-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-wrap;
+}
+.public-campaign-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+.public-campaign-facts dt { color: #65736b; font-size: 13px; }
+.public-campaign-facts dd { margin: 6px 0 0; overflow-wrap: anywhere; }
+.indexer-notice { color: #65736b; font-size: 13px; overflow-wrap: anywhere; }
+.feed-pagination { display: flex; align-items: center; gap: 12px; margin: 20px 0; }
+.campaign-wallet-action code { overflow-wrap: anywhere; }
+.donation-panel { display: grid; gap: 12px; margin-top: 16px; }
+.donation-panel input { max-width: 320px; padding: 12px; border: 1px solid #cedcd1; border-radius: 8px; font: inherit; }
+.donation-panel .button { justify-self: start; }
+.refund-panel { display: grid; gap: 12px; margin-top: 16px; }
+.refund-panel p { margin: 0; }
+.refund-panel .button { justify-self: start; }
+.refund-panel .confirmation-check { margin: 0 0 12px; }
+.refund-panel .confirmation-check input { padding: 0; }
 .dashboard[hidden] {
   display: none;
 }
@@ -204,6 +237,23 @@
   color: #477352;
   text-decoration: none;
   border-top: 1px solid #e2e8e2;
+}
+.journey-state { color: #24744e; font-weight: 600; }
+.campaign-journey > .button { display: inline-flex; align-items: center; text-decoration: none; }
+.journey-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+.journey-facts dt { color: #677c72; font-size: 14px; margin-bottom: 6px; }
+.journey-facts dd { margin: 0; line-height: 1.6; overflow-wrap: anywhere; }
+.transaction-progress { padding: 16px; margin: 20px 0; border: 1px solid #d8e5dc; border-radius: 12px; background: #f7faf8; }
+.transaction-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 0; list-style: none; counter-reset: tx-step; }
+.transaction-steps li { padding: 12px 8px; border-radius: 8px; background: #edf1ee; color: #65786d; font-size: 14px; }
+.transaction-steps li::before { counter-increment: tx-step; content: counter(tx-step) '. '; }
+.transaction-steps .step-current { background: #fff1cb; color: #674d0f; font-weight: 600; }
+.transaction-steps .step-done { background: #dcefe3; color: #205e3d; }
+.campaign-action-row { margin: 18px 0; }
+.refund-wallet-rights li { margin: 12px 0; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .transaction-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .journey-facts { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 720px) {
   .public-area {

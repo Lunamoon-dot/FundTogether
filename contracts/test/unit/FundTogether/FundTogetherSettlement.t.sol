@@ -1,6 +1,7 @@
 pragma solidity 0.8.24;
 
 import { FundTogether } from "../../../src/FundTogether.sol";
+import { FundTogetherBase } from "../../../src/modules/FundTogetherBase.sol";
 import { MockUSDC } from "../../mocks/MockUSDC.sol";
 import { SettlementCallbackToken } from "../../mocks/SettlementCallbackToken.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -280,7 +281,7 @@ contract FundTogetherSettlementTest is Test {
         target.activateMilestone(campaignId, 0);
         vm.warp(_submit(campaignId, 0));
         callbackToken.arm(
-            address(target), abi.encodeCall(FundTogether.activateMilestone, (campaignId, 1)), 0
+            address(target), abi.encodeCall(target.activateMilestone, (campaignId, 1)), 0
         );
         flow.settleMilestone(campaignId, 0);
         assertTrue(callbackToken.attempted());
@@ -289,8 +290,8 @@ contract FundTogetherSettlementTest is Test {
             callbackToken.nestedError(),
             abi.encodeWithSelector(ReentrancyGuard.ReentrancyGuardReentrantCall.selector)
         );
-        (, FundTogether.MilestoneState state) = target.milestones(campaignId, 1);
-        assertTrue(state == FundTogether.MilestoneState.PENDING);
+        (, FundTogetherBase.MilestoneState state) = target.milestones(campaignId, 1);
+        assertTrue(state == FundTogetherBase.MilestoneState.PENDING);
     }
 
     function testUnknownCampaignCannotSubmitChallengeOrSettle() public {
@@ -334,8 +335,8 @@ contract FundTogetherSettlementTest is Test {
         assertEq(token.balanceOf(organizer), goal + bond);
         assertEq(token.balanceOf(address(target)), 6_000_000);
         assertEq(flow.totalReleased(campaignId), goal);
-        assertTrue(target.campaignState(campaignId) == FundTogether.CampaignState.COMPLETED);
-        assertTrue(target.campaignState(id) == FundTogether.CampaignState.MILESTONE_ACTIVE);
+        assertTrue(target.campaignState(campaignId) == FundTogetherBase.CampaignState.COMPLETED);
+        assertTrue(target.campaignState(id) == FundTogetherBase.CampaignState.MILESTONE_ACTIVE);
         assertEq(flow.totalReleased(id), 0);
     }
 }

@@ -324,6 +324,21 @@
   padding: 0;
   list-style: none;
 }
+.account-role-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+}
+.account-role {
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: #eaf1e9;
+  color: #267450;
+  font-size: 12px;
+}
 .linked-wallet {
   padding: 16px;
   border: 1px solid #dfe9df;
@@ -1090,4 +1105,35 @@ textarea[aria-invalid='true'] {
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 14px;
   }
+}
+.draft-delete {
+  margin-top: 12px;
+}
+
+.button--danger {
+  color: #a52b2b;
+  background: #fff;
+  border: 1px solid #e1baba;
+}
+
+.button--danger:hover:not(:disabled) {
+  background: #fff3f3;
+}
+
+.draft-delete-confirmation {
+  padding: 16px;
+  border: 1px solid #e1baba;
+  border-radius: 12px;
+  background: #fffafa;
+  overflow-wrap: anywhere;
+}
+
+.draft-delete-confirmation p {
+  margin: 0 0 12px;
+}
+
+.draft-delete-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
 }

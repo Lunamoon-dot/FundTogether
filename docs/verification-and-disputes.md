@@ -1,8 +1,24 @@
-# Evidence Verification and Dispute Escalation
+# Campaign Verification, Resolver Approval and Dispute Escalation
 
-> Updated: 2026-10-03
-> Status: Reviewed design direction; not implemented
+> Updated: 2026-10-06
+> Status: User-confirmed workflow; partly implemented locally
 > Source: User-supplied layered verification proposal, existing MVP rules and v0.2 threat model
+
+**2026-10-05 approved amendment:** [the minimal milestone policy](./mvp-milestone-completion.md)
+keeps checks, organizer response and rechecking; the existing resolver performs
+both admission and final case handling in MVP. Separate verifier, committee,
+appeals and slashing are post-MVP. One case per evidence version, 7+7-day fixed
+deadlines, CONTINUE / RESUBMIT / STOP and permissionless no-fault timeout.
+This supersedes conflicting actor/appeal/financial proposals below. New contract
+source has isolated evidence/case/storage/indexer/UI integration verification;
+application MVP deployment and real wallet browser acceptance remain pending.
+
+**Current priority:** [business validation and MVP consolidation](./business-validation-and-mvp-hardening.md).
+Resolver staffing, conflicts, evidence standards, donor attention and the cost
+of challenges need practical evidence. The target workflow below retains older
+separate-verifier/appeal proposals as design reference; the approved minimal MVP
+policy controls current implementation. Committee/slash features are deferred,
+not assumed solutions to the remaining real-world questions.
 
 The source-corpus review is recorded in
 [the repository v0.2 corpus](../v0.2/FundTogether_Verification_and_Dispute_Design_2026-10-03.md).
@@ -11,11 +27,23 @@ replacement for that external design corpus.
 
 ## 1. Assessment and scope
 
-Adopt the separation of admissibility checking, donor review, organizer response,
-re-verification and final arbitration as the target direction. It gives organizers
-an opportunity to correct problems and reserves arbitration for unresolved cases.
-Campaign admission before publication and milestone evidence admission are separate
-checks: admission of a campaign cannot verify future delivery.
+The user confirmed two resolver responsibilities for MVP on 2026-10-04:
+campaign approval after system verification, and arbitration of disputes that
+remain unresolved after challenge checks, organizer response and re-verification.
+Authorized platform staff may perform resolver work. Campaign approval and
+dispute arbitration have different checklists and permitted outcomes within this
+role; this workflow does not require separate staff teams.
+
+Every campaign passes through logic/system checks for its dossier, integrity,
+budgets and criteria before resolver review. Organizers correct issues before
+submitting a complete dossier. System verification alone does not approve a
+campaign. Resolver approval permits organizer publication when contract guards,
+including the locked bond, are satisfied. It does not verify future delivery.
+
+Evidence and challenges each have verification stages. Organizers may explain,
+correct and submit new versions; resolver arbitration is reached only when the
+dispute remains unresolved or the bounded handling process requires escalation.
+Resolver participation is in MVP, not wholly deferred to post-MVP.
 
 This document records the assessment and constraints, not approval of every
 example in the supplied text. There is no measured evidence for its "90% happy
@@ -25,19 +53,39 @@ required for this flow and remains outside the current MVP.
 
 ## 2. Target workflow
 
+### Campaign preparation and approval
+
+```text
+Organizer prepares campaign draft
+  -> Logic/system checks dossier, integrity, budgets and criteria
+       issues -> findings -> organizer corrects -> checks run again
+       eligible -> organizer submits completed dossier
+         -> authorized resolver/staff reviews that version and findings
+              changes requested -> recorded reasons -> revised dossier -> checks again
+              rejected -> campaign remains unpublished
+              approved -> organizer publishes subject to bond/deadline guards
+```
+
+Committed versions must not be overwritten during corrections. Campaign review
+decisions must record actor, dossier version and reasons. Request-changes,
+rejection and resubmission semantics remain to be specified/implemented; these
+labels do not add contract states or an unfreeze API by themselves.
+
+### Milestone evidence and challenge
+
 ```text
 Organizer submits a versioned evidence package
-  -> Evidence verifier checks admissibility
+  -> Logic/system checks integrity and criteria; assigned verifier checks admissibility
        REJECTED -> reason -> organizer corrects and submits a new version
        ADMISSIBLE -> authenticated on-chain admission -> 72-hour donor review
           no pending/admitted challenge -> eligible for settlement
           donor submits challenge -> provisional settlement hold
-            Challenge verifier checks admissibility
+            Logic/system checks challenge; challenge verifier checks admissibility
               INVALID -> reason + recorded dismissal; contest path required
               ADMISSIBLE -> organizer response
                 re-verify against original criteria
                   correction accepted -> new evidence version + fresh 72-hour review
-                  contested/unresolved -> independent resolver
+                  contested/unresolved or handling deadline reached -> authorized resolver
                     PASS / RESUBMIT / CANCEL_WITHOUT_FAULT / MISCONDUCT
 ```
 
@@ -59,12 +107,12 @@ Full approved authority and draft objective checklist:
 
 | Actor | Permitted responsibility | Boundary |
 |---|---|---|
-| Campaign admission reviewer | Check campaign eligibility before publication | Separate responsibility from resolving milestone disputes |
+| Resolver acting as campaign reviewer | Review complete dossier and system findings; approve, request changes or reject before publication | System checks precede review; approval does not prove future delivery; revision/rejection paths not yet implemented |
 | Evidence verifier | Check completeness, readability, format and match to committed criteria | ADMISSIBLE does not mean truthful or completed; cannot transfer funds |
 | Challenge verifier | Check donor eligibility, timeliness, scope, duplicates and supporting material | ADMISSIBLE does not establish misconduct; ambiguous merits must escalate |
 | Organizer | Explain, submit additional evidence and correct work | Cannot dismiss its own challenge, change approved criteria or authorize release |
 | Re-verifier | Check the response against fixed criteria; record findings | Contested findings must have an escalation path; no unilateral final monetary verdict |
-| Resolver | Decide unresolved disputes with a reasoned permitted verdict | No arbitrary payout recipient, amount or slash percentage |
+| Resolver acting as dispute arbitrator | Decide unresolved/escalated disputes after verification, response and re-verification | Case-specific conflict checks; no arbitrary payout recipient, amount or slash percentage |
 | Smart contract | Authenticate actors; enforce holds, timers, verdict effects and accounting | Cannot independently establish real-world facts |
 
 Verifier and resolver responsibilities create trusted decision points. Calling
@@ -102,8 +150,14 @@ Domain assessments must disclose who performed them and what was checked.
 
 ## 5. Resolver composition
 
+The 2-of-3 direction below concerns escalated dispute arbitration. It does not
+make campaign admission a committee vote. The 2026-10-04 workflow allows
+authorized platform staff to serve as resolvers; staffing, appointment and
+permissions require explicit roles and conflict checks. The latest follow-up
+defers the previously selected 2-of-3 threshold to post-MVP.
+
 The supplied proposal of three independent resolvers with two matching decisions
-is the selected MVP direction in the user's follow-up. It is permissioned governance,
+is a post-MVP direction after the user's latest scope decision. It is permissioned governance,
 not evidence of decentralization or independence by itself. Three wallets can
 belong to one person; identity and relationships require off-chain checks.
 
@@ -117,7 +171,7 @@ context. Two different verdicts are not a quorum. Each member votes once per
 round; conflicting votes, recusals, lost access and timeout need explicit handling.
 Do not rotate members mid-case without a defined rule.
 
-The threshold is selected as two matching verdicts from three verified members;
+For the deferred committee, the threshold is two matching verdicts from three verified members;
 membership/conflict replacement and timeout handling remain open. Record individual
 votes in ResolverManager; Safe-based resolver execution remains deferred.
 A dynamic registry is not needed for MVP. Reuse established primitives where
@@ -172,16 +226,19 @@ The policy draft, including DEFAULT and vote-context guards, is in
 
 | Concern | Current code | Target direction |
 |---|---|---|
-| Campaign approval | Deployer resolver approves after criteria commitment | Separate campaign admission responsibility |
+| Campaign approval | Deployer resolver approves after criteria commitment; local bonded queue/UI and chain matching exist | System verification/correction first, then resolver dossier approval before organizer publication |
 | Evidence | Versioned pending submission; assigned active verifier acceptance starts review | Admission check implemented; objective checks remain off-chain |
 | Challenge | Contributing donor immediately enters CHALLENGED | Timely hold, screening, response, re-verification, escalation |
 | Corrections | Reject permits a new immutable version; history retained | Challenge remediation and bounded rounds remain planned |
 | Settlement | Permissionless unchallenged expiry; exact budget; final bond return | Preserve financial invariants; add authenticated verdict paths |
 | Disputes | CHALLENGED has no exit | Bounded escalation and recovery |
-| Resolver committee | Not implemented | Selected 2-of-3 verdict voting; identity/conflict checks and policy required |
+| Resolver committee | Post-MVP; not implemented | 2-of-3 verdict voting deferred by latest user decision; identity/conflict checks and policy required |
 
-Evidence admission/versioning is now implemented; event ABI changed to versioned
-creation/assignment/decision events. Backend/frontend domain flows remain unimplemented.
+Evidence admission/versioning is implemented; event ABI uses versioned
+creation/assignment/decision events. Local campaign approval/publication UI and
+indexing exist. The complete dossier/report checking pipeline, campaign
+request-changes/rejection and dispute screening/response/arbitration remain
+incomplete; current queue eligibility is not proof of the full target workflow.
 Next decisions: challenge hold/appeal semantics; per-stage deadlines/fallbacks;
 resolver conflict/replacement rules; terminal financial rules.
 

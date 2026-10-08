@@ -1,6 +1,7 @@
 pragma solidity 0.8.24;
 
 import { FundTogether } from "../../../src/FundTogether.sol";
+import { FundTogetherBase } from "../../../src/modules/FundTogetherBase.sol";
 import { MockUSDC } from "../../mocks/MockUSDC.sol";
 import { CampaignFixtures } from "../../helpers/CampaignFixtures.sol";
 import { RefundAccounting, RefundCallbackToken } from "../../mocks/RefundCallbackToken.sol";
@@ -211,7 +212,7 @@ contract FundTogetherRefundTest is Test {
         _cancel();
         assertEq(
             uint256(fundTogether.campaignState(campaignId)),
-            uint256(FundTogether.CampaignState.FUNDING)
+            uint256(FundTogetherBase.CampaignState.FUNDING)
         );
         assertFalse(refunds.refundSnapshotted(campaignId));
         assertEq(token.balanceOf(address(fundTogether)), 5_000_000);
@@ -304,6 +305,25 @@ contract FundTogetherRefundTest is Test {
         refunds.claimRefund(id);
         assertEq(callbackToken.balanceOf(address(callbackToken)), 3_000_000);
         assertEq(callbackToken.balanceOf(address(fundTogether)), 0);
+    }
+
+    function testClaimGasDoesNotGrowWithDonorCount() public {
+        uint256[2] memory counts = [uint256(2), uint256(128)];
+        uint256[2] memory used;
+        for (uint256 k; k < 2; ++k) {
+            uint256 id = _publish();
+            for (uint256 i; i < counts[k]; ++i) {
+                _donate(id, address(uint160(0x1000 + i)), 100);
+            }
+            vm.prank(organizer);
+            fundTogether.cancelCampaign(id);
+            vm.prank(address(0x1000));
+            uint256 before = gasleft();
+            refunds.claimRefund(id);
+            used[k] = before - gasleft();
+        }
+        assertLe(used[1], used[0] + 3_000);
+        assertLt(used[1], 120_000);
     }
 
     function testFuzzFullRefundConservesFunds(uint256 aliceAmount, uint256 bobAmount) public {

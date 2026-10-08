@@ -2,8 +2,21 @@
 
 > **Status:** Approved MVP baseline for implementation
 > **Version:** 0.3-draft
-> **Updated:** 2026-10-03
+> **Updated:** 2026-10-06
 > **Related:** [Protocol specification](./protocol-spec.md), [Financial rules](./financial-rules.md)
+
+**2026-10-05 approved amendment:** use [the milestone completion state machine](./mvp-milestone-completion.md)
+for MVP admission/disputes. Resolver admission starts 72-hour review. CHALLENGED
+has a fixed 7-day response and 7-day decision deadline; CONTINUE restores the
+original reviewEnd, RESUBMIT starts a new version workflow, STOP/timeout enters
+FAILED and snapshots unreleased donor escrow. No appeal or slash in MVP. Earlier
+verifier/misconduct transitions below are post-MVP proposals, not live capabilities.
+
+**Development priority 2026-10-06:** [MVP consolidation and business validation](./business-validation-and-mvp-hardening.md).
+The approved transitions are a test baseline, not proof that the durations,
+working-capital model or actor responsibilities fit real charitable operations.
+Research may propose revisions; existing campaign commitments and financial
+rights cannot change through a UI label or a projection update.
 
 ## 1. State machine rules
 
@@ -16,6 +29,11 @@ caller → guard → state change → event
 The contract is the final authority for on-chain transitions. The backend and frontend may hide invalid actions for usability, but they cannot authorize an action the contract rejects.
 
 ## 2. Campaign lifecycle
+
+This is the prototype reference with the newer MVP CHALLENGED exits shown for
+comparison. Other tables below retain prototype entrypoints/events. The complete
+new MVP transition/authority reference is in the approved milestone policy;
+atomic bond returns below become independent organizer credit in that deployment.
 
 ```text
 DRAFT
@@ -48,7 +66,9 @@ SETTLEABLE
   └─ settleMilestone → MILESTONE_SETTLED
 
 CHALLENGED
-  └─ resolveChallenge → MILESTONE_SETTLED or CANCELLED
+  ├─ prototype: no implemented exit
+  └─ new MVP: CONTINUE → IN_REVIEW; RESUBMIT → MILESTONE_ACTIVE;
+       STOP/timeout → FAILED (unreleased escrow snapshot, separate bond credit)
 
 MILESTONE_SETTLED
   ├─ activate next milestone before 7-day deadline → MILESTONE_ACTIVE
@@ -64,7 +84,7 @@ Post-funded FAILED
        └─ donors claim proportional shares independently
 ```
 
-The contract implements funding, pre-funded refunds, sequential activation,
+The prototype implements funding, pre-funded refunds, sequential activation,
 versioned evidence admission/rejection, donor challenge and unchallenged settlement/completion.
 SETTLEABLE is a derived time condition, not a stored enum: campaign stays
 IN_REVIEW until settleMilestone executes. Last settlement directly enters
@@ -200,24 +220,35 @@ The detailed specification must define the outcome for:
 
 ### Reviewed target extension — not implemented
 
-The proposed extension separates evidence admission, pending challenge screening,
-organizer response, re-verification and final arbitration. The existing contract
+The user-confirmed extension includes system checks before campaign resolver
+approval and before evidence/challenge review, followed by organizer response,
+re-verification and final arbitration only for unresolved/escalated cases. The existing contract
 enum/guards above still describe the implemented flow. Do not interpret the
 following target as a deployed state machine:
 
 ```text
-Evidence submitted -> admission -> donor review (72h)
-Timely challenge -> settlement hold -> challenge screening
+Campaign draft -> system dossier/integrity/criteria checks -> correction as needed
+  -> submitted dossier -> resolver campaign review
+    request changes -> revised version -> system checks again
+    reject -> remains unpublished
+    approve -> organizer publish with bond/deadline guards
+
+Evidence submitted -> system checks -> verifier admission -> donor review (72h)
+Timely challenge -> settlement hold -> system checks / challenge screening
   inadmissible -> reasoned dismissal with contest path
   admissible -> organizer response -> re-verification
     correction accepted -> new evidence version -> fresh donor review
-    unresolved -> independent resolver -> permitted verdict
+    unresolved / handling deadline escalation -> authorized resolver -> permitted verdict
 ```
 
 Every waiting stage needs an explicit timeout/fallback; revised evidence must
 not overwrite a previous commitment. Max correction rounds, appeal finality and
-timing are still OPEN. Committee 2-of-3 is selected for MVP in the user's follow-up,
-but not implemented. See [Verification and disputes](./verification-and-disputes.md).
+timing are still OPEN. Resolver approval/rejection/request-changes must refer to
+the reviewed campaign version; committed data is never overwritten. The local
+campaign checking/correction/decision-record workflow is described in
+[Internal campaign review](./internal-campaign-review.md). Committee 2-of-3
+is deferred to post-MVP by the latest user decision. Dispute recovery remains open. See
+[Verification and disputes](./verification-and-disputes.md).
 
 At minimum, contract tests must cover:
 

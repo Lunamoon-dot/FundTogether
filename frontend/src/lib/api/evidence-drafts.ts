@@ -51,6 +51,14 @@ export interface EvidenceDraft {
   updatedAt: string
 }
 
+export interface FrozenEvidencePackage {
+  id: string
+  evidenceHash: `0x${string}`
+  submissionVersion: number
+  draftRevision: number
+  createdAt: string
+}
+
 const path = (campaignId: string, milestoneIndex: string) =>
   `/campaigns/${campaignId}/milestones/${milestoneIndex}/evidence-draft`
 
@@ -96,6 +104,23 @@ export async function updateEvidenceDraft(
   return data
 }
 
+export async function listFrozenEvidencePackages(campaignId: string, milestoneIndex: string, signal?: AbortSignal) {
+  const { data } = await http.get<{ items: FrozenEvidencePackage[] }>(`${path(campaignId, milestoneIndex)}/packages`, { signal })
+  return data.items
+}
+
+export async function freezeEvidenceDraft(campaignId: string, milestoneIndex: string, expectedRevision: number) {
+  const { data } = await http.post<FrozenEvidencePackage>(`${path(campaignId, milestoneIndex)}/freeze`, { expectedRevision })
+  return data
+}
+
+export async function downloadFrozenEvidenceManifest(campaignId: string, milestoneIndex: string, packageId: string) {
+  const { data } = await http.get<Blob>(`${path(campaignId, milestoneIndex)}/packages/${packageId}/manifest`, {
+    responseType: 'blob',
+  })
+  return data
+}
+
 export async function uploadEvidenceDocument(campaignId: string, milestoneIndex: string,
   expectedRevision: number, kind: EvidenceDraftContent['documents'][number]['kind'], file: File,
   signal?: AbortSignal) {
@@ -104,7 +129,7 @@ export async function uploadEvidenceDocument(campaignId: string, milestoneIndex:
   form.append('kind', kind)
   form.append('file', file)
   const { data } = await http.post<EvidenceDraft>(`${path(campaignId, milestoneIndex)}/documents`, form, {
-    signal, headers: { 'Content-Type': undefined },
+    signal, timeout: 120_000, headers: { 'Content-Type': undefined },
   })
   return data
 }
@@ -112,7 +137,7 @@ export async function uploadEvidenceDocument(campaignId: string, milestoneIndex:
 export async function downloadEvidenceDocument(campaignId: string, milestoneIndex: string, documentId: string,
   signal?: AbortSignal) {
   const { data } = await http.get<Blob>(`${path(campaignId, milestoneIndex)}/documents/${documentId}`, {
-    signal, responseType: 'blob',
+    signal, timeout: 120_000, responseType: 'blob',
   })
   return data
 }

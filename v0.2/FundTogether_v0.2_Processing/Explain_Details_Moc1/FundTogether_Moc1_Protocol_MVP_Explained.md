@@ -1,5 +1,10 @@
 # FundTogether — Mốc 1: Protocol & MVP Definition
 
+> **Quyết định phạm vi mới nhất (2026-10-04):** MVP dùng resolver được cấp quyền,
+> sau các bước kiểm tra hệ thống. Hội đồng 2/3 và ResolverManager để post-MVP.
+> Các đoạn chọn 2/3 cho MVP bên dưới thuộc quyết định cũ, đã được thay thế;
+> phần cơ chế hội đồng chỉ còn là tài liệu tham khảo cho post-MVP.
+
 > Tài liệu giải thích đầy đủ các mục 1.1–1.10 trong Mốc 1 của Development Process. Đây là tài liệu học và thảo luận; các phương án được ghi là ví dụ/đề xuất chưa phải quyết định được team phê duyệt.
 
 ## Mục lục
@@ -19,10 +24,16 @@ Mỗi phần bắt đầu bằng một mục trong Process. Ví dụ số tiền
 
 ## Cập nhật thiết kế ngày 2026-10-03
 
+**Xác nhận thêm 2026-10-04:** Resolver có thể là nhân viên có quyền trong MVP:
+duyệt campaign sau hệ thống kiểm tra/sửa hồ sơ, và phân xử tranh chấp còn chưa
+giải quyết sau kiểm tra evidence/challenge, giải trình, kiểm tra lại. Đạt kiểm
+tra hệ thống chưa đủ mở campaign. Nhánh không challenge hoặc khắc phục đạt không
+bắt buộc phân xử. Hướng 2/3 dành cho phân xử, không tự áp vào duyệt campaign.
+
 Tham chiếu [Kiểm tra evidence và xử lý tranh chấp theo tầng](../../FundTogether_Verification_and_Dispute_Design_2026-10-03.md).
 Hướng mục tiêu tách admission, donor review, organizer response, re-verification
 và phân xử cuối cùng. Resolver không cần kiểm tra mọi milestone. Nội dung học/ví dụ
-bên dưới vẫn cần đối chiếu bản cập nhật. Người dùng chọn committee 2/3 cho MVP
+bên dưới vẫn cần đối chiếu bản cập nhật. Người dùng đã hoãn committee 2/3 đến post-MVP
 trong [Dispute Policy](../../FundTogether_Dispute_Policy_and_Resolver_Committee_2026-10-03.md).
 Admin cấp/thu hồi quyền verifier và phân công hồ sơ pending đã được chốt và triển khai; timeout, appeal, slash và committee vẫn chưa hoàn tất.
 > Cập nhật tiếp: quyền/giới hạn verifier đã được chốt trong [Verifier Specification v0.1](../../FundTogether_Verifier_Specification_v0.1.md).
@@ -77,7 +88,7 @@ Các actor:
 | Beneficiary | Trường A và học sinh | Nhận lợi ích từ hệ thống lọc nước |
 | Vendor | Công ty B bán và lắp thiết bị | Cung cấp hàng hóa, dịch vụ, hóa đơn |
 | Verifier | Hương, người được giao kiểm tra | Đưa ra kết quả kiểm tra bằng chứng |
-| Resolver | Một bên được chỉ định | Giải quyết tranh chấp |
+| Resolver | Nhân viên/bên được cấp quyền | Duyệt campaign sau kiểm tra; phân xử tranh chấp được chuyển lên sau kiểm tra và giải trình |
 | Protocol Admin | Người hoặc nhóm quản trị protocol | Thực hiện quyền vận hành được quy định |
 
 **Actor là vai trò trong quy trình, không nhất thiết là một loại tài khoản riêng.**
@@ -268,23 +279,28 @@ Các phương án thiết kế gồm:
 
 Ghi `approved = true` trong database không khiến contract tự biết hoặc tự tin kết quả đó.
 
-### 8. Resolver — người giải quyết tranh chấp
+### 8. Resolver — duyệt campaign và phân xử tranh chấp
 
 #### 8.1 Khác Verifier như thế nào?
 
 - **Verifier:** kiểm tra và đưa ra nhận định về bằng chứng.
-- **Resolver:** đưa ra quyết định khi xuất hiện tranh chấp theo thẩm quyền protocol cấp.
+- **Resolver:** duyệt hồ sơ campaign hoàn chỉnh sau lớp kiểm tra/sửa trước publish;
+  phân xử khi dispute vẫn chưa giải quyết sau các lớp kiểm tra và giải trình,
+  hoặc đến hạn escalation theo policy.
 
 Ví dụ Minh thấy hóa đơn ghi hai thiết bị nhưng ảnh chỉ có một:
 
 ```text
 Minh mở challenge
     ↓
+Hệ thống/Verifier kiểm tra điều kiện challenge
+    ↓
 Lan cung cấp giải trình
     ↓
-Hương cung cấp kết quả kiểm tra
+Hệ thống/Hương kiểm tra lại theo tiêu chí đã khóa
     ↓
-Resolver xem hồ sơ và ra quyết định
+Khắc phục đạt → phiên bản mới và donor review mới
+Vẫn chưa giải quyết / đến hạn escalation → Resolver xem hồ sơ và ra quyết định
     ↓
 Contract áp dụng hệ quả được protocol quy định
 ```
@@ -303,7 +319,11 @@ Quyền giải quyết tranh chấp không nên biến thành quyền nhập m�
 - Nếu không xử lý thì có đường thoát nào?
 - Có được đổi Resolver khi tranh chấp đang diễn ra không?
 
-MVP có thể dùng một bên tin cậy làm Resolver như Process đề xuất. Nếu cùng một người vừa làm Verifier vừa làm Resolver, vẫn cần ghi nhận đó là hai quyền khác nhau và làm rõ xung đột lợi ích.
+Resolver trong MVP có thể là nhân viên được cấp quyền. Prototype dùng ví deployer;
+hướng hội đồng phân xử xem Dispute Policy. Một người có thể giữ vai trò ở các
+vụ việc khác nhau, nhưng người đã verify vụ việc không phân xử chính vụ đó,
+theo Verifier Specification. Campaign review và dispute arbitration có checklist
+và quyền riêng, không đồng nghĩa phải có hai đội nhân sự riêng.
 
 ### 9. Protocol Admin — người quản trị protocol
 
@@ -815,7 +835,7 @@ Ví dụ campaign vẫn EXECUTING trong khi M1 ACCEPTED, M2 REVIEW và M3 NOT_ST
 - Review window đã chốt mặc định 72 giờ, bắt đầu từ verifier acceptance.
 - Assigned verifier có role còn hiệu lực phải accept đúng evidence hash/version; submission chưa được accept không bắt đầu review.
 
-Ví dụ này khớp đường không có challenge trong code. Committee 2/3 đã chọn nhưng chưa triển khai; timeout dispute và hệ quả tài chính sau FUNDED vẫn OPEN.
+Ví dụ này khớp đường không có challenge trong code. Committee 2/3 để post-MVP và chưa triển khai; timeout dispute và hệ quả tài chính sau FUNDED vẫn OPEN.
 
 ### 4. Sơ đồ bằng chữ
 
@@ -853,7 +873,7 @@ Tên trong sơ đồ dùng enum hiện tại; milestone SUBMITTED tương ứng 
 | EVIDENCE_PENDING | verifySubmission / rejectSubmission | Assigned verifier | Role còn hiệu lực, đúng hash/version | IN_REVIEW / MILESTONE_ACTIVE | Không chuyển tiền |
 | IN_REVIEW | openChallenge | Donor đã đóng góp | Trước reviewEnd | CHALLENGED | Không slash; chưa có exit |
 | IN_REVIEW | settleMilestone | Bất kỳ ai | Tới reviewEnd, không challenge | MILESTONE_SETTLED hoặc COMPLETED | Chuyển budget; mốc cuối trả bond trong cùng tx |
-| CHALLENGED | Committee resolution | Committee 2/3 mục tiêu | Policy chưa hoàn tất | Chưa triển khai | Chưa được phép giả định refund/slash |
+| CHALLENGED | Permissioned resolver resolution | Resolver được cấp quyền (MVP); 2/3 post-MVP | Policy chưa hoàn tất | Chưa triển khai | Chưa được phép giả định refund/slash |
 | FUNDING_FAILED / CANCELLED | claimRefund | Donor có quyền | Pool đã chốt, chưa claim đủ | Không đổi terminal state | Escrow → donor |
 
 “Bất kỳ ai gọi” không phải bất kỳ ai được tự quyết kết quả. Contract tính kết quả từ điều kiện đã lưu. Người gọi chỉ kích hoạt phép tính và trả gas theo cơ chế giao dịch.
@@ -1608,7 +1628,10 @@ Challenge ≠ tự động slash bond
 
 ### 2. Vì sao không bắt donor vote ở mọi milestone?
 
-Process đề xuất có thể dùng resolver đơn giản trong MVP. Threat Model định hướng chỉ xử lý sâu khi có phản đối, giảm việc donor phải tham gia mọi lần settlement.
+Resolver tham gia MVP nhưng phân xử milestone chỉ khi kiểm tra challenge,
+organizer giải trình và kiểm tra lại vẫn chưa giải quyết được hoặc cần escalation.
+Duyệt campaign vẫn luôn cần resolver sau lớp kiểm tra trước publish. Donor không
+phải bỏ phiếu ở mọi lần settlement.
 
 Đánh đổi: người theo dõi phải có cơ hội tiếp cận evidence và hành động trong thời hạn. Không có challenge có thể vì evidence đúng, nhưng cũng có thể vì không ai đọc.
 
@@ -1645,7 +1668,8 @@ Trong ví dụ:
 - Tại hoặc sau reviewEnd: không được mở challenge thông thường; có thể settle nếu không dispute và đủ điều kiện khác.
 - Một transaction gửi trước hạn nhưng thực thi sau hạn có thể bị từ chối.
 
-Nếu Minh challenge ngày 02/10 lúc 10:00 và chọn resolver deadline bảy ngày từ lúc mở dispute:
+Nếu hồ sơ sau kiểm tra/giải trình được chuyển resolver ngày 02/10 lúc 10:00
+và ví dụ chọn deadline bảy ngày từ khi chuyển phân xử:
 
 ```text
 resolveBy = 09/10/2026 10:00 UTC
@@ -1677,15 +1701,23 @@ Nếu thành công, contract ghi DISPUTED và event. Draft trong database chưa 
 
 #### Bước 4 — Backend/indexer cập nhật hồ sơ và thông báo
 
-Indexer đồng bộ event. Backend có thể tạo thông báo cho Organizer/Resolver. Thông báo hỗ trợ vận hành; việc gửi email thành công không phải điều kiện tự xác nhận dispute đã ghi on-chain.
+Indexer đồng bộ event. Backend hỗ trợ phân công kiểm tra challenge và thông báo
+cho organizer; chỉ chuyển hồ sơ/thông báo resolver khi cần escalation. Thông báo
+hỗ trợ vận hành; gửi email thành công không xác nhận dispute đã ghi on-chain.
 
 #### Bước 5 — Lan giải trình, Verifier nhận xét
 
-Nội dung bổ sung được version hóa và gắn vào hồ sơ. Không xóa bộ evidence ban đầu để thay bằng ảnh mới mà mất lịch sử.
+Challenge phải qua kiểm tra điều kiện. Nội dung giải trình/bổ sung được version
+hóa và gắn vào hồ sơ; hệ thống/Verifier kiểm tra lại theo tiêu chí đã khóa. Khắc
+phục đạt tạo evidence phiên bản mới và donor review mới 72 giờ. Không xóa bộ
+evidence ban đầu để thay bằng ảnh mới mà mất lịch sử.
 
-#### Bước 6 — Resolver ra quyết định
+#### Bước 6 — Resolver ra quyết định nếu vụ việc cần escalation
 
-Resolver kiểm tra hồ sơ, nhập kết quả và lý do trên giao diện quản trị, rồi ký giao dịch theo quyền protocol.
+Chỉ khi vẫn chưa giải quyết/bất đồng hoặc đến hạn escalation theo policy mới
+chuyển resolver; không phải mọi challenge đều đi thẳng tới bước này. Resolver
+kiểm tra hồ sơ và kết quả các bước trước, nhập kết quả/lý do trên giao diện quản
+trị rồi ký giao dịch theo quyền protocol. Deadline và fallback cụ thể vẫn mở.
 
 Nếu lý do dài lưu off-chain, on-chain có thể ghi commitment và mã kết quả. Contract giới hạn lựa chọn kết quả và hệ quả, không cho Resolver tự chuyển tiền đến nơi tùy ý.
 
@@ -2564,7 +2596,7 @@ Nguồn: [Process — 1.10 và Các quyết định cần team trả lời trư�
 
 ## MVP baseline alignment
 
-Baseline hiện tại: Anvil + ERC20 MockUSDC cho local; Arc testnet ưu tiên tích hợp, Arc là ứng viên production ưu tiên. Goal bằng tổng budgets; bond bằng budget lớn nhất; release sau settlement. Verifier admission/versioning bắt buộc trước review 72 giờ đã triển khai. Committee 2/3 đã chọn nhưng chưa có code; taxonomy, timeout và tài chính sau FUNDED vẫn OPEN. Originals truy cập hạn chế, bản redacted mới công khai; không còn baseline public-only.
+Baseline hiện tại: Anvil + ERC20 MockUSDC cho local; Arc testnet ưu tiên tích hợp, Arc là ứng viên production ưu tiên. Goal bằng tổng budgets; bond bằng budget lớn nhất; release sau settlement. Verifier admission/versioning bắt buộc trước review 72 giờ đã triển khai. Committee 2/3 để post-MVP và chưa có code; taxonomy, timeout và tài chính sau FUNDED vẫn OPEN. Originals truy cập hạn chế, bản redacted mới công khai; không còn baseline public-only.
 
 ---
 

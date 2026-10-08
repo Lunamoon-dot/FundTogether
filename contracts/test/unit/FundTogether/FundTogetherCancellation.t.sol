@@ -1,6 +1,7 @@
 pragma solidity 0.8.24;
 
 import { FundTogether } from "../../../src/FundTogether.sol";
+import { FundTogetherBase } from "../../../src/modules/FundTogetherBase.sol";
 import { MockUSDC } from "../../mocks/MockUSDC.sol";
 import { CampaignFixtures } from "../../helpers/CampaignFixtures.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -55,7 +56,7 @@ contract FundTogetherCancellationTest is Test {
 
         assertEq(
             uint256(fundTogether.campaignState(campaignId)),
-            uint256(FundTogether.CampaignState.CANCELLED)
+            uint256(FundTogetherBase.CampaignState.CANCELLED)
         );
         assertEq(token.balanceOf(organizer), 2_000_000);
         assertEq(token.balanceOf(address(fundTogether)), 0);
@@ -94,7 +95,7 @@ contract FundTogetherCancellationTest is Test {
         uint256 id = _create(address(0xBAD));
         _cancel(id);
         assertEq(
-            uint256(fundTogether.campaignState(id)), uint256(FundTogether.CampaignState.CANCELLED)
+            uint256(fundTogether.campaignState(id)), uint256(FundTogetherBase.CampaignState.CANCELLED)
         );
         assertEq(token.balanceOf(organizer), 0);
     }
@@ -105,7 +106,7 @@ contract FundTogetherCancellationTest is Test {
         fundTogether.approveCampaign(id);
         _cancel(id);
         assertEq(
-            uint256(fundTogether.campaignState(id)), uint256(FundTogether.CampaignState.CANCELLED)
+            uint256(fundTogether.campaignState(id)), uint256(FundTogetherBase.CampaignState.CANCELLED)
         );
     }
 
@@ -152,7 +153,7 @@ contract FundTogetherCancellationTest is Test {
         _cancel(campaignId);
         assertEq(
             uint256(fundTogether.campaignState(campaignId)),
-            uint256(FundTogether.CampaignState.DRAFT)
+            uint256(FundTogetherBase.CampaignState.DRAFT)
         );
         assertFalse(fundTogether.refundSnapshotted(campaignId));
         (,,,,, bool locked, uint256 bond,) = fundTogether.campaigns(campaignId);
@@ -183,7 +184,7 @@ contract FundTogetherCancellationTest is Test {
         assertEq(fundTogether.contributions(activeId, donor), 3_000_000);
         assertEq(
             uint256(fundTogether.campaignState(activeId)),
-            uint256(FundTogether.CampaignState.FUNDING)
+            uint256(FundTogetherBase.CampaignState.FUNDING)
         );
         assertFalse(fundTogether.refundSnapshotted(activeId));
     }

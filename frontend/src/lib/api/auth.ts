@@ -3,6 +3,7 @@ import { http } from './http'
 export interface AccountSession {
   userId: string
   email: string | null
+  roles: ('ADMIN' | 'RESOLVER')[]
   wallets: { address: string; chainId: number }[]
 }
 

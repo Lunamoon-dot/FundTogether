@@ -1,6 +1,7 @@
 pragma solidity 0.8.24;
 
 import { FundTogether } from "../../../src/FundTogether.sol";
+import { FundTogetherBase } from "../../../src/modules/FundTogetherBase.sol";
 import { MockUSDC } from "../../mocks/MockUSDC.sol";
 import { CampaignFixtures } from "../../helpers/CampaignFixtures.sol";
 import { Test } from "forge-std/Test.sol";
@@ -18,7 +19,7 @@ contract FundingCaller {
 contract FundTogetherFundingTest is Test {
     event CampaignApproved(uint256 indexed campaignId, address indexed resolver);
     event CampaignPublished(uint256 indexed campaignId, uint256 fundingDeadline);
-    event FundingFinalized(uint256 indexed campaignId, FundTogether.CampaignState state);
+    event FundingFinalized(uint256 indexed campaignId, FundTogetherBase.CampaignState state);
     event CampaignCancelled(uint256 indexed campaignId, address indexed organizer);
 
     function _newCampaign(FundTogether fundTogether, MockUSDC token, uint256 deadline)
@@ -47,14 +48,14 @@ contract FundTogetherFundingTest is Test {
         uint256 campaignId = _newCampaign(fundTogether, token, block.timestamp + 7 days);
 
         require(
-            fundTogether.campaignState(campaignId) == FundTogether.CampaignState.DRAFT, "not draft"
+            fundTogether.campaignState(campaignId) == FundTogetherBase.CampaignState.DRAFT, "not draft"
         );
         CampaignFixtures.configureCriteria(fundTogether, campaignId);
         vm.expectEmit(true, true, false, true, address(fundTogether));
         emit CampaignApproved(campaignId, address(this));
         fundTogether.approveCampaign(campaignId);
         require(
-            fundTogether.campaignState(campaignId) == FundTogether.CampaignState.APPROVED,
+            fundTogether.campaignState(campaignId) == FundTogetherBase.CampaignState.APPROVED,
             "not approved"
         );
     }
@@ -82,7 +83,7 @@ contract FundTogetherFundingTest is Test {
         _publish(fundTogether, token, campaignId);
 
         require(
-            fundTogether.campaignState(campaignId) == FundTogether.CampaignState.FUNDING,
+            fundTogether.campaignState(campaignId) == FundTogetherBase.CampaignState.FUNDING,
             "not funding"
         );
 
@@ -112,11 +113,11 @@ contract FundTogetherFundingTest is Test {
         token.approve(address(fundTogether), 1_000_000);
 
         vm.expectEmit(true, false, false, true, address(fundTogether));
-        emit FundingFinalized(campaignId, FundTogether.CampaignState.FUNDED);
+        emit FundingFinalized(campaignId, FundTogetherBase.CampaignState.FUNDED);
         fundTogether.donate(campaignId, 1_000_000);
 
         require(
-            fundTogether.campaignState(campaignId) == FundTogether.CampaignState.FUNDED,
+            fundTogether.campaignState(campaignId) == FundTogetherBase.CampaignState.FUNDED,
             "not funded"
         );
     }
@@ -144,7 +145,7 @@ contract FundTogetherFundingTest is Test {
         emit CampaignCancelled(campaignId, address(this));
         fundTogether.cancelCampaign(campaignId);
         require(
-            fundTogether.campaignState(campaignId) == FundTogether.CampaignState.CANCELLED,
+            fundTogether.campaignState(campaignId) == FundTogetherBase.CampaignState.CANCELLED,
             "not cancelled"
         );
     }
@@ -159,7 +160,7 @@ contract FundTogetherFundingTest is Test {
 
         caller.finalizeFailure(fundTogether, campaignId);
         require(
-            fundTogether.campaignState(campaignId) == FundTogether.CampaignState.FUNDING_FAILED,
+            fundTogether.campaignState(campaignId) == FundTogetherBase.CampaignState.FUNDING_FAILED,
             "not funding failed"
         );
     }

@@ -43,7 +43,11 @@ export function OrganizationWallet({ organization, userId }: { organization: Org
               {account.isPending && <p role="status">Đang tải ví đã liên kết…</p>}
               {account.isError && <p role="alert">{getErrorMessage(account.error)}</p>}
               {account.isSuccess && wallets.length === 0 && (
-                <p><a href="#/account">Liên kết ví với tài khoản trước</a>, sau đó quay lại chọn ví cho tổ chức.</p>
+                <>
+                  <p>Tài khoản đang đăng nhập chưa có ví đã liên kết. Ví đang kết nối trong trình duyệt chưa đủ để chọn làm ví đại diện.</p>
+                  <a className="button button--primary" href="#/account" target="_blank" rel="noreferrer">Liên kết ví với tài khoản</a>
+                  <p>Sau khi liên kết bằng chữ ký, quay lại đây và bấm “Tải lại danh sách ví”. Ví đã thuộc tài khoản khác không thể được gán qua bước này.</p>
+                </>
               )}
               {wallets.length > 0 && (
                 <>

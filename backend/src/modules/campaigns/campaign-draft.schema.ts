@@ -8,6 +8,7 @@ const criterionSchema = z
   .strict();
 
 const milestoneFields = {
+  budgetUnits: z.string().regex(/^[1-9][0-9]{0,77}$/).refine((value) => /^[1-9][0-9]{0,77}$/.test(value) && BigInt(value) <= (1n << 256n) - 1n, "Budget exceeds uint256"),
   title: z.string().trim().min(1).max(200),
   description: z.string().trim().min(1),
   acceptanceCriteria: z.array(criterionSchema).min(1),
@@ -34,14 +35,15 @@ export const createCampaignDraftSchema = z
     description: z.string().trim().min(1),
     milestones: z.array(milestoneSchema).min(1),
   })
-  .strict();
+  .strict()
+  .refine((input) => input.milestones.reduce((sum, milestone) => sum + (/^[1-9][0-9]{0,77}$/.test(milestone.budgetUnits) ? BigInt(milestone.budgetUnits) : 0n), 0n) <= (1n << 256n) - 1n, { message: "Goal exceeds uint256", path: ["milestones"] });
 
 export type CreateCampaignDraftInput = z.infer<
   typeof createCampaignDraftSchema
 >;
 
 export const updateCampaignDraftSchema = createCampaignDraftSchema
-  .extend({
+  .safeExtend({
     expectedRevision: z.number().int().min(1).max(2147483646),
     milestones: z
       .array(milestoneSchema.safeExtend({ id: z.string().uuid().optional() }))

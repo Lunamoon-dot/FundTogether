@@ -1,5 +1,10 @@
 # FundTogether — Giải thích Mốc 3: Contract Hardening
 
+> **Quyết định phạm vi mới nhất (2026-10-04):** MVP dùng resolver được cấp quyền,
+> sau các bước kiểm tra hệ thống. Hội đồng 2/3 và ResolverManager để post-MVP.
+> Các đoạn chọn 2/3 cho MVP bên dưới thuộc quyết định cũ, đã được thay thế;
+> phần cơ chế hội đồng chỉ còn là tài liệu tham khảo cho post-MVP.
+
 > Mốc này đánh giá prototype contract và tìm lỗi trước khi lấy ABI/event làm nền cho hệ thống Web2. Đây là giải thích quy trình, không phải audit hay xác nhận contract hiện an toàn.
 
 ## 1. Hardening giải quyết câu hỏi nào?
@@ -205,7 +210,7 @@ Nguồn: [Process — Mốc 3 và Final Development Order](../FundTogether_v0.2_
 
 ## MVP baseline alignment
 
-Hardening phải kiểm tra permissionless timeout, không release vượt budget, không claim refund hai lần, bond coverage theo maximum exposure, event đầy đủ cho indexer và quyền resolver trong phạm vi MVP. Committee 2/3 đã chọn cho MVP nhưng chưa có code; không đồng nhất với Safe còn hoãn. AccessControl admission/versioning đã có; EIP-712 vẫn hoãn. Timeout/recovery ngoài funding failure và unchallenged settlement chưa triển khai.
+Hardening phải kiểm tra permissionless timeout, không release vượt budget, không claim refund hai lần, bond coverage theo maximum exposure, event đầy đủ cho indexer và quyền resolver trong phạm vi MVP. Committee 2/3 để post-MVP và chưa có code; không đồng nhất với Safe còn hoãn. AccessControl admission/versioning đã có; EIP-712 vẫn hoãn. Timeout/recovery ngoài funding failure và unchallenged settlement chưa triển khai.
 
 ## Rà soát mốc và hướng Arc — 2026-10-03
 

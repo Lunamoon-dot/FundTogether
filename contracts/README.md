@@ -1,5 +1,26 @@
 # FundTogether Contracts
 
+## Approved MVP milestone boundary — 2026-10-05
+
+`src/FundTogetherMvp.sol` is a new-deployment variant of the prototype described
+below. The existing resolver admits evidence and handles one final case per
+version with fixed 7-day response and 7-day resolution windows. CONTINUE keeps
+the original review, RESUBMIT requires a fresh version/admission/review, and
+STOP/timeout refunds unreleased donor escrow while returning bond without slash.
+Legacy verifier entrypoints revert in this variant; separate verifier actors,
+appeals and penalties are post-MVP. See [the approved policy](../docs/mvp-milestone-completion.md).
+
+New recovery source credits bond for organizer-only `claimBond` separately from
+terminal transitions. `refundAccounting` distinguishes dust from unclaimed rights
+without donor loops. Constructor requires a nonzero public deployment ID. See
+[financial recovery](../docs/financial-recovery.md).
+
+Source and prepared regression tests compile; behavior is not yet tested for
+this variant. The existing application deployment/ABI is unchanged. Evidence
+storage, case indexing and signing UI must be integrated before enabling it.
+
+## Existing prototype
+
 This directory contains the Foundry contract prototype. `FundTogether` manages
 multiple campaigns with separate accounting in one contract. Implemented flows
 include approval, publication, token donations, organizer bond locking and
@@ -35,7 +56,13 @@ submodules in `lib/`: OpenZeppelin Contracts v5.4.0 and forge-std v1.17.0.
 ```text
 contracts/
 ├── src/
-│   └── FundTogether.sol             # Protocol implementation
+│   ├── FundTogether.sol             # Composes the protocol modules
+│   ├── FundTogetherConfigured.sol   # Token restriction and atomic draft submission
+│   └── modules/
+│       ├── FundTogetherBase.sol     # Shared storage, roles, events and accounting helpers
+│       ├── FundTogetherFunding.sol  # Creation, approval, bond, donations and refunds
+│       ├── FundTogetherMilestones.sol # Activation, challenge and settlement
+│       └── FundTogetherEvidence.sol # Evidence versions, verification and timeouts
 ├── test/
 │   ├── mocks/
 │   │   ├── MockUSDC.sol             # Mintable test token
@@ -55,7 +82,9 @@ contracts/
 │           ├── FundTogetherCriteria.t.sol
 │           ├── FundTogetherSettlement.t.sol
 │           ├── FundTogetherVerifier.t.sol
-│           └── FundTogetherRefund.t.sol
+│           ├── FundTogetherRefund.t.sol
+│           ├── FundTogetherTimeout.t.sol
+│           └── FundTogetherConfigured.t.sol
 ├── lib/                            # External dependencies
 ├── foundry.toml
 ├── foundry.lock
@@ -72,9 +101,33 @@ Manual goal/bond arguments were replaced by the committed budget list. The ABI
 is still under development until dispute resolution and recovery are
 implemented; generated integration artifacts must track the exact contract build.
 
-Deployment scripts will go in `script/` when an actual deployment flow is added.
-The single protocol contract keeps state transitions and fund custody together;
-splitting it into modules requires a concrete ownership and authority design.
+Local deployment uses `../backend/scripts/deploy-local.cjs` and targets
+`FundTogetherConfigured`. The modules are abstract Solidity base contracts,
+compiled into that single deployed contract. They share one storage instance,
+one AccessControl role store and one ReentrancyGuard. They are not separately
+deployed services, proxies or external library calls.
+
+Keep all storage declarations and enum ordering in `FundTogetherBase`.
+Funding, milestones and evidence inherit this common base directly; they do not
+inherit one another. The base owns the internal deadline, refund snapshot and
+bond return helpers needed by multiple flows. New behavior belongs in its
+responsible module; shared helpers belong in the base only when needed across
+flows. Solidity callers reference enums through `FundTogetherBase.CampaignState`
+(and the other base enums); instance calls still use `FundTogether`.
+
+Donor escrow and organizer bond remain separately accounted for at one address.
+Only authorized, state-checked entry points can move funds: organizer bond
+locking, donor contribution/refund, eligible milestone settlement and terminal
+bond return. Failed transfers revert the complete transaction; claim flags and
+state transitions prevent repeat payments. CHALLENGED recovery and persistent
+token transfer failures remain the limitations described above.
+
+The 2026-10-05 module refactor preserves function/event/error ABI encoding and
+storage layout. Enum `internalType` names now identify `FundTogetherBase`.
+Runtime instructions are identical to the pre-refactor build after removing
+compiler metadata, but metadata changes the full bytecode hash. Existing local
+deployment manifests and their ABI remain tied to the existing deployment;
+regenerate them together only when intentionally deploying a new build.
 
 ## Run locally
 

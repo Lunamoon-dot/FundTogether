@@ -1,5 +1,10 @@
 # FundTogether — Rà soát 10 mốc và hướng Arc
 
+> **Quyết định phạm vi mới nhất (2026-10-04):** MVP dùng resolver được cấp quyền,
+> sau các bước kiểm tra hệ thống. Hội đồng 2/3 và ResolverManager để post-MVP.
+> Các đoạn chọn 2/3 cho MVP bên dưới thuộc quyết định cũ, đã được thay thế;
+> phần cơ chế hội đồng chỉ còn là tài liệu tham khảo cho post-MVP.
+
 > Ngày: 2026-10-03
 > Phạm vi: đối chiếu tài liệu, source/config hiện tại và Arc docs chính thức.
 > Không chạy lại runtime tests/build, deploy hoặc cài toolchain trong lần rà này.
@@ -29,7 +34,7 @@ hoặc cấu hình FE/BE tự động chỉ bằng việc cập nhật tài li�
 | 5 Indexer | TODO | Tên event thực tế; committed-block finality; USDC duplicate streams; RPC range/retry | ABI/address/start block; idempotent projection/checkpoint/replay |
 | 6 Evidence | IN_PROGRESS | Restricted originals/public redactions; schema parser đã có; hash/report/version độc lập | Authorized immutable storage, file checks, freeze/hash, rule report |
 | 7 Frontend journeys | TODO | Admission trước review; một USDC balance có reserve gas; final/failed/indexed riêng | Nối wallet → contract → indexer/API, success/failure UX |
-| 8 Integrated MVP | TODO | Không đẩy committee 2/3 sau MVP; thêm Arc acceptance gate | Complete journeys và failure recovery trên mạng đích |
+| 8 Integrated MVP | TODO | Hoãn committee 2/3 đến post-MVP; thêm Arc acceptance gate | Complete journeys và failure recovery trên mạng đích |
 | 9 Reputation | TODO — sau MVP | Không suy donation/identity từ balance/USDC logs | Chờ dữ liệu lịch sử đáng tin cậy |
 | 10 Research | TODO — sau MVP | Đo full journey; receipt fees/native units; tách testnet/mainnet | Dataset/metrics/reproducible experiments |
 
@@ -46,7 +51,7 @@ ownership validation. Các kết quả build/test cũ vẫn là lịch sử tron
 | Giải ngân | Activate trả budget | Settlement thành công mới trả budget |
 | Review | 72 giờ là ví dụ/từ submit | 72 giờ đã chốt, từ verifier accept |
 | Verifier | Optional nhận định | Assigned role admission/versioning đã có |
-| Resolver | Trusted resolver là toàn bộ MVP | Deployer approval hiện tại; arbitration committee 2/3 đã chọn, chưa có |
+| Resolver | Trusted resolver là toàn bộ MVP | Deployer approval hiện tại; resolver được cấp quyền cho MVP; committee 2/3 để post-MVP |
 | Evidence | Public-only | Restricted originals + public redacted derivatives |
 | Failure/refund | Hai loại failure mặc nhiên đã freeze; terminal refund coi như đầy đủ | Taxonomy/policy sau FUNDED OPEN; pre-FUNDED full snapshot/pull claim có code |
 | Networks | Sepolia là bước mặc định kế tiếp | Arc testnet ưu tiên, Sepolia dự phòng |

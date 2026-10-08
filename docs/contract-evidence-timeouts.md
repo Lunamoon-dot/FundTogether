@@ -1,5 +1,12 @@
 # Evidence timeout and recovery defaults
 
+**2026-10-05 amendment:** [MVP milestone completion](./mvp-milestone-completion.md)
+keeps these prototype activation/evidence/admission limits, but new MVP deployment
+uses the existing resolver instead of assigned verifier admission. Case response
+and resolution add fixed 7-day windows; STOP/timeout uses the same no-slash
+unreleased-escrow refund and separate bond return. The prototype details below
+do not imply that old deployed campaigns acquired the new case exits.
+
 Date: 2026-10-04. The user authorized reasonable, testable prototype defaults.
 These values are Solidity constants, not admin-editable durations. Existing
 deployments would need redeployment; no upgrade or live deployment is claimed.
@@ -58,17 +65,36 @@ finalization; claim flags prevent repeated refunds.
 
 ## Verification scope
 
-The initial slice was verified by compilation only. A subsequent 2026-10-04
-readiness review ran the existing suite: 128 tests passed and one failed. The
-failing test, `testFuzzRejectedVersionsRetainHistory`, assumes up to eight
-rejections and unchanged escrow/bond balances, conflicting with the new
-three-submission limit and terminal failure/bond return. No timeout-specific
-tests were added during the review; runtime financial safety remains unverified.
-Before integration,
-verify deadline-minus-one/exact/plus-one boundaries; all three rejection/expiry
-rounds; reassignment without extension; old-version decisions; partial-release
-refunds across multiple donors; rounding; failed transfers; callbacks; repeated
-finalization/claims; and isolation of campaigns sharing one token.
+The initial compilation-only slice and readiness review (128 passing tests,
+one outdated test failing) are retained in PROJECT_PROGRESS.md as history.
+On 2026-10-04, the rejection-history test was corrected to the approved
+MAX_SUBMISSIONS limit and its distinct intermediate/terminal financial outcomes.
+Production contract code and financial rules were not changed.
+
+The new [timeout suite](../contracts/test/unit/FundTogether/FundTogetherTimeout.t.sol)
+contains 24 tests, including ten fuzz tests. The full Foundry suite passed
+153 tests across 12 suites with zero failures/skips, using
+`forge test --summary --fuzz-runs 1024`; each of its 14 fuzz tests ran 1,024 cases.
+
+Verified cases include:
+
+- Deadline-minus-one/exact/plus-one activation, evidence, admission and correction.
+- Expiry without an assigned verifier and delayed execution starting a fresh
+  correction window; reassignment/revocation without extending admission.
+- Fresh assignments, retained hash/status/deadline/decision history, mixed
+  rejection/expiry sequences through version 3, and old-version rejection.
+- Terminal failure events, bond recipient, snapshot and repeated-action guards;
+  accepted/challenged evidence and completed campaigns cannot use these timeouts.
+- All four terminal paths after partial release, two-donor proportional refunds
+  in either claim order, rounding/zero claims, unexpected tokens and isolation.
+- Failed bond/claim transfers with rollback and retry, and token callbacks
+  attempting nested timeout/refund calls during bond return.
+
+The failed-bond tests confirm an existing recovery limitation: a permanently
+blocked organizer recipient prevents the atomic terminal action and therefore
+prevents opening donor refunds. Separate bond recovery is still TODO. Passing
+these unit/fuzz tests does not establish production token compatibility,
+deployment, browser interaction or integrated event indexing.
 
 Use deadline getters and Foundry time advancement rather than lowering production
 constants for tests. Challenge screening, resolver committee/quorum, appeals,

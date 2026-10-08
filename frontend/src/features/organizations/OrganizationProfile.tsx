@@ -25,8 +25,8 @@ export function OrganizationProfile({ organizationId, userId }: { organizationId
         <div className="organization-card-meta"><span>Chưa xác minh</span>
           <span>Tạo ngày {new Intl.DateTimeFormat('vi-VN').format(new Date(organization.createdAt))}</span></div>
         <a className="button button--primary organization-workspace-link"
-          href={`#/organizations/${organization.id}/workspace/campaigns`} target="_blank" rel="noopener noreferrer">
-          Quản lý campaign ↗
+          href={`#/organizations/${organization.id}/workspace/campaigns`}>
+          Quản lý campaign
         </a>
       </section>
       <OrganizationWallet key={`${userId}:${organization.id}`} organization={organization} userId={userId} />
