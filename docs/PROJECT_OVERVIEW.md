@@ -11,8 +11,37 @@ outputs and flexible business scope. Read it before reasoning or finalizing a
 project decision; then verify the relevant baseline and source. On 2026-10-08 the
 user selected staged funding before execution, with review before subsequent
 funding (flow B), and evidence-verification workflow as the core design focus.
-Detailed financial conditions and implementation remain pending. Bond removal
-remains a proposal; the deployed reimbursement baseline has not changed.
+On 2026-10-09 the user approved B-D01–B-D10 for a local/pilot deployment:
+no bond, one advance per stage, bounded substantive review/cases, actual returns,
+fixed base refunds plus cumulative supplements. B implementation is in progress;
+the deployed reimbursement baseline and its bond obligations have not changed.
+
+Preparation for B on 2026-10-09 now includes two synthetic gift campaign plans,
+12 original/public fixture packages with byte hashes, eight integer accounting
+traces and [an approved pilot specification](./workflow-b-spec.md), with
+[financial rules](./workflow-b-financial-rules.md). B-D01–B-D10 are APPROVED_FOR_LOCAL_PILOT;
+the offline generator/trace is research tooling, not product financial behavior.
+B contract funding/advance/evidence/case/timeout/return/refund is implemented and
+unit/fuzz tested. Standalone ABI and local deployment31338/RPC9547 exist, with
+genesis/code/anchor/instance/timer verification and atomic snapshots; the final
+contract regression280 PASS. B schema/domain/action API, organization/evidence
+review, private/redacted storage and isolated event indexer are implemented;
+backend152 tests and50 HTTP checks pass. B frontend mode uses a generated API
+client and separate deployment context, with gift planning, organizer actions,
+evidence reports, staff/resolver review, public case and refund views. Frontend113
+tests, lint and A/B builds pass; Edge mocked-API checks14+18 pass. A disposable
+fork HTTP journey completed G1 and all three G2 stages (including a supplement),
+with38 receipts, canonical indexer projections and balance checks. Additional
+failure171/waiting94 receipts pass, including rounding, failed-transfer retry,
+bounded review/timeouts and actual unused returns. Cold chain/DB/files recovery
+and six controlled A/B contract comparison paths pass. Neutral reviewer PDFs/PNGs
+and a local runbook are prepared; human wallet/reviewer acceptance remains pending.
+Browser fixture checks do
+not constitute manual wallet acceptance. See
+[acceptance tracking](./workflow-b-acceptance.md) for verified tooling tests and
+the still-pending T01–T18 system/manual acceptance. The
+[code implementation plan](./workflow-b-code-plan.md) has been approved as required
+by GOAL.md; it targets isolated chain31338/RPC9547 and B DB/storage.
 
 On 2026-10-09 the user clarified that buying/distributing gifts is the first
 campaign type, not the definition of all FundTogether campaigns. Keep activity
@@ -408,8 +437,12 @@ copy action, configured network/chain ID and native balance read from the RPC.
 Each card reads the stored address and chain independently of the current browser
 connection. Loading/error/unsupported-network states, manual refresh and 30-second
 polling are present; RPC errors do not imply a zero balance. Cache keys include
-account identity. The local RPC is http://127.0.0.1:8545 with an eight-second timeout.
-MockUSDC balance display awaits configured token deployment. Bond information
+account identity. The configured local RPC is8545 for A or9547 for B, with an
+eight-second timeout. As of2026-10-09, each card also reads MockUSDC from the
+active deployment's token address with6 decimals, separately from ETH for gas.
+Token loading/errors and zero balances are distinguished; an unsupported chain
+does not read the active deployment's token. Refresh updates both balances.
+Bond information
 belongs to organizer campaign management; it is not part of this personal view.
 
 Local campaign submission now uses FundTogetherConfigured with an immutable configured MockUSDC and organizer-scoped draft keys. FE/BE share generated ABI/deployment files under backend/src/blockchain/generated. Authenticated submission prepare/get/sync endpoints freeze private draft metadata and verify campaign/bond state directly on chain; campaign listing retains submitted entries. Resolver review and organizer publication use wallet signatures. Canonical CampaignPublished indexing gates the public feed/detail. See [campaign submission](./campaign-submission.md) and [publication/indexer](./campaign-publication-indexer.md). Donate/refund UI and the full evidence/dispute journey remain pending.

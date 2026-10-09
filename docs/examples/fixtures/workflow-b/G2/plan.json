@@ -1,0 +1,57 @@
+{
+  "synthetic": true,
+  "campaignKey": "G2",
+  "activityType": "GIFT_DISTRIBUTION",
+  "channel": "DIRECT",
+  "organizer": "Synthetic Organizer A",
+  "recipientScope": "Three separate synthetic beneficiary groups; individual handover",
+  "eligibility": "Synthetic households marked eligible before funding; no wallet required",
+  "fundingDurationSeconds": 604800,
+  "policyHash": "0x28f8f177bf9e814ff35936605588aeffb1157874254c3d8ccec7e61965cfd608",
+  "criteriaHash": "0x7977c45efef60c3f47b41bdfc515586e933aa264746b4dd68f2d23ff3369541e",
+  "goal": "3300000000",
+  "stages": [
+    {
+      "stage": 0,
+      "budget": "1100000000",
+      "packages": 50,
+      "goods": "1000000000",
+      "transportation": "100000000",
+      "executionSlot": "Separate stage 1, within 30 days of its advance",
+      "tasks": [
+        "purchase",
+        "inventory",
+        "transport",
+        "handover"
+      ]
+    },
+    {
+      "stage": 1,
+      "budget": "1100000000",
+      "packages": 50,
+      "goods": "1000000000",
+      "transportation": "100000000",
+      "executionSlot": "Separate stage 2, within 30 days of its advance",
+      "tasks": [
+        "purchase",
+        "inventory",
+        "transport",
+        "handover"
+      ]
+    },
+    {
+      "stage": 2,
+      "budget": "1100000000",
+      "packages": 50,
+      "goods": "1000000000",
+      "transportation": "100000000",
+      "executionSlot": "Separate stage 3, within 30 days of its advance",
+      "tasks": [
+        "purchase",
+        "inventory",
+        "transport",
+        "handover"
+      ]
+    }
+  ]
+}

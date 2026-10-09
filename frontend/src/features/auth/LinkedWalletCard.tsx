@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { useBalance, useConfig } from 'wagmi'
-import { formatUnits } from 'viem'
+import { useBalance, useConfig, useReadContract } from 'wagmi'
+import { erc20Abi, formatUnits } from 'viem'
 import type { Address } from 'viem'
+import deployment from '../../lib/web3/deployment-context'
 
 export function LinkedWalletCard({ address, chainId, userId }: {
   address: string
@@ -16,6 +17,16 @@ export function LinkedWalletCard({ address, chainId, userId }: {
     chainId,
     scopeKey: userId,
     query: { enabled: Boolean(chain), retry: false, staleTime: 0, refetchInterval: 30_000 },
+  })
+  const supportsToken = chain?.id === deployment.chainId
+  const tokenBalance = useReadContract({
+    address: deployment.tokenAddress,
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: [address as Address],
+    chainId: deployment.chainId,
+    scopeKey: `${userId}:${deployment.deploymentId}`,
+    query: { enabled: supportsToken, retry: false, staleTime: 0, refetchInterval: 30_000 },
   })
 
   async function copyAddress() {
@@ -44,14 +55,19 @@ export function LinkedWalletCard({ address, chainId, userId }: {
         ) : balance.isPending ? (
           <p role="status">Đang tải số dư…</p>
         ) : balance.data ? (
-          <p>Số dư: <strong>{formatUnits(balance.data.value, balance.data.decimals)} {balance.data.symbol}</strong></p>
+          <p>Phí giao dịch: <strong>{formatUnits(balance.data.value, balance.data.decimals)} {balance.data.symbol}</strong></p>
         ) : null}
-        {chain && <button className="button button--secondary" disabled={balance.isFetching}
-          onClick={() => void balance.refetch()}>
-          {balance.isFetching ? 'Đang tải…' : 'Tải lại số dư'}
+        {chain && <button className="button button--secondary" disabled={balance.isFetching || tokenBalance.isFetching}
+          onClick={() => void Promise.all([balance.refetch(), ...(supportsToken ? [tokenBalance.refetch()] : [])])}>
+          {balance.isFetching || tokenBalance.isFetching ? 'Đang tải…' : 'Tải lại số dư'}
         </button>}
       </div>
-      {chain?.id === 31337 && <p className="wallet-note">ETH trên mạng local dùng để trả phí giao dịch thử nghiệm.</p>}
+      {supportsToken && <div aria-live="polite">
+        {tokenBalance.isError ? <p role="alert">Không tải được số dư MockUSDC. Thử tải lại số dư.</p>
+          : tokenBalance.isPending ? <p role="status">Đang tải số dư MockUSDC…</p>
+            : tokenBalance.data !== undefined ? <p>Số dư quyên góp: <strong>{formatUnits(tokenBalance.data, deployment.tokenDecimals)} MockUSDC</strong></p> : null}
+      </div>}
+      {(chain?.id === 31337 || chain?.id === 31338) && <p className="wallet-note">ETH dùng để trả phí giao dịch; MockUSDC dùng để quyên góp trên mạng thử nghiệm.</p>}
       {copyState === 'copied' && <span className="public-sr-only" role="status">Đã sao chép địa chỉ ví.</span>}
       {copyState === 'error' && <p role="alert">Không sao chép được. Bạn có thể chọn địa chỉ và sao chép thủ công.</p>}
     </li>

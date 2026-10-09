@@ -1,7 +1,7 @@
 # Định hướng nghiên cứu khoa học — FundTogether
 
 > Ngày ghi nhận: 2026-10-08.
-> Cập nhật: 2026-10-09 — mua và trao quà là loại hình campaign đầu tiên.
+> Cập nhật: 2026-10-09 — loại hình đầu tiên và gói B-D01–B-D10 đã duyệt cho pilot.
 > Trạng thái: Định hướng do người dùng yêu cầu lưu và ưu tiên đọc.
 > Phạm vi: mục tiêu, nội dung và kết quả nghiên cứu dự kiến; các quyết định nghiệp vụ còn mở.
 
@@ -60,9 +60,9 @@ thực nghiệm; thay đổi các trục này cần xem xét lại tên và đ�
 
 | Vấn đề | Hướng thảo luận và giới hạn hiện tại |
 |---|---|
-| Bond | Người dùng nghiêng về bỏ bond vì giá trị chưa tương xứng với gánh nặng vốn. Đây là đề xuất cần đặc tả tác động; code/baseline có bond chưa được thay đổi bởi lượt lưu này. |
+| Bond | B-D02 đã duyệt cho pilot B: không bond; baseline/deployment A có bond giữ nguyên nghĩa vụ. B có deployment local và hành trình tự động; nghiệm thu người dùng còn thiếu. |
 | Xác thực tổ chức | Nghiên cứu xác thực tổ chức trước khi tham gia. Phải phân biệt danh tính/thẩm quyền với thẩm định campaign và nghiệm thu từng hoạt động; xác thực không tự bảo đảm sử dụng tiền đúng. |
-| Dòng vốn | Người dùng chọn hướng B ngày 2026-10-08: cấp tiền theo từng đợt để tổ chức thực hiện, nghiệm thu đợt trước trước khi cấp tiếp. Số tiền/tỷ lệ cấp, điều kiện lần đầu, cửa sổ phản đối và xử lý dư/thiếu còn cần đặc tả. Code hiện vẫn giải ngân sau nghiệm thu. |
+| Dòng vốn | B-D01–B-D10 đã duyệt ngày 2026-10-09: cấp đúng budget/đợt sau đủ goal và eligibility; nghiệm thu trước cấp tiếp; các hạn và return/refund theo spec B. Contract/BE/FE B có code/test và G1/G2/failure chạy tự động; MetaMask/người dùng chưa nghiệm thu. Code A vẫn giải ngân sau nghiệm thu. |
 | Xét duyệt | Người dùng xác định nghiệp vụ xác minh và workflow của nó là trọng tâm. Có thể điều chỉnh số người, vai trò và trách nhiệm; cần phân biệt tiếp nhận hồ sơ với đánh giá đạt tiêu chí, không coi donor im lặng là bằng chứng hoạt động đã hoàn thành. |
 | Bằng chứng | Có thể điều chỉnh loại tài liệu và cách kiểm tra. Hash xác nhận tính toàn vẹn nội dung, không chứng minh sự thật ngoài đời. Nhãn tham chiếu cần có nguồn và tiêu chí rõ ràng. |
 | Phản đối/hoàn tiền | Có thể điều chỉnh điều kiện, thời hạn và cách xử lý; phải chốt hệ quả tài chính. Phần đã giải ngân không tự được thu hồi; không hứa hoàn toàn bộ tiền khi chỉ còn một phần trong escrow. |
@@ -135,6 +135,27 @@ hay nhiều contract theo loại. Khi thêm loại hình, phải đánh giá khu
 có phù hợp và chốt riêng các thay đổi ảnh hưởng quyền, dòng tiền hoặc trạng
 thái. Không mặc định mọi loại từ thiện dùng cùng lịch cấp tiền hoặc bằng chứng.
 
+### 6.4. Gói B-D01–B-D10 được duyệt — 2026-10-09
+
+Người dùng đồng ý bộ [đặc tả B](./workflow-b-spec.md) và
+[quy tắc tài chính B](./workflow-b-financial-rules.md), yêu cầu tiếp tục gói
+B-D01–B-D10. Đây là phê duyệt rule cho local/pilot, thay các chi tiết còn mở
+của hướng B ghi ở 6.1; không phải chứng minh phù hợp thực tế hoặc ready tiền thật.
+
+Đã chốt: một resolver; staff xác thực tổ chức; no-bond, goal=sum budgets;
+eligibility đầu, advance một lần/đợt; kết luận theo criterion; tối đa ba version;
+deadline/hard stop hữu hạn; một case/version, không appeal; unused phải return
+thực nhận; base refund cố định + supplement tích lũy cho return muộn; không
+expiry/sweep; nghiệm thu cuối và refund outcome tách nhau. Xem spec cho giá trị
+thời hạn và rủi ro availability, reviewer sai/mất ví/case cuối đã được trình.
+
+GOAL.md yêu cầu review kế hoạch code sau phê duyệt spec; người dùng đã duyệt
+kế hoạch bằng “tôi duyệt mà”. Triển khai trong chat
+hiện tại, môi trường B riêng; không đổi obligations, account hoặc dữ liệu A.
+Hash/chữ ký vẫn không chứng minh sự thật ngoài đời. Khảo sát, dữ liệu nhãn độc
+lập và nghiệm thu MetaMask vẫn cần thực hiện. Test contract/integration đã có
+bằng chứng theo [acceptance](./workflow-b-acceptance.md), không thay khảo sát.
+
 ## 7. Cách chốt và đánh giá một thay đổi
 
 1. Xác định vấn đề thực tế, nhóm người dùng và giả định cần kiểm chứng.
@@ -143,13 +164,14 @@ thái. Không mặc định mọi loại từ thiện dùng cùng lịch cấp t
 4. Chọn mô hình tham chiếu, kịch bản, chỉ số và cách thu thập dữ liệu trước khi thực nghiệm.
 5. Ghi kết quả, điều kiện áp dụng và giới hạn; không đồng nhất test kỹ thuật với sự phù hợp ngoài đời.
 
-Hướng nghiên cứu, nội dung form và lựa chọn luồng B đã được lưu. Khảo sát người
-dùng thực tế, dataset có nhãn, đặc tả/triển khai luồng B và kết quả so sánh vẫn
-cần thực hiện.
+Hướng nghiên cứu, nội dung form, lựa chọn luồng B và đặc tả pilot đã được lưu/phê
+duyệt. B đã triển khai local và có so sánh contract A/B trên giả định chung;
+khảo sát thực tế, dataset nhãn độc lập và nghiệm thu người dùng vẫn cần thực hiện.
 
 ## 8. Tài liệu cần đối chiếu sau khi đọc định hướng
 
 - [Đề xuất workflow trao quà](./proposed-gift-workflow.md): bản thảo ngày 2026-10-09 về hướng B, kiểu bàn giao, tiêu chí xác minh, vai trò blockchain và thứ tự triển khai; chưa là đặc tả đã duyệt.
+- [Đặc tả pilot B](./workflow-b-spec.md), [financial rules B](./workflow-b-financial-rules.md) và [kế hoạch code](./workflow-b-code-plan.md): gói quyết định đã duyệt và kế hoạch triển khai để review.
 - [Kiểm chứng nghiệp vụ và củng cố MVP](./business-validation-and-mvp-hardening.md): câu hỏi B01–B08 và tiêu chí chuyển giai đoạn.
 - [Tổng quan hiện tại](./PROJECT_OVERVIEW.md) và [tiến độ](./PROJECT_PROGRESS.md): implementation và bằng chứng kiểm tra.
 - [Quy tắc tài chính](./financial-rules.md), [protocol](./protocol-spec.md), [state machine](./state-machine.md) và [MVP milestone](./mvp-milestone-completion.md): baseline tiền, quyền và trạng thái.

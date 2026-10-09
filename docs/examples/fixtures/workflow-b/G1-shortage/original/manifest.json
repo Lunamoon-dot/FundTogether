@@ -1,0 +1,139 @@
+{
+  "schemaVersion": "workflow-b-offline-fixture/1",
+  "synthetic": true,
+  "context": {
+    "environment": "offline",
+    "policyStatus": "DRAFT",
+    "fixtureDeploymentId": "workflow-b-review-v1",
+    "campaignKey": "G1",
+    "activityType": "GIFT_DISTRIBUTION",
+    "channel": "INSTITUTION",
+    "stage": 0,
+    "submissionVersion": "1",
+    "checklistVersion": "gift-review-draft-v1"
+  },
+  "planHash": "0x14be96e34ddba6a8a7678924fad518f4764ecb32c5e96b1d42b54ac6bd85753a",
+  "criteriaHash": "0x140b33448756294c565d6cae5193ad780cd09c930004567385fd88903ca3b4b1",
+  "policyHash": "0x28f8f177bf9e814ff35936605588aeffb1157874254c3d8ccec7e61965cfd608",
+  "parentPackageKey": null,
+  "report": {
+    "budget": "2200000000",
+    "campaignSpent": "2200000000",
+    "unused": "0",
+    "outcomes": [
+      {
+        "criterionId": "G1-C1",
+        "documentIds": [
+          "inventory.json",
+          "delivery.json",
+          "photo.svg"
+        ]
+      },
+      {
+        "criterionId": "G1-C2",
+        "documentIds": [
+          "invoice.json",
+          "payment-proof.json",
+          "budget.json"
+        ]
+      },
+      {
+        "criterionId": "G1-C3",
+        "documentIds": [
+          "delivery.json",
+          "contact-check.json",
+          "photo.svg"
+        ]
+      },
+      {
+        "criterionId": "G1-C4",
+        "documentIds": [
+          "budget.json"
+        ]
+      }
+    ]
+  },
+  "visibility": "RESTRICTED_ORIGINAL",
+  "documents": [
+    {
+      "documentId": "invoice.json",
+      "kind": "INVOICE",
+      "criterionIds": [
+        "G1-C2"
+      ],
+      "path": "G1-shortage/original/invoice.json",
+      "mediaType": "application/json",
+      "byteSize": 244,
+      "sha256": "0xa0e971a0dcdd36a0432321ba2e8fec3984b868db438fd6886cde32d2f52f38ab"
+    },
+    {
+      "documentId": "payment-proof.json",
+      "kind": "PAYMENT_PROOF",
+      "criterionIds": [
+        "G1-C2"
+      ],
+      "path": "G1-shortage/original/payment-proof.json",
+      "mediaType": "application/json",
+      "byteSize": 283,
+      "sha256": "0xb3d7728aaaa454a29458c87c35227954f4e68c594ae04b83a510a9106aecf49b"
+    },
+    {
+      "documentId": "inventory.json",
+      "kind": "REPORT",
+      "criterionIds": [
+        "G1-C1"
+      ],
+      "path": "G1-shortage/original/inventory.json",
+      "mediaType": "application/json",
+      "byteSize": 166,
+      "sha256": "0xca22311203eb7fd39d2721d00551ec9f3d9c25efac9c6b30ee2af37a9ec7f917"
+    },
+    {
+      "documentId": "delivery.json",
+      "kind": "DELIVERY_RECORD",
+      "criterionIds": [
+        "G1-C1",
+        "G1-C3"
+      ],
+      "path": "G1-shortage/original/delivery.json",
+      "mediaType": "application/json",
+      "byteSize": 2481,
+      "sha256": "0xbeb0d77baabeb7b2062e03035ada6ddd0869f57c8d33b14081662d1a711c4545"
+    },
+    {
+      "documentId": "contact-check.json",
+      "kind": "REPORT",
+      "criterionIds": [
+        "G1-C3"
+      ],
+      "path": "G1-shortage/original/contact-check.json",
+      "mediaType": "application/json",
+      "byteSize": 312,
+      "sha256": "0xdb9400b8e9fdada59738e80109f6a7a32002520c03b40a9be9f1b69beae80a63"
+    },
+    {
+      "documentId": "budget.json",
+      "kind": "REPORT",
+      "criterionIds": [
+        "G1-C2",
+        "G1-C4"
+      ],
+      "path": "G1-shortage/original/budget.json",
+      "mediaType": "application/json",
+      "byteSize": 209,
+      "sha256": "0xcb2d173f48d2a63caf03de1a0b6b97853600412f0413be8ec82db4a2b1a006a3"
+    },
+    {
+      "documentId": "photo.svg",
+      "kind": "PHOTO",
+      "criterionIds": [
+        "G1-C1",
+        "G1-C3"
+      ],
+      "path": "G1-shortage/original/photo.svg",
+      "mediaType": "image/svg+xml",
+      "byteSize": 519,
+      "sha256": "0x16943868d9fa4c3a94e2c698a1af4d4b24b9341bd882f38882772b4cf46f04b0"
+    }
+  ]
+}

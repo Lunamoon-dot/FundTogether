@@ -1,0 +1,10 @@
+{
+  "synthetic": true,
+  "budget": "2200000000",
+  "campaignSpent": "2200000000",
+  "unused": "0",
+  "currency": "MockUSDC",
+  "minorUnit": 6,
+  "returnsActuallyReceived": "0",
+  "fundingSource": "CAMPAIGN"
+}

@@ -18,6 +18,8 @@ describe("wallet connections at account boundaries", () => {
       },
     ];
     const disconnect = jest.fn();
+    const cache = { cancelQueries: jest.fn(), removeQueries: jest.fn() };
+    let advance = false;
     const ref = { current: undefined as string | null | undefined };
     let hookIndex = 0;
     const effects: (() => void)[] = [];
@@ -38,6 +40,8 @@ describe("wallet connections at account boundaries", () => {
         useConnections: () => connections,
         useDisconnect: () => ({ disconnect }),
       },
+      "@tanstack/react-query": { useQueryClient: () => cache },
+      "../../lib/web3/deployment-context": { get isAdvance() { return advance; } },
       axios: { default: { isAxiosError: () => false } },
       "../../lib/api/auth": { getSession: () => new Promise(() => {}) },
       "../../lib/api/error": { getErrorMessage: () => "error" },
@@ -66,6 +70,7 @@ describe("wallet connections at account boundaries", () => {
     };
     render();
     expect(disconnect).toHaveBeenCalledWith({ connector });
+    expect(cache.removeQueries).not.toHaveBeenCalled();
     disconnect.mockClear();
     render();
     expect(disconnect).not.toHaveBeenCalled();
@@ -76,7 +81,15 @@ describe("wallet connections at account boundaries", () => {
     render();
     expect(disconnect).not.toHaveBeenCalled();
     session = null;
+    advance = true;
     render();
     expect(disconnect).toHaveBeenCalledWith({ connector });
+    expect(cache.cancelQueries).toHaveBeenCalledTimes(1);
+    expect(cache.removeQueries).toHaveBeenCalledTimes(1);
+    const filter = cache.removeQueries.mock.calls[0][0].predicate;
+    expect(filter({ queryKey: ["advance-review-workflow", "previous-user"] })).toBe(true);
+    expect(filter({ queryKey: ["campaigns", "baseline"] })).toBe(false);
+    render();
+    expect(cache.removeQueries).toHaveBeenCalledTimes(1);
   });
 });

@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import type { PropsWithChildren } from 'react'
 import axios from 'axios'
 import { useConnections, useDisconnect } from 'wagmi'
+import { useQueryClient } from '@tanstack/react-query'
+import { isAdvance } from '../../lib/web3/deployment-context'
 import { getSession } from '../../lib/api/auth'
 import type { AccountSession } from '../../lib/api/auth'
 import { getErrorMessage } from '../../lib/api/error'
@@ -23,11 +25,16 @@ export function AccountSessionProvider({ children }: PropsWithChildren) {
   const connections = useConnections()
   const { disconnect } = useDisconnect()
   const previousAccountId = useRef<string | null | undefined>(undefined)
+  const queryClient = useQueryClient()
 
   useEffect(() => {
     if (sessionLoading) return
     const accountId = session?.userId ?? null
     if (previousAccountId.current === accountId) return
+    if (isAdvance && previousAccountId.current !== undefined) {
+      void queryClient.cancelQueries({ predicate: q => String(q.queryKey[0]).startsWith('advance-') })
+      queryClient.removeQueries({ predicate: q => String(q.queryKey[0]).startsWith('advance-') })
+    }
     previousAccountId.current = accountId
 
     for (const connection of connections) {
@@ -40,7 +47,7 @@ export function AccountSessionProvider({ children }: PropsWithChildren) {
       )
       if (!belongsToAccount) disconnect({ connector: connection.connector })
     }
-  }, [session, sessionLoading, connections, disconnect])
+  }, [session, sessionLoading, connections, disconnect, queryClient])
 
   useEffect(() => {
     let active = true

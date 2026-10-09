@@ -1,0 +1,10 @@
+{
+  "synthetic": true,
+  "checkedPackages": 100,
+  "checkedContents": [
+    "rice-2kg",
+    "oil-1l",
+    "noodles-5packs"
+  ],
+  "checker": "Synthetic Organizer A"
+}

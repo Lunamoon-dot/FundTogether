@@ -1,0 +1,32 @@
+name: fundtogether-workflow-b
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${WORKFLOW_B_DATABASE_PASSWORD:?B database password required}
+      POSTGRES_DB: fundtogether_workflow_b
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - workflow-b-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fundtogether_workflow_b"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+  minio:
+    build: ../minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:?B storage access key required}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:?B storage password required}
+    ports:
+      - "127.0.0.1:9100:9000"
+      - "127.0.0.1:9101:9001"
+    volumes:
+      - workflow-b-minio:/data
+volumes:
+  workflow-b-postgres:
+  workflow-b-minio:

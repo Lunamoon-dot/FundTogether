@@ -20,6 +20,7 @@
 
 # Logs and local tooling
 .local/
+.playwright-cli/
 *.log
 .DS_Store
 .idea/

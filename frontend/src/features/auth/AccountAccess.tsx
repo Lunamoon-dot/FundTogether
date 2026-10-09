@@ -19,7 +19,7 @@ import type { AccountSession } from '../../lib/api/auth'
 import { createSiweMessage } from '../../lib/web3/siwe'
 import { requestWalletProof } from '../../lib/web3/wallet-proof'
 import { assertWalletRequestAvailable } from '../../lib/web3/wallet-confirmation'
-import deployment from '../../../../backend/src/blockchain/generated/deployment.local.json'
+import deployment from '../../lib/web3/deployment-context'
 import { getErrorMessage } from '../../lib/api/error'
 import { LinkedWalletCard } from './LinkedWalletCard'
 

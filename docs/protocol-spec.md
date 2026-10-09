@@ -5,6 +5,12 @@
 > **Updated:** 2026-10-06
 > **Source:** FundTogether v0.2 Process, Tech Stack and Threat Model
 
+**Scope as of 2026-10-09:** this document describes baseline A. The separately
+approved local pilot B uses advance funding and no bond; its authority and
+actions are in [workflow B specification](./workflow-b-spec.md). B implementation
+is in progress under [the approved code plan](./workflow-b-code-plan.md); A deployments and
+existing campaign obligations are not migrated by this documentation.
+
 **2026-10-05 approved amendment:** [MVP milestone completion](./mvp-milestone-completion.md)
 supersedes separate verifier/appeal/slash proposals below for MVP. The existing
 resolver admits evidence and decides CONTINUE / RESUBMIT / STOP; one final case

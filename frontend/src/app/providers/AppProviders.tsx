@@ -11,8 +11,7 @@ import {
   rabbyWallet,
 } from '@rainbow-me/rainbowkit/wallets'
 import { WagmiProvider, createConfig, http } from 'wagmi'
-import { foundry } from 'wagmi/chains'
-import deployment from '../../../../backend/src/blockchain/generated/deployment.local.json'
+import deployment, { activeChain } from '../../lib/web3/deployment-context'
 
 const connectors = connectorsForWallets(
   [
@@ -29,9 +28,9 @@ const connectors = connectorsForWallets(
 )
 
 const wagmiConfig = createConfig({
-  chains: [foundry],
+  chains: [activeChain],
   connectors,
-  transports: { [foundry.id]: http(deployment.rpcUrl, { timeout: 8_000, retryCount: 0 }) },
+  transports: { [activeChain.id]: http(deployment.rpcUrl, { timeout: 8_000, retryCount: 0 }) },
 })
 
 const queryClient = new QueryClient({

@@ -12,15 +12,10 @@ import { campaignAccessCondition } from "./evidence-access.service";
 import { EvidenceDraftsService } from "./evidence-drafts.service";
 import { EvidenceStorageService } from "./evidence-storage.service";
 import type { EvidenceDraftContent } from "./evidence.schema";
-
-// The installed ESM package is loaded by Node 24's require support; keep Nest's CommonJS config.
-const { fileTypeFromBuffer } = require("file-type") as {
-  fileTypeFromBuffer: (buffer: Uint8Array) => Promise<{ mime: string } | undefined>;
-};
-
-export const MAX_EVIDENCE_FILE_BYTES = 10 * 1024 * 1024;
-export const MAX_EVIDENCE_FILES = 20;
-export interface EvidenceUploadFile { buffer: Buffer; originalname: string; mimetype: string; }
+import { MAX_EVIDENCE_FILES, validateEvidenceFile } from "./evidence-file-validation";
+import type { EvidenceUploadFile } from "./evidence-file-validation";
+export { MAX_EVIDENCE_FILE_BYTES, MAX_EVIDENCE_FILES } from "./evidence-file-validation";
+export type { EvidenceUploadFile } from "./evidence-file-validation";
 
 @Injectable()
 export class EvidenceFilesService {
@@ -36,22 +31,17 @@ export class EvidenceFilesService {
     const draft = await this.drafts.get(campaignId, index, userId);
     if (draft.revision !== expectedRevision) throw new ConflictException("Draft changed; reload before uploading");
     if (draft.content.documents.length >= MAX_EVIDENCE_FILES) throw new BadRequestException("Maximum 20 files per evidence draft");
-    if (!file?.buffer.length || file.buffer.length > MAX_EVIDENCE_FILE_BYTES) throw new BadRequestException("File must be between 1 byte and 10 MiB");
-    let detected;
-    try { detected = await fileTypeFromBuffer(file.buffer); } catch { /* Treat malformed headers as an invalid file. */ }
-    if (!detected || !["application/pdf", "image/jpeg", "image/png"].includes(detected.mime) || detected.mime !== file.mimetype) {
-      throw new BadRequestException("File content must match its PDF/JPEG/PNG media type");
-    }
+    const mediaType = await validateEvidenceFile(file);
     const objectId = randomUUID();
     const document: EvidenceDraftContent["documents"][number] = {
       documentId: objectId, storageObjectId: objectId, kind,
-      originalName: file.originalname.replace(/[\\/\u0000-\u001f\u007f]/g, "_").slice(0, 200) || "document",
-      mediaType: detected.mime as EvidenceDraftContent["documents"][number]["mediaType"],
-      byteSize: file.buffer.length, sha256: `0x${createHash("sha256").update(file.buffer).digest("hex")}`,
+      originalName: file!.originalname.replace(/[\\/\u0000-\u001f\u007f]/g, "_").slice(0, 200) || "document",
+      mediaType,
+      byteSize: file!.buffer.length, sha256: `0x${createHash("sha256").update(file!.buffer).digest("hex")}`,
       visibility: "RESTRICTED_ORIGINAL", relatesToExpenseIds: [], relatesToCriterionIds: [],
     };
     try {
-      await this.storage.put(objectId, file.buffer, document.mediaType);
+      await this.storage.put(objectId, file!.buffer, document.mediaType);
       const [saved] = await this.database.update(evidenceDrafts).set({
         content: sql`jsonb_set(${evidenceDrafts.content}, '{documents}', (${evidenceDrafts.content}->'documents') || ${JSON.stringify([document])}::jsonb)`,
         revision: expectedRevision + 1, updatedAt: new Date(),

@@ -1,7 +1,12 @@
 import { UnauthorizedException } from "@nestjs/common";
 jest.mock("./auth.service", () => ({ AuthService: class AuthService {} }));
+jest.mock("@nestjs/config", () => ({ ConfigService: class {
+  constructor(private values: Record<string, unknown> = {}) {}
+  get(key: string) { return this.values[key]; }
+} }));
 import { AuthGuard } from "./auth.guard";
 import { AuthService } from "./auth.service";
+import { ConfigService } from "@nestjs/config";
 
 describe("AuthGuard", () => {
   const account = {
@@ -38,5 +43,15 @@ describe("AuthGuard", () => {
     await expect(guard.canActivate(context())).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
+  });
+
+  it("B accepts only its configured cookie even when A's cookie is present", async () => {
+    jest.mocked(authService.verifySession).mockResolvedValue(account as never);
+    const b = new AuthGuard(authService, new ConfigService({ authSessionCookieName: "ft_workflow_b_session" }));
+    await expect(b.canActivate(context("ft_session=A; ft_workflow_b_session=B"))).resolves.toBe(true);
+    expect(authService.verifySession).toHaveBeenCalledWith("B");
+    jest.clearAllMocks();
+    await expect(b.canActivate(context("ft_session=A"))).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(authService.verifySession).not.toHaveBeenCalled();
   });
 });

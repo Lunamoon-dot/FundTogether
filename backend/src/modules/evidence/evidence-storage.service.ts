@@ -13,6 +13,7 @@ export class EvidenceStorageService implements OnModuleDestroy {
   constructor(private readonly config: ConfigService) {}
 
   async initialize() { await this.storage(); }
+  async verifyPrivateBucket() { this.ready = undefined; await this.storage(); }
   onModuleDestroy() { this.client?.destroy(); }
 
   private async storage() {

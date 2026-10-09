@@ -1,0 +1,78 @@
+{
+  "synthetic": true,
+  "evaluatorOnly": true,
+  "entries": [
+    {
+      "key": "G1-pass",
+      "label": "MET",
+      "reason": "Full institution handover with authorized signer.",
+      "source": "Predetermined synthetic rubric, not output of a reviewer or blockchain."
+    },
+    {
+      "key": "G1-missing-invoice",
+      "label": "NEEDS_INFORMATION",
+      "reason": "Purchase invoice is absent; quantities alone do not establish cost.",
+      "source": "Predetermined synthetic rubric, not output of a reviewer or blockchain."
+    },
+    {
+      "key": "G1-wrong-signer",
+      "label": "NOT_MET",
+      "reason": "Signer is explicitly absent from the synthetic authority registry.",
+      "source": "Predetermined synthetic rubric, not output of a reviewer or blockchain."
+    },
+    {
+      "key": "G1-shortage",
+      "label": "NOT_MET",
+      "reason": "Only 90 of 100 required packages were delivered.",
+      "source": "Predetermined synthetic rubric, not output of a reviewer or blockchain."
+    },
+    {
+      "key": "G1-overspend",
+      "label": "NEEDS_INFORMATION",
+      "reason": "Report charges 2250 to a 2200 campaign advance; separate organizer funding must be evidenced.",
+      "source": "Predetermined synthetic rubric, not output of a reviewer or blockchain."
+    },
+    {
+      "key": "G1-surplus",
+      "label": "MET_CONDITIONAL_RETURN",
+      "reason": "Results met; 50 must actually return before final acceptance can close.",
+      "source": "Predetermined synthetic rubric, not output of a reviewer or blockchain."
+    },
+    {
+      "key": "G1-inconclusive",
+      "label": "INCONCLUSIVE",
+      "reason": "Authority/contact could not be independently checked.",
+      "source": "Predetermined synthetic rubric, not output of a reviewer or blockchain."
+    },
+    {
+      "key": "G1-reused-photo",
+      "label": "INCONCLUSIVE",
+      "reason": "An image from a different campaign is offered as institution handover evidence; check provenance.",
+      "source": "Predetermined synthetic rubric, not output of a reviewer or blockchain."
+    },
+    {
+      "key": "G2-stage-1-pass",
+      "label": "MET",
+      "reason": "Stage 1 result and sample checks are consistent with the synthetic source.",
+      "source": "Predetermined synthetic rubric, not output of a reviewer or blockchain."
+    },
+    {
+      "key": "G2-stage-2-pass",
+      "label": "MET",
+      "reason": "Stage 2 has its own delivery records and image.",
+      "source": "Predetermined synthetic rubric, not output of a reviewer or blockchain."
+    },
+    {
+      "key": "G2-stage-3-pass",
+      "label": "MET",
+      "reason": "Final stage still requires a substantive acceptance decision.",
+      "source": "Predetermined synthetic rubric, not output of a reviewer or blockchain."
+    },
+    {
+      "key": "G2-stage-2-reused-photo",
+      "label": "INCONCLUSIVE",
+      "reason": "Stage 1 image reused for stage 2; investigate provenance, do not infer fraud from hash alone.",
+      "source": "Predetermined synthetic rubric, not output of a reviewer or blockchain."
+    }
+  ]
+}

@@ -5,6 +5,12 @@
 > **Updated:** 2026-10-06
 > **Related:** [Protocol specification](./protocol-spec.md), [State machine](./state-machine.md)
 
+**Scope as of 2026-10-09:** the accounting below is baseline A. The separately
+approved B pilot has no bond and uses actual returns with fixed base/cumulative
+supplement refunds; see [workflow B financial rules](./workflow-b-financial-rules.md).
+B implementation is in progress under [the approved code plan](./workflow-b-code-plan.md); this
+approval does not change funds or refund rights in existing A campaigns.
+
 **2026-10-05 approved amendment:** [MVP case STOP/timeout](./mvp-milestone-completion.md)
 uses `refundPool = totalContributed - totalReleased`; bond returns separately to
 the organizer, with no slash, fee or caller reward. Each donor claims

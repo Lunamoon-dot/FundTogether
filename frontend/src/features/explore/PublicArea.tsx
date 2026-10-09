@@ -5,6 +5,10 @@ import { OrganizationProfile } from '../organizations/OrganizationProfile'
 import { PublicCampaignDetail, PublicCampaignFeed } from './PublicCampaigns'
 import { MyContributions } from './MyContributions'
 import { ReviewPage } from '../review/ReviewPage'
+import { isAdvance } from '../../lib/web3/deployment-context'
+import { AdvanceCampaignDetail, AdvanceCampaignFeed } from './AdvanceCampaignDetail'
+import { AdvanceContributions } from './AdvanceRefundPanel'
+import { AdvanceReview } from '../review/AdvanceReview'
 import './PublicArea.css'
 
 interface PublicAreaProps {
@@ -80,12 +84,14 @@ export function PublicArea({
             {organizationProfile ? '← Tổ chức của tôi' : '← Về khu vực người dùng'}
           </a>
         )}
-        {feed && <PublicCampaignFeed />}
+        {feed && (isAdvance ? <AdvanceCampaignFeed /> : <PublicCampaignFeed />)}
 
-        {detail && <PublicCampaignDetail key={detail[1]} campaignId={detail[1]} />}
-        {review && <ReviewPage key={`${session?.userId ?? 'anonymous'}:${review[1] ?? 'queue'}`} session={session} sessionLoading={sessionLoading} campaignId={review[1]} />}
+        {detail && (isAdvance ? <AdvanceCampaignDetail key={detail[1]} campaignId={detail[1]} /> : <PublicCampaignDetail key={detail[1]} campaignId={detail[1]} />)}
+        {review && (isAdvance ? sessionLoading ? <p role="status">Đang kiểm tra phiên…</p> : session ? <AdvanceReview key={`${session.userId}:${review[1] ?? 'queue'}`} session={session} metadataId={review[1]} />
+          : <a href="#/account">Đăng nhập tài khoản resolver</a>
+          : <ReviewPage key={`${session?.userId ?? 'anonymous'}:${review[1] ?? 'queue'}`} session={session} sessionLoading={sessionLoading} campaignId={review[1]} />)}
 
-        {contributions && <MyContributions session={session} />}
+        {contributions && (isAdvance ? <AdvanceContributions key={session?.userId ?? 'anonymous'} /> : <MyContributions session={session} />)}
 
         {account && (
           <div className="public-account-page">

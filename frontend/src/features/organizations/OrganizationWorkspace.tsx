@@ -10,6 +10,8 @@ import { OrganizationEvidence } from './OrganizationEvidence'
 import { OrganizationsPage } from './OrganizationsPage'
 import { OrganizationProfile } from './OrganizationProfile'
 import './OrganizationsPage.css'
+import { isAdvance } from '../../lib/web3/deployment-context'
+import { AdvanceOrganizationCampaigns } from '../campaigns/advance/AdvanceOrganizationCampaigns'
 
 const sections = [
   { path: '/campaigns', label: 'Campaign' },
@@ -87,18 +89,19 @@ export function OrganizationWorkspace({ organizationId, section, session, sessio
             : <OrganizationsPage key={session.userId} userId={session.userId} />}
         </> : organizationId && !organization ? <section className="panel"><h2>Tổ chức không khả dụng</h2>
           <p>Tổ chức không tồn tại hoặc tài khoản này không có quyền quản lý.</p><a href="#/organizations">Chọn tổ chức khác</a></section>
-          : drafts ? <UnassignedCampaignDrafts key={`${session.userId}:${drafts[1]}`} userId={session.userId} campaignId={drafts[1]} editing={Boolean(drafts[2])} onDeleted={setNotice} basePath={basePath} />
+          : drafts && !isAdvance ? <UnassignedCampaignDrafts key={`${session.userId}:${drafts[1]}`} userId={session.userId} campaignId={drafts[1]} editing={Boolean(drafts[2])} onDeleted={setNotice} basePath={basePath} />
           : !currentSection ? <section className="panel"><h2>Không tìm thấy trang</h2></section>
             : <>
                 {!organization ? <section className="panel"><h1>Bắt đầu quản lý campaign</h1>
                   <p>Tạo tổ chức để lưu bản nháp và quản lý campaign trong dashboard này.</p>
                   <a className="button button--primary" href="#/organizations">Tạo tổ chức</a>
-                </section> : currentSection.path === '/evidence' ? <OrganizationEvidence key={`${session.userId}:${organization.id}`}
+                </section> : isAdvance ? <AdvanceOrganizationCampaigns key={`${session.userId}:${organization.id}`} organizationId={organization.id} userId={session.userId} section={activeSection} />
+                  : currentSection.path === '/evidence' ? <OrganizationEvidence key={`${session.userId}:${organization.id}`}
                   organizationId={organization.id} userId={session.userId} section={activeSection} />
                   : <OrganizationCampaigns key={`${session.userId}:${organization.id}`}
                     organizationId={organization.id} userId={session.userId} section={activeSection}
                     unassignedDrafts={activeSection === '/campaigns' ? <UnassignedCampaignDrafts key={session.userId} userId={session.userId} onDeleted={setNotice} basePath={basePath} /> : undefined} />}
-                {!organization && activeSection === '/campaigns' && <UnassignedCampaignDrafts key={session.userId} userId={session.userId} onDeleted={setNotice} basePath={basePath} />}
+                {!isAdvance && !organization && activeSection === '/campaigns' && <UnassignedCampaignDrafts key={session.userId} userId={session.userId} onDeleted={setNotice} basePath={basePath} />}
               </>}
       </main>
     </div>

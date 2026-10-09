@@ -16,6 +16,7 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import { AuthGuard } from "./auth.guard";
 import { AuthService, SESSION_TTL_MS } from "./auth.service";
+import { readSessionCookie, sessionCookieName } from "./auth-cookie";
 
 const credentialsSchema = z
   .object({
@@ -127,7 +128,7 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ) {
     await this.authService.revokeSession(this.cookieToken(request));
-    response.clearCookie("ft_session", this.cookieOptions());
+    response.clearCookie(sessionCookieName(this.configService), this.cookieOptions());
   }
 
   private parse<T>(schema: z.ZodType<T>, body: unknown): T {
@@ -142,7 +143,7 @@ export class AuthController {
     response: Response,
   ) {
     await this.authService.revokeSession(this.cookieToken(request));
-    response.cookie("ft_session", session.token, {
+    response.cookie(sessionCookieName(this.configService), session.token, {
       ...this.cookieOptions(),
       maxAge: SESSION_TTL_MS,
     });
@@ -150,11 +151,7 @@ export class AuthController {
   }
 
   private cookieToken(request: Request) {
-    return request.headers.cookie
-      ?.split(";")
-      .map((part) => part.trim())
-      .find((part) => part.startsWith("ft_session="))
-      ?.slice("ft_session=".length);
+    return readSessionCookie(request.headers.cookie, sessionCookieName(this.configService));
   }
 
   private cookieOptions() {

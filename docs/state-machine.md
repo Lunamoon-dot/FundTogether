@@ -5,6 +5,12 @@
 > **Updated:** 2026-10-06
 > **Related:** [Protocol specification](./protocol-spec.md), [Financial rules](./financial-rules.md)
 
+**Scope as of 2026-10-09:** the states below are baseline A. The separately
+approved B pilot states, advance/acceptance separation and deadlines are in
+[workflow B specification](./workflow-b-spec.md). B implementation is in progress under
+[the approved code plan](./workflow-b-code-plan.md); enum values and transitions must
+not be shared with an A deployment.
+
 **2026-10-05 approved amendment:** use [the milestone completion state machine](./mvp-milestone-completion.md)
 for MVP admission/disputes. Resolver admission starts 72-hour review. CHALLENGED
 has a fixed 7-day response and 7-day decision deadline; CONTINUE restores the

@@ -7,7 +7,7 @@ import { BaseError, decodeEventLog, formatUnits, keccak256, parseUnits, UserReje
 import type { Abi, Address, Hash, Hex } from 'viem'
 import contractAbiJson from '../../../../backend/src/blockchain/generated/fund-together.abi.json'
 import tokenAbiJson from '../../../../backend/src/blockchain/generated/mock-usdc.abi.json'
-import deployment from '../../../../backend/src/blockchain/generated/deployment.local.json'
+import deployment from '../../lib/web3/deployment-context'
 import type { CampaignWorkflow, IndexerStatus, PublicCampaign } from '../../lib/api/public-campaigns'
 import { getPublicCampaign, listMyContributions } from '../../lib/api/public-campaigns'
 import { getErrorMessage } from '../../lib/api/error'

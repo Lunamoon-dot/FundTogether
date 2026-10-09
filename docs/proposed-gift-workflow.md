@@ -197,6 +197,10 @@ phụ thuộc thứ tự. Không xóa nghĩa vụ chỉ vì token/recipient tạ
 
 ## 8. Kế hoạch thực hiện theo phụ thuộc
 
+[Kế hoạch chi tiết sáu bước](./workflow-b-delivery-plan.md) chia công việc thành
+campaign mẫu, quyết định nghiệp vụ, contract, tích hợp và nghiệm thu; có task,
+đầu ra và điều kiện chuyển bước. Đặc tả quyền/tiền vẫn cần duyệt trước code B.
+
 | Bước | Đầu ra | Điều kiện kiểm tra trước bước sau |
 |---|---|---|
 | 1. Mô tả hai campaign mẫu | Một đợt qua đơn vị, nhiều đợt trao trực tiếp; ngân sách/task/tiêu chí/hồ sơ | Biết rõ nguồn tiền, điểm hoàn thành và ai xác nhận từng tiêu chí |

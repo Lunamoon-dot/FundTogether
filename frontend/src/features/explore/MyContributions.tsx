@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { formatUnits } from 'viem'
-import deployment from '../../../../backend/src/blockchain/generated/deployment.local.json'
+import deployment from '../../lib/web3/deployment-context'
 import type { AccountSession } from '../../lib/api/auth'
 import { getMyRefunds, listMyContributions } from '../../lib/api/public-campaigns'
 import { getErrorMessage } from '../../lib/api/error'

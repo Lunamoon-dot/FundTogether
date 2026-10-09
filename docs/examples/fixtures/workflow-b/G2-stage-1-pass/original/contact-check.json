@@ -1,0 +1,22 @@
+{
+  "synthetic": true,
+  "authorityRegistry": [
+    "Synthetic Authorized Contact A"
+  ],
+  "authorityConfirmed": true,
+  "method": "controlled-10-of-50-sample",
+  "checkedCount": 10,
+  "sampleIds": [
+    "SYNTHETIC-G2-0-1",
+    "SYNTHETIC-G2-0-6",
+    "SYNTHETIC-G2-0-11",
+    "SYNTHETIC-G2-0-16",
+    "SYNTHETIC-G2-0-21",
+    "SYNTHETIC-G2-0-26",
+    "SYNTHETIC-G2-0-31",
+    "SYNTHETIC-G2-0-36",
+    "SYNTHETIC-G2-0-41",
+    "SYNTHETIC-G2-0-46"
+  ],
+  "limitation": "Controlled fixture, not independent field research; a sample does not prove every delivery."
+}

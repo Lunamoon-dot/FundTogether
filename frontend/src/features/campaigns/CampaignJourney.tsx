@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { formatUnits } from 'viem'
-import deployment from '../../../../backend/src/blockchain/generated/deployment.local.json'
+import deployment from '../../lib/web3/deployment-context'
 import type { CampaignWorkflow, IndexerStatus, PublicCampaign } from '../../lib/api/public-campaigns'
 import { campaignNextStep, campaignStatusLabel, deadlineRemaining } from './campaign-journey'
 

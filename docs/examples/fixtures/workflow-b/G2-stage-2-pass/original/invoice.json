@@ -1,0 +1,14 @@
+{
+  "synthetic": true,
+  "vendor": "Synthetic Vendor A",
+  "packages": 50,
+  "contents": [
+    "rice-2kg",
+    "oil-1l",
+    "noodles-5packs"
+  ],
+  "unitPrice": "20000000",
+  "goods": "1000000000",
+  "currency": "MockUSDC",
+  "minorUnit": 6
+}

@@ -1,0 +1,250 @@
+{
+  "synthetic": true,
+  "policyStatus": "DRAFT",
+  "schemaVersion": "workflow-b-offline-fixture/1",
+  "warning": "Local JSON/SVG lab fixtures. Not production upload DTOs, real photos, field evidence or access-controlled storage.",
+  "policy": {
+    "path": "policy-proposal.json",
+    "mediaType": "application/json",
+    "byteSize": 524,
+    "sha256": "0x28f8f177bf9e814ff35936605588aeffb1157874254c3d8ccec7e61965cfd608"
+  },
+  "plans": [
+    {
+      "campaignKey": "G1",
+      "plan": {
+        "path": "G1/plan.json",
+        "mediaType": "application/json",
+        "byteSize": 881,
+        "sha256": "0x14be96e34ddba6a8a7678924fad518f4764ecb32c5e96b1d42b54ac6bd85753a"
+      },
+      "criteria": {
+        "path": "G1/criteria.json",
+        "mediaType": "application/json",
+        "byteSize": 1028,
+        "sha256": "0x140b33448756294c565d6cae5193ad780cd09c930004567385fd88903ca3b4b1"
+      }
+    },
+    {
+      "campaignKey": "G2",
+      "plan": {
+        "path": "G2/plan.json",
+        "mediaType": "application/json",
+        "byteSize": 1568,
+        "sha256": "0x27d87bfe57d4c6d6adfbe8074fd3280090c014e27da214639d0bdd3f2768109d"
+      },
+      "criteria": {
+        "path": "G2/criteria.json",
+        "mediaType": "application/json",
+        "byteSize": 1025,
+        "sha256": "0x7977c45efef60c3f47b41bdfc515586e933aa264746b4dd68f2d23ff3369541e"
+      }
+    }
+  ],
+  "packages": [
+    {
+      "key": "G1-pass",
+      "campaignKey": "G1",
+      "stage": 0,
+      "original": {
+        "path": "G1-pass/original/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3763,
+        "sha256": "0x7940a53e5fed7f2331004b89a187358dd998f75edb43d106f0ba2eff8959f45f"
+      },
+      "public": {
+        "path": "G1-pass/public/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3840,
+        "sha256": "0xe7c7488d040e4d314ba60887c2889d41e4a69b64dff5822e31dc4cc0ceb4c48c"
+      }
+    },
+    {
+      "key": "G1-missing-invoice",
+      "campaignKey": "G1",
+      "stage": 0,
+      "original": {
+        "path": "G1-missing-invoice/original/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3486,
+        "sha256": "0xb95c9eaabf8692a93f9bd9b3c127231cc8864e3f05ac156bddb6dd10743a5d4f"
+      },
+      "public": {
+        "path": "G1-missing-invoice/public/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3565,
+        "sha256": "0xd87722c02b54a4bb00e738fecd4c46b5196ec2706da29d4be3eed5e6015e4d88"
+      }
+    },
+    {
+      "key": "G1-wrong-signer",
+      "campaignKey": "G1",
+      "stage": 0,
+      "original": {
+        "path": "G1-wrong-signer/original/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3819,
+        "sha256": "0xb171b4db6ac354f8b55f6ae2378de5fb1b34040938aab4bb5b67a842fcfa24d8"
+      },
+      "public": {
+        "path": "G1-wrong-signer/public/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3896,
+        "sha256": "0x626fab594650bef4f8af87202f289419a06cce85f543d4380a306fc3e31234ca"
+      }
+    },
+    {
+      "key": "G1-shortage",
+      "campaignKey": "G1",
+      "stage": 0,
+      "original": {
+        "path": "G1-shortage/original/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3791,
+        "sha256": "0x3db59de9e398e68b12d1e469bdef4bc85b1bca2949d14840a48292f109627ac5"
+      },
+      "public": {
+        "path": "G1-shortage/public/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3868,
+        "sha256": "0xa137f50ca6ab17377fcf34a571c6a5fabf9cfa859af27923027b62467c78e05d"
+      }
+    },
+    {
+      "key": "G1-overspend",
+      "campaignKey": "G1",
+      "stage": 0,
+      "original": {
+        "path": "G1-overspend/original/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3798,
+        "sha256": "0xafecd86ea88b79c0a1ff8405b5cb292623bcdd66c54b6bd048c5a27bd27f81b9"
+      },
+      "public": {
+        "path": "G1-overspend/public/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3875,
+        "sha256": "0x8bbff32a7516ded5edcabbd91c33455c29fef7d2173b03d0f7a30d56ba958d9c"
+      }
+    },
+    {
+      "key": "G1-surplus",
+      "campaignKey": "G1",
+      "stage": 0,
+      "original": {
+        "path": "G1-surplus/original/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3796,
+        "sha256": "0x91f847e833312858514f0171f9540403083f92574ca239d18fa38e7a1819366a"
+      },
+      "public": {
+        "path": "G1-surplus/public/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3873,
+        "sha256": "0xa61bbac7842c1f873c4803866540ac6471776b90740c84bc5fd3ef07910c0f34"
+      }
+    },
+    {
+      "key": "G1-inconclusive",
+      "campaignKey": "G1",
+      "stage": 0,
+      "original": {
+        "path": "G1-inconclusive/original/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3819,
+        "sha256": "0xe4cf6df4e253acd5a48c1c8cebfd5e95b5f2db6fe80e9d5ba5de7128f215f660"
+      },
+      "public": {
+        "path": "G1-inconclusive/public/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3896,
+        "sha256": "0xdfc74da586dc34d25c43cdd1f224cb023ada918cfb94f54419d56d761ddb2b5f"
+      }
+    },
+    {
+      "key": "G1-reused-photo",
+      "campaignKey": "G1",
+      "stage": 0,
+      "original": {
+        "path": "G1-reused-photo/original/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3819,
+        "sha256": "0x5512b109016a2cdf029f81b038e3c7a97fd82ae0121b880789a1924bd4eb70ec"
+      },
+      "public": {
+        "path": "G1-reused-photo/public/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3896,
+        "sha256": "0xa991cf494a045a350a48de965ce15b8d7ca308f665f678b6cbdeea993903911d"
+      }
+    },
+    {
+      "key": "G2-stage-1-pass",
+      "campaignKey": "G2",
+      "stage": 0,
+      "original": {
+        "path": "G2-stage-1-pass/original/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3814,
+        "sha256": "0x2fa8e38388a733a32c16194c9055e0959a9c4e3ac44e4507523ccd01b9da1371"
+      },
+      "public": {
+        "path": "G2-stage-1-pass/public/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3891,
+        "sha256": "0x26249ae9af63a2b4f88d93e36acb99a10a1e229fbcae36746e9054328860a884"
+      }
+    },
+    {
+      "key": "G2-stage-2-pass",
+      "campaignKey": "G2",
+      "stage": 1,
+      "original": {
+        "path": "G2-stage-2-pass/original/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3814,
+        "sha256": "0xc3c091f7dbb27d17a034cadee0e6687f078f6b231065077b0a72f8ee0f06c534"
+      },
+      "public": {
+        "path": "G2-stage-2-pass/public/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3891,
+        "sha256": "0x4b4d9e6312f90d6c1497f9ef6a2fa3d197eb0235254115fb491ebc1989c9c86b"
+      }
+    },
+    {
+      "key": "G2-stage-3-pass",
+      "campaignKey": "G2",
+      "stage": 2,
+      "original": {
+        "path": "G2-stage-3-pass/original/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3814,
+        "sha256": "0x54fdc3e42b4418543446721c123b9ec0eeed464436be013afb30c632720033d2"
+      },
+      "public": {
+        "path": "G2-stage-3-pass/public/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3891,
+        "sha256": "0xeedeb2b8085b4eb0169b22fe66ec8a73ee81e94bf7788c363cd6f431bf0d5a06"
+      }
+    },
+    {
+      "key": "G2-stage-2-reused-photo",
+      "campaignKey": "G2",
+      "stage": 1,
+      "original": {
+        "path": "G2-stage-2-reused-photo/original/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3870,
+        "sha256": "0x431a25434d4644c17c3b79b00a0cc1241d9b4ba6a26c953a81a6a81e80b013ba"
+      },
+      "public": {
+        "path": "G2-stage-2-reused-photo/public/manifest.json",
+        "mediaType": "application/json",
+        "byteSize": 3947,
+        "sha256": "0xc20e8467d69fcec27e724ba2fa44e05efa190ca62314894e8fa93f68326bae92"
+      }
+    }
+  ]
+}

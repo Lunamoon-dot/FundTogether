@@ -1,0 +1,10 @@
+{
+  "synthetic": true,
+  "paymentReference": "SYNTHETIC-PAYMENT-G1-shortage",
+  "amount": "2200000000",
+  "goods": "1800000000",
+  "transportation": "400000000",
+  "currency": "MockUSDC",
+  "minorUnit": 6,
+  "limitation": "Fictional receipt, not a real bank or token transaction."
+}

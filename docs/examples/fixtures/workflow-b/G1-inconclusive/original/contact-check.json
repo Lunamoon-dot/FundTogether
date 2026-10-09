@@ -1,0 +1,11 @@
+{
+  "synthetic": true,
+  "authorityRegistry": [
+    "Synthetic Authorized Contact A"
+  ],
+  "authorityConfirmed": null,
+  "method": "controlled-contact-check",
+  "checkedCount": 1,
+  "sampleIds": [],
+  "limitation": "Controlled fixture, not independent field research; a sample does not prove every delivery."
+}

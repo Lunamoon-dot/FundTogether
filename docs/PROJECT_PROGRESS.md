@@ -27,6 +27,455 @@ The dated entries below are evidence for their stated slice and environment.
 Historical DONE entries do not mark the entire MVP, business validation or
 production readiness DONE; old next-step notes are superseded by this direction.
 
+### 2026-10-09 — DONE linked-wallet balance display and partial manual funding
+
+- Subsequent user screenshot shows the organizer wallet linked on31338; B DB
+  independently confirms organizer and donorA now have SIWE links. This confirms
+  those links after fixture repair, not all popup/timeout acceptance cases.
+- The account card previously displayed only native ETH. Added MockUSDC from
+  the current A/B deployment, isolated by wallet/account/chain/deployment, with
+  separate loading/error/zero handling and refresh for both balances.
+- B organizer's newly selected wallet received10,000 MockUSDC and1 local ETH.
+  Both receipts succeeded; token mint Transfer and balances were checked.
+  DonorA already held10,000 MockUSDC; no duplicate top-up was sent. Funding log
+  `.local/workflow-b/requested-funding-result.json` retains destinations/receipts
+  and prevents repeated credits. Resolver/donorB awaited linked recipients at
+  that check; no assumed wallet mapping was used.
+- Targeted frontend47/47 PASS, including10 card cases across A/B; lint and B
+  build PASS. Active port5174 serves the updated card; B preflight remains ready.
+  The card tests cover separate currencies, zero, RPC failure with stale cache,
+  account/wallet cache isolation and unsupported chains.
+
+### 2026-10-09 — DONE repair seeded wallet-link conflicts; human retry pending
+
+- User screenshots showed signature waiting, then HTTP409-equivalent wallet
+  ownership conflict. Current B DB confirmed the selected Anvil wallet belonged
+  to a synthetic manual fixture, not the user's newly registered account.
+- Fixed `seed-local.cjs` to prepare accounts/roles/drafts without SIWE signing,
+  linking default Anvil wallets, binding the organization wallet or minting to
+  assumed donors. Existing fixture accounts/passwords are retained.
+- Backed up and released the five recorded synthetic default-wallet links in
+  B only. Cleared the representative link of the synthetic organization after
+  verifying its two plans remain editable/unfrozen and none of these wallets
+  owns an on-chain campaign. No wallet was assigned to a human account.
+- Hash comparisons verified users/passwords, roles, campaign metadata/plans,
+  projections/reviews and organization verification records unchanged. Unrelated
+  links are unchanged. Repair/backup are in ignored `.local/workflow-b/`.
+- Two real seed reruns PASS: no additional wallet links, changed passwords,
+  organization-wallet binding or duplicate drafts. Six real DB/SIWE checks PASS
+  inside a rolled-back transaction: invalid signature, successful link, replay,
+  idempotent relink, cross-account conflict and session reload. No test account
+  remains; signatures used an ephemeral synthetic wallet, not the user's wallet.
+- The user must retry the extension signature to confirm their selected link;
+  the earlier timeout itself is not claimed fixed by this data repair. I3 and
+  funding each actual chosen user wallet remain pending their verified mapping.
+
+### 2026-10-09 — BLOCKED at I3 human acceptance; implementation approval remains valid
+
+- The same missing human input persists across three consecutive goal turns:
+  completion of automated comparison/waiting checks, G1/G2 handoff audit, and
+  the current direct inspection of the remaining requirements/results.
+- Current reviewer CSV has60 template rows and0 entered outcomes. Acceptance
+  still records humanAcceptance TODO and independentReviewerExperiment TODO;
+  no MetaMask observations were supplied. The previous turn completed the
+  required example/runbook updates, so it was progress, not a live process wait.
+- C1–C6/B1–B6/F1–F6 automated evidence and I1/I2 remain recorded below. Runtime,
+  accounts, neutral files, runbook and observation templates are prepared.
+  No independent required implementation step remains that can supply the
+  missing human signatures, popup observations or reviewer judgments.
+- GOAL explicitly prohibits signing through the user's extension or inventing
+  manual results. Mark the goal BLOCKED pending those inputs, not complete.
+  Resume I3 with the user's browser/MetaMask session and reviewer CSV; verify
+  receipt/indexer/balances and address any defects revealed by that acceptance.
+  This is not a new financial/code-plan approval gate and does not reset A/B.
+- On the resumed I3 audit, browser inventory exposed only the Codex in-app
+  browser and MCP Apps, with no Chrome/Edge connection. No extension action was
+  attempted. The user must open the prepared local app in their wallet browser
+  and supply the actual interaction/transaction observations; choosing an
+  automated browser without that wallet does not satisfy manual acceptance.
+
+### 2026-10-09 — IN_PROGRESS workflow B; code plan approved, C1–C6 implementation
+
+- User explicitly approved the code plan: “tôi duyệt mà”. The approval gate is
+  resolved; execute C1–C6→B1–B6→F1–F6→I1–I3 directly in this chat without asking
+  again at each task. Goal resumed active; the BLOCKED entry below is historical.
+- C1 starts with setup/funding tests, minimal compilable API scaffold, observed
+  behavioral RED, then implementation and Foundry regression. No application
+  chain/DB/storage is touched by these unit tests. Full B goal remains incomplete.
+- Ruling: keep the approved current checkout/baseline and use this progress
+  document as the task ledger; no new chat/subagent or automatic commit/push.
+  GOAL's explicit execution constraints supersede skill workspace/reviewer defaults.
+
+#### C1 — DONE setup/funding; C2 — IN_PROGRESS eligibility/advance
+
+- C1 RED:16 behavioral failures with a compilable empty API scaffold. Implemented
+  standalone no-bond setup, fixed plan/criteria/budgets, resolver approval,
+  organizer publication/cancel, exact capped donations, first-review deadline
+  and funding-timeout snapshot. Targeted16/16 GREEN; full `forge test`216 PASS,
+  0 FAIL/skip,16 suites,268.37s, including the A invariant256 runs/128000 calls.
+  Output: `.local/workflow-b-c1-red.log`, `.local/workflow-b-c1-suite.log`.
+- C2 RED:12 failures for missing eligibility/advance/STOP; the incoming-transfer
+  fault test already passed because C1 implemented exact-transfer donation.
+  Added one-budget claim/deadlines, resolver STOP and first-review/claim timeout,
+  exact outgoing deltas.13/13 C2 plus16/16 C1 PASS; full regression is running
+  under its existing handle, output `.local/workflow-b-c2-suite.log`.
+- Tested false/revert/recipient-fee/sender-fee rollback and retry with actual
+  ERC20 transfer boundaries; callback observes ReentrancyGuard rejection.
+  No Anvil node, deployment, ABI export or wallet/RPC transaction was performed.
+- Ruling C2: include verificationHash in AdvanceAvailable, binding the fresh
+  first-eligibility record in event history; next-stage eligibility uses zero.
+  This closes a traceability omission in the plan, without changing funds/roles.
+- C2 full regression completed: `forge test`229 PASS,0 FAIL/skip,17 suites,
+  266.97s; A invariant256 runs/128000 calls. C2 DONE; no pending test handle.
+- C3 RED:15 behavioral failures, compiled successfully. Implemented submission/
+  immutable versions, four review outcomes, challenge/finalization and next-stage
+  gating, without acceptance payout. C3 IN_PROGRESS; case/hard-stop interactions
+  are verified together with C4, which provides the pending-case behavior.
+- Ruling C3: pull the minimal return primitive forward from C5 because C3's
+  surplus finalization must require an actual token return; C5 still owns the
+  remaining return/refund adversarial and entitlement verification. Added reviewed
+  flag to SubmissionView so unreviewed enum-zero is not displayed as MET.
+- C3 first GREEN attempt:43/44 targeted tests PASS. The failing test used a
+  whole-wallet balance of2200 across two separate funded campaigns, despite two
+  legitimate advances totaling4400; corrected to the campaign's actual balance
+  delta. Contract counters already showed one advance per campaign.
+- C3 corrected targeted run:44/44 PASS; full regression still running under
+  its existing handle, log `.local/workflow-b-c3-suite.log`. C4 added12 behavioral
+  RED cases; implementation passes59/59 B unit tests including3 timeout tests.
+  C3/C4 remain IN_PROGRESS until full regression and remaining boundary audit.
+- C4 enforces one case/version, contributor/resolver opening, immutable response,
+  bounded CONTINUE/RESUBMIT/STOP and permissionless TIMEOUT. Generic resolver
+  STOP terminates a pending case too; timeout emits actor and zero decision hash,
+  preserving the original opener's reason separately. Case material remains logs.
+- Ruling C3/C4: a fresh3-day window must end strictly before hardStop, because
+  finalization at hardStop is forbidden; otherwise MET/CONTINUE would create no
+  valid finalization timestamp. Tested clipped equal case windows and decisions
+  with insufficient time; no financial duration or authority was changed.
+- C3 full regression completed:244 PASS,0 FAIL/skip,18 suites,331.66s. C4 full
+  regression is running under its original handle/log `.local/workflow-b-c4-suite.log`.
+- C5 RED:10 failures for missing claim/view methods;2 existing return primitive
+  tests already PASS. Added full-precision Math.mulDiv, separate baseConsumed/
+  cumulative supplementPaid, effects-before-transfer and zero-payout consumption.
+  First target run71/71 PASS. Additional zero-rounded-base and failed-supplement
+  tests protect future rights; C5 full regression still required before DONE.
+- C4 full regression completed:259 PASS,0 FAIL/skip,20 suites,367.76s. C5 full
+  regression completed:275 PASS,0 FAIL/skip,22 suites,343.51s, including256-run
+  fraction/claim-order fuzz and the baseline A stateful invariant. C5 DONE.
+- C6 added an independent four-campaign/six-donor stateful cash ledger, immutable
+  version/review commitments, atomic artifact generation and strict deployment
+  identity/timer verification. Initial B invariant256 runs/128000 calls PASS,
+  278.54s; selector tuning keeps more live campaigns for the final full run.
+- C6 artifact tests:4 behavioral RED, then4/4 GREEN. Generated B ABI/policy from
+  Foundry artifacts; runtime16910 bytes (<24576). No A ABI/manifest overwritten.
+  Added exact ±1-second boundary audit. Its first run78/79 PASS: the12-campaign
+  review loop exhausted the synthetic donors'10000-token fixture balance; funded
+  that test explicitly for all12 campaigns. Corrected boundary run pending.
+- New B launcher uses native Linux state and validated atomic Windows backups,
+  fixed chain31338/port9547, exact B paths and process ownership. Reuse requires
+  genesis/code/anchor/instance/policy/token/resolver/timer matches; no reset path.
+  Launcher/deployment runtime verification and final A+B regression remain TODO.
+- Corrected boundary audit79/79 PASS; C3/C4 DONE. Full C6 A+B regression is
+  running under its original handle/log `.local/workflow-b-c6-suite.log`.
+- C6 `forge build --sizes` PASS: B runtime16910/initcode17472 bytes. Independent
+  refund gas comparison:2 donors117186,64 donors117198 (+12gas), exact payouts2
+  units each. New gas test was added after full-run compilation; its isolated
+  run PASS is recorded separately, not counted in that full-run total.
+- B deployment receipts success on31338/RPC9547, contract at block2, initial
+  nextCampaignId0 and balance0. Full identity/getters verified before atomic
+  manifest promotion at `.local/workflow-b/generated/deployment.local.json`.
+  Launcher33540 remains owner; reuse check PASS, no second node. Native snapshots
+  and Windows backup/previous274612 bytes exist; supervisor error log empty.
+- Ruling C6: Windows Get-NetTCPConnection did not show WSL localhost forwarding
+  although RPC was reachable. Added HTTP probe before startup so a reachable
+  node must pass identity reuse, protecting against duplicate launch on WSL.
+  No transaction/time/reset/data/ABI changes were made to A.
+- C6 DONE: final A+B regression280 PASS,0 FAIL/skip,24 suites,321.13s; both
+  stateful invariants256 runs/128000 calls. Gas test PASS separately after that
+  run; artifacts/deployment/getters/build/size/reuse/snapshot proofs above.
+- B1 DONE: environment guard3 behavioral RED→3 GREEN; cookie4 behavioral
+  RED→7 GREEN across3 specs; B chain6 RED→6 GREEN. Full backend19 suites/107
+  tests PASS (192.387s), build exit0. Updated checkpoint-orphan assertion6/6
+  PASS. Compiled module graph excludes A blockchain/indexer/evidence/controllers.
+  Nest DI/bootstrap with live B identity PASS, nextCampaignId0, DB connections0,
+  no server listener. Config/DB/storage guards run before connections.
+- B1 verification found two tooling issues: Jest's existing CommonJS setup needs
+  a mock for ESM ConfigService (same pattern as the repository's origin test);
+  compiled tools must resolve from backendRoot, not process.cwd(). Fixed and
+  verified module/bootstrap. No dependency version or A entry point changed.
+- WSL restarted externally during this run: authoritative process inventory
+  showed no B supervisor/node and the original Windows handle was absent.
+  Recovered B from preserved native state via the existing launcher; same
+  genesis/address/deploymentId/code/anchor verified, no redeployment/clock change.
+  Current B launcher18176 owns recovery. B2 draft/freeze/migration is next.
+- B2 DONE:14 schema and4 plan/access tests observed behavioral RED, then18/18
+  GREEN. Full backend21 suites/125 tests PASS,89.184s; build exit0. Owner-only
+  gift drafts, optimistic revision, immutable exact UTF8/SHA256 freeze, per-stage
+  tasks/criteria/budgets and full deployment anchor identity; linked configured
+  representative required. Frozen edit rejects, no unfreeze or authority from DB.
+- New B PostgreSQL5434/DB fundtogether_workflow_b/volume
+  fundtogether-workflow-b_workflow-b-postgres created from isolated compose.
+  Applied0013 after preserving baseline synthetic users/memberships:14 total
+  migrations,9 malformed-context/FK/unique/freeze constraint cases rejected,
+  repeat migration preserves hashes/journal. Report `.local/workflow-b/migration-report.json`.
+  Existing A MinIO9000 and application DB were not migrated or modified.
+- Real DB draft smoke PASS for G1 goal2200000000 and G2 goal3300000000:
+  OWNER/outsider, stale revision, foreign milestone, missing representative,
+  stable milestone ID on update, freeze idempotency/read-only/reload and tamper
+  rejection. Synthetic account register then ephemeral SIWE signer verified;
+  no private key/password/session/signature printed or saved in report. No
+  campaign submitted on-chain; this is not MetaMask/human acceptance. Report
+  `.local/workflow-b/draft-report.json`; fresh fixtures retained on B only.
+- Ruling B2: generated CHECK constraints initially contained bind placeholders
+  for interpolated zero-address literals. Detected by inspecting generated SQL
+  before migration; changed expressions to literal regex exclusions and
+  regenerated only the unapplied0013 artifact/snapshot/journal. Applied SQL has
+  no placeholders, and real constraint checks pass. Read-only GET does not take
+  SELECT FOR SHARE locks; frozen-plan reload rebuilds canonical bytes against
+  the entire current deployment identity.
+- B3 implemented ADMIN verification/revocation with immutable report/validity,
+  fresh RESOLVER role + SIWE wallet, OWNER/creator/contributor conflicts, exact
+  evidence references, required document kinds, criterion outcomes/spent/unused,
+  public report disclosure and live original/public hash checks before MET.
+  Prepared reports are intents; they do not mutate financial projections.
+- B4 implemented schema0.2 drafts, server-owned upload metadata, byte sniffing,
+  freeze/revision serialization, canonical parent binding, separate redacted
+  objects, private original ACL and canonical public downloads. B MinIO9100/9101
+  uses its own volume/bucket; bucket-policy changes and unavailable storage
+  prevent MET preparation. Remaining B4 verification includes supplemental
+  version journeys and the richer neutral-ID reviewer corpus in I1/I2.
+- Real B SIWE/DB/MinIO/chain review smoke PASS: synthetic campaign0 reached
+  CHALLENGE_WINDOW after one2200000000-unit advance; no second transfer on MET.
+  Verified fresh role/wallet/OWNER, revocation/expiry, concurrent save/freeze,
+  MIME spoof, altered bytes, public/original ACL, storage outage, policy recheck,
+  and HTTP-intent versus chain-state separation. Report
+  `.local/workflow-b/review-evidence-report.json`. PDF/PNG are format probes,
+  not independently labelled activity evidence or human/MetaMask acceptance.
+- B5 implemented separate ADVANCE stream identity, transaction/advisory lock,
+  canonical log validation, immutable duplicate audit, projection/checkpoint
+  commit, reorg replay and live-campaign refresh on empty blocks. Real fork9548
+  + DB rollback lab PASS: duplicate/restart, interrupted projection/end-hash
+  rollback, branch replacement/orphan history, time/checkpoint refresh, and
+  same-chain/same-address runtime deploymentId replacement fails closed.
+  Source B9547 identity/head/campaign count preserved; fork process stopped.
+  Report `.local/workflow-b/indexer-report.json`. This is an incarnation mutation
+  test, not a claimed full fresh-node reset test; latter remains in I2 recovery.
+- B6 verification: backend26 suites/151 tests PASS,127.402s and build PASS;
+  OpenAPI32 paths generated from controller routes and runtime Zod schemas.
+  HTTP/auth/action smoke now42 assertions PASS, including B cookie/origin,
+  canonical checkpoint/state, indexer lag, synthetic submit/cancel, resolver
+  access to an integrity-checked prepared public bundle, and private draft
+  exclusion from the review queue. Report `.local/workflow-b/http-report.json`.
+- F1/F2 implemented explicit B mode31338/5174/API3001, generated Orval client,
+  ABI/policy/manifest commitments, G1/G2 gift wizard, revision reload and frozen
+  plans. Organizer actions include submit/publish, exact-budget claim, return,
+  finalize/timeout and cancellation before the first advance. Every signing
+  path checks fresh account/SIWE, wallet RPC deployment, allowed function/args
+  and simulation. Exact allowance is a separate click/receipt; pending hashes
+  survive reload and stage changes through a scoped transaction history.
+- F2 automated verification: six helper tests cover action/amount/actor/context,
+  receipt/replacement/indexing and prior-stage/unused/case gates. A read-only
+  real B RPC test verifies bytecode/policy and the actual campaign1 advance
+  receipt amount/recipient/calldata; wrong bytecode and replacement calldata
+  reject. Report `.local/workflow-b/frontend-wallet-report.json`. No extension
+  or human signing is implied by these checks.
+- F3 implemented per-criterion report/documents, USDC expenses with separate
+  CAMPAIGN/ORGANIZER/OTHER sources, revision-safe upload/save/freeze, immutable
+  package hashes and parent/version history, original downloads, separate
+  redacted upload confirmation and on-chain evidence submission. Added an
+  authorized prepared-publication read route so reload/review retains the
+  committed public hash before MET. Missing evidence can be declared; file
+  upload or unused-budget declaration never reports a financial transfer.
+- Frontend F1–F3 milestone suite102 tests PASS; default A and explicit B builds PASS;
+  lint PASS. Isolated Edge browser fixture14 checks PASS: G1/G2 counts/budgets,
+  base-unit request, frozen/duplicate-submit/claim gating, revision conflict
+  reload, mobile overflow and no React runtime errors. Screenshots inspected
+  at `.local/workflow-b/ui-*.png`; checkbox sizing corrected after inspection.
+  Browser API is mocked from synthetic B data; it is not a live/manual journey.
+- F4–F6 implemented staff organization verification/history; resolver source,
+  original/redacted, criterion and case review; public C/A/R/F/E and immutable
+  reports; contributor case/material/organizer response; separate base/supplement
+  refund rights. Current role/linked resolver wallet and account-scoped cache
+  gates are visible; G1 custody0 and late-return rights are explicit.
+- F4 API extension verification:26 suites/152 backend tests PASS, build PASS,
+  OpenAPI34 paths and HTTP50 assertions PASS. Frontend112 tests PASS, lint PASS,
+  A/B builds PASS. Edge mocked-API18 additional checks PASS for original/redacted
+  review, ADMIN/RESOLVER gating, missing MET criteria, public storage outage,
+  zero-base and late supplement/wrong-wallet refund, mobile overflow and no
+  React runtime errors. Screenshots `.local/workflow-b/ui-review.png`,
+  `ui-verification.png`, `ui-refund.png` inspected. These are automated fixtures.
+- I1 integration: `node backend/scripts/workflow-b/journey-smoke.cjs` PASS on
+  an owned loopback9548 fork, real Nest HTTP/auth/SIWE, DB transaction, MinIO,
+  contract and indexer. G1 COMPLETED; G2 three stages COMPLETED with version2
+  supplement after NEEDS_INFORMATION.38 receipts checked against calldata,
+  actor, successful receipt, decoded events, canonical DB rows and checkpoint;
+  token balances and C+R=A+F+E checked. Final acceptance sends no second payout.
+  Report `.local/workflow-b/journey-report.json` includes gas/mining/indexer
+  timings. Its receipts belong to the disposable fork, not persistent RPC9547.
+- Journey lab cleanup verified DB outer rollback, deletion of only its uploaded
+  storage objects, unchanged source campaign count/canonical block and stopped
+  owned fork. Files are format probes, not a reviewer dataset. One intermediate
+  run had a reverted unlocked-wallet submission; diagnostic receipt/gas capture
+  was added and the complete rerun passed. Retain this as an integration concern
+  while extending failure tests; do not infer extension behavior from this run.
+- Added `start-services.ps1` and read-only `advance-manual-setup.mjs`. Start helper
+  verified existing B containers/chain, migrations, API and frontend context;
+  preflight PASS with API/private storage/indexer ready, no duplicate Anvil.
+  API3001 and FE5174 are available. Handles/logs stay under `.local/workflow-b/`.
+- I2 failure journey PASS:171 successful receipts/30 assertions and11 snapshots,
+  including CONTINUE/RESUBMIT/STOP, late50+110 return, zero-base consumption,
+  return before snapshot, supplement/funding timeout and tiny-unit claim orders.
+  Contributions3/4 against base5 pay2/2; cumulative supplement2 pays0/1 and
+  retains2 rounding units. Injected token balance0 causes a reverted refund;
+  counters/rights are unchanged and restoration permits a single successful retry.
+  Evidence `.local/workflow-b/failure-journey-report.json` and failure log.
+- I2 waiting journey PASS:94 receipts/20 assertions across7 outcomes: first
+  reviewer absent, advance unclaimed, execution evidence absent, reviewer absent,
+  case opened just before challengeEnd then resolution timeout, MAX_VERSIONS3,
+  and actual unused50 return required before COMPLETED. Early timeouts reject;
+  equality boundaries stop with conserved funds. `.local/workflow-b/waiting-journey-report.json`.
+  An earlier unlocked Anvil submission used all168824 gas despite a valid
+  same-block eth_call. Harness now estimates gas with20% margin, stores estimate/
+  limit/actual and checks each receipt. The94-receipt rerun passes; this is not
+  an extension-wallet verification. Failure log preserved locally.
+- Recovery PASS7 checks: cold Anvil snapshot restore, pg_dump/pg_restore into a
+  new isolated database,20 original/redacted objects restored into a new private
+  bucket, missing-object recovery, actual empty-chain reset rejection, RPC restart
+  and indexer lag/recovery without duplicate state. Only owned lab node/DB/bucket
+  removed; source B unchanged. `.local/workflow-b/recovery-report.json`.
+- Startup/preflight and repeated synthetic seed PASS:5 accounts/SIWE roles,
+  two editable G1/G2 drafts, donor mock-token funding; no duplicate accounts or
+  reset of existing passwords. Credentials remain ignored. Runbook created at
+  `docs/workflow-b-local-runbook.md` with runtime/identity/recovery/manual steps.
+- Reviewer corpus v3 prepared:12 neutral IDs,142 PDFs/150 pages plus24 illustrative
+  PNGs. All hashes/text bounds checked,17 representative pages rendered and
+  inspected, labels kept outside reviewer folder. Historical dataset unchanged.
+  Reviewer CSV has0 decisions. `reviewer-results.py` preserves incomplete samples
+  and nonbinary-label exclusions;3 parser tests PASS. This is authored synthetic
+  preparation, not independent reference validation or a human experiment.
+- Controlled A/B comparison PASS:6 paths/138 receipts on fresh contracts in the
+  owned fork; source A matches Git baseline, source hashes match compiler metadata
+  (WSL dependency LF normalization recorded). Equal goals/budgets/donors/full-stage
+  spending: G1 A requires4400 starting token capital versus B0; G2 A2200 versus B0.
+  After stage2 lacks evidence, donor refund pool A2200/B1100. Protocol tx counts
+  G1 A13/B12, G2 A21/B20; receipt gas and limitations in acceptance. No A RPC/DB/
+  storage accessed. `.local/workflow-b/comparison-report.json`.
+- Latest frontend suite113 PASS and lint PASS, including separate base/supplement
+  receipt amounts. Live read-only Edge campaign1/API/storage check PASS, no React
+  error/mobile overflow; screenshot inspected. No extension signed. Acceptance
+  aggregator records8 automated reports and remains IN_PROGRESS; no human
+  observations or independent accuracy rate are invented.
+- Remaining: actual I3 MetaMask/user workflows (G1/G2/STOP/refund plus decline,
+  reload/account switch/replacement/outage UX) and reviewer decisions against
+  the neutral corpus. T01–T18 explicitly separate automated paths from missing
+  human evidence; GOAL is not complete and no real-fund readiness is claimed.
+- I3 handoff audit: updated the named G1/G2 example documents to link current
+  HTTP/contract/storage evidence and neutral PDF/PNG preparation. Preserved their
+  historical60/40 donor inputs and distinguished the integration50/50 inputs,
+  avoiding mismatched refund expectations. Added a manual observation template
+  to the runbook for wallet/UI/receipt/indexer evidence. Current reviewer CSV
+  has60 blank criterion/overall rows and0 actual observations; no manual result
+  or extension interaction has been supplied. Remaining work needs that input.
+
+### 2026-10-09 — Historical BLOCKED workflow B; resolved by subsequent code-plan approval
+
+- The same GOAL phase2 approval gate remained across three consecutive goal
+  turns, including the turn that presented the completed code plan. Policy
+  B-D01–B-D10 is approved; code-plan approval has not been received. The approval
+  question already sent remains the required next user action.
+- Rechecked the authoritative code plan: AWAITING_CODE_PLAN_REVIEW. B contract,
+  backend/ABI and frontend implementation directories do not exist; T01–T18
+  remain TODO and baseline HEAD is unchanged. The preceding turn refined and
+  verified the plan; that progress did not grant permission to execute it.
+- Preparation/source audit is complete for this gate. No independent required
+  work remains that can advance implementation without bypassing the explicit
+  review requirement. Goal is BLOCKED, not complete; resume execution from C1
+  once the user approves the code plan. No product/runtime changes in this audit.
+
+### 2026-10-09 — IN_PROGRESS workflow B; source audit of the pending code plan
+
+- Revalidated GOAL phase2, policy approval and the current code-plan status:
+  AWAITING_CODE_PLAN_REVIEW. The preceding turn made concrete documentation/
+  audit progress; it did not supply user approval of the code plan.
+- Source inspection found EvidenceModule imports BlockchainModule/IndexerModule A.
+  Clarified B provider registration without that module and added a bootstrap
+  isolation test to the plan, so importing storage does not launch A services.
+- Current drizzle.config.ts defaults to DB A independently of Nest startup.
+  Added an explicit guarded B migration config/wrapper, pre-connect URL/DB/port
+  checks and tests to the plan. Reusing the generic migration command would not
+  satisfy the isolation requirement.
+- Verified current evidence table types support the shared report/expenses/files
+  shape; specified B schema parsing and explicit version0.2 instead of an unsafe
+  row cast or the default0.1. These are technical clarifications, not changes to
+  approved financial rules or authority. No product code/runtime was changed.
+- Implementation remains pending the required code-plan review; C/B/F/I and
+  T01–T18 have not been completed. Goal remains active.
+
+### 2026-10-09 — IN_PROGRESS workflow B; policy approved, code plan ready for review
+
+- User approved the presented B-D01–B-D10 package: “được hãy tiếp tục gói
+  B-D01-B-D10 đi”. Marked the B specification/financial rules
+  APPROVED_FOR_LOCAL_PILOT and aligned research direction, overview, delivery
+  plan and G1/G2 status. This does not modify A obligations or authorize real funds.
+- Added [the concrete implementation plan](./workflow-b-code-plan.md): C1–C6,
+  B1–B6, F1–F6 and I1–I3, with files, contract signatures/events, deployment
+  identity, typed API, migration, permissions, storage/indexer and validation.
+  Dedicated B chain31338/RPC9547, DB/storage and API3001/FE5174 are planned;
+  they are not running services created in this turn.
+- Inspected current auth/schema/config: localhost cookies are shared across
+  ports, so the plan explicitly includes B session-cookie isolation with A's
+  existing cookie name as the default. Existing ADMIN performs organization
+  verification; no new staff or on-chain authority is introduced.
+- Verified installed Forge and Anvil1.8.4 with read-only WSL version commands.
+  Document audit passed 138 local links, all21 code tasks and all10 policy IDs;
+  exact SHA-256/byte-size audit passed all195 fixture references in12 packages.
+  Git whitespace check passed; baseline HEAD is unchanged.
+  No contract build/test, ABI generation, migration, deployment, service launch,
+  transaction, application DB/storage mutation or product-code edit was performed.
+  Frozen DRAFT dataset bytes/hashes remain historical preparation artifacts.
+- Next: code plan review required by GOAL.md phase2, then direct execution of
+  C→B→F→I in this chat. B policy approval is complete; implementation and T01–T18
+  automated/manual/research acceptance remain TODO. No goal completion is claimed.
+
+### 2026-10-09 — IN_PROGRESS workflow B; preparation ready for policy review
+
+- Read GOAL.md, research direction, delivery plan, current source and v0.2
+  evidence material. Executed the authorized preparation phase in this chat,
+  without subagents; B funds/authority implementation remains gated by review.
+- Added G1/G2 plans, checklists and synthetic evidence variants; offline Node
+  tooling writes two plan/criteria commitments, a DRAFT policy, 12 original/public
+  package pairs with SHA-256 byte hashes, separate rubric labels and eight bigint
+  accounting traces. There are 198 generated files (201,362 bytes); regeneration
+  is deterministic and different frozen bytes are rejected rather than replaced.
+- Added workflow-b-spec.md and workflow-b-financial-rules.md with the proposed
+  B-D01–B-D10 policy, finite deadlines/version/case limits, final acceptance without
+  payout, actual-return accounting and fixed base plus cumulative supplement pool.
+  Every financial/authority decision is still PENDING, not inferred as APPROVED.
+- Verified `node --test backend/scripts/workflow-b/fixtures.test.cjs`: 14 PASS,
+  0 FAIL after RED→GREEN. Generator completed with 12 packages/eight traces; Node
+  v24.21.0. Backend regression `npm.cmd test -- --runInBand`: 16 suites/96 tests
+  PASS (198.134 seconds). These are tooling and existing-source tests, not B E2E.
+- Generated JSON/SVG files are synthetic lab inputs, not production upload DTOs
+  or field photos. Key names reveal variants; neutral-ID bundles and independent
+  labels/reviewer trials remain TODO. Original/public folders are not storage ACLs.
+- Added workflow-b-acceptance.md with T01–T18 TODO and explicit test boundaries.
+  No B contract/deployment/ABI/migration/FE/BE runtime integration, service reset,
+  wallet signing, money movement, build or Foundry suite was performed. Baseline
+  HEAD remains b1881bd2cb3d6a4413605b06741624e86e2323da; no application chain/DB/storage
+  mutation was performed.
+- Next: user review of the written spec/financial proposal, then a concrete code
+  plan review as GOAL.md requires. Full goal and manual MetaMask acceptance remain
+  incomplete; no real-funds readiness or outside-world verification is claimed.
+
+### 2026-10-09 — DONE drafting the six-step workflow B delivery plan
+
+- User requested a detailed plan. Added `workflow-b-delivery-plan.md` with two
+  synthetic gift campaign outlines, ten policy decisions, contract/BE/FE tasks,
+  fund invariants, eighteen acceptance cases and explicit gates before code.
+- Read current direction, proposal, implementation boundaries and v0.2 material.
+  This records a DRAFT plan, not approved financial rules or completed features.
+  Implementation and experiment results remain TODO; no product/runtime changes
+  or test suites were run for this planning task.
+
 ### 2026-10-09 — DONE recording gift distribution as the first campaign type
 
 - User explicitly clarified that buying/distributing gifts is one charitable

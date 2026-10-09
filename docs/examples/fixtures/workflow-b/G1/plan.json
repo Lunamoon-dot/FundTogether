@@ -1,0 +1,29 @@
+{
+  "synthetic": true,
+  "campaignKey": "G1",
+  "activityType": "GIFT_DISTRIBUTION",
+  "channel": "INSTITUTION",
+  "organizer": "Synthetic Organizer A",
+  "recipientScope": "Synthetic School A; handover to school only",
+  "eligibility": "Institution authority checked against controlled registry",
+  "fundingDurationSeconds": 604800,
+  "policyHash": "0x28f8f177bf9e814ff35936605588aeffb1157874254c3d8ccec7e61965cfd608",
+  "criteriaHash": "0x140b33448756294c565d6cae5193ad780cd09c930004567385fd88903ca3b4b1",
+  "goal": "2200000000",
+  "stages": [
+    {
+      "stage": 0,
+      "budget": "2200000000",
+      "packages": 100,
+      "goods": "2000000000",
+      "transportation": "200000000",
+      "executionSlot": "Separate stage 1, within 30 days of its advance",
+      "tasks": [
+        "purchase",
+        "inventory",
+        "transport",
+        "handover"
+      ]
+    }
+  ]
+}
