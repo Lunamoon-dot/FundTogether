@@ -18,6 +18,8 @@ const { CampaignJourney } = await server.ssrLoadModule('/src/features/campaigns/
 const { TransactionSteps } = await server.ssrLoadModule('/src/features/campaigns/TransactionSteps.tsx')
 const { ReviewDecision } = await server.ssrLoadModule('/src/features/review/ReviewDecision.tsx')
 const { OrganizationWorkspaceLinks } = await server.ssrLoadModule('/src/features/organizations/OrganizationWorkspaceLinks.tsx')
+const { OrganizationWorkspace } = await server.ssrLoadModule('/src/features/organizations/OrganizationWorkspace.tsx')
+const { organizationSwitchPath } = await server.ssrLoadModule('/src/features/organizations/organization-navigation.ts')
 const { AccountAccess } = await server.ssrLoadModule('/src/features/auth/AccountAccess.tsx')
 const { AccountSessionProvider } = await server.ssrLoadModule('/src/features/auth/AccountSessionProvider.tsx')
 const { http: apiHttp } = await server.ssrLoadModule('/src/lib/api/http.ts')
@@ -73,6 +75,47 @@ function render(Component, props, entries = [], failKey) {
       createElement(AccountSessionProvider, null, createElement(Component, props))))))
   client.clear()
   return markup
+}
+
+test('organization switch preserves profile context and leaves old campaign detail behind', () => {
+  for (const section of ['/organizations', '/organizations/old-org']) {
+    assert.equal(organizationSwitchPath('new-org', section), '/organizations/new-org')
+  }
+  assert.equal(organizationSwitchPath('new-org', '/campaigns/old-campaign/edit'), '/organizations/new-org/workspace/campaigns')
+  assert.equal(organizationSwitchPath('new-org', '/evidence/item'), '/organizations/new-org/workspace/evidence')
+})
+
+test('organization profile route renders representative wallet and explicit sidebar link', () => {
+  const org = { id: 'org', name: 'Test organization', createdByUserId: 'user', role: 'OWNER',
+    createdAt: '2026-10-10T00:00:00Z', representativeWallet: null }
+  const cache = [[['organizations', 'user'], [org]], [['account-wallets', 'user'], session]]
+  const props = { section: '/organizations/org', session: { ...session, roles: ['USER'] }, sessionLoading: false, sessionError: '', onSession() {} }
+  const profile = render(OrganizationWorkspace, props, cache)
+  assert.match(profile, /Ví đại diện tổ chức/)
+  assert.match(profile, /Hồ sơ &amp; ví đại diện/)
+  assert.match(profile, /href="#\/organizations\/org"/)
+  const list = render(OrganizationWorkspace, { ...props, section: '/organizations' }, cache)
+  assert.match(list, /href="#\/organizations\/org">Xem hồ sơ/)
+  assert.doesNotMatch(list, /id="organization-wallet-title"/)
+})
+
+for (const [verificationStatus, label] of [
+  ['unverified', 'Chưa xác minh'], ['verified', 'Đã xác minh'],
+  ['revoked', 'Đã thu hồi xác minh'], ['unknown', 'Chưa rõ trạng thái xác minh'],
+]) {
+  test(`organization list and profile display API verification status: ${verificationStatus}`, () => {
+    const org = { id: 'org', name: 'Test organization', createdByUserId: 'user', role: 'OWNER',
+      verificationStatus, createdAt: '2026-10-10T00:00:00Z', representativeWallet: null }
+    const cache = [[['organizations', 'user'], [org]], [['account-wallets', 'user'], session]]
+    for (const section of ['/organizations', '/organizations/org']) {
+      const props = { section, session: { ...session, roles: ['USER'] }, sessionLoading: false, sessionError: '', onSession() {} }
+      const html = render(OrganizationWorkspace, props, cache)
+      assert.match(html, new RegExp(`<span>${label}</span>`))
+      if (verificationStatus !== 'unverified') assert.doesNotMatch(html, /<span>Chưa xác minh<\/span>/)
+      const failed = render(OrganizationWorkspace, props, cache, ['organizations', 'user'])
+      assert.doesNotMatch(failed, /organization-card-meta/)
+    }
+  })
 }
 
 test('resolver page requires account login even if private queue is cached', () => {

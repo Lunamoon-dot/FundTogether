@@ -8,6 +8,21 @@
 .advance-plan-form .advance-checks { display: flex; flex-wrap: wrap; gap: .4rem 1rem; }
 .advance-plan-form .advance-checks label { display: flex; align-items: center; gap: .35rem; margin: .3rem 0; font-size: .85rem; }
 .advance-plan-form input[type=checkbox] { width: 18px; height: 18px; min-width: 18px; min-height: 18px; flex: 0 0 18px; padding: 0; margin: 0; }
+.advance-criteria { display: grid; gap: .75rem; }
+.advance-criterion { min-width: 0; padding: 1rem; border: 1px solid #e0e9e1; border-radius: 12px; background: #fbfcfa; }
+.advance-criterion-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .75rem; }
+.advance-criterion-index { padding: .3rem .6rem; border-radius: 999px; background: #eaf3eb; color: #286448; font-size: .84rem; font-weight: 650; }
+.advance-criterion-remove { padding: .35rem .55rem; border: 0; border-radius: 6px; background: transparent; color: #7c5d5a; font-size: .84rem; }
+.advance-criterion-remove:hover:not(:disabled) { background: #f7eeec; color: #8b3930; }
+.advance-plan-form .advance-criterion-description { display: grid; gap: .4rem; margin: 0 0 .9rem; font-weight: 600; }
+.advance-plan-form .advance-evidence { min-width: 0; margin: 0; padding: .8rem; border: 1px solid #e7ece7; border-radius: 9px; background: #fff; }
+.advance-plan-form .advance-evidence legend { padding: 0 .35rem; font-size: .9rem; font-weight: 650; }
+.advance-evidence > p { margin: 0 0 .65rem; color: #68766d; font-size: .83rem; }
+.advance-document-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .45rem; }
+.advance-plan-form .advance-document-option { display: flex; align-items: center; gap: .55rem; min-height: 42px; margin: 0; padding: .45rem .6rem; border: 1px solid #e0e6e0; border-radius: 7px; background: #fff; color: #405047; font-size: .86rem; line-height: 1.25; cursor: pointer; }
+.advance-plan-form .advance-document-option--selected { border-color: #b9d3bf; background: #f0f6f0; color: #245c41; }
+.advance-plan-form .advance-document-option:focus-within { outline: 2px solid #28734f; outline-offset: 2px; }
+.advance-plan-form .advance-document-option input[type=checkbox] { accent-color: #28734f; }
 .advance-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; margin: 1rem 0; }
 .advance-financials { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 1rem; padding: 1rem 0; }
 .advance-financials dt { color: #526571; font-size: .85rem; }
@@ -16,4 +31,8 @@
 .advance-fieldset { border: 0; border-top: 1px solid #d8dde3; padding: 1rem 0; margin: 1rem 0; min-width: 0; }
 .advance-fieldset label { display: grid; gap: .4rem; margin: .8rem 0; }
 .advance-fieldset input, .advance-fieldset select { max-width: 100%; padding: .6rem; font: inherit; }
-@media (max-width: 700px) { .advance-form-grid { grid-template-columns: 1fr; gap: 0; } }
+@media (max-width: 700px) {
+  .advance-form-grid { grid-template-columns: 1fr; gap: 0; }
+  .advance-document-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 420px) { .advance-document-options { grid-template-columns: 1fr; } }

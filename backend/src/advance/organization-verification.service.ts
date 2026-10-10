@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, desc, eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { DRIZZLE_DB } from "../database/database.constants";
@@ -7,6 +7,7 @@ import { organizationMembers, organizations, organizationVerificationRecords, pl
 import { AdvanceBlockchainService } from "./advance-blockchain.service";
 import { organizationVerificationSchema } from "./advance-review.schema";
 import { sha256 } from "./advance-plan";
+type Tx = Parameters<Parameters<NodePgDatabase<typeof schema>["transaction"]>[0]>[0];
 
 @Injectable()
 export class OrganizationVerificationService {
@@ -32,16 +33,24 @@ export class OrganizationVerificationService {
   }
 
   async record(organizationId: string, userId: string, input: unknown) {
+    const [staff] = await this.db.select().from(platformRoles).where(eq(platformRoles.userId, userId));
+    if (!staff?.roles.includes("ADMIN")) throw new ForbiddenException("Current ADMIN role required for organization verification");
+    return this.db.transaction(tx => this.append(tx, organizationId, userId, input));
+  }
+
+  async append(tx: Tx, organizationId: string, userId: string, input: unknown,
+    request?: { id: string; snapshotHash: string; checks: { identity: true; representation: true; activity: true; contact: true } }) {
     const parsed = organizationVerificationSchema.safeParse(input);
     if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
-    return this.db.transaction(async tx => {
-      const [staff] = await tx.select().from(platformRoles).where(eq(platformRoles.userId, userId)).for("share");
-      if (!staff?.roles.includes("ADMIN")) throw new ForbiddenException("Current ADMIN role required for organization verification");
       const [organization] = await tx.select().from(organizations).where(eq(organizations.id, organizationId)).for("update");
       if (!organization) throw new NotFoundException("Organization not found");
+      const [staff] = await tx.select().from(platformRoles).where(eq(platformRoles.userId, userId)).for("share");
+      if (!staff?.roles.includes("ADMIN")) throw new ForbiddenException("Current ADMIN role required for organization verification");
       const [owner] = await tx.select().from(organizationMembers).where(and(eq(organizationMembers.organizationId, organizationId),
         eq(organizationMembers.userId, userId), eq(organizationMembers.role, "OWNER"))).for("share");
       if (owner) throw new ForbiddenException("Cannot verify an organization you own");
+      if (parsed.data.status === "VERIFIED" && !request)
+        throw new ConflictException("Approve a submitted organization verification request");
       await this.chain.verifyDeployment();
       const block = await this.chain.client.getBlock();
       const validUntil = new Date(parsed.data.validUntil);
@@ -52,15 +61,14 @@ export class OrganizationVerificationService {
         .orderBy(desc(organizationVerificationRecords.createdAt), desc(organizationVerificationRecords.id)).limit(1);
       // Serialized organization lock makes append ordering deterministic even in the same millisecond.
       const createdAt = new Date(Math.max(Date.now(), (previous?.createdAt.getTime() ?? 0) + 1));
-      const reportBytes = JSON.stringify({ schemaVersion: "advance.organization-verification.v1", context: this.chain.context,
+      const reportBytes = JSON.stringify({ schemaVersion: request ? "advance.organization-verification.v2" : "advance.organization-verification.v1", context: this.chain.context,
         organizationId, checkedBy: userId, createdAt: createdAt.toISOString(),
-        checkedBlock: block.number.toString(), checkedBlockHash: block.hash, ...parsed.data });
+        checkedBlock: block.number.toString(), checkedBlockHash: block.hash, ...parsed.data, ...(request ? { request } : {}) });
       const [record] = await tx.insert(organizationVerificationRecords).values({ organizationId, status: parsed.data.status,
         reportBytes, hash: sha256(reportBytes), checkedBy: userId, validUntil, createdAt }).returning();
       await tx.update(organizations).set({ verificationStatus: parsed.data.status === "VERIFIED" ? "verified" : "revoked",
         updatedAt: createdAt }).where(eq(organizations.id, organizationId));
       return { ...record, authority: "OFFCHAIN_VERIFICATION", onchainAction: null };
-    });
   }
 
   async latest(organizationId: string, chainTimestamp: bigint) {
@@ -76,6 +84,16 @@ export class OrganizationVerificationService {
       throw new BadRequestException("Verification fields differ from committed report");
     if (JSON.stringify(report.context) !== JSON.stringify(this.chain.context))
       return { verified: false as const, record, requiredAction: "RESOLVER_STOP_OR_REVERIFY" };
+    const [organization] = await this.db.select().from(organizations).where(eq(organizations.id, organizationId));
+    if (organization?.verificationStatus !== "verified")
+      return { verified: false as const, record, requiredAction: "REVERIFY_CHANGED_ORGANIZATION" };
+    if (report.request) {
+      const [request] = await this.db.select().from(schema.organizationVerificationRequests)
+        .where(eq(schema.organizationVerificationRequests.id, report.request.id));
+      if (!request || request.organizationId !== organizationId || request.status !== "APPROVED" || request.verificationRecordId !== record.id
+        || !request.snapshotBytes || sha256(request.snapshotBytes) !== report.request.snapshotHash || request.snapshotHash !== report.request.snapshotHash)
+        throw new BadRequestException("Verification request binding mismatch");
+    }
     return { verified: true as const, record, requiredAction: null };
   }
 }

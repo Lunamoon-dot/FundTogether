@@ -70,7 +70,8 @@ async function check(page, f) {
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Mobile page has no horizontal overflow')
   await page.screenshot({ path: 'C:/Users/dell/Desktop/FundTogether/.local/workflow-b/ui-evidence-mobile.png' })
   assert(errors.length === 0, `No React runtime errors (${scenario})`)
-  return { kind: 'mocked-API-browser-UI', status: 'PASS', checks, manualWalletSigning: false, realFinancialWrites: false }
+  return { checkedAt: new Date().toISOString(), deploymentId: f.workflow.plan.context.deploymentId,
+    kind: 'mocked-API-browser-UI', status: 'PASS', checks, manualWalletSigning: false, realFinancialWrites: false }
 }
 fs.writeFileSync(new URL('../../.local/workflow-b/ui-check.js', import.meta.url), `async page => (${check.toString()})(page, ${JSON.stringify(fixture)})`)
 console.log('UI fixture script prepared in ignored .local/workflow-b/ui-check.js')

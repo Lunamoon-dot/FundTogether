@@ -9,13 +9,20 @@ const read = file => JSON.parse(fs.readFileSync(path.join(local, file), 'utf8'))
 const manifest = read('generated/deployment.local.json');
 const result = { generatedAt: new Date().toISOString(), deploymentId: manifest.deploymentId,
   overall: 'IN_PROGRESS', evidence: {}, automatedCases: {}, humanAcceptance: 'TODO', independentReviewerExperiment: 'TODO', baselineComparison: 'TODO' };
-for (const file of ['journey-report.json', 'failure-journey-report.json', 'waiting-journey-report.json', 'comparison-report.json', 'recovery-report.json', 'indexer-report.json', 'http-report.json', 'frontend-wallet-report.json']) {
+const reports = {};
+for (const file of ['journey-report.json', 'failure-journey-report.json', 'waiting-journey-report.json', 'comparison-report.json', 'recovery-report.json', 'indexer-report.json', 'http-report.json', 'frontend-wallet-report.json',
+  'organization-onboarding-report.json', 'ui-owner-browser-report.json', 'ui-review-browser-report.json']) {
   if (!fs.existsSync(path.join(local, file))) { result.evidence[file] = { status: 'MISSING' }; continue; }
   const r = read(file);
   assert.equal(r.context?.deploymentId ?? r.deploymentId, manifest.deploymentId, `${file} belongs to another deployment`);
-  const passed = r.result === 'PASS' || r.status === 'PASS' || r.contractSchemas === 'PASS'
-    || (r.checks && !Array.isArray(r.checks) && Object.values(r.checks).every(v => v === 'PASS'));
-  result.evidence[file] = { status: passed ? 'AUTOMATED_PASS' : 'UNVERIFIED', testedAt: r.testedAt ?? null,
+  if (r.deploymentId !== undefined) assert.equal(r.deploymentId, manifest.deploymentId, `${file} has conflicting deployment identity`);
+  reports[file] = r;
+  const statuses = [r.result, r.status, r.contractSchemas].filter(value => value !== undefined);
+  const checkResults = r.checks && !Array.isArray(r.checks) ? Object.values(r.checks) : null;
+  const passed = (statuses.length > 0 ? statuses.every(value => value === 'PASS') : Boolean(checkResults?.length))
+    && (!checkResults || (checkResults.length > 0 && checkResults.every(value => value === 'PASS')));
+  result.evidence[file] = { status: passed ? 'AUTOMATED_PASS' : 'UNVERIFIED', testedAt: r.testedAt ?? r.checkedAt ?? null,
+    kind: r.kind ?? r.mode ?? null, limitations: r.limitations ?? null,
     sha256: createHash('sha256').update(fs.readFileSync(path.join(local, file))).digest('hex'), checks: r.assertions ?? r.checks ?? null };
   if (r.receipts) {
     const gas = {};
@@ -31,23 +38,23 @@ for (const file of ['journey-report.json', 'failure-journey-report.json', 'waiti
     result.evidence[file].timingScope = 'Automated RPC send-to-receipt/indexer only; excludes human/extension delay';
   }
 }
-const failure = fs.existsSync(path.join(local, 'failure-journey-report.json')) ? read('failure-journey-report.json') : null;
-const waiting = fs.existsSync(path.join(local, 'waiting-journey-report.json')) ? read('waiting-journey-report.json') : null;
-const outcomes = new Map([failure, waiting].filter(r => r?.result === 'PASS').flatMap(r => r.journeys.map(j => [j.label, j])));
-function outcome(id, label, expected, gaps = 'Manual extension/user acceptance TODO') {
-  const found = outcomes.get(label), campaign = found?.snapshot.campaign;
-  const valid = campaign && Object.entries(expected).every(([k, v]) => campaign[k] === v);
-  result.automatedCases[id] = { status: valid ? 'AUTOMATED_PASS_FOR_RECORDED_PATH' : 'TODO', label, expected, remaining: gaps };
+const failure = reports['failure-journey-report.json'];
+function outcome(id, label, expected, sourceReport = 'failure-journey-report.json') {
+  const report = reports[sourceReport];
+  const found = report?.journeys?.filter(j => j.label === label).at(-1), campaign = found?.snapshot?.campaign;
+  const valid = result.evidence[sourceReport]?.status === 'AUTOMATED_PASS' && campaign && Object.entries(expected).every(([k, v]) => campaign[k] === v);
+  result.automatedCases[id] = { status: valid ? 'AUTOMATED_PASS_FOR_RECORDED_PATH' : 'TODO', label, expected, sourceReport,
+    testedAt: result.evidence[sourceReport]?.testedAt ?? null, remaining: 'Manual extension/user acceptance TODO' };
 }
-outcome('T01', 'G1-complete', { state: 'COMPLETED', advanced: '2200000000', custody: '0' });
-outcome('T02', 'G2-complete', { state: 'COMPLETED', advanced: '3300000000', custody: '0' });
+outcome('T01', 'G1-complete', { state: 'COMPLETED', advanced: '2200000000', custody: '0' }, 'journey-report.json');
+outcome('T02', 'G2-complete', { state: 'COMPLETED', advanced: '3300000000', custody: '0' }, 'journey-report.json');
 outcome('T03', 'G1-partial-funding-timeout', { state: 'STOPPED', refunded: '1100000000', custody: '0' });
 outcome('T11', 'G2-case-stop', { state: 'STOPPED', basePool: '1100000000', supplementPool: '160000000', custody: '0' });
 outcome('T12', 'G1-zero-base-stop', { state: 'STOPPED', basePool: '0', supplementPool: '50000000', custody: '0' });
 outcome('T13', 'G1-return-before-stop', { state: 'STOPPED', basePool: '50000000', refunded: '50000000' });
 outcome('T14', 'Tiny-units-donorB-first', { basePool: '5', supplementPool: '2', refunded: '5', custody: '2' });
-outcome('T09', 'No-execution-evidence', { state: 'STOPPED', basePool: '0', custody: '0' });
-outcome('T10', 'Evidence-version-limit', { state: 'STOPPED', basePool: '0', advanced: '2200000000' });
+outcome('T09', 'No-execution-evidence', { state: 'STOPPED', basePool: '0', custody: '0' }, 'waiting-journey-report.json');
+outcome('T10', 'Evidence-version-limit', { state: 'STOPPED', basePool: '0', advanced: '2200000000' }, 'waiting-journey-report.json');
 for (const [id, remaining] of Object.entries({
   T04: 'Unit/HTTP/FE gates pass; manual wallet state switches remain',
   T05: 'Neutral bundles prepared; actual human criterion decisions missing',
@@ -60,10 +67,10 @@ for (const [id, remaining] of Object.entries({
   T18: 'Storage policy/hash/ACL/missing-file and RPC/indexer recovery automated; full outage UI/manual remains',
 })) result.automatedCases[id] = { status: 'PARTIAL_OR_HUMAN_TODO', remaining };
 if (failure?.injectedTransferFailure) result.evidence['failure-journey-report.json'].injectedTransferFailure = failure.injectedTransferFailure;
-if (failure?.result === 'PASS' && failure.injectedTransferFailure?.status === 'reverted' && failure.injectedTransferFailure.retainedRights)
+if (result.evidence['failure-journey-report.json'].status === 'AUTOMATED_PASS' && failure?.injectedTransferFailure?.status === 'reverted' && failure.injectedTransferFailure.retainedRights)
   result.automatedCases.T15 = { status: 'AUTOMATED_PASS_FOR_RECORDED_PATH', remaining: 'Forced token-transfer failure reverts and preserves refund rights; retry succeeds. Contract covers false/reentrant token. Manual extension retry remains.' };
-const comparison = fs.existsSync(path.join(local, 'comparison-report.json')) ? read('comparison-report.json') : null;
-if (comparison?.result === 'PASS') result.baselineComparison = { status: 'CONTROLLED_CONTRACT_COMPARISON_PASS', journeys: comparison.journeys,
+const comparison = reports['comparison-report.json'];
+if (result.evidence['comparison-report.json'].status === 'AUTOMATED_PASS') result.baselineComparison = { status: 'CONTROLLED_CONTRACT_COMPARISON_PASS', journeys: comparison.journeys,
   remaining: 'No full A/B browser comparison, human timing or independently validated reviewer experiment' };
 const reviewer = fs.existsSync(path.join(local, 'reviewer-results.json')) ? read('reviewer-results.json') : null;
 result.reviewer = { corpus: 'reviewer-corpus-v3/reviewer/catalog.json', samples: 12, authoredReferencesIndependent: false,

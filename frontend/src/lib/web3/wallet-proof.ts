@@ -56,7 +56,7 @@ export async function requestWalletProof<T extends { chainId: number }>({ expect
     request: () => { checkIdentity(); return sign(text, expected.address!) },
     timeoutMs,
     signal,
-    timeoutMessage: 'Ví chưa trả chữ ký trong 90 giây. Chưa xác nhận liên kết. Mở đúng ví đang kết nối để ký hoặc từ chối yêu cầu cũ; nếu extension bị crash, mở lại rồi tải lại trang.',
+    timeoutMessage: 'Ví chưa trả chữ ký trong thời gian chờ. Lần liên kết này đã dừng; chữ ký trả muộn sẽ bị bỏ qua. Nếu ví còn hiển thị yêu cầu cũ, từ chối yêu cầu đó trước khi thử lại.',
   })
   checkIdentity()
   return { message: text, signature }

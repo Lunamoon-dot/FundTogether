@@ -5,6 +5,9 @@ import { z } from 'zod'
 import { createOrganization, listOrganizations } from '../../lib/api/organizations'
 import type { Organization } from '../../lib/api/organizations'
 import { getErrorMessage } from '../../lib/api/error'
+import { organizationVerificationLabel } from './organization-verification'
+import { isAdvance } from '../../lib/web3/deployment-context'
+import { OrganizationVerificationBadge } from './OrganizationVerificationRequest'
 import './OrganizationsPage.css'
 
 const organizationFormSchema = z.object({
@@ -116,7 +119,7 @@ export function OrganizationsPage({ userId }: { userId: string }) {
               </div>
               <p className="organization-description">{organization.description}</p>
               <div className="organization-card-meta">
-                <span>Chưa xác minh</span>
+                {isAdvance ? <OrganizationVerificationBadge userId={userId} organizationId={organization.id} /> : <span>{organizationVerificationLabel(organization.verificationStatus)}</span>}
                 <span>Tạo ngày {new Intl.DateTimeFormat('vi-VN').format(new Date(organization.createdAt))}</span>
               </div>
               <p className="muted">{organization.representativeWallet

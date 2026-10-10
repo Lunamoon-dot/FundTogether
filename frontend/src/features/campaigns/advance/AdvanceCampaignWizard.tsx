@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { advanceCreateCampaign, advanceGetDraft, advanceUpdateDraft } from '../../../lib/api/generated/advance'
 import type { AdvanceDraft } from '../../../lib/api/generated/advance'
 import { getErrorMessage } from '../../../lib/api/error'
-import { documentKinds, editGiftPlan, giftFormInput, giftTemplate } from './advance-plan'
+import { documentKindLabels, documentKinds, editGiftPlan, giftFormInput, giftTemplate } from './advance-plan'
 import type { GiftForm } from './advance-plan'
 
 export function AdvanceCampaignWizard({ organizationId, initialCampaign, onSaved, onClose }: {
@@ -61,18 +61,30 @@ export function AdvanceCampaignWizard({ organizationId, initialCampaign, onSaved
       <label>Công việc cần hoàn thành<textarea required value={s.description} onChange={e => stage(i, { description: e.target.value })} /></label>
       <label>Hàng hóa mỗi suất<textarea required value={s.goods} onChange={e => stage(i, { goods: e.target.value })} /></label>
       <h3>Tiêu chí nghiệm thu</h3>
-      {s.acceptanceCriteria.map((criterion, ci) => <div className="advance-form-row" key={criterion.criterionId}>
-        <label>Tiêu chí {ci + 1}<textarea required value={criterion.description} onChange={e => stage(i, {
-          acceptanceCriteria: s.acceptanceCriteria.map((c, n) => n === ci ? { ...c, description: e.target.value } : c) })} /></label>
-        <div className="advance-checks" role="group" aria-label={`Tài liệu cho tiêu chí ${ci + 1}`}>
-          {documentKinds.map(kind => <label key={kind}><input type="checkbox" checked={criterion.requiredDocuments.includes(kind)} onChange={e => stage(i, {
-            acceptanceCriteria: s.acceptanceCriteria.map((c, n) => n !== ci ? c : { ...c, requiredDocuments: e.target.checked
-              ? [...c.requiredDocuments, kind] : c.requiredDocuments.filter(k => k !== kind) }) })} />{kind}</label>)}
+      <div className="advance-criteria">
+      {s.acceptanceCriteria.map((criterion, ci) => <section className="advance-criterion" key={criterion.criterionId}>
+        <div className="advance-criterion-heading">
+          <span className="advance-criterion-index">Tiêu chí {ci + 1}</span>
+          {s.acceptanceCriteria.length > 1 && <button type="button" className="advance-criterion-remove" aria-label={`Xóa tiêu chí ${ci + 1}`}
+            disabled={busy || baseline?.frozen} onClick={() => stage(i, {
+              acceptanceCriteria: s.acceptanceCriteria.filter((_, n) => n !== ci),
+              tasks: s.tasks.map(t => ({ ...t, criterionIds: t.criterionIds.filter(id => id !== criterion.criterionId) })) })}>Xóa</button>}
         </div>
-        <button type="button" className="button button--secondary" disabled={s.acceptanceCriteria.length === 1} onClick={() => stage(i, {
-          acceptanceCriteria: s.acceptanceCriteria.filter((_, n) => n !== ci),
-          tasks: s.tasks.map(t => ({ ...t, criterionIds: t.criterionIds.filter(id => id !== criterion.criterionId) })) })}>Bỏ tiêu chí</button>
-      </div>)}
+        <label className="advance-criterion-description">Kết quả cần đạt<textarea required value={criterion.description} onChange={e => stage(i, {
+          acceptanceCriteria: s.acceptanceCriteria.map((c, n) => n === ci ? { ...c, description: e.target.value } : c) })} /></label>
+        <fieldset className="advance-evidence">
+          <legend>Bằng chứng cần nộp</legend>
+          <p id={`stage-${i + 1}-criterion-${ci + 1}-evidence-hint`}>Chọn loại tài liệu cần dùng để kiểm tra kết quả này.</p>
+          <div className="advance-document-options" role="group" aria-label={`Bằng chứng cho tiêu chí ${ci + 1}`}
+            aria-describedby={`stage-${i + 1}-criterion-${ci + 1}-evidence-hint`}>
+          {documentKinds.map(kind => <label className={`advance-document-option${criterion.requiredDocuments.includes(kind) ? ' advance-document-option--selected' : ''}`} key={kind}>
+            <input type="checkbox" checked={criterion.requiredDocuments.includes(kind)} onChange={e => stage(i, {
+            acceptanceCriteria: s.acceptanceCriteria.map((c, n) => n !== ci ? c : { ...c, requiredDocuments: e.target.checked
+              ? [...c.requiredDocuments, kind] : c.requiredDocuments.filter(k => k !== kind) }) })} />{documentKindLabels[kind]}</label>)}
+          </div>
+        </fieldset>
+      </section>)}
+      </div>
       <button type="button" className="button button--secondary" onClick={() => stage(i, { acceptanceCriteria: [...s.acceptanceCriteria,
         { criterionId: crypto.randomUUID(), description: '', requiredDocuments: ['REPORT'] }] })}>Thêm tiêu chí</button>
       <h3>Công việc và tiêu chí liên quan</h3>

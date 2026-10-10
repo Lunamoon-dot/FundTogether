@@ -16,7 +16,7 @@ describe("staff verification and substantive decision policy", () => {
     for (const method of ["from", "where", "for", "limit"]) q[method] = () => q;
     q.then = (resolve: (rows: { roles: string[] }[]) => unknown) => resolve([{ roles: ["RESOLVER"] }]);
     const tx = { select: () => q, insert: jest.fn() };
-    const db = { transaction: async (callback: (value: typeof tx) => unknown) => callback(tx) };
+    const db = { select: tx.select, transaction: async (callback: (value: typeof tx) => unknown) => callback(tx) };
     const service = new OrganizationVerificationService(db as never, {} as never);
     await expect(service.record("org", "user", input)).rejects.toBeInstanceOf(ForbiddenException);
     expect(tx.insert).not.toHaveBeenCalled();

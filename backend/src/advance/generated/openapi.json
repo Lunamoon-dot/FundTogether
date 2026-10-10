@@ -1598,6 +1598,578 @@
         "security": []
       }
     },
+    "/v1/advance/verification-requests/{id}": {
+      "get": {
+        "operationId": "advanceOrganizationRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Account session required"
+          },
+          "403": {
+            "description": "Account or wallet lacks authority"
+          },
+          "409": {
+            "description": "State/version/checkpoint changed; reload"
+          },
+          "503": {
+            "description": "RPC, indexer or storage unavailable"
+          }
+        },
+        "tags": [
+          "OrganizationRequest"
+        ],
+        "security": [
+          {
+            "workflowBSession": []
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "advanceSaveOrganizationRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Account session required"
+          },
+          "403": {
+            "description": "Account or wallet lacks authority"
+          },
+          "409": {
+            "description": "State/version/checkpoint changed; reload"
+          },
+          "503": {
+            "description": "RPC, indexer or storage unavailable"
+          }
+        },
+        "tags": [
+          "OrganizationRequest"
+        ],
+        "security": [
+          {
+            "workflowBSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationRequestSave"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/advance/verification-requests/{id}/submit": {
+      "post": {
+        "operationId": "advanceSubmitOrganizationRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Account session required"
+          },
+          "403": {
+            "description": "Account or wallet lacks authority"
+          },
+          "409": {
+            "description": "State/version/checkpoint changed; reload"
+          },
+          "503": {
+            "description": "RPC, indexer or storage unavailable"
+          }
+        },
+        "tags": [
+          "OrganizationRequest"
+        ],
+        "security": [
+          {
+            "workflowBSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationRequestSubmit"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/advance/verification-requests/{id}/cancel": {
+      "post": {
+        "operationId": "advanceCancelOrganizationRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Account session required"
+          },
+          "403": {
+            "description": "Account or wallet lacks authority"
+          },
+          "409": {
+            "description": "State/version/checkpoint changed; reload"
+          },
+          "503": {
+            "description": "RPC, indexer or storage unavailable"
+          }
+        },
+        "tags": [
+          "OrganizationRequest"
+        ],
+        "security": [
+          {
+            "workflowBSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationRequestRevision"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/advance/verification-requests/{id}/files": {
+      "post": {
+        "operationId": "advanceUploadOrganizationDocument",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Account session required"
+          },
+          "403": {
+            "description": "Account or wallet lacks authority"
+          },
+          "409": {
+            "description": "State/version/checkpoint changed; reload"
+          },
+          "503": {
+            "description": "RPC, indexer or storage unavailable"
+          }
+        },
+        "tags": [
+          "OrganizationRequest"
+        ],
+        "security": [
+          {
+            "workflowBSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file",
+                  "kind",
+                  "expectedRevision"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "IDENTITY",
+                      "REPRESENTATION",
+                      "ACTIVITY",
+                      "OTHER"
+                    ]
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/advance/verification-requests/{id}/files/{documentId}/download": {
+      "get": {
+        "operationId": "advanceDownloadOrganizationDocument",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private verified document",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "OrganizationRequest"
+        ],
+        "security": [
+          {
+            "workflowBSession": []
+          }
+        ]
+      }
+    },
+    "/v1/advance/organizations/{id}/verification-requests": {
+      "get": {
+        "operationId": "advanceOrganizationRequests",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationRequestList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Account session required"
+          },
+          "403": {
+            "description": "Account or wallet lacks authority"
+          },
+          "409": {
+            "description": "State/version/checkpoint changed; reload"
+          },
+          "503": {
+            "description": "RPC, indexer or storage unavailable"
+          }
+        },
+        "tags": [
+          "OrganizationRequestList"
+        ],
+        "security": [
+          {
+            "workflowBSession": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "advanceCreateOrganizationRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Account session required"
+          },
+          "403": {
+            "description": "Account or wallet lacks authority"
+          },
+          "409": {
+            "description": "State/version/checkpoint changed; reload"
+          },
+          "503": {
+            "description": "RPC, indexer or storage unavailable"
+          }
+        },
+        "tags": [
+          "OrganizationRequestList"
+        ],
+        "security": [
+          {
+            "workflowBSession": []
+          }
+        ]
+      }
+    },
+    "/v1/advance/internal/verification-requests": {
+      "get": {
+        "operationId": "advanceOrganizationRequestQueue",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationRequestQueue"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Account session required"
+          },
+          "403": {
+            "description": "Account or wallet lacks authority"
+          },
+          "409": {
+            "description": "State/version/checkpoint changed; reload"
+          },
+          "503": {
+            "description": "RPC, indexer or storage unavailable"
+          }
+        },
+        "tags": [
+          "OrganizationRequestReview"
+        ],
+        "security": [
+          {
+            "workflowBSession": []
+          }
+        ]
+      }
+    },
+    "/v1/advance/internal/verification-requests/{id}/decisions": {
+      "post": {
+        "operationId": "advanceDecideOrganizationRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Account session required"
+          },
+          "403": {
+            "description": "Account or wallet lacks authority"
+          },
+          "409": {
+            "description": "State/version/checkpoint changed; reload"
+          },
+          "503": {
+            "description": "RPC, indexer or storage unavailable"
+          }
+        },
+        "tags": [
+          "OrganizationRequestReview"
+        ],
+        "security": [
+          {
+            "workflowBSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationDecision"
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/register": {
       "post": {
         "operationId": "AuthController_register",
@@ -1685,6 +2257,20 @@
     "/auth/session": {
       "get": {
         "operationId": "AuthController_session",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/wallets/unlink": {
+      "post": {
+        "operationId": "AuthController_unlinkWallet",
         "parameters": [],
         "responses": {
           "200": {
@@ -2885,6 +3471,356 @@
           "validUntil"
         ],
         "additionalProperties": false
+      },
+      "OrganizationRequestSave": {
+        "type": "object",
+        "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 2147483646
+          },
+          "content": {
+            "type": "object",
+            "properties": {
+              "profile": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "REGISTERED_ORGANIZATION",
+                      "VOLUNTEER_GROUP"
+                    ]
+                  },
+                  "legalName": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "registrationNumber": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "address": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "activityScope": {
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "representativeName": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "representativeRole": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "authorityBasis": {
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "identitySource": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "activityEvidence": {
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "contact": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "kind",
+                  "legalName",
+                  "registrationNumber",
+                  "address",
+                  "activityScope",
+                  "representativeName",
+                  "representativeRole",
+                  "authorityBasis",
+                  "identitySource",
+                  "activityEvidence",
+                  "contact"
+                ],
+                "additionalProperties": false
+              },
+              "documentIds": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "responseToReview": {
+                "type": "string",
+                "maxLength": 10000
+              }
+            },
+            "required": [
+              "profile",
+              "documentIds",
+              "responseToReview"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationRequestSubmit": {
+        "type": "object",
+        "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 2147483646
+          },
+          "declaration": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "declaration"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationRequestRevision": {
+        "type": "object",
+        "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 2147483646
+          }
+        },
+        "required": [
+          "expectedRevision"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationDecision": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "expectedRevision": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 2147483646
+              },
+              "decision": {
+                "type": "string",
+                "enum": [
+                  "APPROVE"
+                ]
+              },
+              "reviewNote": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 10000
+              },
+              "verification": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "VERIFIED"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "sources": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "description": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 10000
+                        },
+                        "reference": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 10000
+                        }
+                      },
+                      "required": [
+                        "description",
+                        "reference"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "scope": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "limits": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "validUntil": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  }
+                },
+                "required": [
+                  "status",
+                  "summary",
+                  "reason",
+                  "sources",
+                  "scope",
+                  "limits",
+                  "validUntil"
+                ],
+                "additionalProperties": false
+              },
+              "checks": {
+                "type": "object",
+                "properties": {
+                  "identity": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  },
+                  "representation": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  },
+                  "activity": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  },
+                  "contact": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  }
+                },
+                "required": [
+                  "identity",
+                  "representation",
+                  "activity",
+                  "contact"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "expectedRevision",
+              "decision",
+              "reviewNote",
+              "verification",
+              "checks"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "expectedRevision": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 2147483646
+              },
+              "decision": {
+                "type": "string",
+                "enum": [
+                  "REQUEST_CHANGES"
+                ]
+              },
+              "reviewNote": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 10000
+              },
+              "missingItems": {
+                "minItems": 1,
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                }
+              }
+            },
+            "required": [
+              "expectedRevision",
+              "decision",
+              "reviewNote",
+              "missingItems"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "expectedRevision": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 2147483646
+              },
+              "decision": {
+                "type": "string",
+                "enum": [
+                  "REJECT"
+                ]
+              },
+              "reviewNote": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 10000
+              }
+            },
+            "required": [
+              "expectedRevision",
+              "decision",
+              "reviewNote"
+            ],
+            "additionalProperties": false
+          }
+        ]
       },
       "EvidenceSaveInput": {
         "type": "object",
@@ -7694,6 +8630,761 @@
           "rpc",
           "storage",
           "indexer"
+        ]
+      },
+      "OrganizationRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "UNDER_REVIEW",
+              "CHANGES_REQUESTED",
+              "APPROVED",
+              "REJECTED",
+              "CANCELLED"
+            ]
+          },
+          "revision": {
+            "type": "number"
+          },
+          "content": {
+            "type": "object",
+            "properties": {
+              "profile": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "REGISTERED_ORGANIZATION",
+                      "VOLUNTEER_GROUP"
+                    ]
+                  },
+                  "legalName": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "registrationNumber": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "address": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "activityScope": {
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "representativeName": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "representativeRole": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "authorityBasis": {
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "identitySource": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "activityEvidence": {
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "contact": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "kind",
+                  "legalName",
+                  "registrationNumber",
+                  "address",
+                  "activityScope",
+                  "representativeName",
+                  "representativeRole",
+                  "authorityBasis",
+                  "identitySource",
+                  "activityEvidence",
+                  "contact"
+                ],
+                "additionalProperties": false
+              },
+              "documentIds": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "responseToReview": {
+                "type": "string",
+                "maxLength": 10000
+              }
+            },
+            "required": [
+              "profile",
+              "documentIds",
+              "responseToReview"
+            ],
+            "additionalProperties": false
+          },
+          "policyId": {
+            "type": "string"
+          },
+          "snapshotBytes": {
+            "nullable": true,
+            "type": "string"
+          },
+          "snapshotHash": {
+            "nullable": true,
+            "type": "string"
+          },
+          "submittedAt": {
+            "nullable": true,
+            "type": "string"
+          },
+          "reviewedAt": {
+            "nullable": true,
+            "type": "string"
+          },
+          "reviewedBy": {
+            "nullable": true,
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "reviewNote": {
+            "nullable": true,
+            "type": "string"
+          },
+          "missingItems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "verificationRecordId": {
+            "nullable": true,
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "createdBy": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "organizationId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "requestId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "uploadedBy": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "originalName": {
+                  "type": "string"
+                },
+                "mediaType": {
+                  "type": "string"
+                },
+                "byteSize": {
+                  "type": "number"
+                },
+                "hash": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "organizationId",
+                "requestId",
+                "uploadedBy",
+                "kind",
+                "originalName",
+                "mediaType",
+                "byteSize",
+                "hash",
+                "createdAt"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "status",
+          "revision",
+          "content",
+          "policyId",
+          "snapshotBytes",
+          "snapshotHash",
+          "submittedAt",
+          "reviewedAt",
+          "reviewedBy",
+          "reviewNote",
+          "missingItems",
+          "verificationRecordId",
+          "createdBy",
+          "createdAt",
+          "updatedAt",
+          "documents"
+        ]
+      },
+      "OrganizationVerificationSummary": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "nullable": true,
+            "type": "string",
+            "enum": [
+              "UNVERIFIED",
+              "VERIFIED",
+              "EXPIRED",
+              "SUSPENDED"
+            ]
+          },
+          "verifiedAt": {
+            "nullable": true,
+            "type": "string"
+          },
+          "verificationExpiresAt": {
+            "nullable": true,
+            "type": "string"
+          },
+          "recordId": {
+            "nullable": true,
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "requiresReverification": {
+            "type": "boolean"
+          },
+          "checkedBlock": {
+            "nullable": true,
+            "type": "string"
+          },
+          "chainTimestamp": {
+            "nullable": true,
+            "type": "string"
+          },
+          "error": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "verifiedAt",
+          "verificationExpiresAt",
+          "recordId",
+          "requiresReverification",
+          "checkedBlock",
+          "chainTimestamp",
+          "error"
+        ]
+      },
+      "OrganizationRequestList": {
+        "type": "object",
+        "properties": {
+          "organization": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": {
+                "type": "string"
+              },
+              "verificationStatus": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "verificationStatus"
+            ]
+          },
+          "requests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "organizationId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "DRAFT",
+                    "UNDER_REVIEW",
+                    "CHANGES_REQUESTED",
+                    "APPROVED",
+                    "REJECTED",
+                    "CANCELLED"
+                  ]
+                },
+                "revision": {
+                  "type": "number"
+                },
+                "content": {
+                  "type": "object",
+                  "properties": {
+                    "profile": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "REGISTERED_ORGANIZATION",
+                            "VOLUNTEER_GROUP"
+                          ]
+                        },
+                        "legalName": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "registrationNumber": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "address": {
+                          "type": "string",
+                          "maxLength": 2000
+                        },
+                        "activityScope": {
+                          "type": "string",
+                          "maxLength": 4000
+                        },
+                        "representativeName": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "representativeRole": {
+                          "type": "string",
+                          "maxLength": 500
+                        },
+                        "authorityBasis": {
+                          "type": "string",
+                          "maxLength": 4000
+                        },
+                        "identitySource": {
+                          "type": "string",
+                          "maxLength": 2000
+                        },
+                        "activityEvidence": {
+                          "type": "string",
+                          "maxLength": 4000
+                        },
+                        "contact": {
+                          "type": "string",
+                          "maxLength": 1000
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "legalName",
+                        "registrationNumber",
+                        "address",
+                        "activityScope",
+                        "representativeName",
+                        "representativeRole",
+                        "authorityBasis",
+                        "identitySource",
+                        "activityEvidence",
+                        "contact"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "documentIds": {
+                      "maxItems": 20,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      }
+                    },
+                    "responseToReview": {
+                      "type": "string",
+                      "maxLength": 10000
+                    }
+                  },
+                  "required": [
+                    "profile",
+                    "documentIds",
+                    "responseToReview"
+                  ],
+                  "additionalProperties": false
+                },
+                "policyId": {
+                  "type": "string"
+                },
+                "snapshotBytes": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "snapshotHash": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "submittedAt": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "reviewedAt": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "reviewedBy": {
+                  "nullable": true,
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "reviewNote": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "missingItems": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "verificationRecordId": {
+                  "nullable": true,
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "createdBy": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                },
+                "documents": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "organizationId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "requestId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "uploadedBy": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "kind": {
+                        "type": "string"
+                      },
+                      "originalName": {
+                        "type": "string"
+                      },
+                      "mediaType": {
+                        "type": "string"
+                      },
+                      "byteSize": {
+                        "type": "number"
+                      },
+                      "hash": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "organizationId",
+                      "requestId",
+                      "uploadedBy",
+                      "kind",
+                      "originalName",
+                      "mediaType",
+                      "byteSize",
+                      "hash",
+                      "createdAt"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "organizationId",
+                "status",
+                "revision",
+                "content",
+                "policyId",
+                "snapshotBytes",
+                "snapshotHash",
+                "submittedAt",
+                "reviewedAt",
+                "reviewedBy",
+                "reviewNote",
+                "missingItems",
+                "verificationRecordId",
+                "createdBy",
+                "createdAt",
+                "updatedAt",
+                "documents"
+              ]
+            }
+          },
+          "isOwner": {
+            "type": "boolean"
+          },
+          "verification": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "nullable": true,
+                "type": "string",
+                "enum": [
+                  "UNVERIFIED",
+                  "VERIFIED",
+                  "EXPIRED",
+                  "SUSPENDED"
+                ]
+              },
+              "verifiedAt": {
+                "nullable": true,
+                "type": "string"
+              },
+              "verificationExpiresAt": {
+                "nullable": true,
+                "type": "string"
+              },
+              "recordId": {
+                "nullable": true,
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "requiresReverification": {
+                "type": "boolean"
+              },
+              "checkedBlock": {
+                "nullable": true,
+                "type": "string"
+              },
+              "chainTimestamp": {
+                "nullable": true,
+                "type": "string"
+              },
+              "error": {
+                "nullable": true,
+                "type": "string"
+              }
+            },
+            "required": [
+              "status",
+              "verifiedAt",
+              "verificationExpiresAt",
+              "recordId",
+              "requiresReverification",
+              "checkedBlock",
+              "chainTimestamp",
+              "error"
+            ]
+          },
+          "audit": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "organizationId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "requestId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "actorId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "action": {
+                  "type": "string"
+                },
+                "changedFields": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "happenedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "organizationId",
+                "requestId",
+                "actorId",
+                "action",
+                "changedFields",
+                "happenedAt"
+              ]
+            }
+          }
+        },
+        "required": [
+          "organization",
+          "requests",
+          "isOwner",
+          "verification",
+          "audit"
+        ]
+      },
+      "OrganizationRequestQueue": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "organizationId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "DRAFT",
+                    "UNDER_REVIEW",
+                    "CHANGES_REQUESTED",
+                    "APPROVED",
+                    "REJECTED",
+                    "CANCELLED"
+                  ]
+                },
+                "submittedAt": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "reviewedAt": {
+                  "nullable": true,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "organizationId",
+                "name",
+                "status",
+                "submittedAt",
+                "reviewedAt"
+              ]
+            }
+          },
+          "nextOffset": {
+            "nullable": true,
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "nextOffset"
         ]
       },
       "VerificationHistory": {

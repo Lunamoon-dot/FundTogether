@@ -5,11 +5,15 @@ import { giftDraftSchema, giftUpdateSchema, submissionRevisionSchema } from "./a
 import { advanceActionSchema } from "./advance-workflow.schema";
 import { advanceReviewSchema, organizationVerificationSchema } from "./advance-review.schema";
 import { advanceEvidenceContentSchema } from "./advance-evidence.schema";
+import * as organizationApi from "./organization-request-api.schema";
+import { organizationDecisionSchema, organizationRequestRevisionSchema, organizationRequestSaveSchema, organizationRequestSubmitSchema } from "./organization-request.schema";
 
 export function completeAdvanceOpenApi(document: OpenAPIObject): OpenAPIObject {
   const schemas: Record<string, z.ZodType> = { GiftDraft: giftDraftSchema, GiftUpdate: giftUpdateSchema,
     SubmissionRevision: submissionRevisionSchema, AdvanceActionInput: advanceActionSchema, AdvanceReviewInput: advanceReviewSchema,
     OrganizationVerificationInput: organizationVerificationSchema,
+    OrganizationRequestSave: organizationRequestSaveSchema, OrganizationRequestSubmit: organizationRequestSubmitSchema,
+    OrganizationRequestRevision: organizationRequestRevisionSchema, OrganizationDecision: organizationDecisionSchema,
     EvidenceSaveInput: z.object({ expectedRevision: z.number().int().min(0), content: advanceEvidenceContentSchema }),
     OriginalManifest: z.object({ manifestBytes: z.string(), evidenceHash: z.string() }),
     PublicManifest: z.object({ manifestBytes: z.string(), publicHash: z.string() }),
@@ -17,7 +21,7 @@ export function completeAdvanceOpenApi(document: OpenAPIObject): OpenAPIObject {
     VerificationRecord: z.object({ id: z.uuid(), organizationId: z.uuid(), status: z.enum(["VERIFIED", "REVOKED"]), reportBytes: z.string(),
       hash: z.string(), checkedBy: z.uuid(), validUntil: z.string(), createdAt: z.string(), authority: z.literal("OFFCHAIN_VERIFICATION"), onchainAction: z.null() }),
   };
-  for (const [key, value] of Object.entries(api)) schemas[key[0].toUpperCase() + key.slice(1).replace(/Schema$/, "")] = value;
+  for (const [key, value] of Object.entries({ ...api, ...organizationApi })) schemas[key[0].toUpperCase() + key.slice(1).replace(/Schema$/, "")] = value;
   schemas.VerificationHistory = z.array(schemas.VerificationRecord);
   schemas.VerificationQueue = z.array(z.object({ id: z.uuid(), name: z.string(), description: z.string(), verificationStatus: z.string() }));
   document.components ??= {};
@@ -58,6 +62,23 @@ export function completeAdvanceOpenApi(document: OpenAPIObject): OpenAPIObject {
   route("/v1/advance/internal/organizations/{id}/verifications", "post", "advanceVerifyOrganization", "VerificationRecord", "OrganizationVerificationInput");
   route("/v1/advance/internal/organizations", "get", "advanceVerificationQueue", "VerificationQueue");
   route("/v1/advance/internal/organizations/{id}/verifications", "get", "advanceVerificationHistory", "VerificationHistory");
+  route("/v1/advance/organizations/{id}/verification-requests", "get", "advanceOrganizationRequests", "OrganizationRequestList");
+  route("/v1/advance/organizations/{id}/verification-requests", "post", "advanceCreateOrganizationRequest", "OrganizationRequest");
+  route("/v1/advance/verification-requests/{id}", "get", "advanceOrganizationRequest", "OrganizationRequest");
+  route("/v1/advance/verification-requests/{id}", "patch", "advanceSaveOrganizationRequest", "OrganizationRequest", "OrganizationRequestSave");
+  route("/v1/advance/verification-requests/{id}/submit", "post", "advanceSubmitOrganizationRequest", "OrganizationRequest", "OrganizationRequestSubmit");
+  route("/v1/advance/verification-requests/{id}/cancel", "post", "advanceCancelOrganizationRequest", "OrganizationRequest", "OrganizationRequestRevision");
+  route("/v1/advance/internal/verification-requests", "get", "advanceOrganizationRequestQueue", "OrganizationRequestQueue");
+  route("/v1/advance/internal/verification-requests/{id}/decisions", "post", "advanceDecideOrganizationRequest", "OrganizationRequest", "OrganizationDecision");
+  const organizationUpload = "/v1/advance/verification-requests/{id}/files";
+  route(organizationUpload, "post", "advanceUploadOrganizationDocument", "OrganizationRequest");
+  document.paths[organizationUpload].post!.requestBody = { required: true, content: { "multipart/form-data": { schema: {
+    type: "object", required: ["file", "kind", "expectedRevision"], properties: { file: { type: "string", format: "binary" },
+      kind: { type: "string", enum: ["IDENTITY", "REPRESENTATION", "ACTIVITY", "OTHER"] }, expectedRevision: { type: "integer", minimum: 1 } } } } } };
+  const organizationDownload = document.paths["/v1/advance/verification-requests/{id}/files/{documentId}/download"].get!;
+  organizationDownload.operationId = "advanceDownloadOrganizationDocument";
+  organizationDownload.security = [{ workflowBSession: [] }];
+  organizationDownload.responses = { "200": { description: "Private verified document", content: { "application/octet-stream": { schema: { type: "string", format: "binary" } } } } };
   route("/v1/advance/campaigns/{id}/stages/{stage}/evidence", "get", "advanceGetEvidenceDraft", "AdvanceEvidenceDraft");
   route("/v1/advance/campaigns/{id}/stages/{stage}/evidence", "patch", "advanceSaveEvidenceDraft", "AdvanceEvidenceDraft", "EvidenceSaveInput");
   route("/v1/advance/campaigns/{id}/stages/{stage}/evidence/freeze", "post", "advanceFreezeEvidence", "AdvanceFrozenPackage", "SubmissionRevision");

@@ -20,6 +20,8 @@ import { AdvanceIndexerService } from "./advance-indexer.service";
 import { AdvanceWorkflowService } from "./advance-workflow.service";
 import { AdvancePublicController, AdvanceWorkflowController } from "./advance-public.controller";
 import { AdvanceHealthController } from "./advance-health.controller";
+import { OrganizationRequestService } from "./organization-request.service";
+import { OrganizationRequestController, OrganizationRequestListController, OrganizationRequestReviewController, OrganizationRequestUploadGuard } from "./organization-request.controller";
 import { AdvanceEvidenceController, AdvanceEvidencePackageController, AdvancePublicEvidenceController,
   AdvanceEvidenceUploadGuard, AdvancePublicationUploadGuard } from "./advance-evidence.controller";
 
@@ -27,7 +29,8 @@ import { AdvanceEvidenceController, AdvanceEvidencePackageController, AdvancePub
   imports: [AuthModule, DatabaseModule],
   controllers: [AdvanceCampaignController, OrganizationVerificationController, AdvanceReviewController,
     AdvanceEvidenceController, AdvanceEvidencePackageController, AdvancePublicEvidenceController,
-    AdvancePublicController, AdvanceWorkflowController, AdvanceHealthController],
+    AdvancePublicController, AdvanceWorkflowController, AdvanceHealthController,
+    OrganizationRequestController, OrganizationRequestListController, OrganizationRequestReviewController],
   providers: [
     {
       provide: ADVANCE_DEPLOYMENT,
@@ -44,6 +47,7 @@ import { AdvanceEvidenceController, AdvanceEvidencePackageController, AdvancePub
     AdvanceBlockchainService, EvidenceStorageService, EvidenceAccessService, AdvanceCampaignService, OrganizationVerificationService, AdvanceReviewService,
     AdvanceEvidenceService, AdvanceEvidenceUploadGuard, AdvancePublicationUploadGuard,
     AdvanceIndexerService, AdvanceWorkflowService,
+    OrganizationRequestService, OrganizationRequestUploadGuard,
   ],
   exports: [AdvanceBlockchainService, EvidenceStorageService, EvidenceAccessService, ADVANCE_DEPLOYMENT],
 })

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { amountUnits, giftFormInput, giftTemplate } from '../src/features/campaigns/advance/advance-plan.ts'
+import { amountUnits, documentKinds, documentKindLabels, giftFormInput, giftTemplate } from '../src/features/campaigns/advance/advance-plan.ts'
 function valid(count = 1) {
   const form = giftTemplate(count)
   return { ...form, title: 'Synthetic plan', description: 'Controlled gift delivery', recipientScope: 'Synthetic cohort', eligibilityBasis: 'Controlled authority',
@@ -12,6 +12,10 @@ test('G1/G2 preserve integer budgets, recipient channel and criterion/task refer
   assert.equal(one.stages[0].budgetUnits, '2200000000')
   assert.equal(three.channel, 'DIRECT'); assert.equal(three.stages.reduce((sum, s) => sum + BigInt(s.budgetUnits), 0n), 3300000000n)
   assert.ok(three.stages.every(s => s.targetPackages === 50)); assert.ok(!('budget' in three.stages[0]))
+})
+test('every evidence kind has a readable Vietnamese label while keeping its API key', () => {
+  assert.deepEqual(Object.keys(documentKindLabels), [...documentKinds])
+  assert.deepEqual(Object.values(documentKindLabels), ['Báo cáo', 'Hóa đơn', 'Biên nhận', 'Chứng từ thanh toán', 'Biên bản bàn giao', 'Ảnh minh chứng', 'Khác'])
 })
 test('rejects unsafe financial strings, missing criteria/documents and mismatched task references', () => {
   assert.equal(amountUnits('9007199254.740993'), '9007199254740993')

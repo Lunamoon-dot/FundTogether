@@ -33,46 +33,28 @@ export function PublicArea({
   const organizations = path === '/organizations' || Boolean(organizationProfile)
   const detail = /^\/campaigns\/([^/]+)$/.exec(path)
   const review = /^\/review(?:\/([^/]+))?$/.exec(path)
+  const staff = session?.roles.some(role => role === 'ADMIN' || role === 'RESOLVER') ?? false
+  const organizationAdmin = isAdvance && session?.roles.includes('ADMIN')
+  const internalHref = organizationAdmin ? '#/internal/organizations' : '#/internal/campaigns'
+  const internalLabel = organizationAdmin ? 'Xác thực tổ chức · ADMIN' : 'Resolver / nội bộ'
 
   return (
     <div className="public-area">
       <aside className="public-sidebar" aria-label="Khu vực người dùng">
         <a className="brand" href="#/" aria-label="FundTogether — Khám phá">
-          <span className="brand-mark">F</span>
-          <span>FundTogether</span>
+          <span className="brand-mark">F</span><span>FundTogether</span>
         </a>
         <nav className="public-nav" aria-label="Điều hướng người dùng">
-          <a href="#/" aria-current={feed ? 'page' : undefined}>
-            Khám phá
-          </a>
-          <a
-            href="#/contributions"
-            aria-current={contributions ? 'page' : undefined}
-          >
-            Đóng góp của tôi
-          </a>
-          <a href="#/internal/campaigns">Resolver / nội bộ</a>
+          <a href="#/" aria-current={feed ? 'page' : undefined}>Khám phá</a>
+          <a href="#/contributions" aria-current={contributions ? 'page' : undefined}>Đóng góp của tôi</a>
+          {session && <a href="#/organizations" aria-current={organizations ? 'page' : undefined}>Tổ chức của tôi</a>}
+          {session && <a href="#/workspace" aria-current={path === '/workspace' ? 'page' : undefined}>Quản lý gây quỹ</a>}
+          {staff && <a href={internalHref}>{internalLabel}</a>}
         </nav>
         <div className="public-sidebar-account">
-          <a className="public-sidebar-action" href="#/organizations"
-            aria-current={organizations ? 'page' : undefined}>
-            Tổ chức của tôi
-          </a>
-          <a
-            className="public-sidebar-action"
-            href="#/workspace"
-            aria-current={path === '/workspace' ? 'page' : undefined}
-          >
-            Quản lý gây quỹ
-          </a>
-          <a
-            className="public-sidebar-action"
-            href="#/account"
-            aria-current={path === '/account' ? 'page' : undefined}
-          >
-            <span className="public-avatar" aria-hidden="true">
-              {session ? 'U' : '↗'}
-            </span>
+          <span className="network-pill">Mạng thử nghiệm · MockUSDC</span>
+          <a className="public-sidebar-action" href="#/account" aria-current={account ? 'page' : undefined}>
+            <span className="public-avatar" aria-hidden="true">{session ? 'U' : '↗'}</span>
             {session ? 'Tài khoản' : 'Đăng nhập'}
           </a>
         </div>
@@ -96,31 +78,19 @@ export function PublicArea({
         {account && (
           <div className="public-account-page">
             <div className="feed-heading">
-              <h1>
-                {path === '/workspace'
-                  ? 'Đăng nhập để mở workspace'
-                  : 'Tài khoản'}
-              </h1>
+              <h1>{path === '/workspace' ? 'Đăng nhập để mở workspace' : 'Tài khoản'}</h1>
             </div>
-            {error && (
-              <p className="toast toast--error" role="alert">
-                {error}
-              </p>
-            )}
+            {error && <p className="toast toast--error" role="alert">{error}</p>}
             {sessionLoading ? (
-              <p role="status" className="muted">
-                Đang kiểm tra phiên đăng nhập…
-              </p>
+              <p role="status" className="muted">Đang kiểm tra phiên đăng nhập…</p>
             ) : (
               <>
                 {session && (
                   <section className="panel">
                     <h2>Tài khoản FundTogether</h2>
                     <p className="public-wallet-address">{session.email ?? 'Tài khoản đã liên kết ví'}</p>
-                    <a className="button button--secondary" href="#/workspace">
-                      Mở quản lý gây quỹ
-                    </a>
-                    <a className="button button--secondary" href="#/internal">Mở khu vực nội bộ</a>
+                    <a className="button button--secondary" href="#/workspace">Mở quản lý gây quỹ</a>
+                    {staff && <a className="button button--secondary" href={internalHref}>{internalLabel}</a>}
                   </section>
                 )}
                 <AccountAccess session={session} onSession={onSession} />
@@ -153,10 +123,7 @@ export function PublicArea({
           </section>
         )}
       </main>
-      <footer className="public-footer">
-        <span>FundTogether</span>
-        <span>Local development</span>
-      </footer>
+      <footer className="public-footer"><span>FundTogether</span><span>Môi trường phát triển · Mạng thử nghiệm</span></footer>
     </div>
   )
 }

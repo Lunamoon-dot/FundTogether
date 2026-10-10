@@ -287,6 +287,12 @@ không còn đường nghiệm thu cấp tiền lại; build/ABI/manifest có th
 
 ### 5.1. Các task
 
+Bổ sung thiết kế ngày2026-10-10: [onboarding tổ chức](./workflow-b-organization-onboarding-plan.md)
+đưa organizer nộp hồ sơ và ADMIN yêu cầu bổ sung/duyệt thành task OB1–OB3,
+OF1–OF2, OI1 riêng. Sau yêu cầu tiếp tục goal, OB1–OB3/OF1–OF2 đã có code và
+kiểm thử; OI1 còn nghiệm thu người dùng. Xem acceptance/code plan cho bằng
+chứng, không suy lifecycle mới từ các checkbox gốc.
+
 - [ ] **B1 — Context B:** mở rộng typed blockchain boundary và metadata để không
   nhầm enum/policy A/B; dùng artifact generate, không copy ABI tay. Giữ chain ID,
   deployment ID, contract, token, campaign/đợt/version trong mọi tài nguyên liên quan.

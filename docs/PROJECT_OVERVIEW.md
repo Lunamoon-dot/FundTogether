@@ -1,9 +1,19 @@
 # FundTogether Project Overview
 
-> Updated: 2026-10-09
+> Updated: 2026-10-10
 > Scope: current repository and local MVP deployment
 
 ## Current direction — 2026-10-06
+
+Update2026-10-10: B organization verification now starts with an OWNER request
+(private draft/documents → submit → ADMIN approve/request changes/reject).
+Submitted content and file references are immutable; changes use a new request
+without exposing profile versions. Audit, validity/expiry/suspension and renewal
+are separate from campaign review. The API blocks direct VERIFIED writes;
+existing verification records remain intact. Migrations0014/0015 are applied only
+to B. Schema, API, generated client, UI and automated HTTP/browser coverage are
+implemented; human acceptance remains pending. See [onboarding](./workflow-b-organization-onboarding-plan.md)
+and [acceptance](./workflow-b-acceptance.md) for current evidence.
 
 **First read, user-directed on 2026-10-08:** [research direction](./research-direction.md)
 records the proposed NCKH title, objectives, six research activities, expected
@@ -156,7 +166,14 @@ the 22-check HTTP/PostgreSQL smoke script. On-chain organizer
 addresses are unchanged. See
 [organization backend step](./backend-step-3-organizations.md).
 
-Organizations now have an optional representative wallet selected from the
+Account wallet cards provide password-confirmed
+unlink through POST /auth/wallets/unlink. Only the authenticated owner can remove
+the exact chain/address; representative wallets and frozen submission wallets
+are protected. Passwordless accounts cannot use this flow. Successful unlink
+revokes other sessions and pending challenges, preserving blockchain balances,
+history and the current session. Linking to another account still needs fresh SIWE.
+
+Organizations have an optional representative wallet selected from the
 creator's SIWE-verified links. PUT /organizations/:id/wallet requires creator
 identity and current OWNER membership. Initial selection is persisted and fixed;
 MetaMask connection changes cannot replace it. Migration 0006 is applied locally.

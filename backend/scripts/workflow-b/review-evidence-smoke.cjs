@@ -31,6 +31,8 @@ async function main() {
   const storage = new (from('modules/evidence/evidence-storage.service').EvidenceStorageService)(config);
   const campaigns = new (from('advance/advance-campaign.service').AdvanceCampaignService)(db, chain);
   const verification = new (from('advance/organization-verification.service').OrganizationVerificationService)(db, chain);
+  const organizationRequests = new (from('advance/organization-request.service').OrganizationRequestService)(db, chain, storage, verification);
+  const { approveService } = require('./organization-onboarding-fixture.cjs');
   const reviews = new (from('advance/advance-review.service').AdvanceReviewService)(db, chain, verification, storage);
   const evidence = new (from('advance/advance-evidence.service').AdvanceEvidenceService)(db, chain, storage, reviews);
   const accounts = await chain.client.request({ method: 'eth_accounts' });
@@ -84,7 +86,7 @@ async function main() {
     await pool.query(`insert into platform_roles(user_id,roles) values($1,'["ADMIN"]')`, [organizer.id]);
     await assert.rejects(verification.record(org.id, organizer.id, check), e => e.getStatus() === 403);
     await pool.query('delete from platform_roles where user_id=$1', [organizer.id]);
-    const verified = await verification.record(org.id, staff.id, check);
+    const verified = await approveService(organizationRequests, verification, org.id, organizer.id, staff.id, check);
     const campaign = await campaigns.create(org.id, organizer.id, giftPlan());
     const plan = await campaigns.prepareSubmission(campaign.id, organizer.id, campaign.revision);
     await send(organizer.wallet, 'submitCampaignForDraft', [plan.draftKey, plan.planHash, BigInt(plan.fundingDuration), plan.budgets.map(BigInt), plan.criteriaHashes]);
@@ -107,7 +109,7 @@ async function main() {
     const revocation = await verification.record(org.id, staff.id, { ...check, status: 'REVOKED', reason: 'Controlled revocation test' });
     await assert.rejects(reviews.prepareReview(campaign.id, resolver.id, first), e => e.getStatus() === 409);
     assert.equal((await chain.snapshot(id, (await chain.client.getBlock()).number)).campaign.state, 'FIRST_REVIEW');
-    const renewal = await verification.record(org.id, staff.id, check);
+    const renewal = await approveService(organizationRequests, verification, org.id, organizer.id, staff.id, check);
     assert.equal((await pool.query('select count(*) from organization_verification_records where organization_id=$1', [org.id])).rows[0].count, '3');
     assert.equal((await verification.latest(org.id, BigInt(Math.floor(renewal.validUntil.getTime() / 1000)))).verified, false);
     const eligibility = await reviews.prepareReview(campaign.id, resolver.id, first);

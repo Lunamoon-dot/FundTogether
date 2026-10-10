@@ -72,6 +72,9 @@ Không bỏ kiểm tra chữ ký hoặc cho phép chiếm ví của một tài k
 
 ## Hành trình người dùng cần ghi nhận
 
+Xem [hướng dẫn kiểm thử chi tiết](./workflow-b-manual-test-guide.md) để có thứ tự
+từng tài khoản, số dư kỳ vọng, điểm dừng theo deadline và mẫu ghi PASS/FAIL.
+
 1. Staff đăng nhập → nội bộ/tổ chức → ghi xác minh có căn cứ, phạm vi, giới hạn,
    thời hạn. Organizer tự xác minh phải bị chặn.
 2. Organizer → tổ chức pilot/workspace → mở G1 → kiểm ngân sách2200,100 suất và
@@ -206,7 +209,58 @@ Health ready chứng minh tầng kỹ thuật đang khớp, không chứng minh 
 
 ## Tiến độ và phần chưa nghiệm thu
 
+Từ2026-10-10, xác minh tổ chức dùng organizer request. OWNER vào hồ sơ tổ chức,
+lưu nháp/tài liệu và gửi; ADMIN vào `#/internal/organizations` để yêu cầu bổ sung,
+duyệt hoặc từ chối. Endpoint cũ chỉ còn dùng để ghi REVOKED; không seed VERIFIED
+trực tiếp. Các script journey/review-evidence đã chuyển qua request.
+
+Kiểm tra onboarding từ root checkout:
+
+```powershell
+npm.cmd --prefix backend run build
+npm.cmd --prefix backend run db:migrate:workflow-b
+node backend/scripts/workflow-b/organization-onboarding-smoke.cjs
+node backend/scripts/workflow-b/journey-smoke.cjs
+npm.cmd --prefix frontend test
+```
+
+Chạy hai smoke tuần tự. Onboarding smoke thêm account/tổ chức/tài liệu SYNTHETIC
+vào B private storage để kiểm transaction đồng thời, giữ mọi account cũ, không
+ghi chain. Journey dùng fork/DB rollback. Browser fixture tùy chọn:
+`node backend/scripts/workflow-b/organization-ui-fixture.cjs`; session files ở
+`.local/workflow-b/onboarding-ui/` là riêng tư, không commit/chia sẻ.
+UI validation này không thay thao tác Brave/MetaMask của người dùng.
+
+Kiểm thử giao diện F4–F6 với API giả lập dùng
+`.local/workflow-b/browser-fixture.json` (snapshot synthetic từ
+`node backend/scripts/workflow-b/browser-fixtures.cjs`). Sau khi UI B chạy:
+
+```powershell
+node frontend/scripts/advance-review-browser-check.mjs
+playwright-cli -s=workflow-b-review open http://localhost:5174 --browser=msedge
+playwright-cli -s=workflow-b-review run-code --filename=.local/workflow-b/ui-review-check.js
+playwright-cli -s=workflow-b-review close
+```
+
+Script kiểm32 điều kiện, chặn request không có mock, không gửi mutation hoặc
+ký ví. Bao gồm hồ sơ gốc đã duyệt, cache/quyền đọc, lỗi403/503, hash/file,
+ADMIN queue mới và các gate evidence/refund. Đây là browser regression riêng;
+độ đúng của quyền/transaction backend được kiểm bởi HTTP smoke ở trên.
+
 [Acceptance](./workflow-b-acceptance.md) và [progress](./PROJECT_PROGRESS.md)
 ghi evidence cụ thể. G1/G2 và các nhánh refund/case đã có kiểm thử HTTP/fork;
 recovery và so sánh contract A/B có kiểm soát đã PASS. Manual MetaMask, kết quả
 reviewer và các phần T01–T18 chưa có evidence vẫn cần hoàn thành trước khi đóng GOAL.
+
+Kiểm tra bộ tổng hợp và đọc các report hiện có:
+
+```powershell
+node --test backend/scripts/workflow-b/acceptance-report.test.cjs
+node backend/scripts/workflow-b/acceptance-report.cjs
+```
+
+Inventory ở `.local/workflow-b/acceptance-summary.json` giữ source report và
+ngày chạy, không có nghĩa mọi suite vừa được chạy lại. Report thiếu identity
+hoặc thuộc deployment khác sẽ dừng tổng hợp; không sửa deploymentId của kết quả
+cũ để vượt kiểm tra. Rerun đúng harness để lấy bằng chứng mới. Human acceptance
+và reviewer vẫn TODO dù11 report tự động PASS.

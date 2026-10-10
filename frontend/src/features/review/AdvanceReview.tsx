@@ -17,11 +17,11 @@ import { AdvanceVerificationHistory } from './AdvanceOrganizationVerification'
 import { criterionReviewReason, reviewAction, reviewOutcomeLabels, reviewOutcomes, reviewSources } from './advance-review'
 import '../campaigns/advance/advance.css'
 
-export function AdvanceReview({ session, metadataId }: { session: AccountSession; metadataId?: string }) {
+export function AdvanceReview({ session, metadataId, requestedStage }: { session: AccountSession; metadataId?: string; requestedStage?: string }) {
   const queue = useQuery({ queryKey: ['advance-review-queue', deployment.deploymentId, session.userId], enabled: !metadataId && session.roles.includes('RESOLVER'), retry: false,
     queryFn: ({ signal }) => advanceReviewQueue({ signal }), refetchInterval: 10000 })
   if (!session.roles.includes('RESOLVER')) return <section className="panel"><h1>Xét duyệt campaign</h1><p>Cần account role RESOLVER. ADMIN xác thực tổ chức ở mục riêng.</p></section>
-  if (metadataId) return <AdvanceReviewDetail key={`${session.userId}:${metadataId}`} session={session} metadataId={metadataId} />
+  if (metadataId) return <AdvanceReviewDetail key={`${session.userId}:${metadataId}:${requestedStage ?? 'current'}`} session={session} metadataId={metadataId} requestedStage={requestedStage} />
   return <section className="panel"><h1>Campaign đã nộp · workflow B</h1><p>Quyền đọc hàng chờ theo tài khoản RESOLVER. Ký quyết định cần SIWE đúng ví được cấu hình.</p>
     <p className="advance-hash">Ví ký bắt buộc: {deployment.resolver} · mạng {deployment.chainId}</p>
     {queue.isPending ? <p role="status">Đang tải hàng chờ…</p> : queue.isError ? <><p role="alert">{getErrorMessage(queue.error)}</p><button className="button button--secondary" onClick={() => void queue.refetch()}>Tải lại</button></>
@@ -29,7 +29,7 @@ export function AdvanceReview({ session, metadataId }: { session: AccountSession
         : <ul>{queue.data.map(c => <li key={c.id}><a href={`#/internal/campaigns/${c.id}`}>{c.title}</a><p className="advance-hash">{c.planHash}</p></li>)}</ul>}
   </section>
 }
-function AdvanceReviewDetail({ session, metadataId }: { session: AccountSession; metadataId: string }) {
+function AdvanceReviewDetail({ session, metadataId, requestedStage }: { session: AccountSession; metadataId: string; requestedStage?: string }) {
   const workflow = useQuery({ queryKey: ['advance-review-workflow', deployment.deploymentId, session.userId, metadataId], retry: false,
     queryFn: async ({ signal }) => {
       const value = await advanceGetWorkflow(metadataId, { signal })
@@ -41,6 +41,13 @@ function AdvanceReviewDetail({ session, metadataId }: { session: AccountSession;
   const data = workflow.data, snapshot = data.snapshot
   if (!snapshot) return <p>Campaign chưa được nộp/index; chưa xét duyệt.</p>
   const c = snapshot.campaign, index = Number(c.currentStage), stage = snapshot.stages[index]
+  if (requestedStage !== undefined) {
+    const requestedIndex = Number(requestedStage)
+    if (!Number.isSafeInteger(requestedIndex) || requestedIndex < 0 || requestedIndex >= snapshot.stages.length)
+      return <section className="panel"><h1>Không tìm thấy đợt</h1><p>Đường dẫn không khớp với các đợt trong kế hoạch campaign.</p><a href={`#/internal/campaigns/${metadataId}`}>Mở hồ sơ campaign</a></section>
+    if (requestedIndex !== index)
+      return <section className="panel"><h1>Đợt trong đường dẫn không phải đợt hiện tại</h1><p>Bạn đang mở đợt {requestedIndex + 1}; campaign hiện ở đợt {index + 1}. Chưa mở biểu mẫu quyết định cho đợt khác.</p><a href={`#/internal/campaigns/${metadataId}`}>Mở hồ sơ hiện tại</a></section>
+  }
   const frozen = JSON.parse(data.plan.planBytes) as GiftDraft
   const refresh = () => void workflow.refetch()
   return <><a href="#/internal/campaigns">← Hàng chờ</a><section className="panel"><h1>{data.title}</h1>

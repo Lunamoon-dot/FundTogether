@@ -11,3 +11,4 @@ export * from './indexer.schema';
 export * from './campaign-reviews.schema';
 export * from './milestone-workflow.schema';
 export * from './advance.schema';
+export * from './organization-verification-requests.schema';

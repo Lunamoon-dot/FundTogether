@@ -2,6 +2,11 @@ import { formatUnits, parseUnits } from 'viem'
 import type { AdvanceDraft, GiftDraft } from '../../../lib/api/generated/advance'
 
 export const documentKinds = ['REPORT', 'INVOICE', 'RECEIPT', 'PAYMENT_PROOF', 'DELIVERY_RECORD', 'PHOTO', 'OTHER'] as const
+export type DocumentKind = typeof documentKinds[number]
+export const documentKindLabels: Record<DocumentKind, string> = {
+  REPORT: 'Báo cáo', INVOICE: 'Hóa đơn', RECEIPT: 'Biên nhận', PAYMENT_PROOF: 'Chứng từ thanh toán',
+  DELIVERY_RECORD: 'Biên bản bàn giao', PHOTO: 'Ảnh minh chứng', OTHER: 'Khác',
+}
 export type GiftForm = Omit<GiftDraft, 'stages'> & { stages: (AdvanceDraft['content']['stages'][number] & { budget: string })[] }
 export function amountUnits(value: string): string {
   if (!/^(0|[1-9]\d*)(\.\d{1,6})?$/.test(value) || value.length > 85) throw new Error('Ngân sách phải lớn hơn 0, tối đa 6 chữ số thập phân.')

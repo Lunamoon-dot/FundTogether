@@ -156,6 +156,24 @@ Hash/chữ ký vẫn không chứng minh sự thật ngoài đời. Khảo sát,
 lập và nghiệm thu MetaMask vẫn cần thực hiện. Test contract/integration đã có
 bằng chứng theo [acceptance](./workflow-b-acceptance.md), không thay khảo sát.
 
+### 6.5. Hồ sơ tổ chức — hướng MVP đơn giản hóa ngày2026-10-10
+
+Người dùng chốt không xây explicit profile versioning cho xác thực tổ chức.
+Giữ lịch sử yêu cầu gửi duyệt và audit log; khóa thông tin/tài liệu quan trọng
+khi UNDER_REVIEW. ADMIN duyệt/yêu cầu bổ sung/từ chối, không chỉnh hộ hồ sơ;
+organizer sửa sau yêu cầu bổ sung hoặc hủy yêu cầu đang chờ rồi gửi lại.
+
+Tách trạng thái tổ chức khỏi trạng thái request; có thời điểm xác minh và hết
+hạn. Badge xác minh thuộc Web2 trust layer, chỉ thể hiện đã kiểm hồ sơ theo
+policy, không chứng minh campaign hoặc evidence trung thực. Các gate và dòng
+tiền campaign/milestone/challenge đã duyệt giữ riêng.
+
+[Thiết kế onboarding](./workflow-b-organization-onboarding-plan.md) đã sửa theo
+hướng này. Sau yêu cầu tiếp tục goal ngày2026-10-10, đã triển khai snapshot nhỏ
+trong request, audit/history, khóa hồ sơ đang duyệt và hiệu lực xác minh riêng.
+Sửa thông tin cốt lõi cần duyệt lại; REVOKED ánh xạ SUSPENDED, không tự phục hồi.
+Kiểm thử tự động được ghi ở acceptance; nghiệm thu người dùng còn thiếu.
+
 ## 7. Cách chốt và đánh giá một thay đổi
 
 1. Xác định vấn đề thực tế, nhóm người dùng và giả định cần kiểm chứng.

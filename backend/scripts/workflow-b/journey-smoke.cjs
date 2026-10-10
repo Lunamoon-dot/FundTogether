@@ -201,7 +201,8 @@ async function main() {
           const verification = { status: 'VERIFIED', summary: 'Synthetic authority registry', reason: 'Controlled fixture',
             sources: [{ description: 'Synthetic registry', reference: 'local-fixture-only' }], scope: 'Gift pilot', limits: 'No real institution checked',
             validUntil: new Date(Number((await client.getBlock()).timestamp + 86400000n) * 1000).toISOString() };
-          await request(staff, 'POST', `/v1/advance/internal/organizations/${org.id}/verifications`, verification, 201);
+          await require('./organization-onboarding-fixture.cjs').approveHttp(request, organizer, staff, org.id, verification);
+          check('Organizer private request, document upload and submit precede ADMIN approval; G1/G2 use request-bound verification');
           const ownerView = async c => (await request(organizer, 'GET', `/v1/advance/campaigns/${c.id}/workflow`)).data;
           async function prepare(c, actor, action, extra = {}, expected = 201) {
             const view = await ownerView(c);

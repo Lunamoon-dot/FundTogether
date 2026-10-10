@@ -1,10 +1,36 @@
 # Goal — Hoàn thiện luồng B của FundTogether
 
-> Cập nhật: 2026-10-09.
+> Cập nhật: 2026-10-11.
 > Đây là nội dung mục tiêu để dùng khi khởi chạy goal, không phải cấu hình tự được ứng dụng nạp.
 > Việc tạo/sửa file này không tự kích hoạt goal hoặc phê duyệt các quy tắc tài chính còn mở.
 
 ## Mục tiêu
+
+### Chốt phạm vi ngày 2026-10-11 — hoàn tất triển khai, nghiệm thu sau
+
+Người dùng chọn: “Hoàn tất goal triển khai; giữ nghiệm thu thành giai đoạn sau,
+chưa đạt.” Goal hiện tại được chốt theo phạm vi triển khai đã duyệt và kiểm chứng
+kỹ thuật, trạng thái DONE. Nghiệm thu Brave/MetaMask, thao tác OWNER/ADMIN thật
+và đánh giá reviewer thuộc giai đoạn tiếp theo, giữ TODO, chưa đạt.
+Quyết định này thay thế điều kiện đóng goal gộp cả nghiệm thu con người trong
+các ghi chú cũ bên dưới; không thay đổi quyền, chữ ký hoặc quy tắc tài chính.
+
+### Điều phối ngày 2026-10-11 — bỏ chặn nghiệm thu
+
+Người dùng yêu cầu “bỏ qua block”. Tiếp tục công việc kỹ thuật trong phạm vi
+Workflow B đã duyệt; không đưa goal về BLOCKED chỉ vì chưa có nghiệm thu thủ
+công hoặc kết luận reviewer. Các mục này chuyển sang giai đoạn nghiệm thu sau,
+giữ TODO và không được báo PASS. Quyết định này thay thế ghi chú chờ nghiệm thu
+ngày 2026-10-11 trong progress; không bỏ kiểm tra quyền, chữ ký, hồ sơ hay điều
+kiện giải ngân của ứng dụng.
+
+### Điều phối ngày 2026-10-10
+
+Người dùng yêu cầu tiếp tục hoàn thiện toàn bộ phần triển khai đã duyệt trước,
+hoãn nghiệm thu thủ công Brave/MetaMask và đánh giá hồ sơ bởi người thật.
+Các mục nghiệm thu này giữ TODO, không chặn sửa lỗi và hoàn thiện kỹ thuật.
+Vẫn chạy kiểm tra kỹ thuật phù hợp; không quy đổi kiểm thử tự động thành nghiệm
+thu thủ công hoặc đánh dấu toàn bộ goal hoàn tất khi thiếu bằng chứng đó.
 
 Hoàn thiện luồng B của FundTogether theo
 [kế hoạch sáu bước](./docs/workflow-b-delivery-plan.md): cấp vốn trước theo đợt,
@@ -98,23 +124,31 @@ nghiệm thu thủ công hoặc dữ liệu giả là bằng chứng khảo sát
 - Smart contract → event → indexer → DB; request HTTP/upload/tx hash chưa là thành công.
 - Giữ secrets và PII khỏi source, log, artifact công khai và commit.
 
-## Điều kiện hoàn thành goal
+## Điều kiện hoàn thành goal triển khai — DONE
 
 - [x] G1/G2, đặc tả và policy được review; không còn quyết định tiền/quyền bỏ ngỏ.
 - [x] Contract B và FE/BE build được; test liên quan PASS với bằng chứng môi trường.
-- [x] Hai campaign chạy đủ hành trình, gồm nghiệm thu cuối và nghĩa vụ tiền còn lại.
+- [x] Hai campaign chạy đủ hành trình tự động, gồm nghiệm thu cuối và nghĩa vụ tiền còn lại.
 - [x] Cấp một lần/đợt, chỉ cấp tiếp đúng điều kiện; refund không vượt entitlement/pool;
   transfer lỗi giữ quyền; replay không duplicate và không trộn deployment.
-- [ ] T01–T18 có kết quả và bằng chứng; mọi lỗi chặn tiền/quyền/state/replay đã xử lý.
-- [ ] Nghiệm thu MetaMask/người dùng được thực hiện và ghi nhận; không bỏ qua case
-  còn thiếu để đánh dấu goal hoàn thành.
 - [x] Có báo cáo kết quả, giới hạn, cách chạy lại và hướng dẫn vận hành local.
+
+## Giai đoạn nghiệm thu sau — TODO, chưa đạt
+
+- [ ] Hoàn tất phần nghiệm thu con người của T01–T18, F2/I3/OI1 và ghi bằng chứng.
+- [ ] Thực hiện hành trình Brave/MetaMask, thao tác OWNER/ADMIN thật và ghi nhận lỗi.
+- [ ] Thu thập kết luận reviewer, tổng hợp số đo; không dùng dữ liệu mẫu thay kết quả thật.
+
+Kiểm chứng kỹ thuật khi bàn giao ngày 2026-10-11: frontend157/157,
+backend166/166, contract281/281 PASS; frontend B build/lint PASS; bộ trình duyệt
+F4–F6 dùng API giả lập33 kiểm tra PASS. Inventory xác thực11 báo cáo tích hợp
+đã có, không phải chạy lại toàn bộ hành trình. Reviewer vẫn0 complete/0 partial.
 
 Bằng chứng ngày2026-10-09: [acceptance](./docs/workflow-b-acceptance.md),
 [progress](./docs/PROJECT_PROGRESS.md), [runbook](./docs/workflow-b-local-runbook.md).
 Hai campaign đã chạy bằng HTTP/RPC tự động. Các mục đã kiểm ở trên không thay
 nghiệm thu con người còn thiếu.
 
-Build thành công hoặc phần tự động PASS chỉ là mốc tiến độ. Nếu còn chờ quyết
-định, thao tác người dùng hoặc điều kiện môi trường, báo đúng phần còn thiếu;
-không gọi toàn bộ goal hoàn thành hoặc hệ thống sẵn sàng dùng tiền thật.
+Hoàn thành goal triển khai theo phạm vi người dùng chốt không đồng nghĩa nghiệm
+thu toàn hệ thống đã đạt hoặc hệ thống sẵn sàng dùng tiền thật. Các bằng chứng
+con người còn thiếu được theo dõi riêng, không được ghi PASS.

@@ -23,6 +23,15 @@ TanStack Query, Zod. Không thêm framework workflow, oracle hoặc cryptography
 [workflow-b-financial-rules](./workflow-b-financial-rules.md).
 Kế hoạch sáu bước gốc: [delivery plan](./workflow-b-delivery-plan.md).
 
+**Bổ sung ngày2026-10-10 — thiết kế và triển khai onboarding:**
+[onboarding tổ chức](./workflow-b-organization-onboarding-plan.md) định nghĩa
+organizer nộp hồ sơ → ADMIN yêu cầu bổ sung/duyệt. Sáu task OB1–OB3, OF1–OF2,
+OI1 bổ sung cho kế hoạch gốc. Sau lượt thiết kế, người dùng yêu cầu tiếp tục goal;
+OB1–OB3/OF1–OF2 đã triển khai/kiểm thử, OI1 còn nghiệm thu người dùng.
+Người dùng sau đó chọn hướng MVP gọn: request history + audit + khóa hồ sơ khi
+UNDER_REVIEW, không explicit profile versioning. Thiết kế đã cập nhật theo hướng
+này; snapshot mỗi lần gửi đặt trong request, không thêm bảng submissions/version.
+
 ## Global constraints
 
 - Baseline HEAD `b1881bd2cb3d6a4413605b06741624e86e2323da` giữ nguyên để diff; không sửa shared payout/bond A.
@@ -405,6 +414,9 @@ Metadata association B dựa draftKey + organizer + full identity + planHash/bud
 
 ### B3 — xác thực tổ chức, conflict và quyết định
 
+Phạm vi B3 đã làm là ADMIN ghi xác thực trực tiếp, chưa bao gồm request do
+organizer gửi. Lifecycle mới nằm ở OB1–OB3 bên dưới, không được suy từ các tick B3.
+
 Create `backend/src/advance/organization-verification.service.ts`,
 `organization-verification.controller.ts`, `advance-review.service.ts`,
 `advance-review.schema.ts`, `advance-review.controller.ts` và corresponding `.spec.ts`.
@@ -534,6 +546,10 @@ và B6 action prepare; produces stage report/expenses/unused/submission/ref vers
 
 ### F4 — staff/resolver workflow
 
+Form organizer gửi/bổ sung hồ sơ và queue theo request chưa nằm trong F4 gốc;
+xem OF1–OF2. Nhãn trạng thái tổ chức dùng chung đã sửa ngày2026-10-10 theo API,
+có test list/profile; sửa nhãn không đồng nghĩa lifecycle mới đã có.
+
 Create `frontend/src/features/review/AdvanceOrganizationVerification.tsx`,
 `frontend/src/features/review/AdvanceReview.tsx`,
 `frontend/scripts/advance-review.test.mjs`; modify `InternalArea.tsx` và
@@ -607,7 +623,54 @@ produce actual user acceptance và research outcomes với nguồn/giới hạn.
 - [ ] Record gas/tx count, exposure trước nghiệm thu, organizer working capital, human/chain/indexer timings, correctness và false acceptance riêng. So sánh A/B trên assumptions chung, không dùng vài local PASS để gọi B tối ưu.
 - [ ] Audit từng deliverable GOAL và T01–T18 từ receipt/block/log/chain balances/DB replay/files/UI/manual artifacts; chỉ goal DONE khi không còn required item thiếu hoặc chưa chứng minh. Code build/automated PASS không tự là manual/production approval.
 
-## 7. Review và tiến độ
+## 7. Task onboarding bổ sung — triển khai từ 2026-10-10
+
+Thiết kế, dữ liệu/API, quyền, migration và O01–O12 nằm trong
+[kế hoạch onboarding](./workflow-b-organization-onboarding-plan.md).
+Sau lượt bổ sung thiết kế/task, người dùng yêu cầu “thế tiếp tục goal thôi”.
+Đã triển khai OB1–OB3/OF1–OF2 và kiểm thử tự động; OI1 còn nghiệm thu người dùng.
+
+- [x] **OB1 — Schema/migration/history:** additive DB B, một yêu cầu mở/org, snapshot trong request + audit append-only; tách org/request status và timestamps; không bảng profile version/submissions; test dữ liệu cũ và constraints.
+- [x] **OB2 — Organizer request/files:** draft/save/upload/submit/cancel/gửi lại bằng request mới; OWNER ACL; backend khóa mọi đường sửa field/file khi UNDER_REVIEW; giữ nội dung lịch sử; test retry/storage failure.
+- [x] **OB3 — ADMIN decisions/API:** APPROVE/REQUEST_CHANGES/REJECT, không sửa hộ/tự duyệt; atomic audit/verification, cancel-review concurrency/idempotency; OpenAPI/HTTP tests.
+- [x] **OF1 — Organizer UI:** form hiện tại, timeline audit, bổ sung/hủy/gửi lại; không v1/v2/v3; hiển thị riêng trạng thái yêu cầu và hiệu lực xác minh; test reload/error/submit gating.
+- [x] **OF2 — ADMIN UI:** queue request đã gửi, đọc snapshot/file, ba kết luận và audit; test quyền/request đang xét/expiry.
+- [ ] **OI1 — Onboarding integration/manual:** O01–O12 và G1 dùng verification sinh từ request; tách tự động khỏi thao tác OWNER/ADMIN thật.
+
+OB1–OB3/OF1–OF2 có bằng chứng trong acceptance: migration0014/0015 giữ dữ liệu
+cũ, HTTP/storage/concurrency và component/browser tests. OI1 IN_PROGRESS:
+G1/G2 dùng request-bound verification đã PASS; thao tác OWNER/ADMIN của người
+dùng và I3 MetaMask/reviewer vẫn TODO.
+
+Thứ tự: review thiết kế → OB1 → OB2 → OB3 → OF1 → OF2 → OI1.
+Giữ I3/F2 chưa hoàn thành; không đổi các tick gốc để che phần thiếu onboarding.
+
+## 8. Review và tiến độ
+
+### Chốt goal triển khai — 2026-10-11
+
+Người dùng chọn “Hoàn tất goal triển khai; giữ nghiệm thu thành giai đoạn sau,
+chưa đạt.” Phần triển khai đã duyệt hoàn tất; goal triển khai DONE theo GOAL.md.
+Các ô F2/I3/OI1 còn mở giữ nguyên để theo dõi phần nghiệm thu con người, không
+chặn đóng phạm vi triển khai và không được hiểu là đã PASS. Điều kiện audit
+gộp cả nghiệm thu ở mục I3 áp dụng cho giai đoạn nghiệm thu toàn hệ thống sau.
+Kiểm chứng bàn giao: frontend157/157, backend166/166, contract281/281,
+frontend B build/lint PASS; trình duyệt F4–F6 API giả lập33 kiểm tra PASS.
+
+### Điều phối và sửa lỗi sau thao tác thử — 2026-10-10
+
+Cập nhật 2026-10-11: người dùng yêu cầu “bỏ qua block”. Manual/reviewer chuyển
+sang nghiệm thu sau, giữ TODO; không dùng việc thiếu kết quả này để chặn đợt
+hoàn thiện kỹ thuật đang tiếp tục. Không thay điều kiện tiền/quyền trong sản phẩm.
+
+Người dùng hoãn nghiệm thu thủ công để tiếp tục hoàn thiện triển khai. F2/I3/OI1
+giữ phần manual TODO; không dùng chúng để chặn công việc kỹ thuật đã được duyệt.
+
+- [x] ADMIN-only vào `/internal` mở hàng chờ xác thực tổ chức; điều hướng chỉ đánh dấu trang hiện tại.
+- [x] Hàng chờ có nút “Xem hồ sơ”, bộ lọc rõ ràng và làm mới chủ động; giải thích bản nháp chưa vào hàng chờ.
+- [x] Hàng chờ tự cập nhật mỗi 10 giây khi đang mở; hồ sơ UNDER_REVIEW tự đọc kết luận mới. Bản nháp không cập nhật định kỳ để giữ nội dung chưa lưu; lỗi đọc dừng tự thử lại. Regression và trình duyệt API giả lập đã kiểm tra việc nhận kết luận và giữ bản nháp.
+- [x] Liên kết mang organizationId và requestId để mở đúng lần gửi, kể cả khi lọc lịch sử; ID không tồn tại không quay về hồ sơ mới nhất. Không hiện quyết định duyệt cho yêu cầu lịch sử.
+- Bằng chứng: frontend 155/155, onboarding 18/18, build B/lint PASS; trình duyệt API giả lập 5 kiểm tra PASS, không ghi tài khoản hoặc blockchain thật. Đây không phải nghiệm thu người dùng.
 
 Quy tắc pilot B-D01–B-D10 và kế hoạch code đã được người dùng duyệt theo
 GOAL.md: triển khai thứ tự C1→C6→B1→B6→F1→F6→I1→I3; các lựa chọn

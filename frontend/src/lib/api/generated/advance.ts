@@ -751,6 +751,164 @@ export interface OrganizationVerificationInput {
   validUntil: string;
 }
 
+export type OrganizationRequestSaveContentProfileKind = typeof OrganizationRequestSaveContentProfileKind[keyof typeof OrganizationRequestSaveContentProfileKind];
+
+
+export const OrganizationRequestSaveContentProfileKind = {
+  REGISTERED_ORGANIZATION: 'REGISTERED_ORGANIZATION',
+  VOLUNTEER_GROUP: 'VOLUNTEER_GROUP',
+} as const;
+
+export type OrganizationRequestSaveContentProfile = {
+  kind: OrganizationRequestSaveContentProfileKind;
+  /** @maxLength 200 */
+  legalName: string;
+  /** @maxLength 200 */
+  registrationNumber: string;
+  /** @maxLength 2000 */
+  address: string;
+  /** @maxLength 4000 */
+  activityScope: string;
+  /** @maxLength 200 */
+  representativeName: string;
+  /** @maxLength 500 */
+  representativeRole: string;
+  /** @maxLength 4000 */
+  authorityBasis: string;
+  /** @maxLength 2000 */
+  identitySource: string;
+  /** @maxLength 4000 */
+  activityEvidence: string;
+  /** @maxLength 1000 */
+  contact: string;
+};
+
+export type OrganizationRequestSaveContent = {
+  profile: OrganizationRequestSaveContentProfile;
+  /**
+     * @maxItems 20
+     * @items.pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+     */
+  documentIds: string[];
+  /** @maxLength 10000 */
+  responseToReview: string;
+};
+
+export interface OrganizationRequestSave {
+  /**
+     * @maximum 2147483646
+     * @exclusiveMinimum 0
+     */
+  expectedRevision: number;
+  content: OrganizationRequestSaveContent;
+}
+
+export interface OrganizationRequestSubmit {
+  /**
+     * @maximum 2147483646
+     * @exclusiveMinimum 0
+     */
+  expectedRevision: number;
+  declaration: true;
+}
+
+export interface OrganizationRequestRevision {
+  /**
+     * @maximum 2147483646
+     * @exclusiveMinimum 0
+     */
+  expectedRevision: number;
+}
+
+export type OrganizationDecision = {
+  /**
+     * @maximum 2147483646
+     * @exclusiveMinimum 0
+     */
+  expectedRevision: number;
+  decision: 'APPROVE';
+  /**
+     * @minLength 1
+     * @maxLength 10000
+     */
+  reviewNote: string;
+  verification: {
+  status: 'VERIFIED';
+  /**
+     * @minLength 1
+     * @maxLength 10000
+     */
+  summary: string;
+  /**
+     * @minLength 1
+     * @maxLength 10000
+     */
+  reason: string;
+  /** @minItems 1 */
+  sources: {
+  /**
+     * @minLength 1
+     * @maxLength 10000
+     */
+  description: string;
+  /**
+     * @minLength 1
+     * @maxLength 10000
+     */
+  reference: string;
+}[];
+  /**
+     * @minLength 1
+     * @maxLength 10000
+     */
+  scope: string;
+  /**
+     * @minLength 1
+     * @maxLength 10000
+     */
+  limits: string;
+  /** @pattern ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$ */
+  validUntil: string;
+};
+  checks: {
+  identity: true;
+  representation: true;
+  activity: true;
+  contact: true;
+};
+} | {
+  /**
+     * @maximum 2147483646
+     * @exclusiveMinimum 0
+     */
+  expectedRevision: number;
+  decision: 'REQUEST_CHANGES';
+  /**
+     * @minLength 1
+     * @maxLength 10000
+     */
+  reviewNote: string;
+  /**
+     * @minItems 1
+     * @maxItems 20
+     * @items.minLength 1
+     * @items.maxLength 2000
+     */
+  missingItems: string[];
+} | {
+  /**
+     * @maximum 2147483646
+     * @exclusiveMinimum 0
+     */
+  expectedRevision: number;
+  decision: 'REJECT';
+  /**
+     * @minLength 1
+     * @maxLength 10000
+     */
+  reviewNote: string;
+};
+
 export type EvidenceSaveInputContentReportOutcomesItem = {
   /** @minLength 1 */
   criterionId: string;
@@ -3503,6 +3661,352 @@ export interface AdvanceHealth {
   indexer: AdvanceHealthIndexer;
 }
 
+export type OrganizationRequestStatus = typeof OrganizationRequestStatus[keyof typeof OrganizationRequestStatus];
+
+
+export const OrganizationRequestStatus = {
+  DRAFT: 'DRAFT',
+  UNDER_REVIEW: 'UNDER_REVIEW',
+  CHANGES_REQUESTED: 'CHANGES_REQUESTED',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export type OrganizationRequestContentProfileKind = typeof OrganizationRequestContentProfileKind[keyof typeof OrganizationRequestContentProfileKind];
+
+
+export const OrganizationRequestContentProfileKind = {
+  REGISTERED_ORGANIZATION: 'REGISTERED_ORGANIZATION',
+  VOLUNTEER_GROUP: 'VOLUNTEER_GROUP',
+} as const;
+
+export type OrganizationRequestContentProfile = {
+  kind: OrganizationRequestContentProfileKind;
+  /** @maxLength 200 */
+  legalName: string;
+  /** @maxLength 200 */
+  registrationNumber: string;
+  /** @maxLength 2000 */
+  address: string;
+  /** @maxLength 4000 */
+  activityScope: string;
+  /** @maxLength 200 */
+  representativeName: string;
+  /** @maxLength 500 */
+  representativeRole: string;
+  /** @maxLength 4000 */
+  authorityBasis: string;
+  /** @maxLength 2000 */
+  identitySource: string;
+  /** @maxLength 4000 */
+  activityEvidence: string;
+  /** @maxLength 1000 */
+  contact: string;
+};
+
+export type OrganizationRequestContent = {
+  profile: OrganizationRequestContentProfile;
+  /**
+     * @maxItems 20
+     * @items.pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+     */
+  documentIds: string[];
+  /** @maxLength 10000 */
+  responseToReview: string;
+};
+
+export type OrganizationRequestDocumentsItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  uploadedBy: string;
+  kind: string;
+  originalName: string;
+  mediaType: string;
+  byteSize: number;
+  hash: string;
+  createdAt: string;
+};
+
+export interface OrganizationRequest {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  status: OrganizationRequestStatus;
+  revision: number;
+  content: OrganizationRequestContent;
+  policyId: string;
+  /** @nullable */
+  snapshotBytes: string | null;
+  /** @nullable */
+  snapshotHash: string | null;
+  /** @nullable */
+  submittedAt: string | null;
+  /** @nullable */
+  reviewedAt: string | null;
+  /**
+     * @nullable
+     * @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+     */
+  reviewedBy: string | null;
+  /** @nullable */
+  reviewNote: string | null;
+  missingItems: string[];
+  /**
+     * @nullable
+     * @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+     */
+  verificationRecordId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  documents: OrganizationRequestDocumentsItem[];
+}
+
+/**
+ * @nullable
+ */
+export type OrganizationVerificationSummaryStatus = typeof OrganizationVerificationSummaryStatus[keyof typeof OrganizationVerificationSummaryStatus] | null;
+
+
+export const OrganizationVerificationSummaryStatus = {
+  UNVERIFIED: 'UNVERIFIED',
+  VERIFIED: 'VERIFIED',
+  EXPIRED: 'EXPIRED',
+  SUSPENDED: 'SUSPENDED',
+} as const;
+
+export interface OrganizationVerificationSummary {
+  /** @nullable */
+  status: OrganizationVerificationSummaryStatus;
+  /** @nullable */
+  verifiedAt: string | null;
+  /** @nullable */
+  verificationExpiresAt: string | null;
+  /**
+     * @nullable
+     * @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+     */
+  recordId: string | null;
+  requiresReverification: boolean;
+  /** @nullable */
+  checkedBlock: string | null;
+  /** @nullable */
+  chainTimestamp: string | null;
+  /** @nullable */
+  error: string | null;
+}
+
+export type OrganizationRequestListOrganization = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  name: string;
+  verificationStatus: string;
+};
+
+export type OrganizationRequestListRequestsItemStatus = typeof OrganizationRequestListRequestsItemStatus[keyof typeof OrganizationRequestListRequestsItemStatus];
+
+
+export const OrganizationRequestListRequestsItemStatus = {
+  DRAFT: 'DRAFT',
+  UNDER_REVIEW: 'UNDER_REVIEW',
+  CHANGES_REQUESTED: 'CHANGES_REQUESTED',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export type OrganizationRequestListRequestsItemContentProfileKind = typeof OrganizationRequestListRequestsItemContentProfileKind[keyof typeof OrganizationRequestListRequestsItemContentProfileKind];
+
+
+export const OrganizationRequestListRequestsItemContentProfileKind = {
+  REGISTERED_ORGANIZATION: 'REGISTERED_ORGANIZATION',
+  VOLUNTEER_GROUP: 'VOLUNTEER_GROUP',
+} as const;
+
+export type OrganizationRequestListRequestsItemContentProfile = {
+  kind: OrganizationRequestListRequestsItemContentProfileKind;
+  /** @maxLength 200 */
+  legalName: string;
+  /** @maxLength 200 */
+  registrationNumber: string;
+  /** @maxLength 2000 */
+  address: string;
+  /** @maxLength 4000 */
+  activityScope: string;
+  /** @maxLength 200 */
+  representativeName: string;
+  /** @maxLength 500 */
+  representativeRole: string;
+  /** @maxLength 4000 */
+  authorityBasis: string;
+  /** @maxLength 2000 */
+  identitySource: string;
+  /** @maxLength 4000 */
+  activityEvidence: string;
+  /** @maxLength 1000 */
+  contact: string;
+};
+
+export type OrganizationRequestListRequestsItemContent = {
+  profile: OrganizationRequestListRequestsItemContentProfile;
+  /**
+     * @maxItems 20
+     * @items.pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+     */
+  documentIds: string[];
+  /** @maxLength 10000 */
+  responseToReview: string;
+};
+
+export type OrganizationRequestListRequestsItemDocumentsItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  uploadedBy: string;
+  kind: string;
+  originalName: string;
+  mediaType: string;
+  byteSize: number;
+  hash: string;
+  createdAt: string;
+};
+
+export type OrganizationRequestListRequestsItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  status: OrganizationRequestListRequestsItemStatus;
+  revision: number;
+  content: OrganizationRequestListRequestsItemContent;
+  policyId: string;
+  /** @nullable */
+  snapshotBytes: string | null;
+  /** @nullable */
+  snapshotHash: string | null;
+  /** @nullable */
+  submittedAt: string | null;
+  /** @nullable */
+  reviewedAt: string | null;
+  /**
+     * @nullable
+     * @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+     */
+  reviewedBy: string | null;
+  /** @nullable */
+  reviewNote: string | null;
+  missingItems: string[];
+  /**
+     * @nullable
+     * @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+     */
+  verificationRecordId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  documents: OrganizationRequestListRequestsItemDocumentsItem[];
+};
+
+/**
+ * @nullable
+ */
+export type OrganizationRequestListVerificationStatus = typeof OrganizationRequestListVerificationStatus[keyof typeof OrganizationRequestListVerificationStatus] | null;
+
+
+export const OrganizationRequestListVerificationStatus = {
+  UNVERIFIED: 'UNVERIFIED',
+  VERIFIED: 'VERIFIED',
+  EXPIRED: 'EXPIRED',
+  SUSPENDED: 'SUSPENDED',
+} as const;
+
+export type OrganizationRequestListVerification = {
+  /** @nullable */
+  status: OrganizationRequestListVerificationStatus;
+  /** @nullable */
+  verifiedAt: string | null;
+  /** @nullable */
+  verificationExpiresAt: string | null;
+  /**
+     * @nullable
+     * @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+     */
+  recordId: string | null;
+  requiresReverification: boolean;
+  /** @nullable */
+  checkedBlock: string | null;
+  /** @nullable */
+  chainTimestamp: string | null;
+  /** @nullable */
+  error: string | null;
+};
+
+export type OrganizationRequestListAuditItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  actorId: string;
+  action: string;
+  changedFields: string[];
+  happenedAt: string;
+};
+
+export interface OrganizationRequestList {
+  organization: OrganizationRequestListOrganization;
+  requests: OrganizationRequestListRequestsItem[];
+  isOwner: boolean;
+  verification: OrganizationRequestListVerification;
+  audit: OrganizationRequestListAuditItem[];
+}
+
+export type OrganizationRequestQueueItemsItemStatus = typeof OrganizationRequestQueueItemsItemStatus[keyof typeof OrganizationRequestQueueItemsItemStatus];
+
+
+export const OrganizationRequestQueueItemsItemStatus = {
+  DRAFT: 'DRAFT',
+  UNDER_REVIEW: 'UNDER_REVIEW',
+  CHANGES_REQUESTED: 'CHANGES_REQUESTED',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export type OrganizationRequestQueueItemsItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  name: string;
+  status: OrganizationRequestQueueItemsItemStatus;
+  /** @nullable */
+  submittedAt: string | null;
+  /** @nullable */
+  reviewedAt: string | null;
+};
+
+export interface OrganizationRequestQueue {
+  items: OrganizationRequestQueueItemsItem[];
+  /** @nullable */
+  nextOffset: number | null;
+}
+
 export type VerificationHistoryItemStatus = typeof VerificationHistoryItemStatus[keyof typeof VerificationHistoryItemStatus];
 
 
@@ -3584,6 +4088,28 @@ export type AdvancePublishRedactedBody = {
   redactionConfirmed: AdvancePublishRedactedBodyRedactionConfirmed;
   /** JSON array of original document UUIDs in file order */
   originalDocumentIds: string;
+};
+
+export type AdvanceUploadOrganizationDocumentBodyKind = typeof AdvanceUploadOrganizationDocumentBodyKind[keyof typeof AdvanceUploadOrganizationDocumentBodyKind];
+
+
+export const AdvanceUploadOrganizationDocumentBodyKind = {
+  IDENTITY: 'IDENTITY',
+  REPRESENTATION: 'REPRESENTATION',
+  ACTIVITY: 'ACTIVITY',
+  OTHER: 'OTHER',
+} as const;
+
+export type AdvanceUploadOrganizationDocumentBody = {
+  file: Blob | File;
+  kind: AdvanceUploadOrganizationDocumentBodyKind;
+  /** @minimum 1 */
+  expectedRevision: number;
+};
+
+export type AdvanceOrganizationRequestQueueParams = {
+status: string;
+offset: string;
 };
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
@@ -3906,6 +4432,118 @@ export const advanceHealth = (
       options);
     }
 
+export const advanceOrganizationRequest = (
+    id: string,
+ options?: SecondParameter<typeof advanceHttp<OrganizationRequest>>,) => {
+      return advanceHttp<OrganizationRequest>(
+      {url: `/v1/advance/verification-requests/${id}`, method: 'GET'
+    },
+      options);
+    }
+
+export const advanceSaveOrganizationRequest = (
+    id: string,
+    organizationRequestSave: OrganizationRequestSave,
+ options?: SecondParameter<typeof advanceHttp<OrganizationRequest>>,) => {
+      return advanceHttp<OrganizationRequest>(
+      {url: `/v1/advance/verification-requests/${id}`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: organizationRequestSave
+    },
+      options);
+    }
+
+export const advanceSubmitOrganizationRequest = (
+    id: string,
+    organizationRequestSubmit: OrganizationRequestSubmit,
+ options?: SecondParameter<typeof advanceHttp<OrganizationRequest>>,) => {
+      return advanceHttp<OrganizationRequest>(
+      {url: `/v1/advance/verification-requests/${id}/submit`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: organizationRequestSubmit
+    },
+      options);
+    }
+
+export const advanceCancelOrganizationRequest = (
+    id: string,
+    organizationRequestRevision: OrganizationRequestRevision,
+ options?: SecondParameter<typeof advanceHttp<OrganizationRequest>>,) => {
+      return advanceHttp<OrganizationRequest>(
+      {url: `/v1/advance/verification-requests/${id}/cancel`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: organizationRequestRevision
+    },
+      options);
+    }
+
+export const advanceUploadOrganizationDocument = (
+    id: string,
+    advanceUploadOrganizationDocumentBody: AdvanceUploadOrganizationDocumentBody,
+ options?: SecondParameter<typeof advanceHttp<OrganizationRequest>>,) => {const formData = new FormData();
+formData.append(`file`, advanceUploadOrganizationDocumentBody.file);
+formData.append(`kind`, advanceUploadOrganizationDocumentBody.kind);
+formData.append(`expectedRevision`, advanceUploadOrganizationDocumentBody.expectedRevision.toString())
+
+      return advanceHttp<OrganizationRequest>(
+      {url: `/v1/advance/verification-requests/${id}/files`, method: 'POST',
+      headers: {'Content-Type': 'multipart/form-data', },
+       data: formData
+    },
+      options);
+    }
+
+export const advanceDownloadOrganizationDocument = (
+    id: string,
+    documentId: string,
+ options?: SecondParameter<typeof advanceHttp<Blob>>,) => {
+      return advanceHttp<Blob>(
+      {url: `/v1/advance/verification-requests/${id}/files/${documentId}/download`, method: 'GET',
+        responseType: 'blob'
+    },
+      options);
+    }
+
+export const advanceOrganizationRequests = (
+    id: string,
+ options?: SecondParameter<typeof advanceHttp<OrganizationRequestList>>,) => {
+      return advanceHttp<OrganizationRequestList>(
+      {url: `/v1/advance/organizations/${id}/verification-requests`, method: 'GET'
+    },
+      options);
+    }
+
+export const advanceCreateOrganizationRequest = (
+    id: string,
+ options?: SecondParameter<typeof advanceHttp<OrganizationRequest>>,) => {
+      return advanceHttp<OrganizationRequest>(
+      {url: `/v1/advance/organizations/${id}/verification-requests`, method: 'POST'
+    },
+      options);
+    }
+
+export const advanceOrganizationRequestQueue = (
+    params: AdvanceOrganizationRequestQueueParams,
+ options?: SecondParameter<typeof advanceHttp<OrganizationRequestQueue>>,) => {
+      return advanceHttp<OrganizationRequestQueue>(
+      {url: `/v1/advance/internal/verification-requests`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+export const advanceDecideOrganizationRequest = (
+    id: string,
+    organizationDecision: OrganizationDecision,
+ options?: SecondParameter<typeof advanceHttp<OrganizationRequest>>,) => {
+      return advanceHttp<OrganizationRequest>(
+      {url: `/v1/advance/internal/verification-requests/${id}/decisions`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: organizationDecision
+    },
+      options);
+    }
+
 export const authControllerRegister = (
 
  options?: SecondParameter<typeof advanceHttp<void>>,) => {
@@ -3965,6 +4603,15 @@ export const authControllerSession = (
  options?: SecondParameter<typeof advanceHttp<void>>,) => {
       return advanceHttp<void>(
       {url: `/auth/session`, method: 'GET'
+    },
+      options);
+    }
+
+export const authControllerUnlinkWallet = (
+
+ options?: SecondParameter<typeof advanceHttp<void>>,) => {
+      return advanceHttp<void>(
+      {url: `/auth/wallets/unlink`, method: 'POST'
     },
       options);
     }
@@ -4035,6 +4682,16 @@ export type AdvancePrepareActionResult = NonNullable<Awaited<ReturnType<typeof a
 export type AdvanceListRefundsResult = NonNullable<Awaited<ReturnType<typeof advanceListRefunds>>>
 export type AdvanceGetRefundsResult = NonNullable<Awaited<ReturnType<typeof advanceGetRefunds>>>
 export type AdvanceHealthResult = NonNullable<Awaited<ReturnType<typeof advanceHealth>>>
+export type AdvanceOrganizationRequestResult = NonNullable<Awaited<ReturnType<typeof advanceOrganizationRequest>>>
+export type AdvanceSaveOrganizationRequestResult = NonNullable<Awaited<ReturnType<typeof advanceSaveOrganizationRequest>>>
+export type AdvanceSubmitOrganizationRequestResult = NonNullable<Awaited<ReturnType<typeof advanceSubmitOrganizationRequest>>>
+export type AdvanceCancelOrganizationRequestResult = NonNullable<Awaited<ReturnType<typeof advanceCancelOrganizationRequest>>>
+export type AdvanceUploadOrganizationDocumentResult = NonNullable<Awaited<ReturnType<typeof advanceUploadOrganizationDocument>>>
+export type AdvanceDownloadOrganizationDocumentResult = NonNullable<Awaited<ReturnType<typeof advanceDownloadOrganizationDocument>>>
+export type AdvanceOrganizationRequestsResult = NonNullable<Awaited<ReturnType<typeof advanceOrganizationRequests>>>
+export type AdvanceCreateOrganizationRequestResult = NonNullable<Awaited<ReturnType<typeof advanceCreateOrganizationRequest>>>
+export type AdvanceOrganizationRequestQueueResult = NonNullable<Awaited<ReturnType<typeof advanceOrganizationRequestQueue>>>
+export type AdvanceDecideOrganizationRequestResult = NonNullable<Awaited<ReturnType<typeof advanceDecideOrganizationRequest>>>
 export type AuthControllerRegisterResult = NonNullable<Awaited<ReturnType<typeof authControllerRegister>>>
 export type AuthControllerLoginResult = NonNullable<Awaited<ReturnType<typeof authControllerLogin>>>
 export type AuthControllerNonceResult = NonNullable<Awaited<ReturnType<typeof authControllerNonce>>>
@@ -4042,6 +4699,7 @@ export type AuthControllerVerifyResult = NonNullable<Awaited<ReturnType<typeof a
 export type AuthControllerWalletNonceResult = NonNullable<Awaited<ReturnType<typeof authControllerWalletNonce>>>
 export type AuthControllerLinkWalletResult = NonNullable<Awaited<ReturnType<typeof authControllerLinkWallet>>>
 export type AuthControllerSessionResult = NonNullable<Awaited<ReturnType<typeof authControllerSession>>>
+export type AuthControllerUnlinkWalletResult = NonNullable<Awaited<ReturnType<typeof authControllerUnlinkWallet>>>
 export type AuthControllerLogoutResult = NonNullable<Awaited<ReturnType<typeof authControllerLogout>>>
 export type OrganizationsControllerCreateResult = NonNullable<Awaited<ReturnType<typeof organizationsControllerCreate>>>
 export type OrganizationsControllerListResult = NonNullable<Awaited<ReturnType<typeof organizationsControllerList>>>
