@@ -40,22 +40,26 @@ for (const change of [{ address: undefined }, { chainId: 1 }, { userId: 'resolve
     await assert.rejects(requestWalletProof(h.dependencies), /đã thay đổi/)
   })
 }
-test('crashed wallet times out and a late signature cannot complete proof', async () => {
+test('timed out wallet proof stays locked until a late signature settles', async () => {
   const h = setup(); let finish
   h.dependencies.sign = () => new Promise(resolve => { finish = resolve })
   let linked = false
   try {
     await assert.rejects(requestWalletProof(h.dependencies).then(() => { linked = true }), /Ví chưa trả chữ ký/)
+    assert.throws(() => assertWalletRequestAvailable(address), /yêu cầu xác nhận chưa xử lý/)
+    await assert.rejects(requestWalletProof({ ...h.dependencies, sign: async () => signature }), /yêu cầu xác nhận chưa xử lý/)
+    finish(signature)
+    await new Promise(resolve => setImmediate(resolve))
     const retry = await requestWalletProof({ ...h.dependencies, sign: async () => signature })
     assert.equal(retry.signature, signature)
   } finally {
-    finish(signature)
+    finish?.(signature)
     await new Promise(resolve => setImmediate(resolve))
   }
   assert.equal(linked, false)
 })
 
-test('cancelled proof releases its local lock and late completion cannot unlock a new request', async () => {
+test('cancelled proof stays locked until the wallet settles its uncancellable request', async () => {
   const h = setup()
   const controller = new AbortController()
   let finishOld, finishNew
@@ -66,20 +70,15 @@ test('cancelled proof releases its local lock and late completion cannot unlock 
   const cancelled = assert.rejects(old, /cancelled/)
   controller.abort(new Error('cancelled'))
   await cancelled
-  const next = requestWalletProof({ ...h.dependencies, timeoutMs: 1000,
-    sign: () => new Promise(resolve => { finishNew = resolve }) })
-  // Attach rejection handling immediately so the regression can fail cleanly.
-  const nextResult = next.then(value => ({ value }), error => ({ error }))
-  await new Promise(resolve => setImmediate(resolve))
+  assert.throws(() => assertWalletRequestAvailable(address), /yêu cầu xác nhận chưa xử lý/)
+  await assert.rejects(requestWalletProof(h.dependencies), /yêu cầu xác nhận chưa xử lý/)
   finishOld(signature)
   await new Promise(resolve => setImmediate(resolve))
-  if (finishNew) {
-    assert.throws(() => assertWalletRequestAvailable(address), /yêu cầu xác nhận chưa xử lý/)
-    finishNew(signature)
-  }
-  const result = await nextResult
-  assert.equal(result.error, undefined)
-  assert.equal(result.value.signature, signature)
+  const next = requestWalletProof({ ...h.dependencies, timeoutMs: 1000,
+    sign: () => new Promise(resolve => { finishNew = resolve }) })
+  await new Promise(resolve => setImmediate(resolve))
+  finishNew(signature)
+  assert.equal((await next).signature, signature)
   assert.equal(oldLinked, false)
   assert.doesNotThrow(() => assertWalletRequestAvailable(address))
 })
