@@ -14,6 +14,7 @@ import {
   logout,
   register,
   verifySiwe,
+  unlinkWallet,
 } from '../../lib/api/auth'
 import type { AccountSession } from '../../lib/api/auth'
 import { createSiweMessage } from '../../lib/web3/siwe'
@@ -60,6 +61,9 @@ export function AccountAccess({
   }, [walletStage])
   const currentSession = useRef(session)
   useEffect(() => { currentSession.current = session }, [session])
+  useEffect(() => {
+    proofController.current?.abort(new Error('Kết nối ví hoặc tài khoản đã thay đổi. Lần xác thực cũ đã dừng; bạn có thể liên kết bằng kết nối hiện tại.'))
+  }, [address, chainId, connector?.uid, session?.userId])
   const alreadyLinked = Boolean(address && session?.wallets.some(wallet => wallet.address.toLowerCase() === address.toLowerCase() && wallet.chainId === chainId))
   const wrongResolverWallet = Boolean(session?.roles.includes('RESOLVER') && address && address.toLowerCase() !== deployment.resolver.toLowerCase())
 
@@ -146,7 +150,12 @@ export function AccountAccess({
   }
 
   function stopWaiting() {
-    proofController.current?.abort(new Error('Đã dừng chờ xác thực. Yêu cầu trong extension chưa bị hủy; từ chối yêu cầu cũ trong ví trước khi ký lại. Chữ ký trả muộn không được dùng để liên kết.'))
+    proofController.current?.abort(new Error('Đã dừng lần xác thực này; chữ ký trả muộn sẽ bị bỏ qua. Nếu extension còn hiển thị yêu cầu cũ, từ chối yêu cầu đó trước khi thử lại.'))
+  }
+  function disconnectWallet() {
+    stopWaiting()
+    setError('')
+    if (connector) disconnect({ connector })
   }
   const linkingLabel = walletStage === 'prepare' ? 'Kiểm tra kết nối…'
     : walletStage === 'challenge' ? 'Lấy thông điệp…'
@@ -154,7 +163,7 @@ export function AccountAccess({
         : walletStage === 'verify' ? 'Xác minh chữ ký…' : 'Đang xử lý…'
   const walletRecovery = <>
     {walletStage && walletStage !== 'verify' && <button type="button" className="button button--quiet" onClick={stopWaiting}>Dừng chờ</button>}
-    {address && connector && !busy && <button type="button" className="button button--quiet" onClick={() => disconnect({ connector })}>Ngắt kết nối / đổi ví</button>}
+    {address && connector && (!busy || (walletStage && walletStage !== 'verify')) && <button type="button" className="button button--quiet" onClick={disconnectWallet}>Ngắt kết nối / đổi ví</button>}
     {error && session && !busy && <button type="button" className="button button--quiet" onClick={() => void run(async () => {
       const fresh = await getSession()
       if (fresh.userId !== currentSession.current?.userId) throw new Error('Tài khoản đã thay đổi. Tải lại trang để đọc phiên hiện tại.')
@@ -202,7 +211,14 @@ export function AccountAccess({
               <ul className="linked-wallets">
                 {session.wallets.map((wallet) => (
                   <LinkedWalletCard key={`${session.userId}:${wallet.chainId}:${wallet.address}`}
-                    {...wallet} userId={session.userId} />
+                    {...wallet} userId={session.userId} unlinkDisabled={busy}
+                    onUnlink={confirmation => run(async () => {
+                      const updated = await unlinkWallet(wallet.address, wallet.chainId, confirmation)
+                      if (!mounted.current || currentSession.current?.userId !== session.userId) return
+                      if (getAccount(config).address?.toLowerCase() === wallet.address.toLowerCase()
+                        && getAccount(config).chainId === wallet.chainId) disconnectWallet()
+                      onSession(updated)
+                    })} />
                 ))}
               </ul>
             ) : (
@@ -215,7 +231,7 @@ export function AccountAccess({
               <p>Trang đang dùng ví <code>{address}</code>, khác ví resolver <code>{deployment.resolver}</code>.</p>
               <p>Ngắt ví này, bấm Connect Wallet và chọn MetaMask với đúng địa chỉ resolver. Ví đang mở trong extension chưa tự động trở thành ví kết nối với trang.</p>
               <button type="button" className="button button--secondary" disabled={busy || !connector}
-                onClick={() => { if (connector) disconnect({ connector }) }}>Ngắt ví đang kết nối</button>
+                onClick={disconnectWallet}>Ngắt ví đang kết nối</button>
             </div>}
             <div className="signin-row">
               <ConnectButton showBalance={false} />

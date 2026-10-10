@@ -1,6 +1,6 @@
 # FundTogether Project Progress
 
-> **Updated:** 2026-10-09
+> **Updated:** 2026-10-10
 
 ## Current direction — MVP consolidation and business validation
 
@@ -26,6 +26,131 @@ See [the working plan](./business-validation-and-mvp-hardening.md).
 The dated entries below are evidence for their stated slice and environment.
 Historical DONE entries do not mark the entire MVP, business validation or
 production readiness DONE; old next-step notes are superseded by this direction.
+
+### 2026-10-10 — DONE organization profile navigation correction
+
+- Organization selector previously fell back to campaigns from organization
+  list/profile. It now opens the selected organization's profile in that context,
+  while campaign/evidence/milestone switching keeps its section.
+- Added an explicit "Hồ sơ & ví đại diện" sidebar link for the selected
+  organization and corrected manual-test navigation instructions.
+
+### 2026-10-10 — DONE public Explore visual refresh
+
+- Improved Workflow B campaign cards, local search and status filters, funding
+  progress, current-step guidance, and campaign detail hierarchy. Technical
+  money movement and indexed transaction history remain available in
+  collapsible sections; existing wallet actions are reused.
+- Clearly labels the local test network and MockUSDC. Search and filters apply
+  only to the campaign list already returned by the API.
+- Navigation stays in the left sidebar. Explore uses a compact campaign heading
+  and list; the large hero artwork/thumbnail was removed. Campaign-card spacing
+  and MockUSDC number formatting remain scoped to the public list.
+- Verification: Workflow B frontend TypeScript and production build passed in
+  the Desktop checkout serving `localhost:5174` after the visual correction.
+  The rendered Explore page with sidebar was visually reviewed in the local
+  in-app browser at 1280×720. Brave account-specific and campaign-flow
+  acceptance remain pending.
+- Profile/list links and representative-wallet rendering covered by regression
+  tests; focused suite 30/30 PASS, lint and Workflow B build PASS.
+- Applied to Desktop runtime and d6be. The separate in-app browser is logged out;
+  authenticated Brave click behavior was not independently reproduced. Existing
+  "Xem hồ sơ" href already targeted the profile; no claim that this anchor was
+  the source of the reported redirect. No representative wallet was assigned.
+
+### 2026-10-10 — REVERTED account access dialog
+
+- A temporary centered-dialog presentation was reverted at the user's request.
+  Account and workspace access remain regular routes inside the left-sidebar
+  layout; sign-in, account roles, and linked-wallet actions are unchanged.
+
+### 2026-10-10 — DONE native extension connection; user reports recovery in Brave
+
+- Repeated manual reports show a signature wait without a visible new prompt,
+  including after clearing pending extension requests. Backend nonce responses
+  were fast; no subsequent link verification request reached the API. These
+  observations do not by themselves identify the extension's internal failure.
+- Installed RainbowKit MetaMask preset uses the MetaMask SDK and claims its rdns;
+  Wagmi consequently skips the native announced provider for that rdns. Removed
+  preset connectors and now use Wagmi EIP-6963 discovery directly. The installed
+  wallet list retains extension identities, without a shared window.ethereum
+  fallback or SDK session in this connection path. Extensions must announce
+  their provider; mobile WalletConnect is outside this local workflow.
+- Added actual Wagmi connect/getConnectorClient/signMessage tests with simulated
+  Brave and MetaMask providers. Verified exact provider identity, one signing
+  request, returned signature recovery, discovery deduplication, reject/reconnect,
+  and rejection of a late signature after account change. These are not tests
+  of the user's actual extension UI.
+- Frontend130/130 PASS, lint and B build PASS; Desktop port5174 serves the new
+  configuration. A full page reload is required to replace an existing SDK
+  connection. The user subsequently reported "được rồi" and requested that this
+  incident be recorded. This is user-reported recovery of the current issue,
+  not independent verification of all wallet journeys or long-term stability.
+- Recurrence guide: inspect the selected connector/provider before blaming RPC
+  or increasing timeouts. Keep EIP-6963 discovery in wallet-config.ts; do not
+  reintroduce a preset claiming io.metamask without testing native discovery.
+  A page reload replaces an old SDK connection. Reject stale extension requests
+  if present, then connect to the detected MetaMask and request linking once.
+  Disconnecting or cancelling the app wait does not cancel an extension prompt.
+  Preserve database links and chain state; verify ownership conflicts separately.
+
+### 2026-10-10 — DONE password-confirmed wallet unlink; user action pending
+
+- Added POST /auth/wallets/unlink and a per-wallet confirmation form. The
+  authenticated owner supplies their account password, exact address and chain;
+  no extension signature or token transfer is involved.
+- A transaction locks the account/session/link, rejects passwordless accounts,
+  organization representatives and wallets bound to frozen B plans or A
+  submissions. Absent scoped links permit safe retries without modifying a
+  different user's wallet. Other sessions and current pending challenges are
+  revoked after successful removal. Wallet login holds a shared link lock until
+  session creation, serializing it with unlink.
+- Frontend clears the password after submission, disables duplicate actions,
+  refreshes the account from the response and disconnects the matching wallet.
+  Wallet-only accounts remain unsupported by this password-confirmed flow.
+- Backend auth/controller/guard19 tests PASS; real B DB smoke8 checks PASS with
+  outer rollback, including wrong owner/chain/password, representative guard,
+  session revocation, retry and fresh SIWE relink to another synthetic account.
+  Frontend127 tests, lint, backend and B frontend builds PASS.
+- Desktop API was stopped; started the updated B API (launcher23828, child21520).
+  Health reports ready/ADVANCE/31338; anonymous unlink returns401 and port5174
+  serves the new button. No real user links were removed; user confirmation in
+  the browser remains pending. Worktree Jest path discovery was unsuitable, so
+  focused backend checks ran from the configured Desktop checkout.
+
+### 2026-10-09 — DONE recover abandoned wallet proofs; Brave acceptance pending
+
+- Reproduced two regressions before the fix: timed-out authentication requests
+  retained the connector lock indefinitely, and disconnect/reconnect could not
+  recover an abandoned signature request. The screenshot text came from this
+  frontend lock, not an observed fresh error from the extension.
+- Authentication proofs now release their local lock on timeout/abort and ignore
+  late signatures. Request identity prevents an old promise from unlocking a new
+  request. Transaction requests retain their lock and late-hash callback.
+- AccountAccess aborts an active proof on wallet/chain/connector/account change;
+  disconnect is available during preparation/signing and stops the old proof.
+- Focused regression13/13 and full frontend127/127 PASS; lint and B build PASS.
+  Tests cover timeout retry, cancellation, late-result isolation, duplicate
+  signing, provider rejection and preserved transaction tracking.
+- Applied the same source fix to the active Desktop checkout; HTTP5174 serves
+  all three patched modules. The worktree lacks ignored B deployment config,
+  so its attempted full suite could not load that fixture and was stopped;
+  the complete suite passed in the configured Desktop checkout.
+- A real extension may still retain its own pending prompt; this fix does not
+  claim to cancel it. Brave/MetaMask popup interaction remains manual acceptance.
+
+### 2026-10-09 — DONE manual test guide prepared; I3 remains IN_PROGRESS
+
+- Added [Vietnamese manual test guide](./workflow-b-manual-test-guide.md) with
+  account/wallet/organization prerequisites, G1/G2 steps, expected token deltas,
+  evidence access/version checks, case/return/refund branches and result template.
+- Read-only B check: API/RPC/storage/indexer ready and indexed through block41;
+  organizer organization still lacked representative wallet and verification;
+  resolver/donorB had no linked recipients at that check. No roles, links,
+  balances, deadlines or chain state changed while preparing the guide.
+- Acceptance now records the observed wallet-link slice of T16 separately from
+  unperformed transaction/popup tests and the still-empty reviewer outcomes.
+  Preparing instructions does not complete manual acceptance.
 
 ### 2026-10-09 — DONE linked-wallet balance display and partial manual funding
 

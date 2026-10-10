@@ -64,3 +64,8 @@ export async function linkWallet(message: string, signature: string) {
 export async function logout() {
   await http.post('/auth/logout')
 }
+
+export async function unlinkWallet(address: string, chainId: number, password: string) {
+  const { data } = await http.post<AccountSession>('/auth/wallets/unlink', { address, chainId, password })
+  return data
+}

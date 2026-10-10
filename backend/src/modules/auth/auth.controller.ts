@@ -121,6 +121,20 @@ export class AuthController {
     return request.account;
   }
 
+  @Post("wallets/unlink")
+  @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Header("Cache-Control", "no-store")
+  @UseGuards(AuthGuard)
+  unlinkWallet(@Body() body: unknown, @Req() request: Request) {
+    const input = this.parse(z.object({
+      address: z.string().regex(/^0x[\da-fA-F]{40}$/),
+      chainId: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+      password: z.string().min(1).max(128),
+    }).strict(), body);
+    return this.authService.unlinkWallet(request.account!.userId, request.sessionToken!, input.address, input.chainId, input.password);
+  }
+
   @Post("logout")
   @HttpCode(204)
   async logout(

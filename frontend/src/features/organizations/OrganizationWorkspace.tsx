@@ -9,6 +9,7 @@ import { OrganizationCampaigns } from './OrganizationCampaigns'
 import { OrganizationEvidence } from './OrganizationEvidence'
 import { OrganizationsPage } from './OrganizationsPage'
 import { OrganizationProfile } from './OrganizationProfile'
+import { organizationSwitchPath } from './organization-navigation'
 import './OrganizationsPage.css'
 import { isAdvance } from '../../lib/web3/deployment-context'
 import { AdvanceOrganizationCampaigns } from '../campaigns/advance/AdvanceOrganizationCampaigns'
@@ -49,20 +50,23 @@ export function OrganizationWorkspace({ organizationId, section, session, sessio
         {session && organizations.isSuccess && <label className="workspace-organization-selector">
           Tổ chức đang quản lý
           <select value={organization?.id ?? ''} aria-label="Tổ chức đang quản lý" disabled={organizations.data.length === 0}
-            onChange={(event) => { setNotice(''); window.location.hash = `/organizations/${event.target.value}/workspace${currentSection?.path ?? '/campaigns'}` }}>
+            onChange={(event) => { setNotice(''); window.location.hash = organizationSwitchPath(event.target.value, activeSection) }}>
             {!organization && <option value="">{organizations.data.length ? 'Chọn tổ chức' : 'Chưa có tổ chức'}</option>}
             {organizations.data.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
         </label>}
       </div>
       <nav className="dashboard-nav" aria-label="Điều hướng quản lý gây quỹ">
+        {organization && <a className={`nav-item${profile ? ' nav-item--active' : ''}`}
+          href={`#/organizations/${organization.id}`} onClick={() => setNotice('')}
+          aria-current={profile ? 'page' : undefined}>Hồ sơ &amp; ví đại diện</a>}
         {sections.map((item) => <a key={item.path} href={`#${basePath}${item.path}`}
           onClick={() => setNotice('')}
           className={`nav-item${!organizationPage && currentSection?.path === item.path ? ' nav-item--active' : ''}`}
           aria-current={!organizationPage && currentSection?.path === item.path ? 'page' : undefined}>{item.label}</a>)}
-        <a className={`nav-item${organizationPage ? ' nav-item--active' : ''}`} href="#/organizations"
+        <a className={`nav-item${activeSection === '/organizations' ? ' nav-item--active' : ''}`} href="#/organizations"
           onClick={() => setNotice('')}
-          aria-current={organizationPage ? 'page' : undefined}>Tổ chức của tôi</a>
+          aria-current={activeSection === '/organizations' ? 'page' : undefined}>Tổ chức của tôi</a>
       </nav>
       <div className="sidebar-account">
         {session && <AccountAccess session={session} onSession={onSession} compact />}

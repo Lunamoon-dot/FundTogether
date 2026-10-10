@@ -72,6 +72,9 @@ Không bỏ kiểm tra chữ ký hoặc cho phép chiếm ví của một tài k
 
 ## Hành trình người dùng cần ghi nhận
 
+Xem [hướng dẫn kiểm thử chi tiết](./workflow-b-manual-test-guide.md) để có thứ tự
+từng tài khoản, số dư kỳ vọng, điểm dừng theo deadline và mẫu ghi PASS/FAIL.
+
 1. Staff đăng nhập → nội bộ/tổ chức → ghi xác minh có căn cứ, phạm vi, giới hạn,
    thời hạn. Organizer tự xác minh phải bị chặn.
 2. Organizer → tổ chức pilot/workspace → mở G1 → kiểm ngân sách2200,100 suất và

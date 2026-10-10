@@ -1,37 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { PropsWithChildren } from 'react'
 import { AccountSessionProvider } from '../../features/auth/AccountSessionProvider'
-import {
-  connectorsForWallets,
-  RainbowKitProvider,
-} from '@rainbow-me/rainbowkit'
-import {
-  braveWallet,
-  metaMaskWallet,
-  rabbyWallet,
-} from '@rainbow-me/rainbowkit/wallets'
-import { WagmiProvider, createConfig, http } from 'wagmi'
+import { RainbowKitProvider } from '@rainbow-me/rainbowkit'
+import { WagmiProvider } from 'wagmi'
 import deployment, { activeChain } from '../../lib/web3/deployment-context'
+import { createBrowserWalletConfig } from '../../lib/web3/wallet-config'
 
-const connectors = connectorsForWallets(
-  [
-    {
-      groupName: 'Browser wallets',
-      wallets: [braveWallet, metaMaskWallet, rabbyWallet],
-    },
-  ],
-  {
-    appName: 'FundTogether',
-    // Required by RainbowKit's connector helper; WalletConnect is not enabled here.
-    projectId: 'fundtogether-local',
-  },
-)
-
-const wagmiConfig = createConfig({
-  chains: [activeChain],
-  connectors,
-  transports: { [activeChain.id]: http(deployment.rpcUrl, { timeout: 8_000, retryCount: 0 }) },
-})
+const wagmiConfig = createBrowserWalletConfig(activeChain, deployment.rpcUrl)
 
 const queryClient = new QueryClient({
   defaultOptions: {
