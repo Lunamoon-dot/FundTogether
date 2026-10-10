@@ -156,7 +156,14 @@ the 22-check HTTP/PostgreSQL smoke script. On-chain organizer
 addresses are unchanged. See
 [organization backend step](./backend-step-3-organizations.md).
 
-Organizations now have an optional representative wallet selected from the
+Account wallet cards provide password-confirmed
+unlink through POST /auth/wallets/unlink. Only the authenticated owner can remove
+the exact chain/address; representative wallets and frozen submission wallets
+are protected. Passwordless accounts cannot use this flow. Successful unlink
+revokes other sessions and pending challenges, preserving blockchain balances,
+history and the current session. Linking to another account still needs fresh SIWE.
+
+Organizations have an optional representative wallet selected from the
 creator's SIWE-verified links. PUT /organizations/:id/wallet requires creator
 identity and current OWNER membership. Initial selection is persisted and fixed;
 MetaMask connection changes cannot replace it. Migration 0006 is applied locally.

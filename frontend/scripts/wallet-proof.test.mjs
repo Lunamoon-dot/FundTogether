@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { requestWalletProof } from '../src/lib/web3/wallet-proof.ts'
+import { assertWalletRequestAvailable, requestWalletConfirmation } from '../src/lib/web3/wallet-confirmation.ts'
 import { verifyWalletDeployment } from '../src/lib/web3/wallet-identity.ts'
 import { keccak256 } from 'viem'
 
@@ -45,12 +46,72 @@ test('crashed wallet times out and a late signature cannot complete proof', asyn
   let linked = false
   try {
     await assert.rejects(requestWalletProof(h.dependencies).then(() => { linked = true }), /Ví chưa trả chữ ký/)
-    await assert.rejects(requestWalletProof(h.dependencies), /yêu cầu xác nhận chưa xử lý/)
+    const retry = await requestWalletProof({ ...h.dependencies, sign: async () => signature })
+    assert.equal(retry.signature, signature)
   } finally {
     finish(signature)
     await new Promise(resolve => setImmediate(resolve))
   }
   assert.equal(linked, false)
+})
+
+test('cancelled proof releases its local lock and late completion cannot unlock a new request', async () => {
+  const h = setup()
+  const controller = new AbortController()
+  let finishOld, finishNew
+  let oldLinked = false
+  const old = requestWalletProof({ ...h.dependencies, signal: controller.signal,
+    sign: () => new Promise(resolve => { finishOld = resolve }) }).then(() => { oldLinked = true })
+  await new Promise(resolve => setImmediate(resolve))
+  const cancelled = assert.rejects(old, /cancelled/)
+  controller.abort(new Error('cancelled'))
+  await cancelled
+  const next = requestWalletProof({ ...h.dependencies, timeoutMs: 1000,
+    sign: () => new Promise(resolve => { finishNew = resolve }) })
+  // Attach rejection handling immediately so the regression can fail cleanly.
+  const nextResult = next.then(value => ({ value }), error => ({ error }))
+  await new Promise(resolve => setImmediate(resolve))
+  finishOld(signature)
+  await new Promise(resolve => setImmediate(resolve))
+  if (finishNew) {
+    assert.throws(() => assertWalletRequestAvailable(address), /yêu cầu xác nhận chưa xử lý/)
+    finishNew(signature)
+  }
+  const result = await nextResult
+  assert.equal(result.error, undefined)
+  assert.equal(result.value.signature, signature)
+  assert.equal(oldLinked, false)
+  assert.doesNotThrow(() => assertWalletRequestAvailable(address))
+})
+
+test('active proof still prevents duplicate signing requests', async () => {
+  const h = setup(); let finish
+  const first = requestWalletProof({ ...h.dependencies, timeoutMs: 1000,
+    sign: () => new Promise(resolve => { finish = resolve }) })
+  await new Promise(resolve => setImmediate(resolve))
+  try { await assert.rejects(requestWalletProof(h.dependencies), /yêu cầu xác nhận chưa xử lý/) }
+  finally { finish(signature); await first }
+})
+
+test('provider pending error does not leave a frontend proof lock', async () => {
+  const h = setup()
+  await assert.rejects(requestWalletProof({ ...h.dependencies,
+    sign: async () => { throw Object.assign(new Error('provider request pending'), { code: -32002 }) } }), /provider request pending/)
+  assert.equal((await requestWalletProof(h.dependencies)).signature, signature)
+})
+
+test('transaction timeout retains its lock and records the late transaction hash', async () => {
+  let finish
+  const observed = []
+  const uid = 'transaction-connector'
+  await assert.rejects(requestWalletConfirmation({ connectorUid: uid, timeoutMs: 5,
+    request: () => new Promise(resolve => { finish = resolve }),
+    onResult: (hash, late) => observed.push({ hash, late }) }), /Ví không phản hồi/)
+  assert.throws(() => assertWalletRequestAvailable(uid), /yêu cầu xác nhận chưa xử lý/)
+  finish('0xtx')
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(observed, [{ hash: '0xtx', late: true }])
+  assert.doesNotThrow(() => assertWalletRequestAvailable(uid))
 })
 test('user rejection propagates without a valid proof', async () => {
   const h = setup(); h.dependencies.sign = async () => { throw new Error('User rejected') }

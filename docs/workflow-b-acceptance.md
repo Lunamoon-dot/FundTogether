@@ -5,7 +5,11 @@
 > [spec pilot đã duyệt](./workflow-b-spec.md), [code plan đã duyệt](./workflow-b-code-plan.md).
 
 Trạng thái nghiệm thu: **CHỜ DỮ LIỆU I3**, gồm thao tác MetaMask và quyết định reviewer.
-Kiểm tra hiện tại:60 dòng mẫu CSV,0 outcome được nhập; chưa có bằng chứng manual.
+CSV reviewer hiện có60 dòng mẫu,0 outcome được nhập. Có bằng chứng manual một
+phần về liên kết ví sau sửa seed (ảnh người dùng và liên kết organizer/donorA
+trong DB); chưa có hành trình ký giao dịch G1/G2 hoặc nghiệm thu popup đầy đủ.
+Thực hiện theo [hướng dẫn kiểm thử thủ công](./workflow-b-manual-test-guide.md),
+ghi kết quả từng bước, không suy PASS toàn bộ từ liên kết ví thành công.
 Code-plan approval đã được ghi nhận, không có điểm duyệt lại. Báo cáo kỹ thuật
 vẫn giữ từng kết quả bên dưới; toàn bộ nghiệm thu chưa hoàn tất.
 
@@ -31,7 +35,7 @@ vẫn giữ từng kết quả bên dưới; toàn bộ nghiệm thu chưa hoàn
 | Waiting HTTP journey |94 receipts/20 assertions PASS,7 outcomes: first-review/claim/evidence/reviewer/case timeout; case mine trước challengeEnd; INCONCLUSIVE lần3 dừng, không freeze lần4; MET còn dư50 phải thực return trước COMPLETED. `.local/workflow-b/waiting-journey-report.json` |
 | Recovery |7 checks PASS: cold restore snapshot Anvil, pg_dump/pg_restore vào DB mới,20 objects restore vào bucket riêng, missing-object recovery, fresh anvil_reset cùng31338 bị từ chối, checkpoint giữ nguyên, restart/RPC lag/recover. `.local/workflow-b/recovery-report.json`; source B giữ nguyên |
 | Chuẩn bị manual/reviewer | Startup/preflight PASS, seed5 accounts/G1/G2 drafts chạy lại không tạo trùng. Corpus v3:12 mã trung tính,142 PDF/150 pages +24 PNG; hash/text/bounds toàn bộ PASS,17 trang mẫu render và ảnh minh họa đã kiểm. CSV chưa có quyết định; nhãn tác giả chưa độc lập |
-| MetaMask / reviewer experiment | TODO; không tự ký extension và không dùng số học thay nghiệm thu người dùng |
+| MetaMask / reviewer experiment | IN_PROGRESS một phần liên kết ví; G1/G2 qua extension và quyết định reviewer vẫn TODO; không tự ký extension hoặc dùng số học thay nghiệm thu người dùng |
 | So sánh A/B có kiểm soát |6 paths/138 receipts PASS trên contract/token mới trong fork; A source khớp baseline, artifact source hashes đối chiếu compiler metadata. Gas/tx, vốn ứng và escrow ghi trong `.local/workflow-b/comparison-report.json`; xem giả định bên dưới |
 
 Suite bao gồm boundary B đã triển khai; smoke trên kiểm trực tiếp DB/storage/RPC.
@@ -61,7 +65,7 @@ Tách kết quả tự động và nghiệm thu người dùng. `PASS phần ghi
 | T13 | Return trước/sau snapshot | Auto PASS phần ghi nhận; manual TODO | Return50 trước snapshot vào base, sau snapshot vào supplement; P0 không thay, late110 chia55 mỗi ví |
 | T14 | Refund nhiều donor/base unit nhỏ | Auto PASS phần ghi nhận; manual TODO | HTTP góp3/4, pool5→base2/2; supplement2→0/1; cả hai thứ tự giữ2 đơn vị rounding, không trả người cuối. Contract fuzz/order/gas/near-uint256 và FE floor PASS |
 | T15 | Token false/revert/callback | Auto PASS phần ghi nhận; manual TODO | Contract ERC20 rollback/reentrancy PASS; fork ép token balance0→receipt revert, quyền/counters giữ nguyên, khôi phục token rồi claim thành công một lần |
-| T16 | Reload/đổi ví/popup/replaced tx | TODO human | Automated helper/context/cache/receipt tests PASS; manual five accounts đã seed, extension chưa thực hiện |
+| T16 | Reload/đổi ví/popup/replaced tx | IN_PROGRESS human, partial | Automated helper/context/cache/receipt tests PASS; ảnh organizer liên kết ví và DB organizer/donorA xác nhận sau sửa seed. Timeout/reject/reload/switch/replaced tx và hành trình giao dịch vẫn cần kiểm thủ công |
 | T17 | Replay/reorg/reset | Auto PASS phần ghi nhận; manual TODO | Real fork duplicate/reorg/crash/orphan; cold restore và actual reset trống cùng31338 bị từ chối; checkpoint/restart PASS |
 | T18 | Storage/RPC/indexer gián đoạn | Auto PASS phần ghi nhận; manual TODO | MIME/hash/private ACL/policy outage, missing-file restore và RPC/indexer lag/recover; mocked UI lỗi storage. Full manual outage UX còn thiếu |
 

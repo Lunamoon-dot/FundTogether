@@ -4,12 +4,16 @@ import { erc20Abi, formatUnits } from 'viem'
 import type { Address } from 'viem'
 import deployment from '../../lib/web3/deployment-context'
 
-export function LinkedWalletCard({ address, chainId, userId }: {
+export function LinkedWalletCard({ address, chainId, userId, onUnlink, unlinkDisabled = false }: {
   address: string
   chainId: number
   userId: string
+  onUnlink?: (password: string) => Promise<void>
+  unlinkDisabled?: boolean
 }) {
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
+  const [confirmUnlink, setConfirmUnlink] = useState(false)
+  const [password, setPassword] = useState('')
   const config = useConfig()
   const chain = config.chains.find(item => item.id === chainId)
   const balance = useBalance({
@@ -70,6 +74,25 @@ export function LinkedWalletCard({ address, chainId, userId }: {
       {(chain?.id === 31337 || chain?.id === 31338) && <p className="wallet-note">ETH dùng để trả phí giao dịch; MockUSDC dùng để quyên góp trên mạng thử nghiệm.</p>}
       {copyState === 'copied' && <span className="public-sr-only" role="status">Đã sao chép địa chỉ ví.</span>}
       {copyState === 'error' && <p role="alert">Không sao chép được. Bạn có thể chọn địa chỉ và sao chép thủ công.</p>}
+      {onUnlink && (confirmUnlink ? <form className="form-grid" onSubmit={event => {
+        event.preventDefault()
+        if (unlinkDisabled || !password) return
+        const confirmation = password
+        setPassword('')
+        void onUnlink(confirmation)
+      }}>
+        <p>Gỡ ví <code>{address}</code> khỏi tài khoản trên mạng {chainId}? Số dư và lịch sử blockchain vẫn còn. Các phiên đăng nhập khác sẽ bị đăng xuất.</p>
+        <label>Mật khẩu tài khoản để xác nhận
+          <input type="password" autoComplete="current-password" required maxLength={128}
+            value={password} onChange={event => setPassword(event.target.value)} disabled={unlinkDisabled} />
+        </label>
+        <div className="signin-row">
+          <button type="submit" className="button button--secondary" disabled={unlinkDisabled || !password}>Xác nhận gỡ liên kết</button>
+          <button type="button" className="button button--quiet" disabled={unlinkDisabled}
+            onClick={() => { setConfirmUnlink(false); setPassword('') }}>Hủy</button>
+        </div>
+      </form> : <button type="button" className="button button--quiet" disabled={unlinkDisabled}
+        onClick={() => setConfirmUnlink(true)}>Gỡ liên kết</button>)}
     </li>
   )
 }

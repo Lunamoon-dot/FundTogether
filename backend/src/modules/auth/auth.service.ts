@@ -5,7 +5,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { and, eq, gt, isNull, lt } from "drizzle-orm";
+import { and, eq, gt, isNull, lt, ne, sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { createHash, randomBytes } from "node:crypto";
 import * as argon2 from "argon2";
@@ -18,6 +18,9 @@ import {
   platformRoles,
   users,
   walletLinks,
+  organizations,
+  advanceCampaignPlans,
+  campaignSubmissions,
 } from "../../database/schema";
 
 export const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -149,12 +152,45 @@ export class AuthService {
     return this.getAccount(userId);
   }
 
+  async unlinkWallet(userId: string, token: string, address: string, chainId: number, password: string) {
+    await this.database.transaction(async tx => {
+      const [user] = await tx.select().from(users).where(eq(users.id, userId)).for("update");
+      if (!user?.email || !user.passwordHash)
+        throw new ConflictException("Tài khoản cần có email và mật khẩu trước khi gỡ ví; không thể gỡ phương thức đăng nhập bằng ví theo cách này.");
+      if (!(await argon2.verify(user.passwordHash, password)))
+        throw new UnauthorizedException("Mật khẩu xác nhận không đúng.");
+      const [session] = await tx.select().from(authSessions).where(and(
+        eq(authSessions.userId, userId), eq(authSessions.tokenHash, hashToken(token)), gt(authSessions.expiresAt, new Date()),
+      )).for("update");
+      if (!session) throw new UnauthorizedException("Phiên đăng nhập đã hết hạn. Đăng nhập lại để gỡ ví.");
+      const [wallet] = await tx.select().from(walletLinks).where(and(
+        eq(walletLinks.userId, userId), eq(walletLinks.address, address.toLowerCase()), eq(walletLinks.chainId, String(chainId)),
+      )).for("update");
+      // Safe retry after a response was lost; never touch another account's link.
+      if (!wallet) return;
+      const [organization] = await tx.select({ id: organizations.id }).from(organizations)
+        .where(eq(organizations.representativeWalletLinkId, wallet.id)).limit(1);
+      if (organization) throw new ConflictException("Không thể gỡ ví đại diện tổ chức. Ví này đang ràng buộc quyền quản lý campaign.");
+      const [advancePlan] = await tx.select({ id: advanceCampaignPlans.campaignMetadataId }).from(advanceCampaignPlans)
+        .where(and(eq(advanceCampaignPlans.chainId, chainId), eq(advanceCampaignPlans.organizerWallet, wallet.address))).limit(1);
+      const [submission] = await tx.select({ id: campaignSubmissions.campaignMetadataId }).from(campaignSubmissions)
+        .where(sql`lower(${campaignSubmissions.plan}->>'organizer') = ${wallet.address} AND ${campaignSubmissions.plan}->>'chainId' = ${String(chainId)}`).limit(1);
+      if (advancePlan || submission) throw new ConflictException("Không thể gỡ ví đã gắn với kế hoạch campaign được chốt.");
+      await tx.delete(walletLinks).where(and(eq(walletLinks.id, wallet.id), eq(walletLinks.userId, userId)));
+      // Old authenticated sessions must not retain access after wallet removal.
+      await tx.delete(authSessions).where(and(eq(authSessions.userId, userId), ne(authSessions.tokenHash, hashToken(token))));
+      await tx.delete(authChallenges).where(eq(authChallenges.sessionHash, hashToken(token)));
+    });
+    return this.getAccount(userId);
+  }
+
   async verifySiwe(message: string, signature: string) {
     const { address, chainId } = await this.verifyWalletMessage(
       message,
       signature,
     );
-    const [link] = await this.database
+    return this.database.transaction(async tx => {
+    const [link] = await tx
       .select({ userId: walletLinks.userId })
       .from(walletLinks)
       .where(
@@ -163,12 +199,13 @@ export class AuthService {
           eq(walletLinks.address, address),
         ),
       )
-      .limit(1);
+      .limit(1).for("share");
     if (!link)
       throw new UnauthorizedException(
         "Register an account and link this wallet before using wallet login",
       );
-    return this.createSession(link.userId);
+    return this.createSession(link.userId, tx);
+    });
   }
 
   private async verifyWalletMessage(
@@ -223,9 +260,9 @@ export class AuthService {
     }
   }
 
-  private async createSession(userId: string) {
+  private async createSession(userId: string, database: Pick<NodePgDatabase<typeof schema>, "insert"> = this.database) {
     const token = randomBytes(32).toString("hex");
-    await this.database
+    await database
       .insert(authSessions)
       .values({
         userId,

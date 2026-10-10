@@ -1,7 +1,8 @@
-import { ConflictException, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, ConflictException, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as argon2 from "argon2";
 import { AuthService } from "./auth.service";
+import { AuthController } from "./auth.controller";
 
 jest.mock("@nestjs/config", () => ({
   ConfigService: class {
@@ -42,6 +43,7 @@ describe("account authentication", () => {
         "from",
         "where",
         "limit",
+        "for",
         "leftJoin",
         "innerJoin",
         "returning",
@@ -114,6 +116,70 @@ describe("account authentication", () => {
     await expect(
       service.register(user.email, "long-test-password"),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  describe("unlink wallet with account password", () => {
+    const address = `0x${"1".repeat(40)}`;
+    const token = "a".repeat(64);
+    const wallet = { id: "link-1", userId: user.id, address, chainId: "31338" };
+    beforeEach(() => { jest.mocked(argon2.verify).mockResolvedValue(true); });
+    it("controller rejects malformed targets and caller-supplied user IDs", () => {
+      const controller = new AuthController(service, new ConfigService());
+      const request = { account: { userId: user.id }, sessionToken: token } as any;
+      for (const body of [
+        { address: 'wrong', chainId: 31338, password: 'password' },
+        { address, chainId: -1, password: 'password' },
+        { address, chainId: 31338, password: '' },
+        { address, chainId: 31338, password: 'password', userId: 'another-user' },
+      ]) expect(() => controller.unlinkWallet(body, request)).toThrow(BadRequestException);
+      expect(database.delete).not.toHaveBeenCalled();
+    });
+    it("controller takes owner and session exclusively from authentication", () => {
+      const controller = new AuthController(service, new ConfigService());
+      const unlink = jest.spyOn(service, 'unlinkWallet').mockResolvedValue({ userId: user.id } as any);
+      controller.unlinkWallet({ address, chainId: 31338, password: 'password' }, { account: { userId: user.id }, sessionToken: token } as any);
+      expect(unlink).toHaveBeenCalledWith(user.id, token, address, 31338, 'password');
+    });
+    it("rejects the wrong password before deleting anything", async () => {
+      rows.push([user]);
+      jest.mocked(argon2.verify).mockResolvedValue(false);
+      await expect(service.unlinkWallet(user.id, token, address, 31338, "wrong")).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(database.delete).not.toHaveBeenCalled();
+    });
+    it("protects accounts without a password login", async () => {
+      rows.push([{ ...user, passwordHash: null }]);
+      await expect(service.unlinkWallet(user.id, token, address, 31338, "password")).rejects.toBeInstanceOf(ConflictException);
+      expect(database.delete).not.toHaveBeenCalled();
+    });
+    it("rejects a revoked session even when password is correct", async () => {
+      rows.push([user], []);
+      await expect(service.unlinkWallet(user.id, token, address, 31338, "password")).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(database.delete).not.toHaveBeenCalled();
+    });
+    it("blocks organization representatives", async () => {
+      rows.push([user], [{ userId: user.id }], [wallet], [{ id: "org" }]);
+      await expect(service.unlinkWallet(user.id, token, address, 31338, "password")).rejects.toBeInstanceOf(ConflictException);
+      expect(database.delete).not.toHaveBeenCalled();
+    });
+    for (const [label, advance, legacy] of [["B frozen plan", [{ id: "plan" }], []], ["A submission", [], [{ id: "plan" }]]] as const) {
+      it(`blocks ${label}`, async () => {
+        rows.push([user], [{ userId: user.id }], [wallet], [], [...advance], [...legacy]);
+        await expect(service.unlinkWallet(user.id, token, address, 31338, "password")).rejects.toBeInstanceOf(ConflictException);
+        expect(database.delete).not.toHaveBeenCalled();
+      });
+    }
+    it("removes an unused link and invalidates other sessions and pending challenges", async () => {
+      rows.push([user], [{ userId: user.id }], [wallet], [], [], [], [], [], [], [user], []);
+      const result = await service.unlinkWallet(user.id, token, address, 31338, "password");
+      expect(result.userId).toBe(user.id);
+      expect(result.wallets).toEqual([]);
+      expect(database.delete).toHaveBeenCalledTimes(3);
+    });
+    it("retries safely when the scoped wallet link is absent", async () => {
+      rows.push([user], [{ userId: user.id }], [], [user], []);
+      await expect(service.unlinkWallet(user.id, token, address, 31338, "password")).resolves.toMatchObject({ userId: user.id });
+      expect(database.delete).not.toHaveBeenCalled();
+    });
   });
 
   it("rejects incorrect passwords without issuing a session", async () => {
