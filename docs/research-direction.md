@@ -5,6 +5,14 @@
 > Trạng thái: Định hướng do người dùng yêu cầu lưu và ưu tiên đọc.
 > Phạm vi: mục tiêu, nội dung và kết quả nghiên cứu dự kiến; các quyết định nghiệp vụ còn mở.
 
+> Quyết định mới ngày 2026-10-11: người dùng chọn chuyển hẳn sản phẩm sang
+> yêu cầu cấp vốn có căn cứ thay cho chia milestone cố định, trên codebase/nhánh
+> hiện tại. Trước mắt lưu checkpoint và lập kế hoạch giữ/sửa/xóa; chưa triển khai
+> quy tắc tiền mới. Các mô tả B bên dưới là baseline đã duyệt, không phải spec
+> của hướng mới. Xem [kế hoạch chuyển đổi](./superpowers/plans/2026-10-11-funding-requests-cleanup.md).
+> Vẫn giữ mục tiêu xác minh sử dụng tiền sau cấp; điều kiện funding, xét duyệt,
+> reserve, timeout và refund mới phải được đặc tả trước khi sửa tài chính.
+
 ## 1. Quy tắc sử dụng — đọc trước khi quyết định
 
 Đọc tài liệu này trước khi phân tích, suy luận, đề xuất hoặc chốt quyết định

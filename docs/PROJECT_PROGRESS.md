@@ -2,6 +2,12 @@
 
 > **Updated:** 2026-10-11
 
+## 2026-10-11 — Checkpoint and funding-request transition plan
+
+- DONE: checkpoint `28b245c` on existing `main`, 79 files; no new branch or push. Fresh frontend157/157 and backend166/166 PASS. Staged scan found no runtime/env/key files; password candidates were schema/input declarations, generated fixture credentials or test inputs. Standard whitespace check reported pre-existing Markdown hard breaks and two EOF blank lines, preserved in this snapshot; check excluding those categories passed.
+- User chose replacing fixed milestones with funding requests. Added `docs/superpowers/plans/2026-10-11-funding-requests-cleanup.md`: retain shared auth/wallet/org/storage, extract organization verification from advance, replace financial domain before deleting dependent UI/API/tests, preserve deployed obligations and data.
+- Planning only: no code deletion, migration execution, deployment, chain/account reset or new financial-policy approval. Workflow B acceptance remains deferred; its evidence is not acceptance of the proposed model.
+
 ## 2026-10-11 — Implementation goal complete; human acceptance deferred
 
 - DONE: user explicitly chose “Hoàn tất goal triển khai; giữ nghiệm thu thành giai đoạn sau, chưa đạt.” GOAL.md now separates implementation completion from later human acceptance. This supersedes the historical BLOCKED/IN_PROGRESS goal dispositions below, without changing application authority or financial rules.
