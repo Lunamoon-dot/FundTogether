@@ -11,6 +11,13 @@ import type { HedDeployment } from "./hed.types";
 export const hedStreamKey = (deployment: HedDeployment) => ["HED", deployment.chainId, deployment.contractAddress.toLowerCase(),
   deployment.genesisHash, deployment.deploymentBlockNumber, deployment.deploymentBlockHash].join(":");
 
+const canonicalJson = (value: unknown): string => {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`).join(",")}}`;
+  return JSON.stringify(value);
+};
+
 @Injectable()
 export class HedIndexerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(HedIndexerService.name);
@@ -29,7 +36,7 @@ export class HedIndexerService implements OnModuleInit, OnModuleDestroy {
   onModuleInit() { if (process.env.HED_INDEXER_ENABLED === "true") this.schedule(0); }
   private schedule(delay: number) {
     if (this.stopped) return;
-    this.timer = setTimeout(() => { void this.runOnce().catch(() => this.logger.warn("HED synchronization failed; checkpoint retained for retry"))
+    this.timer = setTimeout(() => { void this.runOnce().catch(error => this.logger.error(error, "HED synchronization failed; checkpoint retained for retry"))
       .finally(() => this.schedule(2000)); }, delay);
     this.timer.unref();
   }
@@ -81,7 +88,7 @@ export class HedIndexerService implements OnModuleInit, OnModuleDestroy {
             eq(chainEvents.logIndex, log.logIndex), eq(chainEvents.blockHash, log.blockHash));
           const [existing] = await tx.select().from(chainEvents).where(key);
           if (existing && (existing.blockNumber !== log.blockNumber.toString() || existing.eventName !== event.eventName
-            || JSON.stringify(existing.args) !== JSON.stringify(args))) throw new Error("Conflicting duplicate HED event");
+            || canonicalJson(existing.args) !== canonicalJson(args))) throw new Error("Conflicting duplicate HED event");
           await tx.insert(chainEvents).values({ streamId, transactionHash: log.transactionHash, logIndex: log.logIndex, blockHash: log.blockHash,
             blockNumber: log.blockNumber.toString(), eventName: event.eventName!, args, canonical: true }).onConflictDoUpdate({
             target: [chainEvents.streamId, chainEvents.transactionHash, chainEvents.logIndex, chainEvents.blockHash], set: { canonical: true },
