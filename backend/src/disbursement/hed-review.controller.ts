@@ -8,7 +8,6 @@ import { HedReviewService } from "./hed-review.service";
 @UseGuards(AuthGuard)
 export class HedReviewController {
   constructor(private readonly reviews: HedReviewService) {}
-  @Get("pending") pending(@Req() request: Request) { return this.reviews.pending(request.account!.userId); }
   @Get() list(@Param("requestId", new ParseUUIDPipe()) requestId: string, @Req() request: Request) { return this.reviews.list(requestId, request.account!.userId); }
   @Post() record(@Param("requestId", new ParseUUIDPipe()) requestId: string, @Body() body: unknown, @Req() request: Request) {
     const parsed = hedReviewSchema.safeParse(body);

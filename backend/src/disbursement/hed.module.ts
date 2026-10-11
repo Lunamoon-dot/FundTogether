@@ -21,10 +21,11 @@ import { HedReviewController } from "./hed-review.controller";
 import { HedReviewService } from "./hed-review.service";
 import { HedActivityController } from "./hed-activity.controller";
 import { HedActivityService } from "./hed-activity.service";
+import { HedReviewQueueController } from "./hed-review-queue.controller";
 
 @Module({
   imports: [AuthModule, DatabaseModule, EvidenceStorageModule],
-  controllers: [HedHealthController, HedPublicController, HedCampaignDraftController, HedActivityController, HedCampaignVendorController, HedRequestDraftController, HedVendorVerificationController, HedReviewController],
+  controllers: [HedHealthController, HedPublicController, HedCampaignDraftController, HedActivityController, HedCampaignVendorController, HedRequestDraftController, HedVendorVerificationController, HedReviewController, HedReviewQueueController],
   providers: [{
     provide: HED_DEPLOYMENT,
     useFactory: (): HedDeployment => {
