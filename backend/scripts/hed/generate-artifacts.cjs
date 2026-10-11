@@ -63,6 +63,7 @@ function artifacts(root) {
     'createCampaign(bytes32,uint256,uint256)', 'donate(uint256,uint256)', 'activateCampaign(uint256,bytes32)',
     'finalizeFundingFailure(uint256)', 'claimRefund(uint256)', 'startWindDown(uint256)', 'createActivity(uint256,bytes32,uint256)',
     'submitRequest(uint256,uint256,bytes32,address,uint256,uint256)', 'approveRequest(uint256,uint256,bytes32)',
+    'takeOverRequestApproval(uint256,uint256,bytes32)',
     'acknowledgeVendor(uint256,uint256,bytes32)', 'payDeposit(uint256,uint256)',
     'candidateDelivery(uint256,uint256,uint256,bytes32)', 'openDeliveryCase(uint256,uint256,bytes32)',
     'upholdDeliveryCase(uint256,uint256,bytes32)', 'executeFinal(uint256,uint256)',

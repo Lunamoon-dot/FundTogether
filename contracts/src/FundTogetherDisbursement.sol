@@ -34,6 +34,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     mapping(uint256 => uint256) public requestCount;
     mapping(uint256 => uint256) public activityCount;
     mapping(uint256 => bool) public hasOpenRequest;
+    mapping(uint256 => mapping(uint256 => bool)) public requestApprovalTakenOver;
     mapping(uint256 => bool) public hasOpenActivity;
     mapping(uint256 => mapping(uint256 => bool)) public deliveryCaseOpen;
     mapping(uint256 => mapping(uint256 => bool)) public outcomeCaseOpen;
@@ -50,6 +51,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     event OutcomeCaseOpened(uint256 indexed campaignId, uint256 indexed activityId, address indexed donor, bytes32 reasonHash);
     event OutcomeCaseUpheld(uint256 indexed campaignId, uint256 indexed activityId, bytes32 decisionHash, uint256 challengeEnd);
     event RequestReserved(uint256 indexed campaignId, uint256 indexed requestId, uint256 amount, uint256 available, uint256 reserved);
+    event RequestApprovalTakenOver(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
     event VendorAcknowledged(uint256 indexed campaignId, uint256 indexed requestId, address indexed vendor, bytes32 termsHash);
     event DepositPaid(uint256 indexed campaignId, uint256 indexed requestId, address indexed vendor, uint256 amount);
     event DeliveryCandidate(uint256 indexed campaignId, uint256 indexed requestId, uint256 acceptedValue, bytes32 reportHash);
@@ -201,15 +203,16 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         if (_activities[campaignId][activityId].state != T.ActivityState.OPEN) revert WrongState();
         requestId = requestCount[campaignId]++;
         hasOpenRequest[campaignId] = true;
-        _requests[campaignId][requestId] = T.RequestView(activityId, requestHash, vendor, bytes32(0), amount, deposit, 0, 0, 0, 0, 0, 0, T.RequestState.SUBMITTED);
+        _requests[campaignId][requestId] = T.RequestView(activityId, requestHash, vendor, bytes32(0), amount, deposit, 0, 0, 0, 0, 0, 0, block.timestamp, T.RequestState.SUBMITTED);
         emit RequestSubmitted(campaignId, requestId, requestHash, amount, deposit);
     }
 
     function approveRequest(uint256 campaignId, uint256 requestId, bytes32 expectedRequestHash) external {
         T.CampaignView storage c = _campaign(campaignId);
-        if (msg.sender != resolver) revert WrongCaller();
         if (c.state != T.CampaignState.ACTIVE || requestId >= requestCount[campaignId]) revert WrongState();
         T.RequestView storage r = _requests[campaignId][requestId];
+        if ((msg.sender != resolver || requestApprovalTakenOver[campaignId][requestId])
+            && (msg.sender != backupResolver || !requestApprovalTakenOver[campaignId][requestId])) revert WrongCaller();
         T.ActivityView storage a = _activities[campaignId][r.activityId];
         if (r.state != T.RequestState.SUBMITTED || r.requestHash != expectedRequestHash || r.approvedAmount > c.available || r.approvedAmount > a.ceiling - a.approved
             || r.depositAmount > r.approvedAmount * MAX_DEPOSIT_BPS / 10_000 || r.depositAmount > c.goal * MAX_CAMPAIGN_DEPOSIT_BPS / 10_000) revert InvalidInput();
@@ -219,6 +222,16 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         r.approvedAt = block.timestamp;
         r.state = T.RequestState.APPROVED_RESERVED;
         emit RequestReserved(campaignId, requestId, r.approvedAmount, c.available, c.reserved);
+    }
+
+    function takeOverRequestApproval(uint256 campaignId, uint256 requestId, bytes32 reasonHash) external {
+        _campaign(campaignId);
+        if (msg.sender != backupResolver || requestId >= requestCount[campaignId]) revert WrongCaller();
+        T.RequestView storage r = _requests[campaignId][requestId];
+        if (r.state != T.RequestState.SUBMITTED || requestApprovalTakenOver[campaignId][requestId]
+            || block.timestamp < r.submittedAt + PRIMARY_REVIEW_WINDOW || reasonHash == bytes32(0)) revert WrongState();
+        requestApprovalTakenOver[campaignId][requestId] = true;
+        emit RequestApprovalTakenOver(campaignId, requestId, reasonHash);
     }
 
     function acknowledgeVendor(uint256 campaignId, uint256 requestId, bytes32 termsHash) external {

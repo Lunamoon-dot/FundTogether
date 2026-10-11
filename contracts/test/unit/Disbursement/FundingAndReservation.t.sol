@@ -57,6 +57,23 @@ contract HedFundingAndReservationTest is Test {
         assertEq(uint256(disbursement.campaign(campaignId).state), uint256(T.CampaignState.ACTIVE));
     }
 
+    function test_backupRequestTakeoverIsScopedAndBlocksLatePrimaryApproval() public {
+        uint256 campaignId = _activeCampaign();
+        vm.prank(organizer);
+        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), vendor, 500e6, 0);
+        vm.expectRevert(FundTogetherDisbursement.WrongCaller.selector);
+        vm.prank(backupResolver);
+        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
+        vm.warp(block.timestamp + 3 days);
+        vm.prank(backupResolver);
+        disbursement.takeOverRequestApproval(campaignId, requestId, keccak256("takeover"));
+        vm.expectRevert(FundTogetherDisbursement.WrongCaller.selector);
+        vm.prank(resolver);
+        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
+        vm.prank(backupResolver);
+        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
+    }
+
     function test_vendorAcknowledgementLocksRecipientAndPaysOnlyExactDeposit() public {
         uint256 campaignId = _activeCampaign();
         vm.prank(organizer);
