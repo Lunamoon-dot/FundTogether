@@ -34,6 +34,7 @@ library DisbursementTypes {
         uint256 grossPaid;
         uint256 returned;
         uint256 acceptedDeliveryValue;
+        bytes32 deliveryReportHash;
         uint256 challengeEnd;
         uint256 approvedAt;
         uint256 committedAt;

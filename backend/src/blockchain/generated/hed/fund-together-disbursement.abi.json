@@ -1102,6 +1102,11 @@
             "internalType": "uint256"
           },
           {
+            "name": "deliveryReportHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
             "name": "challengeEnd",
             "type": "uint256",
             "internalType": "uint256"

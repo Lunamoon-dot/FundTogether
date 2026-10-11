@@ -38,6 +38,7 @@ export interface HedActivityView { commitmentHash: Hex; outcomeReportHash: Hex; 
 export interface HedRequestView {
   activityId: string; requestHash: Hex; vendor: Address; termsHash: Hex; approvedAmount: string;
   depositAmount: string; grossPaid: string; returned: string; acceptedDeliveryValue: string;
+  deliveryReportHash: Hex;
   challengeEnd: string; state: typeof HED_REQUEST_STATES[number];
 }
 export interface HedCampaignSnapshot {

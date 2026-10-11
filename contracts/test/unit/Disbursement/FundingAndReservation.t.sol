@@ -115,6 +115,20 @@ contract HedFundingAndReservationTest is Test {
         disbursement.candidateOutcome(campaignId, 0, keccak256("outcome"));
     }
 
+    function test_candidateDeliveryPersistsTheSelectedReportHash() public {
+        uint256 campaignId = _activeCampaign();
+        vm.prank(organizer);
+        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), vendor, 500e6, 0);
+        vm.prank(resolver);
+        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
+        vm.prank(vendor);
+        disbursement.acknowledgeVendor(campaignId, requestId, keccak256("terms"));
+        bytes32 reportHash = keccak256("delivery-report");
+        vm.prank(resolver);
+        disbursement.candidateDelivery(campaignId, requestId, 500e6, reportHash);
+        assertEq(disbursement.request(campaignId, requestId).deliveryReportHash, reportHash);
+    }
+
     function test_backupCanUpholdStuckDeliveryCaseOnlyAfterItsReviewWindow() public {
         uint256 campaignId = _activeCampaign();
         vm.prank(organizer);

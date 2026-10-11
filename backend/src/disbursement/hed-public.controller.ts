@@ -55,12 +55,12 @@ export class HedPublicController {
     const block = await this.chain.client.getBlock({ blockTag: "latest" }); const snapshot = await this.chain.snapshot(BigInt(campaignId), block.number);
     if (content.kind === "DELIVERY") {
       const [request] = await this.db.select().from(schema.disbursementRequests).where(eq(schema.disbursementRequests.requestDraftId, content.requestDraftId)).limit(1);
-      const state = request?.onchainRequestId === null || request?.onchainRequestId === undefined ? undefined : snapshot.requests[Number(request.onchainRequestId)]?.state;
-      if (state !== "DELIVERY_CANDIDATE" && state !== "FINANCIALLY_SETTLED") throw new NotFoundException("HED public evidence not available");
+      const onchain = request?.onchainRequestId === null || request?.onchainRequestId === undefined ? undefined : snapshot.requests[Number(request.onchainRequestId)];
+      if (!onchain || (onchain.state !== "DELIVERY_CANDIDATE" && onchain.state !== "FINANCIALLY_SETTLED") || onchain.deliveryReportHash !== content.publicHash) throw new NotFoundException("HED public evidence not available");
     } else {
       const [activity] = await this.db.select().from(schema.hedActivities).where(eq(schema.hedActivities.id, content.activityId)).limit(1);
       const state = activity?.onchainActivityId === null || activity?.onchainActivityId === undefined ? undefined : snapshot.activities[Number(activity.onchainActivityId)]?.state;
-      if (state !== "OUTCOME_CANDIDATE" && state !== "VERIFIED") throw new NotFoundException("HED public evidence not available");
+      if ((state !== "OUTCOME_CANDIDATE" && state !== "VERIFIED") || snapshot.activities[Number(activity?.onchainActivityId)]?.outcomeReportHash !== content.publicHash) throw new NotFoundException("HED public evidence not available");
     }
     const object = await this.storage.get(content.publicDocumentId); if (!object.Body) throw new NotFoundException("HED public evidence not found");
     response.setHeader("X-Content-Type-Options", "nosniff");

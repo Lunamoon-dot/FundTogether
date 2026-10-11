@@ -236,7 +236,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         if (_activities[campaignId][activityId].state != T.ActivityState.OPEN) revert WrongState();
         requestId = requestCount[campaignId]++;
         hasOpenRequest[campaignId] = true;
-        _requests[campaignId][requestId] = T.RequestView(activityId, requestHash, vendor, bytes32(0), amount, deposit, 0, 0, 0, 0, 0, 0, block.timestamp, T.RequestState.SUBMITTED);
+        _requests[campaignId][requestId] = T.RequestView(activityId, requestHash, vendor, bytes32(0), amount, deposit, 0, 0, 0, bytes32(0), 0, 0, 0, block.timestamp, T.RequestState.SUBMITTED);
         emit RequestSubmitted(campaignId, requestId, requestHash, amount, deposit);
     }
 
@@ -299,6 +299,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
             && (msg.sender != backupResolver || !deliveryReviewTakenOver[campaignId][requestId])) revert WrongCaller();
         if (r.state != T.RequestState.VENDOR_COMMITTED || acceptedValue > r.approvedAmount || reportHash == bytes32(0)) revert InvalidInput();
         r.acceptedDeliveryValue = acceptedValue;
+        r.deliveryReportHash = reportHash;
         r.challengeEnd = block.timestamp + 3 days;
         r.state = T.RequestState.DELIVERY_CANDIDATE;
         emit DeliveryCandidate(campaignId, requestId, acceptedValue, reportHash);
