@@ -109,6 +109,26 @@ contract HedFundingAndReservationTest is Test {
         disbursement.createActivity(campaignId, keccak256("next"), 1_000e6);
     }
 
+    function test_donorOutcomeCaseBlocksVerificationUntilResolverReopensChallenge() public {
+        uint256 campaignId = _activeCampaign();
+        vm.prank(resolver);
+        disbursement.candidateOutcome(campaignId, 0, keccak256("outcome"));
+        vm.prank(donor);
+        disbursement.openOutcomeCase(campaignId, 0, keccak256("missing-proof"));
+        vm.warp(block.timestamp + 3 days);
+        vm.expectRevert(FundTogetherDisbursement.WrongState.selector);
+        vm.prank(resolver);
+        disbursement.verifyOutcome(campaignId, 0, keccak256("final"));
+        vm.prank(resolver);
+        disbursement.upholdOutcomeCase(campaignId, 0, keccak256("decision"));
+        vm.expectRevert(FundTogetherDisbursement.WrongState.selector);
+        vm.prank(resolver);
+        disbursement.verifyOutcome(campaignId, 0, keccak256("final"));
+        vm.warp(block.timestamp + 3 days);
+        vm.prank(resolver);
+        disbursement.verifyOutcome(campaignId, 0, keccak256("final"));
+    }
+
     function test_approvalRejectsDepositAboveRequestOrCampaignPolicyCap() public {
         uint256 campaignId = _activeCampaign();
         vm.prank(organizer);

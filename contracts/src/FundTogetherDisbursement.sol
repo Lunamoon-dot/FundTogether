@@ -44,6 +44,8 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     event ActivityCreated(uint256 indexed campaignId, uint256 indexed activityId, bytes32 commitmentHash, uint256 ceiling);
     event OutcomeCandidate(uint256 indexed campaignId, uint256 indexed activityId, bytes32 reportHash, uint256 challengeEnd);
     event OutcomeVerified(uint256 indexed campaignId, uint256 indexed activityId, bytes32 reportHash);
+    event OutcomeCaseOpened(uint256 indexed campaignId, uint256 indexed activityId, address indexed donor, bytes32 reasonHash);
+    event OutcomeCaseUpheld(uint256 indexed campaignId, uint256 indexed activityId, bytes32 decisionHash, uint256 challengeEnd);
     event RequestReserved(uint256 indexed campaignId, uint256 indexed requestId, uint256 amount, uint256 available, uint256 reserved);
     event VendorAcknowledged(uint256 indexed campaignId, uint256 indexed requestId, address indexed vendor, bytes32 termsHash);
     event DepositPaid(uint256 indexed campaignId, uint256 indexed requestId, address indexed vendor, uint256 amount);
@@ -307,6 +309,26 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         a.state = T.ActivityState.VERIFIED;
         hasOpenActivity[campaignId] = false;
         emit OutcomeVerified(campaignId, activityId, reportHash);
+    }
+
+    function openOutcomeCase(uint256 campaignId, uint256 activityId, bytes32 reasonHash) external {
+        _campaign(campaignId);
+        if (activityId >= activityCount[campaignId]) revert InvalidReference();
+        T.ActivityView storage a = _activities[campaignId][activityId];
+        if (a.state != T.ActivityState.OUTCOME_CANDIDATE || block.timestamp >= a.challengeEnd || contributions[campaignId][msg.sender] == 0
+            || reasonHash == bytes32(0) || outcomeCaseOpen[campaignId][activityId]) revert WrongState();
+        outcomeCaseOpen[campaignId][activityId] = true;
+        emit OutcomeCaseOpened(campaignId, activityId, msg.sender, reasonHash);
+    }
+
+    function upholdOutcomeCase(uint256 campaignId, uint256 activityId, bytes32 decisionHash) external {
+        if (msg.sender != resolver) revert WrongCaller();
+        if (activityId >= activityCount[campaignId]) revert InvalidReference();
+        T.ActivityView storage a = _activities[campaignId][activityId];
+        if (a.state != T.ActivityState.OUTCOME_CANDIDATE || !outcomeCaseOpen[campaignId][activityId] || decisionHash == bytes32(0)) revert WrongState();
+        outcomeCaseOpen[campaignId][activityId] = false;
+        a.challengeEnd = block.timestamp + 3 days;
+        emit OutcomeCaseUpheld(campaignId, activityId, decisionHash, a.challengeEnd);
     }
 
     function _campaign(uint256 id) private view returns (T.CampaignView storage c) {
