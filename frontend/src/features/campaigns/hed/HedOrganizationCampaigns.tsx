@@ -47,7 +47,7 @@ function HedCampaignEntry({ value, onFrozen }: { value: HedCampaignDraft; onFroz
   return <li className="panel"><div className="organization-card-heading"><h2>{value.title}</h2><span className="organization-role">{value.frozenAt ? 'Đã chốt' : 'Bản nháp'}</span></div>
     <p className="organization-description">{value.description}</p><p>Mục tiêu: {value.goal} base units MockUSDC · {value.fundingDuration / 86_400} ngày gây quỹ</p>
     {error && <p className="toast toast--error" role="alert">{error}</p>}
-    {value.frozenAt ? <><p className="advance-hash">Commitment: {value.commitmentHash}</p><button className="button button--primary" disabled={busy || !account.address} onClick={() => void publish()}>{busy ? 'Đang xử lý…' : 'Tạo campaign trên HED chain'}</button><HedRequestWorkspace campaignId={value.id} /></> : <button className="button button--primary" disabled={busy} onClick={() => void freeze()}>{busy ? 'Đang chốt…' : 'Chốt commitment'}</button>}
+    {value.frozenAt ? <><p className="advance-hash">Commitment: {value.commitmentHash}</p>{value.onchainCampaignId ? <p>Campaign HED on-chain: {value.onchainCampaignId}</p> : <button className="button button--primary" disabled={busy || !account.address} onClick={() => void publish()}>{busy ? 'Đang xử lý…' : 'Tạo campaign trên HED chain'}</button>}<HedRequestWorkspace campaignId={value.id} /></> : <button className="button button--primary" disabled={busy} onClick={() => void freeze()}>{busy ? 'Đang chốt…' : 'Chốt commitment'}</button>}
   </li>
 }
 

@@ -5,7 +5,7 @@ export interface HedCampaignDraftInput {
   outcomeCriteria: string[]; goal: string; fundingDuration: number; policyHash: `0x${string}`
 }
 export interface HedCampaignDraft extends HedCampaignDraftInput {
-  id: string; organizationId: string; commitmentHash: string | null; frozenAt: string | null
+  id: string; organizationId: string; commitmentHash: string | null; frozenAt: string | null; onchainCampaignId?: string | null
 }
 
 export async function listHedCampaignDrafts(organizationId: string, signal?: AbortSignal) {

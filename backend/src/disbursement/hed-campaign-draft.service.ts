@@ -42,8 +42,10 @@ export class HedCampaignDraftService {
     await this.owner(organizationId, userId);
     return this.db.select({ id: campaignMetadata.id, title: campaignMetadata.title, description: campaignMetadata.description,
       content: hedCampaignDrafts.content, goal: hedCampaignDrafts.goal, fundingDuration: hedCampaignDrafts.fundingDuration,
-      commitmentHash: hedCampaignDrafts.commitmentHash, frozenAt: hedCampaignDrafts.frozenAt, createdAt: hedCampaignDrafts.createdAt })
+      commitmentHash: hedCampaignDrafts.commitmentHash, frozenAt: hedCampaignDrafts.frozenAt, createdAt: hedCampaignDrafts.createdAt,
+      onchainCampaignId: schema.disbursementCampaigns.onchainCampaignId })
       .from(hedCampaignDrafts).innerJoin(campaignMetadata, eq(campaignMetadata.id, hedCampaignDrafts.campaignMetadataId))
+      .leftJoin(schema.disbursementCampaigns, eq(schema.disbursementCampaigns.campaignMetadataId, campaignMetadata.id))
       .where(and(eq(campaignMetadata.organizationId, organizationId), eq(campaignMetadata.createdByUserId, userId))).orderBy(desc(hedCampaignDrafts.createdAt));
   }
 
