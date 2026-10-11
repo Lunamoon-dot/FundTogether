@@ -12,6 +12,7 @@ or real-money readiness.
 | Artifact and deployment identity | `npm.cmd --prefix backend run artifacts:hed` and `node backend/scripts/hed/artifact-contract.test.cjs` | Generated ABI is bound to the HED contract; malformed or cross-deployment manifests are rejected. |
 | API schemas and evidence rules | Five focused HED Jest suites | 7 passing tests for campaign/request hashes, review schema, evidence hash and HED stream identity. |
 | Local vertical journey | `npm.cmd --prefix backend run smoke:hed` | Full funding → activation → purchase → delivery candidate/final → transport in the same activity → delivery candidate/final → outcome verified. The smoke checks MockUSDC vendor balance, selected report hashes and REST/indexer projection. |
+| Indexer restart | Stop/restart local HED API with `start-services.ps1 -SkipBuild`, then compare public projection | Campaign #2 remained at indexed block 254 with two `FINANCIALLY_SETTLED` requests, `VERIFIED` activity and gross vendor payout 1,500,000,000. |
 | Runtime health | `GET http://127.0.0.1:3002/health` | HED deployment identity and indexed checkpoint must both report `ready`. |
 
 ## HED-MVP mapping
@@ -21,9 +22,9 @@ or real-money readiness.
 - MVP-T12 is covered by private/public evidence separation, server-derived
   public hashes and state/hash-gated public download. Browser interaction is
   still manual work.
-- MVP-T13 has deployment identity checks and an idempotent, canonical-block
-  indexer. Forced reorg/replay/restart needs a dedicated integration run before
-  this case can be called complete.
+- MVP-T13 has deployment identity checks, an idempotent canonical-block indexer
+  and one persisted-projection restart run. Forced reorg/replay still needs a
+  dedicated integration run before this case can be called complete.
 - MVP-T14 is partially covered by outcome state and case guards; a human must
   still judge incorrect/insufficient outcome evidence.
 - MVP-T15 is partly technical (one open request and frozen recipient/hash).
