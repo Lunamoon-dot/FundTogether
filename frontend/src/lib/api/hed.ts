@@ -78,3 +78,7 @@ export interface HedApprovalPayload { onchainCampaignId: string; onchainRequestI
 export async function prepareHedRequestApproval(requestId: string) {
   return (await http.post<HedApprovalPayload>(`/v1/disbursement/requests/${requestId}/reviews/approval`)).data
 }
+export interface HedVendorRequest { requestId: string; requestHash: `0x${string}`; vendorWallet: `0x${string}`; onchainCampaignId: string; onchainRequestId: string; content: HedRequestDraftInput }
+export async function listHedVendorRequests(signal?: AbortSignal) {
+  return (await http.get<HedVendorRequest[]>('/v1/disbursement/vendor/requests', { signal })).data
+}
