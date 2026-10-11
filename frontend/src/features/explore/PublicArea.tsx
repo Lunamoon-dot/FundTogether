@@ -47,7 +47,7 @@ export function PublicArea({
         </a>
         <nav className="public-nav" aria-label="Điều hướng người dùng">
           <a href="#/" aria-current={feed ? 'page' : undefined}>Khám phá</a>
-          <a href="#/contributions" aria-current={contributions ? 'page' : undefined}>Đóng góp của tôi</a>
+          {!isHed && <a href="#/contributions" aria-current={contributions ? 'page' : undefined}>Đóng góp của tôi</a>}
           {session && <a href="#/organizations" aria-current={organizations ? 'page' : undefined}>Tổ chức của tôi</a>}
           {session && <a href="#/workspace" aria-current={path === '/workspace' ? 'page' : undefined}>Quản lý gây quỹ</a>}
           {staff && <a href={internalHref}>{internalLabel}</a>}
