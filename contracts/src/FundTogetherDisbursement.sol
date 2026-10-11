@@ -36,6 +36,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     mapping(uint256 => bool) public hasOpenRequest;
     mapping(uint256 => bool) public eligibilityTakenOver;
     mapping(uint256 => mapping(uint256 => bool)) public requestApprovalTakenOver;
+    mapping(uint256 => mapping(uint256 => bool)) public deliveryReviewTakenOver;
     mapping(uint256 => bool) public hasOpenActivity;
     mapping(uint256 => mapping(uint256 => bool)) public deliveryCaseOpen;
     mapping(uint256 => mapping(uint256 => bool)) public deliveryCaseUsed;
@@ -57,6 +58,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     event OutcomeCaseUpheld(uint256 indexed campaignId, uint256 indexed activityId, bytes32 decisionHash, uint256 challengeEnd);
     event RequestReserved(uint256 indexed campaignId, uint256 indexed requestId, uint256 amount, uint256 available, uint256 reserved);
     event RequestApprovalTakenOver(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
+    event DeliveryReviewTakenOver(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
     event VendorAcknowledged(uint256 indexed campaignId, uint256 indexed requestId, address indexed vendor, bytes32 termsHash);
     event DepositPaid(uint256 indexed campaignId, uint256 indexed requestId, address indexed vendor, uint256 amount);
     event DeliveryCandidate(uint256 indexed campaignId, uint256 indexed requestId, uint256 acceptedValue, bytes32 reportHash);
@@ -281,14 +283,25 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     }
 
     function candidateDelivery(uint256 campaignId, uint256 requestId, uint256 acceptedValue, bytes32 reportHash) external {
-        if (msg.sender != resolver) revert WrongCaller();
         if (requestId >= requestCount[campaignId]) revert InvalidReference();
         T.RequestView storage r = _requests[campaignId][requestId];
+        if ((msg.sender != resolver || deliveryReviewTakenOver[campaignId][requestId])
+            && (msg.sender != backupResolver || !deliveryReviewTakenOver[campaignId][requestId])) revert WrongCaller();
         if (r.state != T.RequestState.VENDOR_COMMITTED || acceptedValue > r.approvedAmount || reportHash == bytes32(0)) revert InvalidInput();
         r.acceptedDeliveryValue = acceptedValue;
         r.challengeEnd = block.timestamp + 3 days;
         r.state = T.RequestState.DELIVERY_CANDIDATE;
         emit DeliveryCandidate(campaignId, requestId, acceptedValue, reportHash);
+    }
+
+    function takeOverDeliveryReview(uint256 campaignId, uint256 requestId, bytes32 reasonHash) external {
+        _campaign(campaignId);
+        if (msg.sender != backupResolver || requestId >= requestCount[campaignId]) revert WrongCaller();
+        T.RequestView storage r = _requests[campaignId][requestId];
+        if (r.state != T.RequestState.VENDOR_COMMITTED || deliveryReviewTakenOver[campaignId][requestId]
+            || block.timestamp < r.committedAt + PRIMARY_REVIEW_WINDOW || reasonHash == bytes32(0)) revert WrongState();
+        deliveryReviewTakenOver[campaignId][requestId] = true;
+        emit DeliveryReviewTakenOver(campaignId, requestId, reasonHash);
     }
 
     function executeFinal(uint256 campaignId, uint256 requestId) external nonReentrant {
