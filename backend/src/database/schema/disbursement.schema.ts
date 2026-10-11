@@ -7,6 +7,7 @@ import type { HedCampaignSnapshot } from "../../disbursement/hed.types";
 import type { HedCampaignDraftInput } from "../../disbursement/hed-campaign-draft.schema";
 import type { HedRequestDraftInput } from "../../disbursement/hed-request-draft.schema";
 import type { HedVendorVerificationInput } from "../../disbursement/hed-vendor-verification.schema";
+import type { HedReviewInput } from "../../disbursement/hed-review.schema";
 
 export const hedCampaignDrafts = pgTable("hed_campaign_drafts", {
   campaignMetadataId: uuid("campaign_metadata_id").primaryKey().references(() => campaignMetadata.id),
@@ -70,6 +71,17 @@ export const hedRequestEvidenceDocuments = pgTable("hed_request_evidence_documen
   check("hed_request_evidence_kind_check", sql`${table.kind} IN ('QUOTE', 'NEED', 'TERMS', 'OTHER')`),
   check("hed_request_evidence_size_check", sql`${table.byteSize} > 0 AND ${table.byteSize} <= 10485760`),
   check("hed_request_evidence_hash_check", sql`${table.sha256} ~ '^0x[0-9a-f]{64}$' AND ${table.sha256} !~ '^0x0+$'`),
+]);
+
+export const hedRequestReviews = pgTable("hed_request_reviews", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  requestDraftId: uuid("request_draft_id").notNull().references(() => hedRequestDrafts.id),
+  content: jsonb("content").$type<HedReviewInput>().notNull(),
+  reviewedBy: uuid("reviewed_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, table => [
+  uniqueIndex("hed_request_review_criterion_version_idx").on(table.requestDraftId, sql`(${table.content}->>'evidenceVersion')`, sql`(${table.content}->>'criterionId')`),
+  check("hed_request_review_outcome_check", sql`(${table.content}->>'outcome') IN ('MET','NOT_MET','NEEDS_INFO')`),
 ]);
 
 export const disbursementCampaigns = pgTable("disbursement_campaigns", {
