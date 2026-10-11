@@ -198,6 +198,20 @@ contract HedFundingAndReservationTest is Test {
         disbursement.returnFunds(campaignId, requestId, 101e6);
     }
 
+    function test_organizerCanCancelOnlyAnUncommittedReservedRequest() public {
+        uint256 campaignId = _activeCampaign();
+        vm.prank(organizer);
+        uint256 requestId = disbursement.submitRequest(campaignId, keccak256("request"), vendor, 1_000e6, 0);
+        vm.prank(resolver);
+        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
+        vm.prank(organizer);
+        disbursement.cancelUncommittedRequest(campaignId, requestId, keccak256("cancel"));
+        T.CampaignView memory campaign = disbursement.campaign(campaignId);
+        assertEq(campaign.available, 2_000e6);
+        assertEq(campaign.reserved, 0);
+        assertFalse(disbursement.hasOpenRequest(campaignId));
+    }
+
     function _activeCampaign() private returns (uint256 campaignId) {
         vm.prank(organizer);
         campaignId = disbursement.createCampaign(keccak256("campaign"), 2_000e6, 1 days);

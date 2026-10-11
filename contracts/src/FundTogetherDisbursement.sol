@@ -43,6 +43,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     event FundingFailed(uint256 indexed campaignId, uint256 basePool);
     event RefundClaimed(uint256 indexed campaignId, address indexed donor, uint256 amount);
     event FundsReturned(uint256 indexed campaignId, uint256 indexed requestId, address indexed vendor, uint256 amount);
+    event UncommittedRequestCancelled(uint256 indexed campaignId, uint256 indexed requestId, uint256 amount, bytes32 reasonHash);
 
     constructor(address token, address resolver_, bytes32 policyHash_) {
         if (token == address(0) || resolver_ == address(0) || policyHash_ == bytes32(0)) revert InvalidInput();
@@ -120,6 +121,19 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         r.returned += amount;
         c.available += amount;
         emit FundsReturned(campaignId, requestId, msg.sender, amount);
+    }
+
+    function cancelUncommittedRequest(uint256 campaignId, uint256 requestId, bytes32 reasonHash) external {
+        T.CampaignView storage c = _campaign(campaignId);
+        if (msg.sender != c.organizer) revert WrongCaller();
+        if (requestId >= requestCount[campaignId]) revert InvalidReference();
+        T.RequestView storage r = _requests[campaignId][requestId];
+        if (r.state != T.RequestState.APPROVED_RESERVED || reasonHash == bytes32(0)) revert WrongState();
+        c.reserved -= r.approvedAmount;
+        c.available += r.approvedAmount;
+        r.state = T.RequestState.CANCELLED;
+        hasOpenRequest[campaignId] = false;
+        emit UncommittedRequestCancelled(campaignId, requestId, r.approvedAmount, reasonHash);
     }
 
     function submitRequest(uint256 campaignId, bytes32 requestHash, address vendor, uint256 amount, uint256 deposit) external returns (uint256 requestId) {
