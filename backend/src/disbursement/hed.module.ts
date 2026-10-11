@@ -11,6 +11,7 @@ import type { HedDeployment } from "./hed.types";
 import { HedHealthController, HedPublicController } from "./hed-public.controller";
 import { HedCampaignDraftController } from "./hed-campaign-draft.controller";
 import { HedCampaignDraftService } from "./hed-campaign-draft.service";
+import { HedCampaignVendorController } from "./hed-campaign-vendor.controller";
 import { HedRequestDraftController } from "./hed-request-draft.controller";
 import { HedRequestDraftService } from "./hed-request-draft.service";
 import { HedVendorVerificationController } from "./hed-vendor-verification.controller";
@@ -18,7 +19,7 @@ import { HedVendorVerificationService } from "./hed-vendor-verification.service"
 
 @Module({
   imports: [AuthModule, DatabaseModule],
-  controllers: [HedHealthController, HedPublicController, HedCampaignDraftController, HedRequestDraftController, HedVendorVerificationController],
+  controllers: [HedHealthController, HedPublicController, HedCampaignDraftController, HedCampaignVendorController, HedRequestDraftController, HedVendorVerificationController],
   providers: [{
     provide: HED_DEPLOYMENT,
     useFactory: (): HedDeployment => {

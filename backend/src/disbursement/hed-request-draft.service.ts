@@ -1,5 +1,5 @@
 import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { keccak256, toHex } from "viem";
 import { DRIZZLE_DB } from "../database/database.constants";
@@ -43,6 +43,14 @@ export class HedRequestDraftService {
     await this.campaign(campaignId, userId);
     return this.db.select().from(schema.hedRequestDrafts).where(eq(schema.hedRequestDrafts.campaignMetadataId, campaignId))
       .orderBy(desc(schema.hedRequestDrafts.createdAt));
+  }
+
+  async vendorOptions(campaignId: string, userId: string) {
+    await this.campaign(campaignId, userId);
+    return this.db.select({ id: schema.hedVendorVerifications.id, vendorWallet: schema.hedVendorVerifications.vendorWallet,
+      content: schema.hedVendorVerifications.content, validUntil: schema.hedVendorVerifications.validUntil })
+      .from(schema.hedVendorVerifications).where(and(eq(schema.hedVendorVerifications.status, "VERIFIED"),
+        sql`${schema.hedVendorVerifications.validUntil} > now()`)).orderBy(desc(schema.hedVendorVerifications.createdAt));
   }
 
   async create(campaignId: string, userId: string, input: unknown) {
