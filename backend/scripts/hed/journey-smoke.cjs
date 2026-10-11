@@ -41,6 +41,6 @@ async function main() {
   await client.request({ method: 'evm_increaseTime', params: [3 * 24 * 60 * 60] }); await client.request({ method: 'evm_mine' });
   await send(0, disbursement.abi, manifest.contractAddress, 'verifyOutcome', [campaignId, 0n, outcomeReportHash]);
   const activity = await client.readContract({ address: manifest.contractAddress, abi: disbursement.abi, functionName: 'activity', args: [campaignId, 0n] });
-  assert.equal(activity.state, 2); console.log(JSON.stringify({ campaignId: campaignId.toString(), vendorPaid: request.toString(), outcomeState: 'VERIFIED' }));
+  assert.equal(activity.outcomeReportHash, outcomeReportHash); assert.equal(activity.state, 2); console.log(JSON.stringify({ campaignId: campaignId.toString(), vendorPaid: request.toString(), outcomeState: 'VERIFIED' }));
 }
 main().catch(error => { console.error(error.stack || error.message); process.exitCode = 1; });
