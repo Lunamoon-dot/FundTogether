@@ -16,6 +16,7 @@
     "start:hed": "node dist/src/disbursement/hed-main.js",
     "api:export:workflow-b": "node scripts/workflow-b/export-openapi.cjs",
     "artifacts:hed": "node scripts/hed/generate-artifacts.cjs",
+    "smoke:hed": "node scripts/hed/journey-smoke.cjs",
     "lint": "eslint \"{src,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
