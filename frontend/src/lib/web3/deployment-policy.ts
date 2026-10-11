@@ -50,6 +50,8 @@ export function validateDeploymentContext(value: unknown, expected: 'BASELINE' |
     if (v.abiVersion !== '1') throw new Error('ABI version B không được hỗ trợ.')
     Object.assign(result, { abiVersion: '1', abiHash: hex('abiHash'), policyHash: hex('policyHash'), workflowPolicy: hex('workflowPolicy') })
   } else if (expected === 'HED') {
+    if (v.abiVersion !== '1') throw new Error('ABI HED không được hỗ trợ.')
+    hex('backupResolver', 40)
     Object.assign(result, { abiVersion: '1', abiHash: hex('abiHash'), policyHash: hex('policyHash') })
   } else {
     if (v.milestonePolicy) result.milestonePolicy = hex('milestonePolicy')
