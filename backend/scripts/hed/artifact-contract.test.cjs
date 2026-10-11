@@ -3,14 +3,14 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { artifacts, generate, validateManifest, hashJson, verifyDeployment } = require('./generate-artifacts.cjs');
+const { artifacts, policy, generate, validateManifest, hashJson, verifyDeployment } = require('./generate-artifacts.cjs');
 
 const hash = n => `0x${n.toString(16).padStart(64, '0')}`;
 const address = n => `0x${n.toString(16).padStart(40, '0')}`;
 const manifest = () => ({ protocolKind: 'HED', chainId: 31339, rpcUrl: 'http://127.0.0.1:9548',
   contractAddress: address(1), tokenAddress: address(2), resolver: address(3), backupResolver: address(4),
   genesisHash: hash(5), contractCodeHash: hash(6), tokenCodeHash: hash(7), deploymentBlockNumber: '2',
-  deploymentBlockHash: hash(8), tokenDecimals: 6, confirmations: 1, abiVersion: '1', abiHash: hashJson([]), policyHash: hash(10) });
+  deploymentBlockHash: hash(8), tokenDecimals: 6, confirmations: 1, abiVersion: '1', abiHash: hashJson([]), policyHash: hashJson(policy) });
 
 test('HED artifact generator rejects incomplete or oversized Foundry artifacts', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ft-hed-artifacts-'));

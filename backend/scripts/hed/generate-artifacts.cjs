@@ -4,6 +4,9 @@ const { keccak256, toFunctionSignature, toHex } = require('viem');
 
 const bytes = value => JSON.stringify(value, null, 2) + '\n';
 const hashJson = value => keccak256(toHex(bytes(value)));
+const policy = Object.freeze({ MAX_DEPOSIT_BPS: 2_000, MAX_CAMPAIGN_DEPOSIT_BPS: 1_000,
+  PRIMARY_REVIEW_WINDOW: 259_200, VENDOR_ACK_WINDOW: 259_200, DEPOSIT_WINDOW: 259_200,
+  EXECUTION_HORIZON: 15_552_000, CHALLENGE_WINDOW: 259_200 });
 
 function validateManifest(manifest) {
   const fail = () => { throw new Error('HED manifest identity/configuration invalid'); };
@@ -14,6 +17,7 @@ function validateManifest(manifest) {
     || !['localhost', '127.0.0.1'].includes(url.hostname) || url.port !== '9548' || url.username
     || url.password || url.pathname !== '/' || url.search || url.hash || !/^\d+$/.test(manifest.deploymentBlockNumber)
     || BigInt(manifest.deploymentBlockNumber) === 0n) fail();
+  if (manifest.policyHash !== hashJson(policy)) fail();
   for (const key of ['contractAddress', 'tokenAddress', 'resolver', 'backupResolver']) {
     if (!/^0x[0-9a-fA-F]{40}$/.test(manifest[key]) || /^0x0+$/.test(manifest[key])) fail();
   }
@@ -87,12 +91,13 @@ function generate(root = path.resolve(__dirname, '../../..'), out = path.join(ro
   const result = artifacts(root);
   atomicWrite(path.join(out, 'fund-together-disbursement.abi.json'), result.disbursement.abi);
   atomicWrite(path.join(out, 'mock-usdc.abi.json'), result.token.abi);
-  return result;
+  atomicWrite(path.join(out, 'policy.json'), policy);
+  return { ...result, policyHash: hashJson(policy) };
 }
 
 if (require.main === module) {
   const result = generate();
-  console.log(JSON.stringify({ runtimeBytes: result.runtimeBytes }));
+  console.log(JSON.stringify({ runtimeBytes: result.runtimeBytes, policyHash: result.policyHash }));
 }
 
-module.exports = { artifacts, generate, atomicWrite, validateManifest, hashJson, verifyDeployment };
+module.exports = { artifacts, policy, generate, atomicWrite, validateManifest, hashJson, verifyDeployment };
