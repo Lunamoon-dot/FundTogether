@@ -19,6 +19,13 @@ export class HedIndexerService implements OnModuleInit, OnModuleDestroy {
   private stopped = false;
   constructor(@Inject(DRIZZLE_DB) private readonly db: NodePgDatabase<typeof schema>, readonly chain: HedBlockchainService) {}
   get streamKey() { return hedStreamKey(this.chain.deployment); }
+  async refreshCampaign(onchainCampaignId: string, metadataId: string | null) {
+    const block = await this.chain.client.getBlock({ blockTag: "latest" });
+    const snapshot = await this.chain.snapshot(BigInt(onchainCampaignId), block.number);
+    await this.db.insert(indexerStreams).values({ streamId: this.streamKey }).onConflictDoNothing();
+    await this.db.insert(disbursementCampaignProjection).values({ streamId: this.streamKey, onchainCampaignId, metadataId, snapshot })
+      .onConflictDoUpdate({ target: [disbursementCampaignProjection.streamId, disbursementCampaignProjection.onchainCampaignId], set: { metadataId, snapshot } });
+  }
   onModuleInit() { if (process.env.HED_INDEXER_ENABLED === "true") this.schedule(0); }
   private schedule(delay: number) {
     if (this.stopped) return;

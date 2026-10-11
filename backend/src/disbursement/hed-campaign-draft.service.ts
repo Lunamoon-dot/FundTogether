@@ -7,6 +7,7 @@ import * as schema from "../database/schema";
 import { campaignMetadata, hedCampaignDrafts, organizationMembers, organizations, walletLinks } from "../database/schema";
 import type { HedCampaignDraftInput } from "./hed-campaign-draft.schema";
 import { HedBlockchainService } from "./hed-blockchain.service";
+import { HedIndexerService } from "./hed-indexer.service";
 
 export const hedCommitmentHash = (content: HedCampaignDraftInput) => keccak256(toHex(JSON.stringify({
   version: "hed-mvp-1", purpose: content.purpose, beneficiaryScope: content.beneficiaryScope,
@@ -16,7 +17,7 @@ export const hedCommitmentHash = (content: HedCampaignDraftInput) => keccak256(t
 
 @Injectable()
 export class HedCampaignDraftService {
-  constructor(@Inject(DRIZZLE_DB) private readonly db: NodePgDatabase<typeof schema>, private readonly chain: HedBlockchainService) {}
+  constructor(@Inject(DRIZZLE_DB) private readonly db: NodePgDatabase<typeof schema>, private readonly chain: HedBlockchainService, private readonly indexer: HedIndexerService) {}
 
   private async owner(organizationId: string, userId: string) {
     const [membership] = await this.db.select().from(organizationMembers).where(and(
@@ -82,6 +83,7 @@ export class HedCampaignDraftService {
     const [saved] = await this.db.select().from(schema.disbursementCampaigns).where(eq(schema.disbursementCampaigns.campaignMetadataId, campaignId)).limit(1);
     if (!saved || saved.onchainCampaignId !== onchainCampaignId || saved.contractAddress !== this.chain.context.contractAddress.toLowerCase())
       throw new ConflictException("HED campaign is already mapped to another on-chain identity");
+    await this.indexer.refreshCampaign(onchainCampaignId, campaignId);
     return { campaignId, onchainCampaignId, checkpoint: snapshot.checkpoint };
   }
 }
