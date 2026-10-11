@@ -9,6 +9,11 @@ import { HedBlockchainService } from "./hed-blockchain.service";
 const needCriteria = ["NEED-01", "NEED-02", "NEED-03", "NEED-04", "NEED-05", "NEED-06"];
 const deliveryCriteria = ["DEL-01", "DEL-02", "DEL-03", "DEL-04"];
 const outcomeCriteria = ["OUT-01", "OUT-02", "OUT-03", "OUT-04"];
+const latestByCriterion = <T extends { content: { criterionId: string } }>(reviews: T[]) => {
+  const latest = new Map<string, T>();
+  for (const review of reviews) if (!latest.has(review.content.criterionId)) latest.set(review.content.criterionId, review);
+  return [...latest.values()];
+};
 
 @Injectable()
 export class HedReviewService {
@@ -92,8 +97,9 @@ export class HedReviewService {
     const sourceReferences = documents.map(document => document.id).sort();
     if (!sourceReferences.length) throw new ConflictException("Frozen HED request has no server-owned need evidence");
     const reviews = await this.db.select().from(schema.hedRequestReviews).where(and(eq(schema.hedRequestReviews.requestDraftId, requestId),
-      eq(sql`${schema.hedRequestReviews.content}->>'evidenceVersion'`, String(request.draft.version)), inArray(sql`${schema.hedRequestReviews.content}->>'criterionId'`, needCriteria)));
-    const approved = new Set(reviews.filter(review => review.content.outcome === "MET" && review.content.manifestHash === request.draft.requestHash
+      eq(sql`${schema.hedRequestReviews.content}->>'evidenceVersion'`, String(request.draft.version)), inArray(sql`${schema.hedRequestReviews.content}->>'criterionId'`, needCriteria)))
+      .orderBy(desc(schema.hedRequestReviews.createdAt));
+    const approved = new Set(latestByCriterion(reviews).filter(review => review.content.outcome === "MET" && review.content.manifestHash === request.draft.requestHash
       && review.content.publicHash === request.draft.requestHash && review.content.sourceReferences.length === sourceReferences.length
       && review.content.sourceReferences.every(id => sourceReferences.includes(id))).map(review => review.content.criterionId));
     if (needCriteria.some(criterion => !approved.has(criterion))) throw new ConflictException("All NEED-01 through NEED-06 reviews must be MET before reserve approval");
@@ -134,8 +140,9 @@ export class HedReviewService {
       throw new ConflictException("HED delivery package is not mapped to a frozen on-chain request");
     if (request.draft.version !== evidence.content.evidenceVersion) throw new ConflictException("Delivery package evidence version is stale for this request");
     const reviews = await this.db.select().from(schema.hedRequestReviews).where(and(eq(schema.hedRequestReviews.requestDraftId, request.draft.id),
-      eq(sql`${schema.hedRequestReviews.content}->>'evidenceVersion'`, String(evidence.content.evidenceVersion)), inArray(sql`${schema.hedRequestReviews.content}->>'criterionId'`, deliveryCriteria)));
-    const approved = new Set(reviews.filter(review => review.content.outcome === "MET" && review.content.manifestHash === evidence.content.manifestHash
+      eq(sql`${schema.hedRequestReviews.content}->>'evidenceVersion'`, String(evidence.content.evidenceVersion)), inArray(sql`${schema.hedRequestReviews.content}->>'criterionId'`, deliveryCriteria)))
+      .orderBy(desc(schema.hedRequestReviews.createdAt));
+    const approved = new Set(latestByCriterion(reviews).filter(review => review.content.outcome === "MET" && review.content.manifestHash === evidence.content.manifestHash
       && review.content.publicHash === evidence.content.publicHash && review.content.sourceReferences.every(id => evidence.content.documentIds.includes(id)))
       .map(review => review.content.criterionId));
     if (deliveryCriteria.some(criterion => !approved.has(criterion))) throw new ConflictException("All DEL-01 through DEL-04 reviews must be MET for this delivery package");
@@ -166,8 +173,9 @@ export class HedReviewService {
       .from(schema.hedActivities).innerJoin(schema.disbursementCampaigns, eq(schema.disbursementCampaigns.campaignMetadataId, schema.hedActivities.campaignMetadataId))
       .where(and(eq(schema.hedActivities.id, evidence.content.activityId), eq(schema.hedActivities.campaignMetadataId, evidence.campaignMetadataId!))).limit(1);
     if (!row?.activity.onchainActivityId || !row.campaign.onchainCampaignId) throw new ConflictException("HED outcome package is not mapped on chain");
-    const reviews = await this.db.select().from(schema.hedActivityReviews).where(and(eq(schema.hedActivityReviews.activityId, row.activity.id), eq(sql`${schema.hedActivityReviews.content}->>'evidenceVersion'`, String(evidence.content.evidenceVersion)), inArray(sql`${schema.hedActivityReviews.content}->>'criterionId'`, outcomeCriteria)));
-    const approved = new Set(reviews.filter(review => review.content.outcome === "MET" && review.content.manifestHash === evidence.content.manifestHash && review.content.publicHash === evidence.content.publicHash && review.content.sourceReferences.every(id => evidence.content.documentIds.includes(id))).map(review => review.content.criterionId));
+    const reviews = await this.db.select().from(schema.hedActivityReviews).where(and(eq(schema.hedActivityReviews.activityId, row.activity.id), eq(sql`${schema.hedActivityReviews.content}->>'evidenceVersion'`, String(evidence.content.evidenceVersion)), inArray(sql`${schema.hedActivityReviews.content}->>'criterionId'`, outcomeCriteria)))
+      .orderBy(desc(schema.hedActivityReviews.createdAt));
+    const approved = new Set(latestByCriterion(reviews).filter(review => review.content.outcome === "MET" && review.content.manifestHash === evidence.content.manifestHash && review.content.publicHash === evidence.content.publicHash && review.content.sourceReferences.every(id => evidence.content.documentIds.includes(id))).map(review => review.content.criterionId));
     if (outcomeCriteria.some(criterion => !approved.has(criterion))) throw new ConflictException("All OUT-01 through OUT-04 reviews must be MET for this outcome package");
     const block = await this.chain.client.getBlock({ blockTag: "latest" }), snapshot = await this.chain.snapshot(BigInt(row.campaign.onchainCampaignId), block.number);
     if (snapshot.campaign.state !== "ACTIVE" || snapshot.requests.some(request => request.state !== "FINANCIALLY_SETTLED" && request.state !== "CANCELLED")) throw new ConflictException("HED activity still has an open financial request");
