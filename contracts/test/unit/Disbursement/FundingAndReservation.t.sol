@@ -147,6 +147,9 @@ contract HedFundingAndReservationTest is Test {
         vm.prank(resolver);
         disbursement.upholdOutcomeCase(campaignId, 0, keccak256("decision"));
         vm.expectRevert(FundTogetherDisbursement.WrongState.selector);
+        vm.prank(donor);
+        disbursement.openOutcomeCase(campaignId, 0, keccak256("replay"));
+        vm.expectRevert(FundTogetherDisbursement.WrongState.selector);
         vm.prank(resolver);
         disbursement.verifyOutcome(campaignId, 0, keccak256("final"));
         vm.warp(block.timestamp + 3 days);
@@ -261,6 +264,9 @@ contract HedFundingAndReservationTest is Test {
         disbursement.openDeliveryCase(campaignId, requestId, keccak256("conflict"));
         vm.prank(resolver);
         disbursement.upholdDeliveryCase(campaignId, requestId, keccak256("decision"));
+        vm.expectRevert(FundTogetherDisbursement.WrongState.selector);
+        vm.prank(donor);
+        disbursement.openDeliveryCase(campaignId, requestId, keccak256("replay"));
         vm.expectRevert(FundTogetherDisbursement.WrongState.selector);
         disbursement.executeFinal(campaignId, requestId);
         vm.warp(block.timestamp + 3 days);

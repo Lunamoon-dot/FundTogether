@@ -38,7 +38,9 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     mapping(uint256 => mapping(uint256 => bool)) public requestApprovalTakenOver;
     mapping(uint256 => bool) public hasOpenActivity;
     mapping(uint256 => mapping(uint256 => bool)) public deliveryCaseOpen;
+    mapping(uint256 => mapping(uint256 => bool)) public deliveryCaseUsed;
     mapping(uint256 => mapping(uint256 => bool)) public outcomeCaseOpen;
+    mapping(uint256 => mapping(uint256 => bool)) public outcomeCaseUsed;
     mapping(uint256 => mapping(address => uint256)) public contributions;
     mapping(uint256 => mapping(address => bool)) private _refundClaimed;
     mapping(uint256 => mapping(address => uint256)) private _supplementClaimed;
@@ -313,8 +315,10 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     function openDeliveryCase(uint256 campaignId, uint256 requestId, bytes32 reasonHash) external {
         if (requestId >= requestCount[campaignId]) revert InvalidReference();
         T.RequestView storage r = _requests[campaignId][requestId];
-        if (r.state != T.RequestState.DELIVERY_CANDIDATE || block.timestamp >= r.challengeEnd || contributions[campaignId][msg.sender] == 0 || reasonHash == bytes32(0) || deliveryCaseOpen[campaignId][requestId]) revert WrongState();
+        if (r.state != T.RequestState.DELIVERY_CANDIDATE || block.timestamp >= r.challengeEnd || contributions[campaignId][msg.sender] == 0 || reasonHash == bytes32(0)
+            || deliveryCaseOpen[campaignId][requestId] || deliveryCaseUsed[campaignId][requestId]) revert WrongState();
         deliveryCaseOpen[campaignId][requestId] = true;
+        deliveryCaseUsed[campaignId][requestId] = true;
         emit DeliveryCaseOpened(campaignId, requestId, msg.sender, reasonHash);
     }
 
@@ -394,8 +398,9 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         if (activityId >= activityCount[campaignId]) revert InvalidReference();
         T.ActivityView storage a = _activities[campaignId][activityId];
         if (a.state != T.ActivityState.OUTCOME_CANDIDATE || block.timestamp >= a.challengeEnd || contributions[campaignId][msg.sender] == 0
-            || reasonHash == bytes32(0) || outcomeCaseOpen[campaignId][activityId]) revert WrongState();
+            || reasonHash == bytes32(0) || outcomeCaseOpen[campaignId][activityId] || outcomeCaseUsed[campaignId][activityId]) revert WrongState();
         outcomeCaseOpen[campaignId][activityId] = true;
+        outcomeCaseUsed[campaignId][activityId] = true;
         emit OutcomeCaseOpened(campaignId, activityId, msg.sender, reasonHash);
     }
 
