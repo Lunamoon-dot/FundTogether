@@ -6,6 +6,7 @@ const { artifacts, verifyDeployment } = require('./generate-artifacts.cjs');
 const root = require('node:path').resolve(__dirname, '../../..');
 const manifest = JSON.parse(readFileSync(require('node:path').join(root, '.local/hed/generated/deployment.local.json'), 'utf8'));
 const chain = defineChain({ id: 31339, name: 'FundTogether HED', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: [manifest.rpcUrl] } } });
+const apiUrl = process.env.HED_API_URL || 'http://127.0.0.1:3002';
 
 async function main() {
   const { disbursement, token } = artifacts(root), client = createPublicClient({ chain, transport: http(manifest.rpcUrl) });
@@ -19,6 +20,18 @@ async function main() {
     assert.equal(receipt.status, 'success', `${functionName} receipt`); return receipt;
   };
   const hash = label => keccak256(toHex(`hed-smoke:${label}:${Date.now()}`));
+  const projection = async campaignId => {
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const response = await fetch(`${apiUrl}/v1/disbursement/public/campaigns/${campaignId}`);
+      if (response.ok) {
+        const value = await response.json();
+        if (value.requests?.length === 2 && value.requests.every(request => request.state === 'FINANCIALLY_SETTLED')
+          && value.activities?.[0]?.state === 'VERIFIED') return value;
+      }
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    throw new Error('HED indexer projection did not catch up to the verified journey');
+  };
   const goal = 3_000_000_000n, purchase = 1_000_000_000n, transport = 500_000_000n;
   const commitment = hash('campaign'), eligibility = hash('eligibility'), activityHash = hash('activity'), purchaseHash = hash('purchase-request'), transportHash = hash('transport-request');
   const vendorBalanceBefore = await client.readContract({ address: manifest.tokenAddress, abi: token.abi, functionName: 'balanceOf', args: [accounts[3]] });
@@ -55,6 +68,10 @@ async function main() {
   await send(0, disbursement.abi, manifest.contractAddress, 'verifyOutcome', [campaignId, 0n, outcomeReportHash]);
   const activity = await client.readContract({ address: manifest.contractAddress, abi: disbursement.abi, functionName: 'activity', args: [campaignId, 0n] });
   assert.equal(activity.outcomeReportHash, outcomeReportHash); assert.equal(activity.approved, purchase + transport); assert.equal(activity.state, 2);
-  console.log(JSON.stringify({ campaignId: campaignId.toString(), purchasePaid: purchase.toString(), transportPaid: transport.toString(), outcomeState: 'VERIFIED' }));
+  const indexed = await projection(campaignId);
+  assert.equal(indexed.activities[0].outcomeReportHash, outcomeReportHash);
+  assert.equal(indexed.requests[0].deliveryReportHash, deliveryReportHash);
+  assert.equal(indexed.requests[1].deliveryReportHash, transportReportHash);
+  console.log(JSON.stringify({ campaignId: campaignId.toString(), purchasePaid: purchase.toString(), transportPaid: transport.toString(), outcomeState: 'VERIFIED', indexedBlock: indexed.checkpoint.blockNumber }));
 }
 main().catch(error => { console.error(error.stack || error.message); process.exitCode = 1; });
