@@ -120,6 +120,13 @@
       "when": 1791713331176,
       "tag": "0016_chief_miss_america",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791714898388,
+      "tag": "0017_typical_polaris",
+      "breakpoints": true
     }
   ]
 }

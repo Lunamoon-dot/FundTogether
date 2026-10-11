@@ -1,7 +1,9 @@
 import { sql } from "drizzle-orm";
-import { check, integer, numeric, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { check, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 import { campaignMetadata } from "./campaigns.schema";
+import { indexerStreams } from "./indexer.schema";
 import { users } from "./users.schema";
+import type { HedCampaignSnapshot } from "../../disbursement/hed.types";
 
 export const disbursementCampaigns = pgTable("disbursement_campaigns", {
   campaignMetadataId: uuid("campaign_metadata_id").primaryKey().references(() => campaignMetadata.id),
@@ -47,4 +49,14 @@ export const disbursementReviewRecords = pgTable("disbursement_review_records", 
 }, table => [
   uniqueIndex("disbursement_review_criterion_version_idx").on(table.requestId, table.evidenceVersion, table.criterionId),
   check("disbursement_review_outcome_check", sql`${table.outcome} IN ('MET', 'NOT_MET', 'NEEDS_INFO') AND ${table.evidenceVersion} > 0`),
+]);
+
+export const disbursementCampaignProjection = pgTable("disbursement_campaign_projection", {
+  streamId: text("stream_id").notNull().references(() => indexerStreams.streamId),
+  onchainCampaignId: numeric("onchain_campaign_id", { precision: 78, scale: 0 }).notNull(),
+  metadataId: uuid("metadata_id").references(() => campaignMetadata.id),
+  snapshot: jsonb("snapshot").$type<HedCampaignSnapshot>().notNull(),
+}, table => [
+  primaryKey({ columns: [table.streamId, table.onchainCampaignId] }),
+  check("disbursement_projection_id_check", sql`${table.onchainCampaignId} >= 0 AND ${table.onchainCampaignId} <= 115792089237316195423570985008687907853269984665640564039457584007913129639935`),
 ]);
