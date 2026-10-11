@@ -8,7 +8,7 @@ or real-money readiness.
 
 | Scope | Evidence | Result |
 | --- | --- | --- |
-| Financial state and authority | `forge test --match-contract HedFundingAndReservationTest` | 25 passing tests: reserve, single open request, vendor acknowledgement, deposit caps, partial delivery, challenges, return invalidation, primary/backup takeover, wind-down and refunds. |
+| Financial state and authority | `forge test --match-contract HedFundingAndReservationTest` | 26 passing tests, including a 256-run reserve/custody fuzz: reserve, single open request, vendor acknowledgement, deposit caps, partial delivery, challenges, return invalidation, primary/backup takeover, wind-down and refunds. |
 | Artifact and deployment identity | `npm.cmd --prefix backend run artifacts:hed` and `node backend/scripts/hed/artifact-contract.test.cjs` | Generated ABI is bound to the HED contract; malformed or cross-deployment manifests are rejected. |
 | API schemas and evidence rules | Five focused HED Jest suites | 7 passing tests for campaign/request hashes, review schema, evidence hash and HED stream identity. |
 | Local vertical journey | `npm.cmd --prefix backend run smoke:hed` | Full funding → activation → purchase → delivery candidate/final → transport in the same activity → delivery candidate/final → outcome verified. The smoke checks MockUSDC vendor balance, selected report hashes and REST/indexer projection. |
