@@ -101,12 +101,16 @@ export async function prepareHedDelivery(packageId: string) {
 }
 export interface HedEvidenceDocument { id: string; sha256: `0x${string}`; originalName: string; mediaType: string; byteSize: number }
 export interface HedDeliveryPackageInput { kind: 'DELIVERY'; requestDraftId: string; activityId: string; evidenceVersion: number; publicHash: `0x${string}`; acceptedValue: string; documentIds: string[] }
+export interface HedOutcomePackageInput { kind: 'OUTCOME'; activityId: string; evidenceVersion: number; publicHash: `0x${string}`; deliveredQuantity: number; documentIds: string[] }
 export async function uploadHedEvidence(campaignId: string, value: { kind: 'DELIVERY' | 'OUTCOME'; activityId: string; requestDraftId?: string; file: File }) {
   const body = new FormData(); body.set('kind', value.kind); body.set('activityId', value.activityId); if (value.requestDraftId) body.set('requestDraftId', value.requestDraftId); body.set('file', value.file)
   return (await http.post<HedEvidenceDocument>(`/v1/disbursement/campaigns/${campaignId}/evidence/upload`, body, { headers: { 'Content-Type': undefined } })).data
 }
 export async function createHedDeliveryPackage(campaignId: string, value: HedDeliveryPackageInput) {
   return (await http.post<{ id: string; content: HedDeliveryPackage }>(`/v1/disbursement/campaigns/${campaignId}/evidence`, value)).data
+}
+export async function createHedOutcomePackage(campaignId: string, value: HedOutcomePackageInput) {
+  return (await http.post<{ id: string }>(`/v1/disbursement/campaigns/${campaignId}/evidence`, value)).data
 }
 export interface HedVendorRequest { requestId: string; requestHash: `0x${string}`; vendorWallet: `0x${string}`; onchainCampaignId: string; onchainRequestId: string; content: HedRequestDraftInput }
 export async function listHedVendorRequests(signal?: AbortSignal) {
