@@ -13,8 +13,8 @@ import { validateEvidenceFile } from "../modules/evidence/evidence-file-validati
 import type { EvidenceUploadFile } from "../modules/evidence/evidence-file-validation";
 import { HedBlockchainService } from "./hed-blockchain.service";
 
-export const hedRequestHash = (campaignCommitmentHash: string, vendorReportHash: string, content: HedRequestDraftInput) => keccak256(toHex(JSON.stringify({
-  version: "hed-mvp-1", campaignCommitmentHash, vendorReportHash, activityReference: content.activityReference,
+export const hedRequestHash = (campaignCommitmentHash: string, activityCommitmentHash: string, vendorReportHash: string, content: HedRequestDraftInput) => keccak256(toHex(JSON.stringify({
+  version: "hed-mvp-1", campaignCommitmentHash, activityCommitmentHash, vendorReportHash, activityId: content.activityId,
   purpose: content.purpose, itemLines: content.itemLines, amount: content.amount, deposit: content.deposit,
   expectedDeliveryAt: content.expectedDeliveryAt, acceptanceCriteria: content.acceptanceCriteria, terms: content.terms,
   needEvidenceReferences: content.needEvidenceReferences,
@@ -67,7 +67,11 @@ export class HedRequestDraftService {
     if ((await this.chain.snapshot(BigInt(mapped.onchainCampaignId), block.number)).campaign.state !== "ACTIVE")
       throw new ConflictException("HED payment requests open only after the campaign is ACTIVE on chain");
     const parsed = hedRequestDraftSchema.parse(input), vendor = await this.verifiedVendor(parsed.vendorVerificationId);
-    return this.db.insert(schema.hedRequestDrafts).values({ campaignMetadataId: campaign.campaign.id, vendorVerificationId: vendor.id,
+    const [activity] = await this.db.select().from(schema.hedActivities).where(and(eq(schema.hedActivities.id, parsed.activityId),
+      eq(schema.hedActivities.campaignMetadataId, campaign.campaign.id))).limit(1);
+    if (!activity?.frozenAt || !activity.commitmentHash || !activity.onchainActivityId)
+      throw new ConflictException("Freeze and publish the HED activity before creating a payment request");
+    return this.db.insert(schema.hedRequestDrafts).values({ campaignMetadataId: campaign.campaign.id, activityId: activity.id, vendorVerificationId: vendor.id,
       content: parsed, createdBy: userId }).returning();
   }
 
@@ -112,7 +116,11 @@ export class HedRequestDraftService {
         throw new ConflictException("Upload and reload the server-owned request evidence before freezing");
       const [vendor] = await tx.select().from(schema.hedVendorVerifications).where(eq(schema.hedVendorVerifications.id, draft.vendorVerificationId)).for("share");
       if (!vendor || vendor.status !== "VERIFIED" || vendor.validUntil.getTime() <= Date.now()) throw new ConflictException("Vendor verification is no longer valid");
-      const requestHash = hedRequestHash(campaign.draft.commitmentHash!, vendor.reportHash, draft.content);
+      if (!draft.activityId) throw new ConflictException("Legacy HED request draft has no frozen activity");
+      const [activity] = await tx.select().from(schema.hedActivities).where(eq(schema.hedActivities.id, draft.activityId)).for("share");
+      if (!activity?.commitmentHash || !activity.frozenAt || !activity.onchainActivityId)
+        throw new ConflictException("HED activity is not a frozen on-chain activity");
+      const requestHash = hedRequestHash(campaign.draft.commitmentHash!, activity.commitmentHash, vendor.reportHash, draft.content);
       const [saved] = await tx.update(schema.hedRequestDrafts).set({ requestHash, frozenAt: new Date(), updatedAt: new Date() })
         .where(and(eq(schema.hedRequestDrafts.id, draft.id), isNull(schema.hedRequestDrafts.frozenAt))).returning();
       if (!saved) throw new ConflictException("HED request changed; reload before freezing");

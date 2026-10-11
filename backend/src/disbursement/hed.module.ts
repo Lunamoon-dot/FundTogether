@@ -19,10 +19,12 @@ import { HedVendorVerificationController } from "./hed-vendor-verification.contr
 import { HedVendorVerificationService } from "./hed-vendor-verification.service";
 import { HedReviewController } from "./hed-review.controller";
 import { HedReviewService } from "./hed-review.service";
+import { HedActivityController } from "./hed-activity.controller";
+import { HedActivityService } from "./hed-activity.service";
 
 @Module({
   imports: [AuthModule, DatabaseModule, EvidenceStorageModule],
-  controllers: [HedHealthController, HedPublicController, HedCampaignDraftController, HedCampaignVendorController, HedRequestDraftController, HedVendorVerificationController, HedReviewController],
+  controllers: [HedHealthController, HedPublicController, HedCampaignDraftController, HedActivityController, HedCampaignVendorController, HedRequestDraftController, HedVendorVerificationController, HedReviewController],
   providers: [{
     provide: HED_DEPLOYMENT,
     useFactory: (): HedDeployment => {
@@ -32,7 +34,7 @@ import { HedReviewService } from "./hed-review.service";
       if (manifest.rpcUrl !== process.env.HED_BLOCKCHAIN_RPC_URL) throw new Error("HED manifest/RPC configuration mismatch");
       return Object.freeze(manifest);
     },
-  }, HedBlockchainService, HedIndexerService, HedCampaignDraftService, HedRequestDraftService, HedVendorVerificationService, HedReviewService],
+  }, HedBlockchainService, HedIndexerService, HedCampaignDraftService, HedActivityService, HedRequestDraftService, HedVendorVerificationService, HedReviewService],
   exports: [HedBlockchainService, HedIndexerService, HED_DEPLOYMENT],
 })
 export class HedModule {}

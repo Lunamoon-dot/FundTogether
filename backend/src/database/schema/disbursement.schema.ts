@@ -6,6 +6,7 @@ import { users } from "./users.schema";
 import type { HedCampaignSnapshot } from "../../disbursement/hed.types";
 import type { HedCampaignDraftInput } from "../../disbursement/hed-campaign-draft.schema";
 import type { HedRequestDraftInput } from "../../disbursement/hed-request-draft.schema";
+import type { HedActivityInput } from "../../disbursement/hed-activity.schema";
 import type { HedVendorVerificationInput } from "../../disbursement/hed-vendor-verification.schema";
 import type { HedReviewInput } from "../../disbursement/hed-review.schema";
 import type { HedEvidencePackageInput } from "../../disbursement/hed-evidence-package.schema";
@@ -40,9 +41,25 @@ export const hedVendorVerifications = pgTable("hed_vendor_verifications", {
   check("hed_vendor_report_hash_check", sql`${table.reportHash} ~ '^0x[0-9a-f]{64}$' AND ${table.reportHash} !~ '^0x0+$'`),
 ]);
 
+export const hedActivities = pgTable("hed_activities", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  campaignMetadataId: uuid("campaign_metadata_id").notNull().references(() => campaignMetadata.id),
+  content: jsonb("content").$type<HedActivityInput>().notNull(),
+  commitmentHash: varchar("commitment_hash", { length: 66 }),
+  onchainActivityId: numeric("onchain_activity_id", { precision: 78, scale: 0 }),
+  frozenAt: timestamp("frozen_at", { withTimezone: true }),
+  createdBy: uuid("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, table => [
+  uniqueIndex("hed_activity_chain_identity_idx").on(table.campaignMetadataId, table.onchainActivityId),
+  check("hed_activity_ceiling_check", sql`(${table.content}->>'ceiling') ~ '^[1-9][0-9]*$'`),
+  check("hed_activity_freeze_check", sql`(${table.frozenAt} IS NULL AND ${table.commitmentHash} IS NULL) OR (${table.frozenAt} IS NOT NULL AND ${table.commitmentHash} ~ '^0x[0-9a-f]{64}$' AND ${table.commitmentHash} !~ '^0x0+$')`),
+]);
+
 export const hedRequestDrafts = pgTable("hed_request_drafts", {
   id: uuid("id").defaultRandom().primaryKey(),
   campaignMetadataId: uuid("campaign_metadata_id").notNull().references(() => campaignMetadata.id),
+  activityId: uuid("activity_id").references(() => hedActivities.id),
   vendorVerificationId: uuid("vendor_verification_id").notNull().references(() => hedVendorVerifications.id),
   content: jsonb("content").$type<HedRequestDraftInput>().notNull(),
   version: integer("version").notNull().default(1),

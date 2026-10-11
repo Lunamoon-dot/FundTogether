@@ -5,7 +5,7 @@ const nonNegativeAmount = z.string().regex(/^(0|[1-9][0-9]*)$/);
 
 export const hedRequestDraftSchema = z.object({
   vendorVerificationId: z.string().uuid(),
-  activityReference: z.string().trim().min(3).max(100),
+  activityId: z.string().uuid(),
   purpose: z.string().trim().min(10).max(2_000),
   itemLines: z.array(z.object({ description: z.string().trim().min(2).max(500), quantity: z.number().int().positive().max(1_000_000),
     unitAmount: tokenAmount }).strict()).min(1).max(50),

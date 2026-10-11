@@ -22,7 +22,22 @@ export async function registerHedOnchainCampaign(id: string, onchainCampaignId: 
 }
 
 export interface HedVendorOption { id: string; vendorWallet: string; content: { legalName: string; categories: string[] }; validUntil: string }
-export interface HedRequestDraftInput { vendorVerificationId: string; activityReference: string; purpose: string;
+export interface HedActivityInput { title: string; beneficiaryScope: string; targetQuantity: number; outcomeCriteria: string[]; ceiling: string; deliveryDeadline: string; outcomeDeadline: string }
+export interface HedActivityDraft extends HedActivityInput { id: string; commitmentHash: string | null; frozenAt: string | null; onchainActivityId: string | null }
+export async function listHedActivities(campaignId: string, signal?: AbortSignal) {
+  return (await http.get<HedActivityDraft[]>(`/v1/disbursement/campaigns/${campaignId}/activities`, { signal })).data
+}
+export async function createHedActivity(campaignId: string, value: HedActivityInput) {
+  return (await http.post<HedActivityDraft>(`/v1/disbursement/campaigns/${campaignId}/activities`, value)).data
+}
+export async function freezeHedActivity(campaignId: string, activityId: string) {
+  return (await http.post<HedActivityDraft>(`/v1/disbursement/campaigns/${campaignId}/activities/${activityId}/freeze`)).data
+}
+export async function registerHedOnchainActivity(campaignId: string, activityId: string, onchainActivityId: string) {
+  return (await http.post<HedActivityDraft>(`/v1/disbursement/campaigns/${campaignId}/activities/${activityId}/onchain`, { onchainActivityId })).data
+}
+
+export interface HedRequestDraftInput { vendorVerificationId: string; activityId: string; purpose: string;
   itemLines: { description: string; quantity: number; unitAmount: string }[]; amount: string; deposit: string;
   expectedDeliveryAt: string; acceptanceCriteria: string[]; terms: string; needEvidenceReferences: string[] }
 export interface HedRequestDraft extends HedRequestDraftInput { id: string; version: number; requestHash: string | null; frozenAt: string | null }
