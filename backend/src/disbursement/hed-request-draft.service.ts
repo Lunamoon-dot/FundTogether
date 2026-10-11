@@ -2,23 +2,15 @@ import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundExce
 import { createHash, randomUUID } from "node:crypto";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { keccak256, toHex } from "viem";
 import { DRIZZLE_DB } from "../database/database.constants";
 import * as schema from "../database/schema";
 import { campaignMetadata, hedCampaignDrafts, organizationMembers } from "../database/schema";
-import { hedRequestDraftSchema } from "./hed-request-draft.schema";
+import { hedRequestDraftSchema, hedRequestHash } from "./hed-request-draft.schema";
 import type { HedRequestDraftInput } from "./hed-request-draft.schema";
 import { EvidenceStorageService } from "../modules/evidence/evidence-storage.service";
 import { validateEvidenceFile } from "../modules/evidence/evidence-file-validation";
 import type { EvidenceUploadFile } from "../modules/evidence/evidence-file-validation";
 import { HedBlockchainService } from "./hed-blockchain.service";
-
-export const hedRequestHash = (campaignCommitmentHash: string, activityCommitmentHash: string, vendorReportHash: string, content: HedRequestDraftInput) => keccak256(toHex(JSON.stringify({
-  version: "hed-mvp-1", campaignCommitmentHash, activityCommitmentHash, vendorReportHash, activityId: content.activityId,
-  purpose: content.purpose, itemLines: content.itemLines, amount: content.amount, deposit: content.deposit,
-  expectedDeliveryAt: content.expectedDeliveryAt, acceptanceCriteria: content.acceptanceCriteria, terms: content.terms,
-  needEvidenceReferences: content.needEvidenceReferences,
-})));
 
 @Injectable()
 export class HedRequestDraftService {

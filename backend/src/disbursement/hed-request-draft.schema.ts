@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { keccak256, toHex } from "viem";
 
 const tokenAmount = z.string().regex(/^[1-9][0-9]*$/);
 const nonNegativeAmount = z.string().regex(/^(0|[1-9][0-9]*)$/);
@@ -22,3 +23,10 @@ export const hedRequestDraftSchema = z.object({
 });
 
 export type HedRequestDraftInput = z.infer<typeof hedRequestDraftSchema>;
+
+export const hedRequestHash = (campaignCommitmentHash: string, activityCommitmentHash: string, vendorReportHash: string, content: HedRequestDraftInput) => keccak256(toHex(JSON.stringify({
+  version: "hed-mvp-1", campaignCommitmentHash, activityCommitmentHash, vendorReportHash, activityId: content.activityId,
+  purpose: content.purpose, itemLines: content.itemLines, amount: content.amount, deposit: content.deposit,
+  expectedDeliveryAt: content.expectedDeliveryAt, acceptanceCriteria: content.acceptanceCriteria, terms: content.terms,
+  needEvidenceReferences: content.needEvidenceReferences,
+})));
