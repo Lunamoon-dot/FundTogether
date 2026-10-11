@@ -33,6 +33,8 @@ function HedCampaignEntry({ value, onFrozen }: { value: HedCampaignDraft; onFroz
   const [busy, setBusy] = useState(false), [error, setError] = useState('')
   const account = useAccount(), client = usePublicClient({ chainId: deployment.chainId })
   const { data: wallet } = useWalletClient({ account: account.address, connector: account.connector })
+  const state = useQuery({ queryKey: ['hed-campaign-state', value.onchainCampaignId], enabled: Boolean(client && value.onchainCampaignId),
+    queryFn: () => client!.readContract({ address: deployment.contractAddress, abi, functionName: 'campaign', args: [BigInt(value.onchainCampaignId!)] }).then(v => Number((v as { state: number }).state)), refetchInterval: 10_000 })
   async function freeze() { if (busy || value.frozenAt) return; setBusy(true); setError(''); try { await freezeHedCampaignDraft(value.id); onFrozen() } catch (cause) { setError(getErrorMessage(cause)) } finally { setBusy(false) } }
   async function publish() { if (busy || !value.commitmentHash || !account.address || !client || !wallet) return; setBusy(true); setError(''); try {
     if (account.chainId !== deployment.chainId) throw new Error(`Chuyển ví sang mạng HED ${deployment.chainId} trước khi publish.`)
@@ -47,7 +49,7 @@ function HedCampaignEntry({ value, onFrozen }: { value: HedCampaignDraft; onFroz
   return <li className="panel"><div className="organization-card-heading"><h2>{value.title}</h2><span className="organization-role">{value.frozenAt ? 'Đã chốt' : 'Bản nháp'}</span></div>
     <p className="organization-description">{value.description}</p><p>Mục tiêu: {value.goal} base units MockUSDC · {value.fundingDuration / 86_400} ngày gây quỹ</p>
     {error && <p className="toast toast--error" role="alert">{error}</p>}
-    {value.frozenAt ? <><p className="advance-hash">Commitment: {value.commitmentHash}</p>{value.onchainCampaignId ? <p>Campaign HED on-chain: {value.onchainCampaignId}</p> : <button className="button button--primary" disabled={busy || !account.address} onClick={() => void publish()}>{busy ? 'Đang xử lý…' : 'Tạo campaign trên HED chain'}</button>}<HedRequestWorkspace campaignId={value.id} /></> : <button className="button button--primary" disabled={busy} onClick={() => void freeze()}>{busy ? 'Đang chốt…' : 'Chốt commitment'}</button>}
+    {value.frozenAt ? <><p className="advance-hash">Commitment: {value.commitmentHash}</p>{value.onchainCampaignId ? <><p>Campaign HED on-chain: {value.onchainCampaignId}</p>{state.data === 1 ? <HedRequestWorkspace campaignId={value.id} /> : <p className="muted">Request chỉ mở sau khi resolver kích hoạt campaign trên chain.</p>}</> : <button className="button button--primary" disabled={busy || !account.address} onClick={() => void publish()}>{busy ? 'Đang xử lý…' : 'Tạo campaign trên HED chain'}</button>}</> : <button className="button button--primary" disabled={busy} onClick={() => void freeze()}>{busy ? 'Đang chốt…' : 'Chốt commitment'}</button>}
   </li>
 }
 
