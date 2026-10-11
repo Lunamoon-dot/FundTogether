@@ -10,12 +10,13 @@ contract HedFundingAndReservationTest is Test {
     FundTogetherDisbursement private disbursement;
     address private organizer = makeAddr("organizer");
     address private resolver = makeAddr("resolver");
+    address private backupResolver = makeAddr("backup-resolver");
     address private donor = makeAddr("donor");
     address private vendor = makeAddr("vendor");
 
     function setUp() public {
         token = new MockUSDC();
-        disbursement = new FundTogetherDisbursement(address(token), resolver, keccak256("hed-mvp-1"));
+        disbursement = new FundTogetherDisbursement(address(token), resolver, backupResolver, keccak256("hed-mvp-1"));
         token.mint(donor, 4_000e6);
         vm.prank(donor);
         token.approve(address(disbursement), type(uint256).max);
@@ -40,6 +41,20 @@ contract HedFundingAndReservationTest is Test {
         assertEq(campaign.reserved, 1_000e6);
         assertEq(request.grossPaid, 0);
         assertEq(token.balanceOf(address(disbursement)), 2_000e6);
+    }
+
+    function test_backupCanOnlyTakeOverEligibilityAfterPrimaryWindow() public {
+        vm.prank(organizer);
+        uint256 campaignId = disbursement.createCampaign(keccak256("campaign"), 2_000e6, 1 days);
+        vm.prank(donor);
+        disbursement.donate(campaignId, 2_000e6);
+        vm.expectRevert(FundTogetherDisbursement.WrongCaller.selector);
+        vm.prank(backupResolver);
+        disbursement.activateCampaign(campaignId, keccak256("eligibility"));
+        vm.warp(block.timestamp + 3 days);
+        vm.prank(backupResolver);
+        disbursement.activateCampaign(campaignId, keccak256("eligibility"));
+        assertEq(uint256(disbursement.campaign(campaignId).state), uint256(T.CampaignState.ACTIVE));
     }
 
     function test_vendorAcknowledgementLocksRecipientAndPaysOnlyExactDeposit() public {

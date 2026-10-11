@@ -11,6 +11,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
 
     uint256 public constant MAX_DEPOSIT_BPS = 2_000;
     uint256 public constant MAX_CAMPAIGN_DEPOSIT_BPS = 1_000;
+    uint256 public constant PRIMARY_REVIEW_WINDOW = 3 days;
 
     error InvalidInput();
     error WrongCaller();
@@ -21,6 +22,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
 
     IERC20 public immutable supportedToken;
     address public immutable resolver;
+    address public immutable backupResolver;
     bytes32 public immutable policyHash;
     uint256 public nextCampaignId;
     mapping(uint256 => T.CampaignView) private _campaigns;
@@ -52,10 +54,11 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     event DeliveryAuthorizationInvalidated(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
     event UncommittedRequestCancelled(uint256 indexed campaignId, uint256 indexed requestId, uint256 amount, bytes32 reasonHash);
 
-    constructor(address token, address resolver_, bytes32 policyHash_) {
-        if (token == address(0) || resolver_ == address(0) || policyHash_ == bytes32(0)) revert InvalidInput();
+    constructor(address token, address resolver_, address backupResolver_, bytes32 policyHash_) {
+        if (token == address(0) || resolver_ == address(0) || backupResolver_ == address(0) || resolver_ == backupResolver_ || policyHash_ == bytes32(0)) revert InvalidInput();
         supportedToken = IERC20(token);
         resolver = resolver_;
+        backupResolver = backupResolver_;
         policyHash = policyHash_;
     }
 
@@ -89,13 +92,14 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         contributions[id][msg.sender] += amount;
         c.contributed += amount;
         c.available += amount;
+        if (c.contributed == c.goal) c.fullyFundedAt = block.timestamp;
         emit Donated(id, msg.sender, amount, c.contributed);
         _receiveExact(msg.sender, amount);
     }
 
     function activateCampaign(uint256 id, bytes32 eligibilityHash) external {
         T.CampaignView storage c = _campaign(id);
-        if (msg.sender != resolver) revert WrongCaller();
+        if (msg.sender != resolver && (msg.sender != backupResolver || block.timestamp < c.fullyFundedAt + PRIMARY_REVIEW_WINDOW)) revert WrongCaller();
         if (c.state != T.CampaignState.FUNDING || c.contributed != c.goal) revert WrongState();
         if (eligibilityHash == bytes32(0)) revert InvalidInput();
         c.state = T.CampaignState.ACTIVE;

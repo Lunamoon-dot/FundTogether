@@ -9,6 +9,7 @@ library DisbursementTypes {
         bytes32 commitmentHash;
         uint256 goal;
         uint256 fundingEnd;
+        uint256 fullyFundedAt;
         CampaignState state;
         uint256 contributed;
         uint256 available;
