@@ -8,6 +8,7 @@ import { HedBlockchainService } from "./hed-blockchain.service";
 
 const needCriteria = ["NEED-01", "NEED-02", "NEED-03", "NEED-04", "NEED-05", "NEED-06"];
 const deliveryCriteria = ["DEL-01", "DEL-02", "DEL-03", "DEL-04"];
+const outcomeCriteria = ["OUT-01", "OUT-02", "OUT-03", "OUT-04"];
 
 @Injectable()
 export class HedReviewService {
@@ -134,5 +135,30 @@ export class HedReviewService {
       throw new ConflictException("HED delivery no longer matches the committed on-chain request");
     return { onchainCampaignId: request.campaign.onchainCampaignId, onchainRequestId: request.chain.onchainRequestId,
       acceptedValue: evidence.content.acceptedValue, reportHash: evidence.content.publicHash, checkpoint: snapshot.checkpoint };
+  }
+
+  async recordOutcome(activityId: string, userId: string, input: unknown) {
+    await this.resolver(userId);
+    const parsed = hedReviewSchema.safeParse(input);
+    if (!parsed.success || !outcomeCriteria.includes(parsed.data.criterionId)) throw new ConflictException("Invalid HED outcome review");
+    const [activity] = await this.db.select().from(schema.hedActivities).where(eq(schema.hedActivities.id, activityId));
+    if (!activity?.onchainActivityId) throw new ConflictException("HED activity is not published on chain");
+    return this.db.insert(schema.hedActivityReviews).values({ activityId, content: parsed.data, reviewedBy: userId }).returning();
+  }
+
+  async prepareOutcome(packageId: string, userId: string) {
+    await this.resolver(userId);
+    const [evidence] = await this.db.select().from(schema.hedEvidencePackages).where(eq(schema.hedEvidencePackages.id, packageId)).limit(1);
+    if (!evidence || evidence.content.kind !== "OUTCOME") throw new NotFoundException("HED outcome package not found");
+    const [row] = await this.db.select({ activity: schema.hedActivities, campaign: schema.disbursementCampaigns })
+      .from(schema.hedActivities).innerJoin(schema.disbursementCampaigns, eq(schema.disbursementCampaigns.campaignMetadataId, schema.hedActivities.campaignMetadataId))
+      .where(and(eq(schema.hedActivities.id, evidence.content.activityId), eq(schema.hedActivities.campaignMetadataId, evidence.campaignMetadataId!))).limit(1);
+    if (!row?.activity.onchainActivityId || !row.campaign.onchainCampaignId) throw new ConflictException("HED outcome package is not mapped on chain");
+    const reviews = await this.db.select().from(schema.hedActivityReviews).where(and(eq(schema.hedActivityReviews.activityId, row.activity.id), eq(sql`${schema.hedActivityReviews.content}->>'evidenceVersion'`, String(evidence.content.evidenceVersion)), inArray(sql`${schema.hedActivityReviews.content}->>'criterionId'`, outcomeCriteria)));
+    const approved = new Set(reviews.filter(review => review.content.outcome === "MET" && review.content.manifestHash === evidence.content.manifestHash && review.content.publicHash === evidence.content.publicHash && review.content.sourceReferences.every(id => evidence.content.documentIds.includes(id))).map(review => review.content.criterionId));
+    if (outcomeCriteria.some(criterion => !approved.has(criterion))) throw new ConflictException("All OUT-01 through OUT-04 reviews must be MET for this outcome package");
+    const block = await this.chain.client.getBlock({ blockTag: "latest" }), snapshot = await this.chain.snapshot(BigInt(row.campaign.onchainCampaignId), block.number);
+    if (snapshot.campaign.state !== "ACTIVE" || snapshot.requests.some(request => request.state !== "FINANCIALLY_SETTLED" && request.state !== "CANCELLED")) throw new ConflictException("HED activity still has an open financial request");
+    return { onchainCampaignId: row.campaign.onchainCampaignId, onchainActivityId: row.activity.onchainActivityId, reportHash: evidence.content.publicHash, checkpoint: snapshot.checkpoint };
   }
 }

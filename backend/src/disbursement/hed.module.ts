@@ -18,6 +18,7 @@ import { HedRequestDraftService } from "./hed-request-draft.service";
 import { HedVendorVerificationController } from "./hed-vendor-verification.controller";
 import { HedVendorVerificationService } from "./hed-vendor-verification.service";
 import { HedReviewController } from "./hed-review.controller";
+import { HedOutcomeReviewController } from "./hed-outcome-review.controller";
 import { HedReviewService } from "./hed-review.service";
 import { HedActivityController } from "./hed-activity.controller";
 import { HedActivityService } from "./hed-activity.service";
@@ -29,7 +30,7 @@ import { HedEvidencePackageService } from "./hed-evidence-package.service";
 
 @Module({
   imports: [AuthModule, DatabaseModule, EvidenceStorageModule],
-  controllers: [HedHealthController, HedPublicController, HedCampaignDraftController, HedActivityController, HedCampaignVendorController, HedRequestDraftController, HedVendorVerificationController, HedReviewController, HedReviewQueueController, HedVendorController, HedEvidencePackageController],
+  controllers: [HedHealthController, HedPublicController, HedCampaignDraftController, HedActivityController, HedCampaignVendorController, HedRequestDraftController, HedVendorVerificationController, HedReviewController, HedOutcomeReviewController, HedReviewQueueController, HedVendorController, HedEvidencePackageController],
   providers: [{
     provide: HED_DEPLOYMENT,
     useFactory: (): HedDeployment => {
