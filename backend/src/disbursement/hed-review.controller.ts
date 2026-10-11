@@ -14,7 +14,7 @@ export class HedReviewController {
     if (!parsed.success) throw new BadRequestException({ message: "Invalid HED review", issues: parsed.error.issues });
     return this.reviews.record(requestId, request.account!.userId, parsed.data);
   }
-  @Post(":requestId/approval") prepareApproval(@Param("requestId", new ParseUUIDPipe()) requestId: string, @Req() request: Request) {
+  @Post("approval") prepareApproval(@Param("requestId", new ParseUUIDPipe()) requestId: string, @Req() request: Request) {
     return this.reviews.prepareApproval(requestId, request.account!.userId);
   }
 }

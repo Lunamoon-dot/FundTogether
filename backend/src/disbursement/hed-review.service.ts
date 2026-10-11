@@ -36,7 +36,7 @@ export class HedReviewService {
   async pending(userId: string) {
     await this.resolver(userId);
     return this.db.select({ requestId: schema.hedRequestDrafts.id, requestHash: schema.hedRequestDrafts.requestHash,
-      amount: schema.hedRequestDrafts.content, onchainRequestId: schema.disbursementRequests.onchainRequestId,
+      content: schema.hedRequestDrafts.content, onchainRequestId: schema.disbursementRequests.onchainRequestId,
       onchainCampaignId: schema.disbursementCampaigns.onchainCampaignId })
       .from(schema.disbursementRequests).innerJoin(schema.hedRequestDrafts, eq(schema.hedRequestDrafts.id, schema.disbursementRequests.requestDraftId))
       .innerJoin(schema.disbursementCampaigns, eq(schema.disbursementCampaigns.campaignMetadataId, schema.disbursementRequests.campaignMetadataId))
