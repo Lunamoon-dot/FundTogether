@@ -41,8 +41,12 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     mapping(uint256 => bool) public hasOpenActivity;
     mapping(uint256 => mapping(uint256 => bool)) public deliveryCaseOpen;
     mapping(uint256 => mapping(uint256 => bool)) public deliveryCaseUsed;
+    mapping(uint256 => mapping(uint256 => uint256)) public deliveryCaseOpenedAt;
+    mapping(uint256 => mapping(uint256 => bool)) public deliveryCaseTakenOver;
     mapping(uint256 => mapping(uint256 => bool)) public outcomeCaseOpen;
     mapping(uint256 => mapping(uint256 => bool)) public outcomeCaseUsed;
+    mapping(uint256 => mapping(uint256 => uint256)) public outcomeCaseOpenedAt;
+    mapping(uint256 => mapping(uint256 => bool)) public outcomeCaseTakenOver;
     mapping(uint256 => mapping(address => uint256)) public contributions;
     mapping(uint256 => mapping(address => bool)) private _refundClaimed;
     mapping(uint256 => mapping(address => uint256)) private _supplementClaimed;
@@ -68,6 +72,8 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     event ResidualReleased(uint256 indexed campaignId, uint256 indexed requestId, uint256 amount, bytes32 reasonHash);
     event DeliveryCaseOpened(uint256 indexed campaignId, uint256 indexed requestId, address indexed donor, bytes32 reasonHash);
     event DeliveryCaseUpheld(uint256 indexed campaignId, uint256 indexed requestId, bytes32 decisionHash, uint256 challengeEnd);
+    event DeliveryCaseTakenOver(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
+    event OutcomeCaseTakenOver(uint256 indexed campaignId, uint256 indexed activityId, bytes32 reasonHash);
     event FundingFailed(uint256 indexed campaignId, uint256 basePool);
     event WindDownStarted(uint256 indexed campaignId, uint256 basePool);
     event RefundClaimed(uint256 indexed campaignId, address indexed donor, uint256 baseAmount, uint256 supplementAmount);
@@ -334,17 +340,28 @@ contract FundTogetherDisbursement is ReentrancyGuard {
             || deliveryCaseOpen[campaignId][requestId] || deliveryCaseUsed[campaignId][requestId]) revert WrongState();
         deliveryCaseOpen[campaignId][requestId] = true;
         deliveryCaseUsed[campaignId][requestId] = true;
+        deliveryCaseOpenedAt[campaignId][requestId] = block.timestamp;
         emit DeliveryCaseOpened(campaignId, requestId, msg.sender, reasonHash);
     }
 
     function upholdDeliveryCase(uint256 campaignId, uint256 requestId, bytes32 decisionHash) external {
-        if (msg.sender != resolver) revert WrongCaller();
         if (requestId >= requestCount[campaignId]) revert InvalidReference();
         T.RequestView storage r = _requests[campaignId][requestId];
+        if ((msg.sender != resolver || deliveryCaseTakenOver[campaignId][requestId])
+            && (msg.sender != backupResolver || !deliveryCaseTakenOver[campaignId][requestId])) revert WrongCaller();
         if (r.state != T.RequestState.DELIVERY_CANDIDATE || !deliveryCaseOpen[campaignId][requestId] || decisionHash == bytes32(0)) revert WrongState();
         deliveryCaseOpen[campaignId][requestId] = false;
         r.challengeEnd = block.timestamp + 3 days;
         emit DeliveryCaseUpheld(campaignId, requestId, decisionHash, r.challengeEnd);
+    }
+
+    function takeOverDeliveryCase(uint256 campaignId, uint256 requestId, bytes32 reasonHash) external {
+        _campaign(campaignId);
+        if (msg.sender != backupResolver || requestId >= requestCount[campaignId]) revert WrongCaller();
+        if (!deliveryCaseOpen[campaignId][requestId] || deliveryCaseTakenOver[campaignId][requestId]
+            || block.timestamp < deliveryCaseOpenedAt[campaignId][requestId] + PRIMARY_REVIEW_WINDOW || reasonHash == bytes32(0)) revert WrongState();
+        deliveryCaseTakenOver[campaignId][requestId] = true;
+        emit DeliveryCaseTakenOver(campaignId, requestId, reasonHash);
     }
 
     function releaseResidual(uint256 campaignId, uint256 requestId, bytes32 reasonHash) external {
@@ -427,17 +444,28 @@ contract FundTogetherDisbursement is ReentrancyGuard {
             || reasonHash == bytes32(0) || outcomeCaseOpen[campaignId][activityId] || outcomeCaseUsed[campaignId][activityId]) revert WrongState();
         outcomeCaseOpen[campaignId][activityId] = true;
         outcomeCaseUsed[campaignId][activityId] = true;
+        outcomeCaseOpenedAt[campaignId][activityId] = block.timestamp;
         emit OutcomeCaseOpened(campaignId, activityId, msg.sender, reasonHash);
     }
 
     function upholdOutcomeCase(uint256 campaignId, uint256 activityId, bytes32 decisionHash) external {
-        if (msg.sender != resolver) revert WrongCaller();
         if (activityId >= activityCount[campaignId]) revert InvalidReference();
         T.ActivityView storage a = _activities[campaignId][activityId];
+        if ((msg.sender != resolver || outcomeCaseTakenOver[campaignId][activityId])
+            && (msg.sender != backupResolver || !outcomeCaseTakenOver[campaignId][activityId])) revert WrongCaller();
         if (a.state != T.ActivityState.OUTCOME_CANDIDATE || !outcomeCaseOpen[campaignId][activityId] || decisionHash == bytes32(0)) revert WrongState();
         outcomeCaseOpen[campaignId][activityId] = false;
         a.challengeEnd = block.timestamp + 3 days;
         emit OutcomeCaseUpheld(campaignId, activityId, decisionHash, a.challengeEnd);
+    }
+
+    function takeOverOutcomeCase(uint256 campaignId, uint256 activityId, bytes32 reasonHash) external {
+        _campaign(campaignId);
+        if (msg.sender != backupResolver || activityId >= activityCount[campaignId]) revert WrongCaller();
+        if (!outcomeCaseOpen[campaignId][activityId] || outcomeCaseTakenOver[campaignId][activityId]
+            || block.timestamp < outcomeCaseOpenedAt[campaignId][activityId] + PRIMARY_REVIEW_WINDOW || reasonHash == bytes32(0)) revert WrongState();
+        outcomeCaseTakenOver[campaignId][activityId] = true;
+        emit OutcomeCaseTakenOver(campaignId, activityId, reasonHash);
     }
 
     function _campaign(uint256 id) private view returns (T.CampaignView storage c) {
