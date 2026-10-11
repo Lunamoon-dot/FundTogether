@@ -1,14 +1,19 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAccount, usePublicClient, useWalletClient } from 'wagmi'
+import { parseEventLogs } from 'viem'
+import type { Abi } from 'viem'
 import deployment from '../../../lib/web3/deployment-context'
-import { createHedCampaignDraft, createHedRequestDraft, freezeHedCampaignDraft, freezeHedRequestDraft, listHedCampaignDrafts, listHedRequestDrafts, listHedVendorOptions, uploadHedRequestEvidence } from '../../../lib/api/hed'
+import generatedAbi from '../../../../../backend/src/blockchain/generated/hed/fund-together-disbursement.abi.json'
+import { createHedCampaignDraft, createHedRequestDraft, freezeHedCampaignDraft, freezeHedRequestDraft, listHedCampaignDrafts, listHedRequestDrafts, listHedVendorOptions, registerHedOnchainCampaign, uploadHedRequestEvidence } from '../../../lib/api/hed'
 import type { HedCampaignDraft, HedCampaignDraftInput, HedRequestDraftInput } from '../../../lib/api/hed'
 import { getErrorMessage } from '../../../lib/api/error'
 import '../advance/advance.css'
 
 const initial = (): HedCampaignDraftInput => ({ title: '', description: '', purpose: '', beneficiaryScope: '', allowedExpenseCategories: ['GOODS'],
   outcomeCriteria: [''], goal: '', fundingDuration: 86_400, policyHash: deployment.policyHash! })
+const abi = generatedAbi as Abi
 
 export function HedOrganizationCampaigns({ organizationId, userId, section }: { organizationId: string; userId: string; section: string }) {
   const base = `/organizations/${organizationId}/workspace/campaigns`, creating = section === '/campaigns/new'
@@ -26,11 +31,23 @@ export function HedOrganizationCampaigns({ organizationId, userId, section }: { 
 
 function HedCampaignEntry({ value, onFrozen }: { value: HedCampaignDraft; onFrozen: () => void }) {
   const [busy, setBusy] = useState(false), [error, setError] = useState('')
+  const account = useAccount(), client = usePublicClient({ chainId: deployment.chainId })
+  const { data: wallet } = useWalletClient({ account: account.address, connector: account.connector })
   async function freeze() { if (busy || value.frozenAt) return; setBusy(true); setError(''); try { await freezeHedCampaignDraft(value.id); onFrozen() } catch (cause) { setError(getErrorMessage(cause)) } finally { setBusy(false) } }
+  async function publish() { if (busy || !value.commitmentHash || !account.address || !client || !wallet) return; setBusy(true); setError(''); try {
+    if (account.chainId !== deployment.chainId) throw new Error(`Chuyển ví sang mạng HED ${deployment.chainId} trước khi publish.`)
+    const request = await client.simulateContract({ account: account.address, address: deployment.contractAddress, abi, functionName: 'createCampaign', args: [value.commitmentHash, BigInt(value.goal), BigInt(value.fundingDuration)] })
+    const hash = await wallet.writeContract(request.request)
+    const receipt = await client.waitForTransactionReceipt({ hash, confirmations: deployment.confirmations, timeout: 90_000 })
+    if (receipt.status !== 'success') throw new Error('Giao dịch tạo campaign bị revert.')
+    const event = parseEventLogs({ abi, logs: receipt.logs, eventName: 'CampaignCreated', strict: true }).find(log => log.address.toLowerCase() === deployment.contractAddress.toLowerCase()) as { args: { campaignId: bigint; commitmentHash: string; organizer: string } } | undefined
+    if (!event || event.args.commitmentHash?.toLowerCase() !== value.commitmentHash.toLowerCase() || event.args.organizer?.toLowerCase() !== account.address.toLowerCase()) throw new Error('Receipt không chứa CampaignCreated đúng commitment và ví đang ký.')
+    await registerHedOnchainCampaign(value.id, String(event.args.campaignId)); onFrozen()
+  } catch (cause) { setError(getErrorMessage(cause)) } finally { setBusy(false) } }
   return <li className="panel"><div className="organization-card-heading"><h2>{value.title}</h2><span className="organization-role">{value.frozenAt ? 'Đã chốt' : 'Bản nháp'}</span></div>
     <p className="organization-description">{value.description}</p><p>Mục tiêu: {value.goal} base units MockUSDC · {value.fundingDuration / 86_400} ngày gây quỹ</p>
     {error && <p className="toast toast--error" role="alert">{error}</p>}
-    {value.frozenAt ? <><p className="advance-hash">Commitment: {value.commitmentHash}</p><HedRequestWorkspace campaignId={value.id} /></> : <button className="button button--primary" disabled={busy} onClick={() => void freeze()}>{busy ? 'Đang chốt…' : 'Chốt commitment'}</button>}
+    {value.frozenAt ? <><p className="advance-hash">Commitment: {value.commitmentHash}</p><button className="button button--primary" disabled={busy || !account.address} onClick={() => void publish()}>{busy ? 'Đang xử lý…' : 'Tạo campaign trên HED chain'}</button><HedRequestWorkspace campaignId={value.id} /></> : <button className="button button--primary" disabled={busy} onClick={() => void freeze()}>{busy ? 'Đang chốt…' : 'Chốt commitment'}</button>}
   </li>
 }
 
