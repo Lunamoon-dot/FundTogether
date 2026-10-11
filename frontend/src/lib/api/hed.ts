@@ -30,6 +30,14 @@ export async function registerHedOnchainCampaign(id: string, onchainCampaignId: 
 }
 
 export interface HedVendorOption { id: string; vendorWallet: string; content: { legalName: string; categories: string[] }; validUntil: string }
+export interface HedVendorVerificationInput { vendorWallet: `0x${string}`; legalName: string; contact: string; categories: string[]; relatedPartyDeclaration: false; validUntil: string }
+export interface HedVendorVerification { id: string; vendorWallet: `0x${string}`; content: HedVendorVerificationInput; status: string; reportHash: `0x${string}`; validUntil: string; createdAt: string }
+export async function listHedVendorVerifications(signal?: AbortSignal) {
+  return (await http.get<HedVendorVerification[]>('/v1/disbursement/vendors', { signal })).data
+}
+export async function verifyHedVendor(value: HedVendorVerificationInput) {
+  return (await http.post<HedVendorVerification>('/v1/disbursement/vendors/verify', value)).data
+}
 export interface HedActivityInput { title: string; beneficiaryScope: string; targetQuantity: number; outcomeCriteria: string[]; ceiling: string; deliveryDeadline: string; outcomeDeadline: string }
 export interface HedActivityDraft extends HedActivityInput { id: string; commitmentHash: string | null; frozenAt: string | null; onchainActivityId: string | null }
 export async function listHedActivities(campaignId: string, signal?: AbortSignal) {

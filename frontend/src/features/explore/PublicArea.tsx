@@ -36,8 +36,8 @@ export function PublicArea({
   const review = /^\/review(?:\/([^/]+))?$/.exec(path)
   const staff = session?.roles.some(role => role === 'ADMIN' || role === 'RESOLVER') ?? false
   const organizationAdmin = isAdvance && session?.roles.includes('ADMIN')
-  const internalHref = organizationAdmin ? '#/internal/organizations' : '#/internal/campaigns'
-  const internalLabel = organizationAdmin ? 'Xác thực tổ chức · ADMIN' : 'Resolver / nội bộ'
+  const internalHref = isHed ? (session?.roles.includes('RESOLVER') ? '#/internal/requests' : '#/internal/vendors') : organizationAdmin ? '#/internal/organizations' : '#/internal/campaigns'
+  const internalLabel = isHed ? (session?.roles.includes('RESOLVER') ? 'Yêu cầu HED · RESOLVER' : 'Vendor HED · ADMIN') : organizationAdmin ? 'Xác thực tổ chức · ADMIN' : 'Resolver / nội bộ'
 
   return (
     <div className="public-area">
