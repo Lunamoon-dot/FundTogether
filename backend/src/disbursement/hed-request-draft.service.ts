@@ -11,6 +11,7 @@ import type { HedRequestDraftInput } from "./hed-request-draft.schema";
 import { EvidenceStorageService } from "../modules/evidence/evidence-storage.service";
 import { validateEvidenceFile } from "../modules/evidence/evidence-file-validation";
 import type { EvidenceUploadFile } from "../modules/evidence/evidence-file-validation";
+import { HedBlockchainService } from "./hed-blockchain.service";
 
 export const hedRequestHash = (campaignCommitmentHash: string, vendorReportHash: string, content: HedRequestDraftInput) => keccak256(toHex(JSON.stringify({
   version: "hed-mvp-1", campaignCommitmentHash, vendorReportHash, activityReference: content.activityReference,
@@ -21,7 +22,7 @@ export const hedRequestHash = (campaignCommitmentHash: string, vendorReportHash:
 
 @Injectable()
 export class HedRequestDraftService {
-  constructor(@Inject(DRIZZLE_DB) private readonly db: NodePgDatabase<typeof schema>, private readonly storage: EvidenceStorageService) {}
+  constructor(@Inject(DRIZZLE_DB) private readonly db: NodePgDatabase<typeof schema>, private readonly storage: EvidenceStorageService, private readonly chain: HedBlockchainService) {}
 
   private async campaign(campaignId: string, userId: string) {
     const [row] = await this.db.select({ campaign: campaignMetadata, draft: hedCampaignDrafts }).from(hedCampaignDrafts)
@@ -59,6 +60,12 @@ export class HedRequestDraftService {
 
   async create(campaignId: string, userId: string, input: unknown) {
     const campaign = await this.campaign(campaignId, userId);
+    const [mapped] = await this.db.select().from(schema.disbursementCampaigns).where(eq(schema.disbursementCampaigns.campaignMetadataId, campaign.campaign.id)).limit(1);
+    if (!mapped?.onchainCampaignId || mapped.chainId !== this.chain.context.chainId || mapped.contractAddress !== this.chain.context.contractAddress.toLowerCase())
+      throw new ConflictException("Publish and index the HED campaign before creating a payment request");
+    const block = await this.chain.client.getBlock({ blockTag: "latest" });
+    if ((await this.chain.snapshot(BigInt(mapped.onchainCampaignId), block.number)).campaign.state !== "ACTIVE")
+      throw new ConflictException("HED payment requests open only after the campaign is ACTIVE on chain");
     const parsed = hedRequestDraftSchema.parse(input), vendor = await this.verifiedVendor(parsed.vendorVerificationId);
     return this.db.insert(schema.hedRequestDrafts).values({ campaignMetadataId: campaign.campaign.id, vendorVerificationId: vendor.id,
       content: parsed, createdBy: userId }).returning();
