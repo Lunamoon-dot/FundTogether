@@ -40,6 +40,19 @@
   },
   {
     "type": "function",
+    "name": "EXECUTION_HORIZON",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "MAX_CAMPAIGN_DEPOSIT_BPS",
     "inputs": [],
     "outputs": [
@@ -275,6 +288,16 @@
           },
           {
             "name": "fullyFundedAt",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "activeAt",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "executionEnd",
             "type": "uint256",
             "internalType": "uint256"
           },
@@ -925,6 +948,19 @@
       },
       {
         "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "startWindDown",
+    "inputs": [
+      {
+        "name": "id",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -1737,6 +1773,25 @@
         "type": "bytes32",
         "indexed": false,
         "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "WindDownStarted",
+    "inputs": [
+      {
+        "name": "campaignId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "basePool",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false

@@ -11,6 +11,8 @@ library DisbursementTypes {
         uint256 goal;
         uint256 fundingEnd;
         uint256 fullyFundedAt;
+        uint256 activeAt;
+        uint256 executionEnd;
         CampaignState state;
         uint256 contributed;
         uint256 available;

@@ -256,6 +256,19 @@ contract HedFundingAndReservationTest is Test {
         assertEq(token.balanceOf(donor), before + 500e6);
     }
 
+    function test_executionHorizonWindDownRefundsOnlyFreeCustodyAfterRequestsClose() public {
+        uint256 campaignId = _activeCampaign();
+        vm.warp(block.timestamp + 180 days);
+        disbursement.startWindDown(campaignId);
+        T.CampaignView memory campaign = disbursement.campaign(campaignId);
+        assertEq(uint256(campaign.state), uint256(T.CampaignState.STOPPED));
+        assertEq(campaign.basePool, 2_000e6);
+        uint256 before = token.balanceOf(donor);
+        vm.prank(donor);
+        disbursement.claimRefund(campaignId);
+        assertEq(token.balanceOf(donor), before + 2_000e6);
+    }
+
     function test_vendorReturnRequiresActualTokenInflowAndCannotExceedGrossPaid() public {
         uint256 campaignId = _activeCampaign();
         vm.prank(organizer);

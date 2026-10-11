@@ -14,6 +14,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     uint256 public constant PRIMARY_REVIEW_WINDOW = 3 days;
     uint256 public constant VENDOR_ACK_WINDOW = 3 days;
     uint256 public constant DEPOSIT_WINDOW = 3 days;
+    uint256 public constant EXECUTION_HORIZON = 180 days;
 
     error InvalidInput();
     error WrongCaller();
@@ -57,6 +58,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     event DeliveryCaseOpened(uint256 indexed campaignId, uint256 indexed requestId, address indexed donor, bytes32 reasonHash);
     event DeliveryCaseUpheld(uint256 indexed campaignId, uint256 indexed requestId, bytes32 decisionHash, uint256 challengeEnd);
     event FundingFailed(uint256 indexed campaignId, uint256 basePool);
+    event WindDownStarted(uint256 indexed campaignId, uint256 basePool);
     event RefundClaimed(uint256 indexed campaignId, address indexed donor, uint256 amount);
     event FundsReturned(uint256 indexed campaignId, uint256 indexed requestId, address indexed vendor, uint256 amount);
     event DeliveryAuthorizationInvalidated(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
@@ -112,6 +114,8 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         if (c.state != T.CampaignState.FUNDING || c.contributed != c.goal) revert WrongState();
         if (eligibilityHash == bytes32(0)) revert InvalidInput();
         c.state = T.CampaignState.ACTIVE;
+        c.activeAt = block.timestamp;
+        c.executionEnd = block.timestamp + EXECUTION_HORIZON;
         emit CampaignActivated(id, eligibilityHash);
     }
 
@@ -133,6 +137,16 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         c.refunded += amount;
         emit RefundClaimed(id, msg.sender, amount);
         if (amount != 0) _sendExact(msg.sender, amount);
+    }
+
+    function startWindDown(uint256 id) external {
+        T.CampaignView storage c = _campaign(id);
+        if (c.state != T.CampaignState.ACTIVE || hasOpenRequest[id] || block.timestamp < c.executionEnd) revert WrongState();
+        c.state = T.CampaignState.STOPPED;
+        c.basePool = c.available;
+        c.available = 0;
+        c.refundSnapshotted = true;
+        emit WindDownStarted(id, c.basePool);
     }
 
     function createActivity(uint256 campaignId, bytes32 commitmentHash, uint256 ceiling) external returns (uint256 activityId) {
