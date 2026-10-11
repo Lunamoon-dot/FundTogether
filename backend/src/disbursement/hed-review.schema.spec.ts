@@ -1,4 +1,5 @@
 import { hedReviewSchema } from "./hed-review.schema";
+import { latestByCriterion } from "./hed-review.service";
 
 const source = "11111111-1111-4111-8111-111111111111";
 const review = { evidenceVersion: 1, criterionId: "NEED-01", outcome: "MET", reasonCode: "SCOPE_MATCH",
@@ -11,5 +12,17 @@ describe("hedReviewSchema", () => {
     expect(hedReviewSchema.safeParse({ ...review, publicHash: undefined }).success).toBe(false);
     expect(hedReviewSchema.safeParse({ ...review, sourceReferences: [] }).success).toBe(false);
     expect(hedReviewSchema.safeParse({ ...review, criterionId: "DEL-99" }).success).toBe(false);
+  });
+
+  it("keeps only the newest immutable decision for each criterion", () => {
+    const decisions = latestByCriterion([
+      { content: { criterionId: "NEED-01", outcome: "NOT_MET" } },
+      { content: { criterionId: "NEED-01", outcome: "MET" } },
+      { content: { criterionId: "NEED-02", outcome: "MET" } },
+    ]);
+    expect(decisions).toEqual([
+      { content: { criterionId: "NEED-01", outcome: "NOT_MET" } },
+      { content: { criterionId: "NEED-02", outcome: "MET" } },
+    ]);
   });
 });

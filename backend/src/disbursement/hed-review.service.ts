@@ -9,7 +9,7 @@ import { HedBlockchainService } from "./hed-blockchain.service";
 const needCriteria = ["NEED-01", "NEED-02", "NEED-03", "NEED-04", "NEED-05", "NEED-06"];
 const deliveryCriteria = ["DEL-01", "DEL-02", "DEL-03", "DEL-04"];
 const outcomeCriteria = ["OUT-01", "OUT-02", "OUT-03", "OUT-04"];
-const latestByCriterion = <T extends { content: { criterionId: string } }>(reviews: T[]) => {
+export const latestByCriterion = <T extends { content: { criterionId: string } }>(reviews: T[]) => {
   const latest = new Map<string, T>();
   for (const review of reviews) if (!latest.has(review.content.criterionId)) latest.set(review.content.criterionId, review);
   return [...latest.values()];
