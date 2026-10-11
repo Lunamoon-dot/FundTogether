@@ -9,6 +9,9 @@ import { DisbursementTypes as T } from "./disbursement/DisbursementTypes.sol";
 contract FundTogetherDisbursement is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
+    uint256 public constant MAX_DEPOSIT_BPS = 2_000;
+    uint256 public constant MAX_CAMPAIGN_DEPOSIT_BPS = 1_000;
+
     error InvalidInput();
     error WrongCaller();
     error WrongState();
@@ -170,7 +173,8 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         if (c.state != T.CampaignState.ACTIVE || requestId >= requestCount[campaignId]) revert WrongState();
         T.RequestView storage r = _requests[campaignId][requestId];
         T.ActivityView storage a = _activities[campaignId][r.activityId];
-        if (r.state != T.RequestState.SUBMITTED || r.requestHash != expectedRequestHash || r.approvedAmount > c.available || r.approvedAmount > a.ceiling - a.approved) revert InvalidInput();
+        if (r.state != T.RequestState.SUBMITTED || r.requestHash != expectedRequestHash || r.approvedAmount > c.available || r.approvedAmount > a.ceiling - a.approved
+            || r.depositAmount > r.approvedAmount * MAX_DEPOSIT_BPS / 10_000 || r.depositAmount > c.goal * MAX_CAMPAIGN_DEPOSIT_BPS / 10_000) revert InvalidInput();
         c.available -= r.approvedAmount;
         c.reserved += r.approvedAmount;
         a.approved += r.approvedAmount;

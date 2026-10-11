@@ -16,7 +16,7 @@ contract HedFundingAndReservationTest is Test {
     function setUp() public {
         token = new MockUSDC();
         disbursement = new FundTogetherDisbursement(address(token), resolver, keccak256("hed-mvp-1"));
-        token.mint(donor, 2_000e6);
+        token.mint(donor, 4_000e6);
         vm.prank(donor);
         token.approve(address(disbursement), type(uint256).max);
     }
@@ -66,6 +66,22 @@ contract HedFundingAndReservationTest is Test {
         vm.expectRevert(FundTogetherDisbursement.WrongState.selector);
         disbursement.submitRequest(campaignId, 0, keccak256("second"), vendor, 500e6, 0);
         vm.stopPrank();
+    }
+
+    function test_approvalRejectsDepositAboveRequestOrCampaignPolicyCap() public {
+        uint256 campaignId = _activeCampaign();
+        vm.prank(organizer);
+        uint256 overRequestCap = disbursement.submitRequest(campaignId, 0, keccak256("request-cap"), vendor, 1_000e6, 201e6);
+        vm.expectRevert(FundTogetherDisbursement.InvalidInput.selector);
+        vm.prank(resolver);
+        disbursement.approveRequest(campaignId, overRequestCap, keccak256("request-cap"));
+
+        uint256 otherCampaignId = _activeCampaign();
+        vm.prank(organizer);
+        uint256 overCampaignCap = disbursement.submitRequest(otherCampaignId, 0, keccak256("campaign-cap"), vendor, 900e6, 201e6);
+        vm.expectRevert(FundTogetherDisbursement.InvalidInput.selector);
+        vm.prank(resolver);
+        disbursement.approveRequest(otherCampaignId, overCampaignCap, keccak256("campaign-cap"));
     }
 
     function test_partialFinalPaymentKeepsSlotUntilResidualIsResolved() public {
