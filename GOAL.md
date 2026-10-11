@@ -1,154 +1,90 @@
-# Goal — Hoàn thiện luồng B của FundTogether
+# Goal — Triển khai MVP P1 giải ngân theo yêu cầu
 
-> Cập nhật: 2026-10-11.
-> Đây là nội dung mục tiêu để dùng khi khởi chạy goal, không phải cấu hình tự được ứng dụng nạp.
-> Việc tạo/sửa file này không tự kích hoạt goal hoặc phê duyệt các quy tắc tài chính còn mở.
+> Cập nhật: 2026-10-11 · Trạng thái triển khai local: DONE.
+> File định nghĩa mục tiêu; không tự khởi chạy goal trong ứng dụng.
+> Viết goal không chứng minh tính năng đã triển khai/nghiệm thu, không tự cho phép deploy tiền thật hoặc thay đổi nghĩa vụ cũ.
 
-## Mục tiêu
+## 1. Kết quả cần đạt
 
-### Chốt phạm vi ngày 2026-10-11 — hoàn tất triển khai, nghiệm thu sau
+Chuyển luồng tạo campaign mới từ milestone cấp vốn cố định sang yêu cầu thanh toán có căn cứ theo thiết kế MVP P1. Hoàn thiện xuyên tầng contract → event/indexer → API/storage → UI:
 
-Người dùng chọn: “Hoàn tất goal triển khai; giữ nghiệm thu thành giai đoạn sau,
-chưa đạt.” Goal hiện tại được chốt theo phạm vi triển khai đã duyệt và kiểm chứng
-kỹ thuật, trạng thái DONE. Nghiệm thu Brave/MetaMask, thao tác OWNER/ADMIN thật
-và đánh giá reviewer thuộc giai đoạn tiếp theo, giữ TODO, chưa đạt.
-Quyết định này thay thế điều kiện đóng goal gộp cả nghiệm thu con người trong
-các ghi chú cũ bên dưới; không thay đổi quyền, chữ ký hoặc quy tắc tài chính.
+```text
+Xác thực tổ chức/vendor → duyệt campaign → gây đủ quỹ
+→ tạo activity → duyệt yêu cầu mua → vendor xác nhận terms
+→ cọc nếu có → xét giao hàng/challenge → thanh toán phần còn lại
+→ thuê vận chuyển nếu cần → xác minh kết quả trao quà
+→ hoàn tất hoặc wind-down → hoàn quỹ còn đủ điều kiện
+```
 
-### Điều phối ngày 2026-10-11 — bỏ chặn nghiệm thu
+Bàn giao triển khai local có bằng chứng kiểm chứng kỹ thuật. Nghiệm thu Brave/MetaMask và đánh giá hồ sơ bởi người thật theo dõi riêng, chưa làm thì giữ TODO; không dùng kết quả tự động thay nghiệm thu con người.
 
-Người dùng yêu cầu “bỏ qua block”. Tiếp tục công việc kỹ thuật trong phạm vi
-Workflow B đã duyệt; không đưa goal về BLOCKED chỉ vì chưa có nghiệm thu thủ
-công hoặc kết luận reviewer. Các mục này chuyển sang giai đoạn nghiệm thu sau,
-giữ TODO và không được báo PASS. Quyết định này thay thế ghi chú chờ nghiệm thu
-ngày 2026-10-11 trong progress; không bỏ kiểm tra quyền, chữ ký, hồ sơ hay điều
-kiện giải ngân của ứng dụng.
+## 2. Nguồn và cách sử dụng
 
-### Điều phối ngày 2026-10-10
+1. Đọc [định hướng nghiên cứu](./docs/research-direction.md), AGENTS.md và skills/AGENTSKILLS.md trước.
+2. Dùng [thiết kế MVP](./docs/hed-mvp-design.md) cho phạm vi và phương án HED-MVP-1, gồm 12 OPEN và MVP-13.
+3. Dùng [kế hoạch chuyển đổi](./docs/superpowers/plans/2026-10-11-funding-requests-cleanup.md) để rà giữ/sửa/xóa. Nếu khác hướng tiền mới, ghi rõ delta theo thiết kế MVP.
+4. [Post-MVP](./docs/hed-post-mvp-design.md) nằm ngoài goal. [Kế hoạch request trước](./docs/funding-request-plan.md) là lịch sử lựa chọn; không trộn partial funding/P2 vào P1.
+5. Kiểm source và [progress](./docs/PROJECT_PROGRESS.md) trước kết luận triển khai. [Goal B đã lưu](./docs/goals/workflow-b-completed-2026-10-11.md) chỉ mô tả baseline cũ; không chuyển dấu DONE sang MVP này.
 
-Người dùng yêu cầu tiếp tục hoàn thiện toàn bộ phần triển khai đã duyệt trước,
-hoãn nghiệm thu thủ công Brave/MetaMask và đánh giá hồ sơ bởi người thật.
-Các mục nghiệm thu này giữ TODO, không chặn sửa lỗi và hoàn thiện kỹ thuật.
-Vẫn chạy kiểm tra kỹ thuật phù hợp; không quy đổi kiểm thử tự động thành nghiệm
-thu thủ công hoặc đánh dấu toàn bộ goal hoàn tất khi thiếu bằng chứng đó.
+Tỷ lệ/thời hạn trong thiết kế là phương án thử nghiệm local, chưa phải policy production. H0 phải làm rõ mâu thuẫn hoặc quyết định còn thiếu trước khi code phần tiền phụ thuộc; không âm thầm đổi quyền, recipient, cap hoặc công thức refund. Không hỏi lại quyết định người dùng đã chốt; tự giải quyết lựa chọn kỹ thuật nhỏ từ repo.
 
-Hoàn thiện luồng B của FundTogether theo
-[kế hoạch sáu bước](./docs/workflow-b-delivery-plan.md): cấp vốn trước theo đợt,
-nghiệm thu thực chất trước cấp tiếp, xử lý phản đối/quá hạn/tiền dư và hoàn tiền.
-Mua và trao quà là loại hình campaign đầu tiên; giữ ranh giới để không áp checklist
-trao quà lên toàn bộ các loại campaign trong tương lai.
+## 3. Phạm vi
 
-Đọc [định hướng NCKH](./docs/research-direction.md) trước khi suy luận hoặc chốt
-quyết định, rồi đọc AGENTS.md, kế hoạch, đặc tả liên quan và source hiện có.
-Phân biệt đề xuất, rule đã duyệt, implementation và kết quả đã kiểm chứng.
+- P1 trả trực tiếp vendor, MockUSDC local; đủ goal trước tạo nghĩa vụ/giải ngân.
+- Một request tài chính và một activity outcome đang mở; hỗ trợ mua rồi vận chuyển tuần tự trong cùng activity.
+- Reserve toàn Q; tối đa một cọc và một final payment chính xác; vendor ký terms trước thực hiện.
+- Kiểm nhu cầu mua, giao hàng và kết quả thiện nguyện riêng; bằng chứng gốc riêng tư, bản công khai được che dữ liệu.
+- Primary/backup resolver, challenge, timeout, partial delivery, recovery, wind-down và refund base/supplement theo thiết kế.
+- Giữ auth, liên kết ví, organization verification và storage dùng chung. ADMIN xác thực tổ chức/vendor; RESOLVER quyết định nghiệp vụ đúng thẩm quyền.
+- Không P2/P3, partial funding, request song song, nhiều installment, fiat, adaptive policy, voting/bond hoặc AI tự xét.
 
-## Giai đoạn 1 — Hoàn thành mẫu và đặc tả để duyệt
+## 4. Các chặng thực hiện
 
-Thực hiện bước 1–2 của kế hoạch:
+Mỗi chặng dưới đây đã có artifact và bằng chứng HED local trong `docs/hed-implementation-status.md`; manual acceptance ở mục 7 vẫn TODO. Goal này không thay implementation plan.
 
-1. Hoàn thành mẫu G1 một đợt qua đơn vị và G2 nhiều đợt trao trực tiếp: ngân sách,
-   task, tiêu chí hoàn thành, checklist, hồ sơ giả và trace số dư thành công/thất bại.
-2. Đối chiếu code/baseline A với B; giải quyết các nhánh thiếu bằng chứng, xác nhận
-   sai, reviewer vắng mặt, bổ sung, phản đối, timeout và số dư.
-3. Viết `docs/workflow-b-spec.md` và `docs/workflow-b-financial-rules.md` thành
-   phương án cụ thể có thể review. Lập bảng B-D01–B-D10: đề xuất, lý do, ảnh hưởng
-   đến quyền/tiền và quyết định còn cần người dùng chốt.
-4. Trình các tài liệu cùng các lựa chọn còn mở trong một lượt review rõ ràng.
+| ID | Công việc và đầu ra | Kiểm chứng trước DONE |
+|---|---|---|
+| H0 — DONE | Rà source/dependency; lập implementation plan, bảng state/action/actor/guard; đối chiếu policy, deadline, accounting và migration | Mỗi yêu cầu có task/test; trace thành công/wind-down khớp sổ; quyết định ảnh hưởng tiền/quyền không còn mâu thuẫn |
+| H1 — DONE | Tách phần dùng chung khỏi advance theo dependency thực tế; giữ organization/account/wallet/file ACL | Regression onboarding, OWNER/ADMIN, liên kết ví và private/public files; không mất dữ liệu |
+| H2 — DONE | Contract P1: funding, reserve/ack/cọc/final, delivery/outcome/case, takeover, stop/return/refund; ABI/events sinh từ nguồn | Unit/fuzz/invariant với ledger độc lập; MVP-T01–T11, quyền/replay; double payment và transfer fail không phá sổ |
+| H3 — DONE | Migration additive, API/vendor/request/evidence/report, indexer/projections theo deployment identity | Validation/ACL, frozen version/hash, duplicate/reorg/replay/restart; DB không tự cấp quyền chi |
+| H4 — DONE | UI OWNER/ADMIN/RESOLVER/vendor/donor: danh sách, chi tiết, hành động, lý do khóa, trạng thái tx và reload | UI journeys; stale version/account/chain, pending/revert/indexer lag; MVP-T12–T15 ở tầng phù hợp |
+| H5 — DONE | Deployment local HED riêng, fixtures và integration; mua → vận chuyển → trao quà; các nhánh thất bại | Actual balances + receipt/events + projections khớp; trace mục 10 thiết kế, recovery/replay; mock UI không thay chain evidence |
+| H6 — DONE | Chuyển luồng tạo mới sang HED; dọn milestone không còn dùng sau dependency check; giữ đường đọc/xử lý nghĩa vụ A/B | Không route/import/API chết; không xóa lịch sử/migration đã áp dụng; đường xử lý nghĩa vụ cũ còn cần hoạt động |
+| H7 — DONE | Báo cáo kết quả, runbook, hướng dẫn nghiệm thu HED và cập nhật overview/progress | Bằng chứng gắn commit/deployment/commands tái lập; giới hạn/manual TODO rõ; đủ checklist bên dưới |
 
-### Điểm duyệt bắt buộc
+H2/H3 thống nhất ABI/event trước tích hợp. Kiểm thử trong từng chặng, không chờ H5 mới kiểm tiền/quyền. Không đưa post-MVP vào để xử lý giới hạn đã được chấp nhận trong thiết kế.
 
-Trước khi sửa quyền hoặc dòng tiền, cần người dùng duyệt đặc tả viết thành file,
-đặc biệt: bond, điều kiện cấp đầu/cấp tiếp, quyền xét duyệt, deadline, tiền dư,
-khoản trả lại sau snapshot, công thức refund và điều kiện hoàn tất.
+## 5. Ràng buộc thực hiện
 
-Yêu cầu này đến từ AGENTS.md: quyết định ảnh hưởng kiến trúc, bảo mật, tiền hoặc
-hành vi không thể đảo ngược phải được chốt. Việc đồng ý dùng goal không tự duyệt
-những quy tắc chưa được viết ra. Không biến đề xuất thành APPROVED bằng suy đoán.
+- Làm trên codebase/nhánh hiện tại; không tự tạo nhánh, chat khác hoặc sub-agent.
+- Không tự push, tạo PR, public deploy hoặc chuyển tiền thật. Test dùng tài khoản/token local dành cho thử nghiệm.
+- Không reset/xóa chain, DB, ví, tài khoản, tài liệu hoặc runtime cũ để làm test xanh. Tách deployment/data thử nghiệm; bảo toàn nghĩa vụ và bằng chứng cũ.
+- Không xóa migration đã áp dụng hoặc diễn giải snapshot A/B thành HED. Dọn code sau dependency check và kiểm chứng luồng thay thế.
+- Contract là nguồn trạng thái tài chính; event → indexer → DB. Upload/API success hoặc tx hash không phải payout confirmed/indexed.
+- Reserve/quarantine không đồng thời chia refund. Chỉ return thực nhận mới tăng custody; không hứa thu hồi token đã trả vendor.
+- Timeout không tự phê duyệt/xóa nghĩa vụ vendor. Mất hai resolver có thể khóa phần nghĩa vụ; công bố rõ và vẫn cho claim phần refund đã allocated.
+- Không tin địa chỉ client thay chữ ký; không lộ khóa, credential, PII hoặc URL riêng trong log/artifact/commit.
 
-Trong lúc chờ review, có thể hoàn thiện mẫu, trace và rà soát đặc tả. Không triển
-khai contract hoặc hành vi tài chính phụ thuộc quyết định chưa có. Không hỏi lại
-quyết định người dùng đã duyệt; nếu có sửa đổi mới ảnh hưởng tiền/quyền, trình rõ
-phần thay đổi và tác động.
+## 6. Điều kiện hoàn thành triển khai
 
-## Giai đoạn 2 — Triển khai đặc tả đã duyệt
+- [x] H0–H7 DONE với bằng chứng HED, không kế thừa PASS Workflow B.
+- [x] Contract/backend/frontend build, test liên quan và lint/check của dự án đạt.
+- [x] MVP-T01–T15 ánh xạ tới test hoặc giới hạn human review được nêu rõ; guard kỹ thuật có test thực thi.
+- [x] Mua → vận chuyển → trao quà → hoàn tất chạy xuyên tầng local.
+- [x] Kiểm các nhánh thiếu goal, partial delivery, dispute, thiếu reviewer, loss, wind-down, return/refund.
+- [x] Sổ campaign/request khớp actual balances; claim lặp, transfer fail, late return, rounding/dust không phá quyền vendor/donor.
+- [x] Có bằng chứng indexer replay/restart/reorg; UI không trộn deployment hoặc báo thành công sớm.
+- [x] Luồng tạo mới dùng HED; dữ liệu/nghĩa vụ A/B được giữ; auth/org/wallet/storage không regression.
+- [x] Có runbook, fixtures, hướng dẫn nghiệm thu, báo cáo và giới hạn HED; không ghi đè báo cáo B thành HED.
 
-Sau điểm duyệt, lập task code cụ thể với file, interface, ABI/event, migration
-và test. Trình kế hoạch code để review trước thực hiện. Sau khi được duyệt,
-triển khai trực tiếp trong chat này; không tự tạo chat khác hoặc giao sub-agent.
+Chỉ đánh dấu goal triển khai DONE khi các mục trên đạt. Manual chưa test không chặn công việc kỹ thuật độc lập; hoãn manual không có nghĩa bỏ test tài chính tự động.
 
-Thực hiện theo phụ thuộc:
+## 7. Nghiệm thu con người — giai đoạn sau, TODO
 
-1. **Contract B:** funding, cấp vốn, hồ sơ/nghiệm thu, case/timeout, return/refund,
-   invariant và artifact deployment. Tách cấp tiền khỏi chốt nghiệm thu.
-2. **BE/storage/indexer:** dữ liệu/checklist/version, quyền hồ sơ, quyết định,
-   projection và replay theo deployment identity.
-3. **FE:** hành trình tổ chức/resolver/donor; trạng thái, việc tiếp theo, ví, hạn,
-   số tiền và lý do bật/tắt từng hành động.
-4. **Tích hợp:** G1 chạy toàn hành trình trước; tiếp tục G2 và các nhánh bổ sung,
-   phản đối, dừng, tiền dư và refund.
+- [ ] Brave/MetaMask thật: đổi account/chain, ký terms, cọc/final, pending/reload và claim.
+- [ ] OWNER, ADMIN, primary/backup resolver, vendor, donor thao tác đúng vai; hiểu khoản giữ, đã trả, được hoàn.
+- [ ] Reviewer xét hồ sơ đủ/thiếu/mâu thuẫn và outcome sai; lưu kết luận, không coi hash là chứng minh sự thật.
+- [ ] Ghi nhận vendor có chấp nhận cọc/thời gian chờ và hoạt động có phù hợp cap MVP.
 
-Tự xử lý lựa chọn kỹ thuật nhỏ, có thể đảo ngược và phù hợp spec; không xin xác
-nhận lại ở mỗi task. Không thêm generic workflow engine, loại campaign chưa có
-nghiệp vụ hoặc tính năng post-MVP ngoài phạm vi kế hoạch.
-
-## Giai đoạn 3 — Kiểm chứng và nghiệm thu
-
-Khi goal được khởi chạy, phạm vi công việc bao gồm viết và chạy test, build,
-kiểm tra tích hợp và sửa lỗi thuộc luồng B. Làm test kỹ thuật cùng từng task;
-không chờ build toàn bộ mới kiểm tra tiền/quyền.
-
-- Contract: unit/fuzz/invariant, access/state/version/deadline, double payout,
-  entitlement/pool, transfer fail và reentrancy.
-- BE/storage/indexer: quyền original/redacted, freeze/hash, migration, retry,
-  duplicate/replay/reorg/reset, deployment identity và checkpoint recovery.
-- FE: action gating, trạng thái giao dịch, đổi account/ví, reload và lỗi popup/RPC/indexer.
-- Tích hợp: đối chiếu balances/counters, receipt/events và projection theo base unit.
-- Nghiệm thu T01–T18 và báo cáo `docs/workflow-b-acceptance.md`; ghi dữ liệu/môi
-  trường/cách tái lập. Tách correctness kỹ thuật khỏi xét duyệt sai bằng chứng.
-
-Không tự ký thay người dùng qua extension hoặc bịa kết quả MetaMask. Chuẩn bị
-hướng dẫn, fixture và công cụ cần thiết trước các bước cần người dùng ký/đánh giá.
-Những case chưa được thao tác thực tế phải ghi TODO, không coi test tự động là
-nghiệm thu thủ công hoặc dữ liệu giả là bằng chứng khảo sát ngoài đời.
-
-## Ràng buộc môi trường và tài chính
-
-- Giữ baseline Git `b1881bd2cb3d6a4413605b06741624e86e2323da` để diff/đối chiếu.
-- Dùng môi trường test chain/DB/storage riêng cho B; kiểm tra đích trước thao tác.
-  Không xóa account hoặc reset dữ liệu/chain hiện tại chỉ để chạy test B.
-- B dùng deployment mới. Không suy source/FE mới tự nâng cấp nghĩa vụ campaign A.
-- Dùng số nguyên/base unit và bigint; không dùng floating point cho tiền.
-- Chỉ return thực nhận được tính vào custody. Không hứa thu hồi advance đã rời
-  escrow; không thay đổi quyền snapshot âm thầm hoặc sweep khoản donor chưa claim.
-- Hash/chữ ký ràng buộc nội dung và người ký; không tự chứng minh sự thật ngoài đời.
-- Smart contract → event → indexer → DB; request HTTP/upload/tx hash chưa là thành công.
-- Giữ secrets và PII khỏi source, log, artifact công khai và commit.
-
-## Điều kiện hoàn thành goal triển khai — DONE
-
-- [x] G1/G2, đặc tả và policy được review; không còn quyết định tiền/quyền bỏ ngỏ.
-- [x] Contract B và FE/BE build được; test liên quan PASS với bằng chứng môi trường.
-- [x] Hai campaign chạy đủ hành trình tự động, gồm nghiệm thu cuối và nghĩa vụ tiền còn lại.
-- [x] Cấp một lần/đợt, chỉ cấp tiếp đúng điều kiện; refund không vượt entitlement/pool;
-  transfer lỗi giữ quyền; replay không duplicate và không trộn deployment.
-- [x] Có báo cáo kết quả, giới hạn, cách chạy lại và hướng dẫn vận hành local.
-
-## Giai đoạn nghiệm thu sau — TODO, chưa đạt
-
-- [ ] Hoàn tất phần nghiệm thu con người của T01–T18, F2/I3/OI1 và ghi bằng chứng.
-- [ ] Thực hiện hành trình Brave/MetaMask, thao tác OWNER/ADMIN thật và ghi nhận lỗi.
-- [ ] Thu thập kết luận reviewer, tổng hợp số đo; không dùng dữ liệu mẫu thay kết quả thật.
-
-Kiểm chứng kỹ thuật khi bàn giao ngày 2026-10-11: frontend157/157,
-backend166/166, contract281/281 PASS; frontend B build/lint PASS; bộ trình duyệt
-F4–F6 dùng API giả lập33 kiểm tra PASS. Inventory xác thực11 báo cáo tích hợp
-đã có, không phải chạy lại toàn bộ hành trình. Reviewer vẫn0 complete/0 partial.
-
-Bằng chứng ngày2026-10-09: [acceptance](./docs/workflow-b-acceptance.md),
-[progress](./docs/PROJECT_PROGRESS.md), [runbook](./docs/workflow-b-local-runbook.md).
-Hai campaign đã chạy bằng HTTP/RPC tự động. Các mục đã kiểm ở trên không thay
-nghiệm thu con người còn thiếu.
-
-Hoàn thành goal triển khai theo phạm vi người dùng chốt không đồng nghĩa nghiệm
-thu toàn hệ thống đã đạt hoặc hệ thống sẵn sàng dùng tiền thật. Các bằng chứng
-con người còn thiếu được theo dõi riêng, không được ghi PASS.
+Giữ nghiệm thu chưa đạt tới khi có bằng chứng. Hoàn tất triển khai local không đồng nghĩa sẵn sàng dùng tiền thật.

@@ -2,6 +2,28 @@
 
 > **Updated:** 2026-10-11
 
+## 2026-10-11 — HED-MVP-1 local implementation complete
+
+- DONE: H0–H7 implementation for the isolated HED deployment. `140af32` adds a repeatable local acceptance command; `b0de5ee` gates public final/outcome actions on indexed chain time rather than the browser clock.
+- Evidence: `npm.cmd --prefix backend run acceptance:hed` passed 26 HED contract tests (including 256-run custody fuzz), 4 artifact checks, 11 HED backend tests, frontend build, full purchase → transport → outcome projection and forced reorg cleanup. Frontend regression 163/163 and lint passed; HED cutover tests passed after the final clock gate change.
+- HED remains a local MockUSDC deployment on chain 31339/RPC 9548. Workflow B was not reset, migrated or used as acceptance evidence. Human wallet/reviewer/vendor acceptance remains TODO in `GOAL.md` section 7.
+
+## 2026-10-11 — Goal file switched to MVP P1
+
+- Replaced root `GOAL.md` with HED MVP scope, H0–H7 delivery stages and technical completion criteria; implementation remains TODO. Human acceptance remains a separate pending stage.
+- Preserved the previous B goal in `docs/goals/workflow-b-completed-2026-10-11.md`, with relative links adjusted. This documentation change does not start an app goal, implement HED, deploy or reset existing data.
+
+## 2026-10-11 — MVP P1 and post-MVP design proposals
+
+- Added `docs/hed-mvp-design.md`: concrete recommended P1 scope, vendor terms/authority, reserve/settlement, delivery versus outcome, primary/backup timeouts, wind-down/refund, 12 OPEN choices plus funding policy, trace and acceptance matrix.
+- Added `docs/hed-post-mvp-design.md`: P2/P3, parallelism, partial funding, installments, risk-adaptive policy and external settlement as separately gated research; none blocks MVP.
+- Documentation only. Numeric thresholds are local experimental proposals; no claim of protocol implementation, financial-policy deployment or new test results. Existing local planning files and v0.3 sources preserved.
+
+## 2026-10-11 — Funding-request business plan written
+
+- DONE (documentation): `docs/funding-request-plan.md` records the user's choice of the six recommended directions, request lifecycle, reserve/accounting, partial funding and post-spend reporting, a 300/200/20/120 trace, and P1–P7 delivery order linked to the cleanup plan.
+- Explicit design follow-ups: deadlines/case outcomes and pooled refund treatment for donors contributing after disbursement need complete financial specification. These details are not presented as already implemented or previously approved B policy. No runtime/code/data changes or new acceptance claims.
+
 ## 2026-10-11 — Checkpoint and funding-request transition plan
 
 - DONE: checkpoint `28b245c` on existing `main`, 79 files; no new branch or push. Fresh frontend157/157 and backend166/166 PASS. Staged scan found no runtime/env/key files; password candidates were schema/input declarations, generated fixture credentials or test inputs. Standard whitespace check reported pre-existing Markdown hard breaks and two EOF blank lines, preserved in this snapshot; check excluding those categories passed.
