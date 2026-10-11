@@ -9,7 +9,7 @@ import type { HedRequestDraftInput } from "../../disbursement/hed-request-draft.
 import type { HedActivityInput } from "../../disbursement/hed-activity.schema";
 import type { HedVendorVerificationInput } from "../../disbursement/hed-vendor-verification.schema";
 import type { HedReviewInput } from "../../disbursement/hed-review.schema";
-import type { HedEvidencePackageInput } from "../../disbursement/hed-evidence-package.schema";
+import type { HedEvidencePackage } from "../../disbursement/hed-evidence-package.schema";
 
 export const hedCampaignDrafts = pgTable("hed_campaign_drafts", {
   campaignMetadataId: uuid("campaign_metadata_id").primaryKey().references(() => campaignMetadata.id),
@@ -105,7 +105,7 @@ export const hedRequestReviews = pgTable("hed_request_reviews", {
 export const hedEvidencePackages = pgTable("hed_evidence_packages", {
   id: uuid("id").defaultRandom().primaryKey(),
   campaignMetadataId: uuid("campaign_metadata_id").references(() => campaignMetadata.id),
-  content: jsonb("content").$type<HedEvidencePackageInput>().notNull(),
+  content: jsonb("content").$type<HedEvidencePackage>().notNull(),
   createdBy: uuid("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, table => [

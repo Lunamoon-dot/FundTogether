@@ -8,8 +8,7 @@ import { campaignMetadata, organizationMembers } from "../database/schema";
 import { EvidenceStorageService } from "../modules/evidence/evidence-storage.service";
 import { validateEvidenceFile } from "../modules/evidence/evidence-file-validation";
 import type { EvidenceUploadFile } from "../modules/evidence/evidence-file-validation";
-import { hedEvidencePackageSchema } from "./hed-evidence-package.schema";
-import type { HedEvidencePackageInput } from "./hed-evidence-package.schema";
+import { hedEvidencePackageHash, hedEvidencePackageSchema } from "./hed-evidence-package.schema";
 
 @Injectable()
 export class HedEvidencePackageService {
@@ -62,7 +61,9 @@ export class HedEvidencePackageService {
     if (documents.length !== parsed.documentIds.length || documents.some(document => document.kind !== parsed.kind
       || (parsed.kind === "DELIVERY" && document.requestDraftId !== parsed.requestDraftId)))
       throw new ConflictException("Evidence package documents are not server-owned for this HED delivery or outcome");
-    const [saved] = await this.db.insert(schema.hedEvidencePackages).values({ campaignMetadataId: campaignId, content: parsed, createdBy: userId }).returning();
+    const hashes = new Map(documents.map(document => [document.id, document.sha256]));
+    const content = { ...parsed, manifestHash: hedEvidencePackageHash(parsed, parsed.documentIds.map(id => ({ id, sha256: hashes.get(id)! }))) };
+    const [saved] = await this.db.insert(schema.hedEvidencePackages).values({ campaignMetadataId: campaignId, content, createdBy: userId }).returning();
     return saved;
   }
 
