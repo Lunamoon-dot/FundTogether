@@ -6,7 +6,8 @@ import * as schema from "../database/schema";
 import { hedReviewSchema } from "./hed-review.schema";
 import { HedBlockchainService } from "./hed-blockchain.service";
 
-const needCriteria = ["NEED-01", "NEED-02", "NEED-03", "NEED-04", "NEED-05"];
+const needCriteria = ["NEED-01", "NEED-02", "NEED-03", "NEED-04", "NEED-05", "NEED-06"];
+const deliveryCriteria = ["DEL-01", "DEL-02", "DEL-03", "DEL-04"];
 
 @Injectable()
 export class HedReviewService {
@@ -35,12 +36,16 @@ export class HedReviewService {
 
   async pending(userId: string) {
     await this.resolver(userId);
-    return this.db.select({ requestId: schema.hedRequestDrafts.id, requestHash: schema.hedRequestDrafts.requestHash,
+    const rows = await this.db.select({ requestId: schema.hedRequestDrafts.id, requestHash: schema.hedRequestDrafts.requestHash,
       content: schema.hedRequestDrafts.content, onchainRequestId: schema.disbursementRequests.onchainRequestId,
       onchainCampaignId: schema.disbursementCampaigns.onchainCampaignId })
       .from(schema.disbursementRequests).innerJoin(schema.hedRequestDrafts, eq(schema.hedRequestDrafts.id, schema.disbursementRequests.requestDraftId))
       .innerJoin(schema.disbursementCampaigns, eq(schema.disbursementCampaigns.campaignMetadataId, schema.disbursementRequests.campaignMetadataId))
-      .where(isNotNull(schema.hedRequestDrafts.frozenAt));
+      .where(and(isNotNull(schema.hedRequestDrafts.frozenAt), isNotNull(schema.disbursementCampaigns.onchainCampaignId), isNotNull(schema.disbursementRequests.onchainRequestId)));
+    const block = await this.chain.client.getBlock({ blockTag: "latest" });
+    const snapshots = new Map<string, Awaited<ReturnType<HedBlockchainService["snapshot"]>>>();
+    for (const row of rows) if (!snapshots.has(row.onchainCampaignId!)) snapshots.set(row.onchainCampaignId!, await this.chain.snapshot(BigInt(row.onchainCampaignId!), block.number));
+    return rows.filter(row => snapshots.get(row.onchainCampaignId!)?.requests[Number(row.onchainRequestId!)]?.state === "SUBMITTED");
   }
 
   async prepareApproval(requestId: string, userId: string) {
@@ -54,12 +59,56 @@ export class HedReviewService {
     const reviews = await this.db.select().from(schema.hedRequestReviews).where(and(eq(schema.hedRequestReviews.requestDraftId, requestId),
       eq(sql`${schema.hedRequestReviews.content}->>'evidenceVersion'`, String(request.draft.version)), inArray(sql`${schema.hedRequestReviews.content}->>'criterionId'`, needCriteria)));
     const approved = new Set(reviews.filter(review => review.content.outcome === "MET").map(review => review.content.criterionId));
-    if (needCriteria.some(criterion => !approved.has(criterion))) throw new ConflictException("All NEED-01 through NEED-05 reviews must be MET before reserve approval");
+    if (needCriteria.some(criterion => !approved.has(criterion))) throw new ConflictException("All NEED-01 through NEED-06 reviews must be MET before reserve approval");
     const block = await this.chain.client.getBlock({ blockTag: "latest" });
     const snapshot = await this.chain.snapshot(BigInt(request.campaign.onchainCampaignId), block.number);
     const onchain = snapshot.requests[Number(request.chain.onchainRequestId)];
     if (!onchain || onchain.requestHash.toLowerCase() !== request.draft.requestHash.toLowerCase() || onchain.state !== "SUBMITTED")
       throw new ConflictException("HED on-chain request is no longer awaiting reserve approval");
     return { onchainCampaignId: request.campaign.onchainCampaignId, onchainRequestId: request.chain.onchainRequestId, expectedRequestHash: request.draft.requestHash, checkpoint: snapshot.checkpoint };
+  }
+
+  async pendingDelivery(userId: string) {
+    await this.resolver(userId);
+    const rows = await this.db.select({ evidence: schema.hedEvidencePackages, request: schema.hedRequestDrafts,
+      chain: schema.disbursementRequests, campaign: schema.disbursementCampaigns })
+      .from(schema.hedEvidencePackages)
+      .innerJoin(schema.hedRequestDrafts, eq(schema.hedRequestDrafts.id, sql`${schema.hedEvidencePackages.content}->>'requestDraftId'`))
+      .innerJoin(schema.disbursementRequests, eq(schema.disbursementRequests.requestDraftId, schema.hedRequestDrafts.id))
+      .innerJoin(schema.disbursementCampaigns, eq(schema.disbursementCampaigns.campaignMetadataId, schema.disbursementRequests.campaignMetadataId))
+      .where(and(eq(sql`${schema.hedEvidencePackages.content}->>'kind'`, "DELIVERY"), isNotNull(schema.disbursementCampaigns.onchainCampaignId), isNotNull(schema.disbursementRequests.onchainRequestId)));
+    const block = await this.chain.client.getBlock({ blockTag: "latest" });
+    const snapshots = new Map<string, Awaited<ReturnType<HedBlockchainService["snapshot"]>>>();
+    for (const row of rows) if (!snapshots.has(row.campaign.onchainCampaignId!)) snapshots.set(row.campaign.onchainCampaignId!, await this.chain.snapshot(BigInt(row.campaign.onchainCampaignId!), block.number));
+    return rows.filter(row => snapshots.get(row.campaign.onchainCampaignId!)?.requests[Number(row.chain.onchainRequestId!)]?.state === "VENDOR_COMMITTED")
+      .map(row => ({ packageId: row.evidence.id, requestId: row.request.id, onchainCampaignId: row.campaign.onchainCampaignId,
+        onchainRequestId: row.chain.onchainRequestId, requestHash: row.request.requestHash, content: row.evidence.content }));
+  }
+
+  async prepareDelivery(packageId: string, userId: string) {
+    await this.resolver(userId);
+    const [evidence] = await this.db.select().from(schema.hedEvidencePackages).where(eq(schema.hedEvidencePackages.id, packageId)).limit(1);
+    if (!evidence || evidence.content.kind !== "DELIVERY") throw new NotFoundException("HED delivery package not found");
+    const [request] = await this.db.select({ draft: schema.hedRequestDrafts, chain: schema.disbursementRequests, campaign: schema.disbursementCampaigns })
+      .from(schema.hedRequestDrafts).innerJoin(schema.disbursementRequests, eq(schema.disbursementRequests.requestDraftId, schema.hedRequestDrafts.id))
+      .innerJoin(schema.disbursementCampaigns, eq(schema.disbursementCampaigns.campaignMetadataId, schema.disbursementRequests.campaignMetadataId))
+      .where(and(eq(schema.hedRequestDrafts.id, evidence.content.requestDraftId), eq(schema.hedRequestDrafts.campaignMetadataId, evidence.campaignMetadataId!))).limit(1);
+    if (!request?.draft.requestHash || !request.chain.onchainRequestId || !request.campaign.onchainCampaignId)
+      throw new ConflictException("HED delivery package is not mapped to a frozen on-chain request");
+    if (request.draft.version !== evidence.content.evidenceVersion) throw new ConflictException("Delivery package evidence version is stale for this request");
+    const reviews = await this.db.select().from(schema.hedRequestReviews).where(and(eq(schema.hedRequestReviews.requestDraftId, request.draft.id),
+      eq(sql`${schema.hedRequestReviews.content}->>'evidenceVersion'`, String(evidence.content.evidenceVersion)), inArray(sql`${schema.hedRequestReviews.content}->>'criterionId'`, deliveryCriteria)));
+    const approved = new Set(reviews.filter(review => review.content.outcome === "MET" && review.content.manifestHash === evidence.content.manifestHash
+      && review.content.publicHash === evidence.content.publicHash && review.content.sourceReferences.every(id => evidence.content.documentIds.includes(id)))
+      .map(review => review.content.criterionId));
+    if (deliveryCriteria.some(criterion => !approved.has(criterion))) throw new ConflictException("All DEL-01 through DEL-04 reviews must be MET for this delivery package");
+    const block = await this.chain.client.getBlock({ blockTag: "latest" });
+    const snapshot = await this.chain.snapshot(BigInt(request.campaign.onchainCampaignId), block.number);
+    const onchain = snapshot.requests[Number(request.chain.onchainRequestId)];
+    if (!onchain || onchain.state !== "VENDOR_COMMITTED" || onchain.requestHash.toLowerCase() !== request.draft.requestHash.toLowerCase()
+      || onchain.vendor.toLowerCase() !== request.chain.vendorWallet.toLowerCase() || BigInt(evidence.content.acceptedValue) > BigInt(onchain.approvedAmount))
+      throw new ConflictException("HED delivery no longer matches the committed on-chain request");
+    return { onchainCampaignId: request.campaign.onchainCampaignId, onchainRequestId: request.chain.onchainRequestId,
+      acceptedValue: evidence.content.acceptedValue, reportHash: evidence.content.publicHash, checkpoint: snapshot.checkpoint };
   }
 }

@@ -1,4 +1,4 @@
-import { Controller, Get, Req, UseGuards } from "@nestjs/common";
+import { Controller, Get, Param, ParseUUIDPipe, Post, Req, UseGuards } from "@nestjs/common";
 import type { Request } from "express";
 import { AuthGuard } from "../modules/auth/auth.guard";
 import { HedReviewService } from "./hed-review.service";
@@ -8,4 +8,8 @@ import { HedReviewService } from "./hed-review.service";
 export class HedReviewQueueController {
   constructor(private readonly reviews: HedReviewService) {}
   @Get("pending") pending(@Req() request: Request) { return this.reviews.pending(request.account!.userId); }
+  @Get("delivery/pending") pendingDelivery(@Req() request: Request) { return this.reviews.pendingDelivery(request.account!.userId); }
+  @Post("delivery/:packageId/prepare") prepareDelivery(@Param("packageId", new ParseUUIDPipe()) packageId: string, @Req() request: Request) {
+    return this.reviews.prepareDelivery(packageId, request.account!.userId);
+  }
 }
