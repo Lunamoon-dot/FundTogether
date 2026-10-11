@@ -50,6 +50,7 @@ export function PublicArea({
           {!isHed && <a href="#/contributions" aria-current={contributions ? 'page' : undefined}>Đóng góp của tôi</a>}
           {session && <a href="#/organizations" aria-current={organizations ? 'page' : undefined}>Tổ chức của tôi</a>}
           {session && <a href="#/workspace" aria-current={path === '/workspace' ? 'page' : undefined}>Quản lý gây quỹ</a>}
+          {isHed && session && <a href="#/vendor">Vendor HED</a>}
           {staff && <a href={internalHref}>{internalLabel}</a>}
         </nav>
         <div className="public-sidebar-account">
