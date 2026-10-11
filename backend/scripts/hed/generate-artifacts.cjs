@@ -2,6 +2,25 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { toFunctionSignature } = require('viem');
 
+function validateManifest(manifest) {
+  const fail = () => { throw new Error('HED manifest identity/configuration invalid'); };
+  let url;
+  try { url = new URL(manifest.rpcUrl); } catch { fail(); }
+  if (manifest.protocolKind !== 'HED' || manifest.chainId !== 31339 || manifest.tokenDecimals !== 6
+    || manifest.confirmations !== 1 || manifest.abiVersion !== '1' || url.protocol !== 'http:'
+    || !['localhost', '127.0.0.1'].includes(url.hostname) || url.port !== '9548' || url.username
+    || url.password || url.pathname !== '/' || url.search || url.hash || !/^\d+$/.test(manifest.deploymentBlockNumber)
+    || BigInt(manifest.deploymentBlockNumber) === 0n) fail();
+  for (const key of ['contractAddress', 'tokenAddress', 'resolver', 'backupResolver']) {
+    if (!/^0x[0-9a-fA-F]{40}$/.test(manifest[key]) || /^0x0+$/.test(manifest[key])) fail();
+  }
+  if (manifest.contractAddress.toLowerCase() === manifest.tokenAddress.toLowerCase()
+    || manifest.resolver.toLowerCase() === manifest.backupResolver.toLowerCase()) fail();
+  for (const key of ['genesisHash', 'contractCodeHash', 'tokenCodeHash', 'deploymentBlockHash', 'abiHash', 'policyHash']) {
+    if (!/^0x[0-9a-fA-F]{64}$/.test(manifest[key]) || /^0x0+$/.test(manifest[key])) fail();
+  }
+}
+
 function artifacts(root) {
   const read = name => JSON.parse(fs.readFileSync(path.join(root, 'contracts/out', `${name}.sol`, `${name}.json`), 'utf8'));
   const disbursement = read('FundTogetherDisbursement');
@@ -50,4 +69,4 @@ if (require.main === module) {
   console.log(JSON.stringify({ runtimeBytes: result.runtimeBytes }));
 }
 
-module.exports = { artifacts, generate, atomicWrite };
+module.exports = { artifacts, generate, atomicWrite, validateManifest };

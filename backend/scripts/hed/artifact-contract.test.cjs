@@ -3,7 +3,14 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { artifacts, generate } = require('./generate-artifacts.cjs');
+const { artifacts, generate, validateManifest } = require('./generate-artifacts.cjs');
+
+const hash = n => `0x${n.toString(16).padStart(64, '0')}`;
+const address = n => `0x${n.toString(16).padStart(40, '0')}`;
+const manifest = () => ({ protocolKind: 'HED', chainId: 31339, rpcUrl: 'http://127.0.0.1:9548',
+  contractAddress: address(1), tokenAddress: address(2), resolver: address(3), backupResolver: address(4),
+  genesisHash: hash(5), contractCodeHash: hash(6), tokenCodeHash: hash(7), deploymentBlockNumber: '2',
+  deploymentBlockHash: hash(8), tokenDecimals: 6, confirmations: 1, abiVersion: '1', abiHash: hash(9), policyHash: hash(10) });
 
 test('HED artifact generator rejects incomplete or oversized Foundry artifacts', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ft-hed-artifacts-'));
@@ -41,4 +48,12 @@ test('HED artifacts export deterministically with the required escrow functions'
     assert.ok(fs.existsSync(path.join(out, 'fund-together-disbursement.abi.json')));
     assert.ok(fs.existsSync(path.join(out, 'mock-usdc.abi.json')));
   } finally { fs.rmSync(out, { recursive: true }); }
+});
+
+test('HED manifest rejects Workflow B endpoint and malformed deployment identity', () => {
+  validateManifest(manifest());
+  for (const delta of [{ protocolKind: 'ADVANCE' }, { chainId: 31338 }, { rpcUrl: 'http://127.0.0.1:9547' },
+    { contractAddress: address(0) }, { backupResolver: address(3) }, { deploymentBlockNumber: '0' }, { tokenDecimals: 18 }]) {
+    assert.throws(() => validateManifest({ ...manifest(), ...delta }), /HED manifest/);
+  }
 });
