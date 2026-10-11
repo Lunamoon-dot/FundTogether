@@ -23,6 +23,18 @@ export class HedEvidencePackageService {
     return campaign;
   }
 
+  private async viewer(campaignId: string, userId: string) {
+    try { return await this.owner(campaignId, userId); }
+    catch (error) {
+      if (!(error instanceof ForbiddenException)) throw error;
+      const [role] = await this.db.select().from(schema.platformRoles).where(eq(schema.platformRoles.userId, userId)).limit(1);
+      if (!role?.roles.includes("RESOLVER")) throw error;
+      const [campaign] = await this.db.select().from(campaignMetadata).where(eq(campaignMetadata.id, campaignId)).limit(1);
+      if (!campaign) throw new NotFoundException("HED campaign not found");
+      return campaign;
+    }
+  }
+
   private async activity(campaignId: string, activityId: string) {
     const [activity] = await this.db.select().from(schema.hedActivities).where(and(eq(schema.hedActivities.id, activityId),
       eq(schema.hedActivities.campaignMetadataId, campaignId))).limit(1);
@@ -68,4 +80,14 @@ export class HedEvidencePackageService {
   }
 
   async list(campaignId: string, userId: string) { await this.owner(campaignId, userId); return this.db.select().from(schema.hedEvidencePackages).where(eq(schema.hedEvidencePackages.campaignMetadataId, campaignId)).orderBy(schema.hedEvidencePackages.createdAt); }
+
+  async download(campaignId: string, userId: string, documentId: string) {
+    await this.viewer(campaignId, userId);
+    const [document] = await this.db.select().from(schema.hedEvidenceDocuments).where(and(eq(schema.hedEvidenceDocuments.id, documentId),
+      eq(schema.hedEvidenceDocuments.campaignMetadataId, campaignId))).limit(1);
+    if (!document) throw new NotFoundException("HED evidence document not found");
+    const object = await this.storage.get(document.id);
+    if (!object.Body) throw new NotFoundException("HED evidence document not found");
+    return { document, body: object.Body };
+  }
 }
