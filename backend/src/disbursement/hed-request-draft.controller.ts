@@ -37,4 +37,11 @@ export class HedRequestDraftController {
     @Req() request: Request) {
     return this.requests.freeze(campaignId, requestId, request.account!.userId);
   }
+
+  @Post(":requestId/onchain")
+  registerOnchain(@Param("campaignId", new ParseUUIDPipe()) campaignId: string, @Param("requestId", new ParseUUIDPipe()) requestId: string,
+    @Body("onchainRequestId") onchainRequestId: unknown, @Req() request: Request) {
+    if (typeof onchainRequestId !== "string" || !/^\d+$/.test(onchainRequestId)) throw new BadRequestException("HED on-chain request ID is invalid");
+    return this.requests.registerOnchain(campaignId, requestId, request.account!.userId, onchainRequestId);
+  }
 }

@@ -6,7 +6,7 @@ import { parseEventLogs } from 'viem'
 import type { Abi } from 'viem'
 import deployment from '../../../lib/web3/deployment-context'
 import generatedAbi from '../../../../../backend/src/blockchain/generated/hed/fund-together-disbursement.abi.json'
-import { createHedActivity, createHedCampaignDraft, createHedRequestDraft, freezeHedActivity, freezeHedCampaignDraft, freezeHedRequestDraft, listHedActivities, listHedCampaignDrafts, listHedRequestDrafts, listHedVendorOptions, registerHedOnchainActivity, registerHedOnchainCampaign, uploadHedRequestEvidence } from '../../../lib/api/hed'
+import { createHedActivity, createHedCampaignDraft, createHedRequestDraft, freezeHedActivity, freezeHedCampaignDraft, freezeHedRequestDraft, listHedActivities, listHedCampaignDrafts, listHedRequestDrafts, listHedVendorOptions, registerHedOnchainActivity, registerHedOnchainCampaign, registerHedOnchainRequest, uploadHedRequestEvidence } from '../../../lib/api/hed'
 import type { HedActivityInput, HedCampaignDraft, HedCampaignDraftInput, HedRequestDraftInput } from '../../../lib/api/hed'
 import { getErrorMessage } from '../../../lib/api/error'
 import '../advance/advance.css'
@@ -49,7 +49,7 @@ function HedCampaignEntry({ value, onFrozen }: { value: HedCampaignDraft; onFroz
   return <li className="panel"><div className="organization-card-heading"><h2>{value.title}</h2><span className="organization-role">{value.frozenAt ? 'Đã chốt' : 'Bản nháp'}</span></div>
     <p className="organization-description">{value.description}</p><p>Mục tiêu: {value.goal} base units MockUSDC · {value.fundingDuration / 86_400} ngày gây quỹ</p>
     {error && <p className="toast toast--error" role="alert">{error}</p>}
-    {value.frozenAt ? <><p className="advance-hash">Commitment: {value.commitmentHash}</p>{value.onchainCampaignId ? <><p>Campaign HED on-chain: {value.onchainCampaignId}</p>{state.data === 1 ? <><HedActivityWorkspace campaignId={value.id} onchainCampaignId={value.onchainCampaignId} /><HedRequestWorkspace campaignId={value.id} /></> : <p className="muted">Request chỉ mở sau khi resolver kích hoạt campaign trên chain.</p>}</> : <button className="button button--primary" disabled={busy || !account.address} onClick={() => void publish()}>{busy ? 'Đang xử lý…' : 'Tạo campaign trên HED chain'}</button>}</> : <button className="button button--primary" disabled={busy} onClick={() => void freeze()}>{busy ? 'Đang chốt…' : 'Chốt commitment'}</button>}
+    {value.frozenAt ? <><p className="advance-hash">Commitment: {value.commitmentHash}</p>{value.onchainCampaignId ? <><p>Campaign HED on-chain: {value.onchainCampaignId}</p>{state.data === 1 ? <><HedActivityWorkspace campaignId={value.id} onchainCampaignId={value.onchainCampaignId} /><HedRequestWorkspace campaignId={value.id} onchainCampaignId={value.onchainCampaignId} /></> : <p className="muted">Request chỉ mở sau khi resolver kích hoạt campaign trên chain.</p>}</> : <button className="button button--primary" disabled={busy || !account.address} onClick={() => void publish()}>{busy ? 'Đang xử lý…' : 'Tạo campaign trên HED chain'}</button>}</> : <button className="button button--primary" disabled={busy} onClick={() => void freeze()}>{busy ? 'Đang chốt…' : 'Chốt commitment'}</button>}
   </li>
 }
 
@@ -78,11 +78,13 @@ function HedActivityWorkspace({ campaignId, onchainCampaignId }: { campaignId: s
   </section>
 }
 
-function HedRequestWorkspace({ campaignId }: { campaignId: string }) {
+function HedRequestWorkspace({ campaignId, onchainCampaignId }: { campaignId: string; onchainCampaignId: string }) {
   const cache = useQueryClient(), key = ['hed-requests', campaignId], vendorKey = ['hed-vendors', campaignId], activityKey = ['hed-activities', campaignId]
   const requests = useQuery({ queryKey: key, queryFn: ({ signal }) => listHedRequestDrafts(campaignId, signal), retry: false })
   const vendors = useQuery({ queryKey: vendorKey, queryFn: ({ signal }) => listHedVendorOptions(campaignId, signal), retry: false })
   const activities = useQuery({ queryKey: activityKey, queryFn: ({ signal }) => listHedActivities(campaignId, signal), retry: false })
+  const account = useAccount(), client = usePublicClient({ chainId: deployment.chainId })
+  const { data: wallet } = useWalletClient({ account: account.address, connector: account.connector })
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [file, setFile] = useState<File | null>(null)
   const [form, setForm] = useState<HedRequestDraftInput>({ vendorVerificationId: '', activityId: '', purpose: '', itemLines: [{ description: '', quantity: 1, unitAmount: '' }], amount: '', deposit: '0', expectedDeliveryAt: '', acceptanceCriteria: [''], terms: '', needEvidenceReferences: [] })
   const ready = vendors.data?.length ? vendors.data : []
@@ -90,9 +92,21 @@ function HedRequestWorkspace({ campaignId }: { campaignId: string }) {
     const draft = await createHedRequestDraft(campaignId, form); await uploadHedRequestEvidence(campaignId, draft.id, 'QUOTE', file); await cache.invalidateQueries({ queryKey: key }); setFile(null)
   } catch (cause) { setError(getErrorMessage(cause)) } finally { setBusy(false) } }
   async function freeze(id: string) { if (busy) return; setBusy(true); setError(''); try { await freezeHedRequestDraft(campaignId, id); await cache.invalidateQueries({ queryKey: key }) } catch (cause) { setError(getErrorMessage(cause)) } finally { setBusy(false) } }
+  async function publish(request: HedRequestDraftInput & { id: string; requestHash: string | null; onchainRequestId: string | null }) { if (busy || !request.requestHash || !account.address || !client || !wallet) return; setBusy(true); setError(''); try {
+    const activity = activities.data?.find(value => value.id === request.activityId)
+    const vendor = ready.find(value => value.id === request.vendorVerificationId)
+    if (!activity?.onchainActivityId || !vendor) throw new Error('Activity hoặc vendor verification không còn hợp lệ.')
+    if (account.chainId !== deployment.chainId) throw new Error(`Chuyển ví sang mạng HED ${deployment.chainId} trước khi gửi request.`)
+    const call = await client.simulateContract({ account: account.address, address: deployment.contractAddress, abi, functionName: 'submitRequest', args: [BigInt(onchainCampaignId), BigInt(activity.onchainActivityId), request.requestHash, vendor.vendorWallet as `0x${string}`, BigInt(request.amount), BigInt(request.deposit)] })
+    const hash = await wallet.writeContract(call.request), receipt = await client.waitForTransactionReceipt({ hash, confirmations: deployment.confirmations, timeout: 90_000 })
+    if (receipt.status !== 'success') throw new Error('Giao dịch gửi request bị revert.')
+    const event = parseEventLogs({ abi, logs: receipt.logs, eventName: 'RequestSubmitted', strict: true }).find(log => log.address.toLowerCase() === deployment.contractAddress.toLowerCase()) as { args: { campaignId: bigint; requestId: bigint; requestHash: string; amount: bigint; deposit: bigint } } | undefined
+    if (!event || event.args.requestHash.toLowerCase() !== request.requestHash.toLowerCase() || event.args.amount !== BigInt(request.amount) || event.args.deposit !== BigInt(request.deposit)) throw new Error('Receipt không chứa RequestSubmitted đúng hash và amount.')
+    await registerHedOnchainRequest(campaignId, request.id, String(event.args.requestId)); await cache.invalidateQueries({ queryKey: key })
+  } catch (cause) { setError(getErrorMessage(cause)) } finally { setBusy(false) } }
   return <section className="panel"><h3>Yêu cầu thanh toán</h3><p>Hồ sơ chưa là reserve, vendor acknowledgement hay payout. Upload chỉ lưu evidence private.</p>
     {error && <p className="toast toast--error" role="alert">{error}</p>}
-    {requests.data?.map(request => <div key={request.id}><p>{request.purpose} · {request.amount} base units · {request.frozenAt ? `Đã chốt ${request.requestHash}` : 'Chưa chốt'}</p>{!request.frozenAt && <button className="button button--secondary" disabled={busy} onClick={() => void freeze(request.id)}>Chốt request đã có evidence</button>}</div>)}
+    {requests.data?.map(request => <div key={request.id}><p>{request.purpose} · {request.amount} base units · {request.onchainRequestId !== null ? `chain #${request.onchainRequestId}` : request.frozenAt ? `Đã chốt ${request.requestHash}` : 'Chưa chốt'}</p>{!request.frozenAt ? <button className="button button--secondary" disabled={busy} onClick={() => void freeze(request.id)}>Chốt request đã có evidence</button> : request.onchainRequestId === null && <button className="button button--secondary" disabled={busy || !account.address} onClick={() => void publish(request)}>Gửi request lên chain</button>}</div>)}
     {ready.length === 0 ? <p role="status">Chưa có vendor verified khả dụng.</p> : !activities.data?.some(activity => activity.onchainActivityId !== null) ? <p role="status">Tạo, chốt và publish activity trước khi lập request.</p> : <form className="advance-plan-form" onSubmit={create}><label>Vendor<select required value={form.vendorVerificationId} onChange={e => setForm(v => ({ ...v, vendorVerificationId: e.target.value }))}><option value="">Chọn vendor đã verify</option>{ready.map(v => <option key={v.id} value={v.id}>{v.content.legalName} · {v.vendorWallet}</option>)}</select></label>
       <label>Activity đã khóa<select required value={form.activityId} onChange={e => setForm(v => ({ ...v, activityId: e.target.value }))}><option value="">Chọn activity đã publish</option>{activities.data.filter(activity => activity.onchainActivityId !== null).map(activity => <option key={activity.id} value={activity.id}>{activity.title} · chain #{activity.onchainActivityId}</option>)}</select></label><label>Mục đích<textarea required value={form.purpose} onChange={e => setForm(v => ({ ...v, purpose: e.target.value }))} /></label>
       <label>Line item<input required value={form.itemLines[0].description} onChange={e => setForm(v => ({ ...v, itemLines: [{ ...v.itemLines[0], description: e.target.value }] }))} /></label><label>Đơn giá / amount<input required inputMode="numeric" value={form.amount} onChange={e => setForm(v => ({ ...v, amount: e.target.value, itemLines: [{ ...v.itemLines[0], unitAmount: e.target.value }] }))} /></label><label>Cọc<input required inputMode="numeric" value={form.deposit} onChange={e => setForm(v => ({ ...v, deposit: e.target.value }))} /></label>

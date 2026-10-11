@@ -46,8 +46,10 @@ export class HedRequestDraftService {
 
   async list(campaignId: string, userId: string) {
     await this.campaign(campaignId, userId);
-    return this.db.select().from(schema.hedRequestDrafts).where(eq(schema.hedRequestDrafts.campaignMetadataId, campaignId))
+    const rows = await this.db.select({ draft: schema.hedRequestDrafts, onchainRequestId: schema.disbursementRequests.onchainRequestId }).from(schema.hedRequestDrafts)
+      .leftJoin(schema.disbursementRequests, eq(schema.disbursementRequests.requestDraftId, schema.hedRequestDrafts.id)).where(eq(schema.hedRequestDrafts.campaignMetadataId, campaignId))
       .orderBy(desc(schema.hedRequestDrafts.createdAt));
+    return rows.map(({ draft, onchainRequestId }) => ({ ...draft, onchainRequestId }));
   }
 
   async vendorOptions(campaignId: string, userId: string) {
@@ -126,5 +128,33 @@ export class HedRequestDraftService {
       if (!saved) throw new ConflictException("HED request changed; reload before freezing");
       return saved;
     });
+  }
+
+  async registerOnchain(campaignId: string, requestId: string, userId: string, onchainRequestId: string) {
+    const campaign = await this.campaign(campaignId, userId);
+    const [mappedCampaign] = await this.db.select().from(schema.disbursementCampaigns)
+      .where(eq(schema.disbursementCampaigns.campaignMetadataId, campaignId)).limit(1);
+    if (!mappedCampaign?.onchainCampaignId) throw new ConflictException("HED campaign is not mapped on chain");
+    const [draft] = await this.db.select().from(schema.hedRequestDrafts).where(and(eq(schema.hedRequestDrafts.id, requestId),
+      eq(schema.hedRequestDrafts.campaignMetadataId, campaignId))).limit(1);
+    if (!draft?.frozenAt || !draft.requestHash || !draft.activityId) throw new ConflictException("Freeze the HED request before registering its on-chain identity");
+    const [activity, vendor] = await Promise.all([
+      this.db.select().from(schema.hedActivities).where(eq(schema.hedActivities.id, draft.activityId)).limit(1).then(rows => rows[0]),
+      this.db.select().from(schema.hedVendorVerifications).where(eq(schema.hedVendorVerifications.id, draft.vendorVerificationId)).limit(1).then(rows => rows[0]),
+    ]);
+    if (!activity?.onchainActivityId || !vendor) throw new ConflictException("HED request activity or vendor verification is not valid");
+    const block = await this.chain.client.getBlock({ blockTag: "latest" });
+    const snapshot = await this.chain.snapshot(BigInt(mappedCampaign.onchainCampaignId), block.number);
+    const onchain = snapshot.requests[Number(onchainRequestId)];
+    if (!onchain || onchain.requestHash.toLowerCase() !== draft.requestHash.toLowerCase()
+      || onchain.activityId !== activity.onchainActivityId || onchain.vendor.toLowerCase() !== vendor.vendorWallet.toLowerCase()
+      || onchain.approvedAmount !== draft.content.amount || onchain.depositAmount !== draft.content.deposit)
+      throw new ConflictException("On-chain request does not match the frozen HED request, activity, vendor, amount, and deposit");
+    await this.db.insert(schema.disbursementRequests).values({ campaignMetadataId: campaign.campaign.id, requestDraftId: draft.id,
+      onchainRequestId, requestVersion: draft.version, requestHash: draft.requestHash, vendorWallet: vendor.vendorWallet,
+      amount: draft.content.amount, deposit: draft.content.deposit, frozenAt: draft.frozenAt }).onConflictDoNothing();
+    const [saved] = await this.db.select().from(schema.disbursementRequests).where(eq(schema.disbursementRequests.requestDraftId, draft.id)).limit(1);
+    if (!saved || saved.onchainRequestId !== onchainRequestId) throw new ConflictException("HED request is already mapped to another on-chain identity");
+    return { requestId, onchainRequestId, checkpoint: snapshot.checkpoint };
   }
 }

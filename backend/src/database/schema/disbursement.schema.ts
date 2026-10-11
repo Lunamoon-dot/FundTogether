@@ -128,6 +128,7 @@ export const disbursementCampaigns = pgTable("disbursement_campaigns", {
 export const disbursementRequests = pgTable("disbursement_requests", {
   id: uuid("id").defaultRandom().primaryKey(),
   campaignMetadataId: uuid("campaign_metadata_id").notNull().references(() => disbursementCampaigns.campaignMetadataId),
+  requestDraftId: uuid("request_draft_id").references(() => hedRequestDrafts.id),
   onchainRequestId: numeric("onchain_request_id", { precision: 78, scale: 0 }),
   requestVersion: integer("request_version").notNull(),
   requestHash: varchar("request_hash", { length: 66 }).notNull(),
@@ -137,6 +138,7 @@ export const disbursementRequests = pgTable("disbursement_requests", {
   frozenAt: timestamp("frozen_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, table => [
+  uniqueIndex("disbursement_request_draft_identity_idx").on(table.requestDraftId),
   uniqueIndex("disbursement_request_version_idx").on(table.campaignMetadataId, table.onchainRequestId, table.requestVersion),
   check("disbursement_request_values_check", sql`${table.requestVersion} > 0 AND ${table.amount} > 0 AND ${table.deposit} >= 0 AND ${table.deposit} <= ${table.amount}`),
 ]);

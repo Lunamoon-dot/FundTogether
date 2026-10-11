@@ -169,6 +169,13 @@
       "when": 1791721830812,
       "tag": "0023_tranquil_centennial",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791722235607,
+      "tag": "0024_stale_logan",
+      "breakpoints": true
     }
   ]
 }

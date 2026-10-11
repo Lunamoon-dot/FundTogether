@@ -40,7 +40,7 @@ export async function registerHedOnchainActivity(campaignId: string, activityId:
 export interface HedRequestDraftInput { vendorVerificationId: string; activityId: string; purpose: string;
   itemLines: { description: string; quantity: number; unitAmount: string }[]; amount: string; deposit: string;
   expectedDeliveryAt: string; acceptanceCriteria: string[]; terms: string; needEvidenceReferences: string[] }
-export interface HedRequestDraft extends HedRequestDraftInput { id: string; version: number; requestHash: string | null; frozenAt: string | null }
+export interface HedRequestDraft extends HedRequestDraftInput { id: string; version: number; requestHash: string | null; frozenAt: string | null; onchainRequestId: string | null }
 
 export async function listHedVendorOptions(campaignId: string, signal?: AbortSignal) {
   return (await http.get<HedVendorOption[]>(`/v1/disbursement/campaigns/${campaignId}/vendors`, { signal })).data
@@ -57,6 +57,9 @@ export async function uploadHedRequestEvidence(campaignId: string, requestId: st
 }
 export async function freezeHedRequestDraft(campaignId: string, requestId: string) {
   return (await http.post<HedRequestDraft>(`/v1/disbursement/campaigns/${campaignId}/requests/${requestId}/freeze`)).data
+}
+export async function registerHedOnchainRequest(campaignId: string, requestId: string, onchainRequestId: string) {
+  return (await http.post(`/v1/disbursement/campaigns/${campaignId}/requests/${requestId}/onchain`, { onchainRequestId })).data
 }
 
 export interface HedReviewInput { evidenceVersion: number; criterionId: string; outcome: 'MET' | 'NOT_MET' | 'NEEDS_INFO';
