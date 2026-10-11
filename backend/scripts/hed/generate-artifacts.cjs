@@ -1,0 +1,53 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const { toFunctionSignature } = require('viem');
+
+function artifacts(root) {
+  const read = name => JSON.parse(fs.readFileSync(path.join(root, 'contracts/out', `${name}.sol`, `${name}.json`), 'utf8'));
+  const disbursement = read('FundTogetherDisbursement');
+  const token = read('MockUSDC');
+  for (const artifact of [disbursement, token]) {
+    for (const field of ['bytecode', 'deployedBytecode']) {
+      if (!/^0x(?:[a-fA-F0-9]{2})+$/.test(artifact[field]?.object || '')) throw new Error('HED artifact missing bytecode');
+    }
+    if (!Array.isArray(artifact.abi)) throw new Error('HED artifact missing ABI');
+  }
+  const signatures = disbursement.abi.filter(item => item.type === 'function').map(toFunctionSignature);
+  const expected = [
+    'createCampaign(bytes32,uint256,uint256)', 'donate(uint256,uint256)', 'activateCampaign(uint256,bytes32)',
+    'finalizeFundingFailure(uint256)', 'claimRefund(uint256)', 'createActivity(uint256,bytes32,uint256)',
+    'submitRequest(uint256,uint256,bytes32,address,uint256,uint256)', 'approveRequest(uint256,uint256,bytes32)',
+    'acknowledgeVendor(uint256,uint256,bytes32)', 'payDeposit(uint256,uint256)',
+    'candidateDelivery(uint256,uint256,uint256,bytes32)', 'openDeliveryCase(uint256,uint256,bytes32)',
+    'upholdDeliveryCase(uint256,uint256,bytes32)', 'executeFinal(uint256,uint256)',
+    'releaseResidual(uint256,uint256,bytes32)', 'returnFunds(uint256,uint256,uint256)',
+    'cancelUncommittedRequest(uint256,uint256,bytes32)', 'campaign(uint256)', 'request(uint256,uint256)', 'activity(uint256,uint256)',
+  ];
+  for (const signature of expected) if (!signatures.includes(signature)) throw new Error(`HED ABI drift: ${signature}`);
+  const runtimeBytes = (disbursement.deployedBytecode.object.length - 2) / 2;
+  if (runtimeBytes > 24576) throw new Error('HED runtime exceeds EVM limit');
+  return { disbursement, token, runtimeBytes };
+}
+
+function atomicWrite(file, value) {
+  const content = JSON.stringify(value, null, 2) + '\n';
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  if (fs.existsSync(file) && fs.readFileSync(file, 'utf8') === content) return;
+  const pending = `${file}.${process.pid}.pending`;
+  fs.writeFileSync(pending, content, { flag: 'wx' });
+  fs.renameSync(pending, file);
+}
+
+function generate(root = path.resolve(__dirname, '../../..'), out = path.join(root, 'backend/src/blockchain/generated/hed')) {
+  const result = artifacts(root);
+  atomicWrite(path.join(out, 'fund-together-disbursement.abi.json'), result.disbursement.abi);
+  atomicWrite(path.join(out, 'mock-usdc.abi.json'), result.token.abi);
+  return result;
+}
+
+if (require.main === module) {
+  const result = generate();
+  console.log(JSON.stringify({ runtimeBytes: result.runtimeBytes }));
+}
+
+module.exports = { artifacts, generate, atomicWrite };

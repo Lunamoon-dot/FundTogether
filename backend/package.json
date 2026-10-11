@@ -14,6 +14,7 @@
     "start:prod": "node dist/src/main.js",
     "start:workflow-b": "node scripts/workflow-b/run-backend.cjs",
     "api:export:workflow-b": "node scripts/workflow-b/export-openapi.cjs",
+    "artifacts:hed": "node scripts/hed/generate-artifacts.cjs",
     "lint": "eslint \"{src,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
