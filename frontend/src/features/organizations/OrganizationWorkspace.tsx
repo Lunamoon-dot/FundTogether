@@ -15,11 +15,12 @@ import { isAdvance, isHed } from '../../lib/web3/deployment-context'
 import { AdvanceOrganizationCampaigns } from '../campaigns/advance/AdvanceOrganizationCampaigns'
 import { HedOrganizationCampaigns } from '../campaigns/hed/HedOrganizationCampaigns'
 
-const sections = [
+const legacySections = [
   { path: '/campaigns', label: 'Campaign' },
   { path: '/milestones', label: 'Milestones' },
   { path: '/evidence', label: 'Bằng chứng' },
 ]
+const sections = isHed ? [{ path: '/campaigns', label: 'Campaign' }] : legacySections
 
 export function OrganizationWorkspace({ organizationId, section, session, sessionLoading, sessionError, onSession }: {
   organizationId?: string

@@ -4,14 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --mode hed",
     "dev:workflow-b": "vite --mode workflow-b",
     "dev:hed": "vite --mode hed",
     "build:workflow-b": "tsc -b && vite build --mode workflow-b",
     "build:hed": "tsc -b && vite build --mode hed",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build --mode hed",
     "api:generate:workflow-b": "orval --config orval.workflow-b.config.ts",
-    "test": "node --test scripts/campaign-action.test.mjs scripts/public-review.test.mjs scripts/public-design.test.mjs scripts/wallet-proof.test.mjs scripts/wallet-provider.test.mjs scripts/linked-wallet.test.mjs scripts/submission-receipt.test.mjs scripts/refund-action.test.mjs scripts/campaign-journey.test.mjs scripts/milestone-action.test.mjs scripts/advance-context.test.mjs scripts/hed-context.test.mjs scripts/advance-plan.test.mjs scripts/advance-action.test.mjs scripts/advance-evidence.test.mjs scripts/advance-review.test.mjs scripts/advance-journey.test.mjs scripts/advance-refund.test.mjs scripts/organization-onboarding.test.mjs",
+    "test": "node --test scripts/campaign-action.test.mjs scripts/public-review.test.mjs scripts/public-design.test.mjs scripts/wallet-proof.test.mjs scripts/wallet-provider.test.mjs scripts/linked-wallet.test.mjs scripts/submission-receipt.test.mjs scripts/refund-action.test.mjs scripts/campaign-journey.test.mjs scripts/milestone-action.test.mjs scripts/advance-context.test.mjs scripts/hed-context.test.mjs scripts/hed-cutover.test.mjs scripts/advance-plan.test.mjs scripts/advance-action.test.mjs scripts/advance-evidence.test.mjs scripts/advance-review.test.mjs scripts/advance-journey.test.mjs scripts/advance-refund.test.mjs scripts/organization-onboarding.test.mjs",
     "lint": "oxlint",
     "preview": "vite preview"
   },
