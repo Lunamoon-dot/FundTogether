@@ -78,6 +78,15 @@ export interface HedApprovalPayload { onchainCampaignId: string; onchainRequestI
 export async function prepareHedRequestApproval(requestId: string) {
   return (await http.post<HedApprovalPayload>(`/v1/disbursement/requests/${requestId}/reviews/approval`)).data
 }
+export interface HedDeliveryPackage { kind: 'DELIVERY'; requestDraftId: string; activityId: string; evidenceVersion: number; manifestHash: `0x${string}`; publicHash: `0x${string}`; acceptedValue: string; documentIds: string[] }
+export interface HedDeliveryQueueItem { packageId: string; requestId: string; onchainCampaignId: string; onchainRequestId: string; requestHash: `0x${string}`; content: HedDeliveryPackage }
+export async function listHedPendingDeliveryReviews(signal?: AbortSignal) {
+  return (await http.get<HedDeliveryQueueItem[]>('/v1/disbursement/reviews/delivery/pending', { signal })).data
+}
+export interface HedDeliveryPayload { onchainCampaignId: string; onchainRequestId: string; acceptedValue: string; reportHash: `0x${string}` }
+export async function prepareHedDelivery(packageId: string) {
+  return (await http.post<HedDeliveryPayload>(`/v1/disbursement/reviews/delivery/${packageId}/prepare`)).data
+}
 export interface HedVendorRequest { requestId: string; requestHash: `0x${string}`; vendorWallet: `0x${string}`; onchainCampaignId: string; onchainRequestId: string; content: HedRequestDraftInput }
 export async function listHedVendorRequests(signal?: AbortSignal) {
   return (await http.get<HedVendorRequest[]>('/v1/disbursement/vendor/requests', { signal })).data
