@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { createOrganization, listOrganizations } from '../../lib/api/organizations'
 import type { Organization } from '../../lib/api/organizations'
 import { getErrorMessage } from '../../lib/api/error'
+import { organizationVerificationLabel } from './organization-verification'
 import './OrganizationsPage.css'
 
 const organizationFormSchema = z.object({
@@ -116,7 +117,7 @@ export function OrganizationsPage({ userId }: { userId: string }) {
               </div>
               <p className="organization-description">{organization.description}</p>
               <div className="organization-card-meta">
-                <span>Chưa xác minh</span>
+                <span>{organizationVerificationLabel(organization.verificationStatus)}</span>
                 <span>Tạo ngày {new Intl.DateTimeFormat('vi-VN').format(new Date(organization.createdAt))}</span>
               </div>
               <p className="muted">{organization.representativeWallet
@@ -125,11 +126,6 @@ export function OrganizationsPage({ userId }: { userId: string }) {
               <div className="organization-form-actions">
               <a className="button button--secondary organization-workspace-link"
                 href={`#/organizations/${organization.id}`}>Xem hồ sơ</a>
-              <a className="button button--primary organization-workspace-link"
-                href={`#/organizations/${organization.id}/workspace/campaigns`}
-                aria-label={`Quản lý campaign của ${organization.name}`}>
-                Quản lý campaign
-              </a>
               </div>
             </li>
           ))}

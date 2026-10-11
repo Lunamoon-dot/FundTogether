@@ -1,6 +1,15 @@
 import { keccak256, publicActions } from 'viem'
 import type { Address, WalletClient } from 'viem'
-import type { SubmissionPlan } from '../api/campaign-submission'
+interface DeploymentIdentity {
+  chainId: number
+  contractAddress: Address
+  tokenAddress: Address
+  genesisHash: `0x${string}`
+  contractCodeHash: `0x${string}`
+  tokenCodeHash: `0x${string}`
+  deploymentBlockNumber?: string
+  deploymentBlockHash?: `0x${string}`
+}
 
 export interface WalletConnectionIdentity { address?: Address; chainId?: number; connectorUid?: string; userId: string | null }
 
@@ -11,7 +20,7 @@ export function assertWalletConnection(expected: WalletConnectionIdentity, activ
     throw new Error('Ví, mạng hoặc tài khoản đã thay đổi. Chọn đúng ví rồi thực hiện lại.')
 }
 
-export async function verifyWalletDeployment(wallet: WalletClient, plan: Pick<SubmissionPlan, 'chainId' | 'contractAddress' | 'tokenAddress' | 'genesisHash' | 'contractCodeHash' | 'tokenCodeHash' | 'deploymentBlockNumber' | 'deploymentBlockHash'>) {
+export async function verifyWalletDeployment(wallet: WalletClient, plan: DeploymentIdentity) {
   const reader = wallet.extend(publicActions)
   let timer: ReturnType<typeof setTimeout> | undefined
   try {

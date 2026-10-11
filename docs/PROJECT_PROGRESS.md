@@ -1,6 +1,74 @@
 # FundTogether Project Progress
 
-> **Updated:** 2026-10-10
+> **Updated:** 2026-10-11
+
+## 2026-10-11 — HED-MVP-1 local implementation complete
+
+- DONE: H0–H7 implementation for the isolated HED deployment. `140af32` adds a repeatable local acceptance command; `b0de5ee` gates public final/outcome actions on indexed chain time rather than the browser clock.
+- Evidence: `npm.cmd --prefix backend run acceptance:hed` passed 26 HED contract tests (including 256-run custody fuzz), 4 artifact checks, 11 HED backend tests, frontend build, full purchase → transport → outcome projection and forced reorg cleanup. Frontend regression 163/163 and lint passed; HED cutover tests passed after the final clock gate change.
+- HED remains a local MockUSDC deployment on chain 31339/RPC 9548. Workflow B was not reset, migrated or used as acceptance evidence. Human wallet/reviewer/vendor acceptance remains TODO in `GOAL.md` section 7.
+
+## 2026-10-11 — Goal file switched to MVP P1
+
+- Replaced root `GOAL.md` with HED MVP scope, H0–H7 delivery stages and technical completion criteria; implementation remains TODO. Human acceptance remains a separate pending stage.
+- Preserved the previous B goal in `docs/goals/workflow-b-completed-2026-10-11.md`, with relative links adjusted. This documentation change does not start an app goal, implement HED, deploy or reset existing data.
+
+## 2026-10-11 — MVP P1 and post-MVP design proposals
+
+- Added `docs/hed-mvp-design.md`: concrete recommended P1 scope, vendor terms/authority, reserve/settlement, delivery versus outcome, primary/backup timeouts, wind-down/refund, 12 OPEN choices plus funding policy, trace and acceptance matrix.
+- Added `docs/hed-post-mvp-design.md`: P2/P3, parallelism, partial funding, installments, risk-adaptive policy and external settlement as separately gated research; none blocks MVP.
+- Documentation only. Numeric thresholds are local experimental proposals; no claim of protocol implementation, financial-policy deployment or new test results. Existing local planning files and v0.3 sources preserved.
+
+## 2026-10-11 — Funding-request business plan written
+
+- DONE (documentation): `docs/funding-request-plan.md` records the user's choice of the six recommended directions, request lifecycle, reserve/accounting, partial funding and post-spend reporting, a 300/200/20/120 trace, and P1–P7 delivery order linked to the cleanup plan.
+- Explicit design follow-ups: deadlines/case outcomes and pooled refund treatment for donors contributing after disbursement need complete financial specification. These details are not presented as already implemented or previously approved B policy. No runtime/code/data changes or new acceptance claims.
+
+## 2026-10-11 — Checkpoint and funding-request transition plan
+
+- DONE: checkpoint `28b245c` on existing `main`, 79 files; no new branch or push. Fresh frontend157/157 and backend166/166 PASS. Staged scan found no runtime/env/key files; password candidates were schema/input declarations, generated fixture credentials or test inputs. Standard whitespace check reported pre-existing Markdown hard breaks and two EOF blank lines, preserved in this snapshot; check excluding those categories passed.
+- User chose replacing fixed milestones with funding requests. Added `docs/superpowers/plans/2026-10-11-funding-requests-cleanup.md`: retain shared auth/wallet/org/storage, extract organization verification from advance, replace financial domain before deleting dependent UI/API/tests, preserve deployed obligations and data.
+- Planning only: no code deletion, migration execution, deployment, chain/account reset or new financial-policy approval. Workflow B acceptance remains deferred; its evidence is not acceptance of the proposed model.
+
+## 2026-10-11 — Implementation goal complete; human acceptance deferred
+
+- DONE: user explicitly chose “Hoàn tất goal triển khai; giữ nghiệm thu thành giai đoạn sau, chưa đạt.” GOAL.md now separates implementation completion from later human acceptance. This supersedes the historical BLOCKED/IN_PROGRESS goal dispositions below, without changing application authority or financial rules.
+- Verified handoff: frontend157/157 (fresh full run), backend166/166, contracts281/281; frontend B build/lint PASS. F4–F6 intercepted-API browser suite33 checks PASS. B preflight and inventory validation of11 historical integration reports PASS; inventory validation is not a rerun of all journeys.
+- TODO, not accepted: F2/I3/OI1 human portions, remaining T01–T18 human evidence, actual Brave/MetaMask journeys and independent reviewer outcomes. Reviewer data remains0 complete/0 partial. No claim of full acceptance or production readiness; no immediate manual testing requested.
+
+## 2026-10-11 — User removes the human-acceptance blocker
+
+- DONE: B milestone review deep links now retain the requested stage index. Invalid/out-of-range indices show a missing-stage page; a link to a different stage does not silently open the current decision form and offers an explicit current-campaign link. The guard is reevaluated on workflow refresh. A routes and on-chain permissions are unchanged.
+- Evidence: browser regression failed before the fix; component regression covers previous-stage and invalid/unsafe indices. Focused suite20/20, B build/lint PASS. Full F4–F6 intercepted-API browser suite33 checks PASS, including a valid `/milestones/.../0` route. Updated its escrow assertion to open the current “Dòng tiền và thông tin mạng” disclosure and verify 0 MockUSDC, preserving the accounting check. Saved `.local/workflow-b/ui-review-browser-report.json` and rebuilt acceptance inventory; zero real wallet/API writes and no manual acceptance claim.
+
+- DONE: submitted and historical organization dossiers now show each document's stored category (identity, representation, activity, other), alongside filename and binary size. Previously the upload form collected category but the read-only review omitted it. This exposes existing frozen metadata without changing the record or file permissions. Existing approved-dossier regression now checks the representation label; onboarding19/19, TypeScript build check and lint PASS.
+
+- DONE: public account actions now use the same staff-role check and destination as the sidebar. USER no longer receives a link to an inaccessible internal workspace; B ADMIN opens organization verification and RESOLVER opens campaign review. Existing server authorization remains unchanged. Durable browser regression `frontend/scripts/internal-navigation-browser-check.js` reproduced the USER entry before the fix and passes all four role combinations after it using intercepted API, zero real writes. B build/lint verified.
+
+- DONE: fixed silent omission of a locally selected organization document when other documents were already uploaded. Submission now waits for upload or explicit removal. Pending file and document category survive draft revision refresh, including save-success/upload-failure, and oversized files have an explicit explanation. No backend or authority changes.
+- Regression evidence: `frontend/scripts/organization-upload-browser-check.js` failed before the fix with “Selected but unuploaded file can be silently omitted”; after the fix, isolated Edge/intercepted API passes pending-file gating, clearing the picker, preserving file/category after save followed by upload failure, and retry/upload/submit. No real account/chain writes. Onboarding19/19, B build and lint PASS; existing large-bundle advisory remains.
+
+- IN_PROGRESS: explicit user instruction “bỏ qua block” supersedes the blocked disposition below. Goal status was verified ACTIVE. Continue approved technical work without treating deferred manual/reviewer evidence as a reason to block this iteration again.
+- F2/I3/OI1 human observations stay TODO for the later acceptance phase, not PASS. Application authorization, signature verification, organization verification and financial gates remain required; this instruction concerns development coordination only.
+
+## 2026-10-11 — Goal completion blocked on deferred human evidence
+
+- Completion audit rechecked GOAL.md, all open code-plan gates, current test logs and reviewer output. The previous turn made progress by rerunning all contracts and recording current evidence. Across the latest consecutive goal turns, the remaining completion condition has stayed the same: actual wallet journeys and reviewer observations are absent and explicitly deferred by the user.
+- BLOCKED for full-goal acceptance, not a failed build or an unimplemented organization-request feature. C/B/F and onboarding implementation have automated evidence; latest logs remain contract281, backend166, frontend156 PASS. No new technical failure or unimplemented approved task was identified by the audit. Repeating those tests or inventing additional features cannot supply the missing human results.
+- Preserve F2/I3/OI1 and T01–T18 human portions as TODO. No request for immediate manual testing, no fabricated reviewer decisions, and no automatic signing. Continue from these gates when the user chooses to resume acceptance or supplies concrete further implementation work; do not restart existing environments or replay completed work.
+
+## 2026-10-10 — Continue engineering; defer human acceptance
+
+- Fresh completion audit: full local `forge test` finished successfully, 281/281 across 24 suites, zero failures/skips, 265.91 seconds; no application-chain transactions. Log `.local/workflow-b/contracts-latest-tests.log`. B preflight PASS. Rebuilt acceptance inventory validates deployment identity/report hashes for 11 historical automated reports; this is not a rerun of those journeys. Reviewer parser still reports 0 complete/0 partial observations. Current requirement/evidence mapping is appended to `workflow-b-code-audit-2026-10-10.md`; full goal remains unproven because manual/reviewer gates are deferred.
+
+- DONE (follow-up): ADMIN queue refreshes every 10 seconds while visible; submitted organization requests refresh until a decision arrives. Drafts and terminal requests do not poll, failed reads stop automatic retry, and revisiting requests checks fresh state instead of the global 30-second cache. No background writes or wallet requests were added.
+- Fresh verification for this follow-up: frontend 156/156 (onboarding 19/19), backend 166/166 across 27 suites, B build and frontend lint PASS. Isolated Edge/mock API verified queue arrival without reload, organizer receiving a changes-requested decision without reload, and an unsaved draft retaining its text with no periodic request after 11 seconds. Human acceptance remains deferred.
+
+- IN_PROGRESS: user explicitly requested completing approved implementation before further manual testing. Manual F2/I3/OI1 and independent reviewer outcomes remain TODO and no longer block engineering work. This supersedes earlier instructions to wait for human results before continuing.
+- DONE: organization queue now exposes an explicit dossier action, readable cards/filter, manual refresh and draft explanation. ADMIN-only `/internal` defaults to organization verification; sidebar highlights only the current page.
+- DONE: queue links bind the selected request ID. Historical filters previously opened the latest request for the organization; detail now selects the exact request, rejects missing IDs and only offers review for the latest UNDER_REVIEW request. Financial permissions and data are unchanged.
+- Verified this turn: two regression tests failed before the fix; onboarding 18/18 and full frontend 155/155 pass after it. Workflow B build and lint pass (existing large-chunk advisory remains). Isolated Edge with mocked API passes ADMIN landing, refresh, historical selection, no historical decision controls, and 390px no-overflow checks. Screenshot inspected. No real account/chain writes; not Brave/MetaMask acceptance.
+
 
 ## Current direction — MVP consolidation and business validation
 
@@ -27,6 +95,159 @@ The dated entries below are evidence for their stated slice and environment.
 Historical DONE entries do not mark the entire MVP, business validation or
 production readiness DONE; old next-step notes are superseded by this direction.
 
+### 2026-10-10 — DONE clarify unsent organization drafts and internal roles
+
+- Read-only inspection of the reported owner's new organization found a DRAFT
+  with complete profile fields and one uploaded document, but no representative
+  wallet. Audit contains CREATED/SAVED/DOCUMENT_ADDED, no SUBMITTED event; this
+  explains why the UNDER_REVIEW queue excludes it. No user records were changed.
+- The draft now explicitly says it has not reached ADMIN, identifies a missing
+  organization wallet and provides a scroll/focus button to the wallet selector.
+  Saving/uploading remains available; submit waits for representative selection.
+- B internal navigation now shows organization verification to ADMIN and
+  campaign/milestone/case review to RESOLVER, with a short role explanation.
+- Two regression tests failed before the fix; all16 onboarding tests now PASS.
+  Isolated Edge with mocked API verified five checks including bind-then-submit
+  and ADMIN menu visibility; no real submission/signing. B build and lint PASS
+  with the existing bundle warning. The owner must choose the wallet and submit.
+
+### 2026-10-10 — DONE direct ADMIN navigation from account/public pages
+
+- Added an explicit `Xác thực tổ chức · ADMIN` link in the public sidebar and
+  account panel for B accounts with ADMIN, leading to `/internal/organizations`.
+- Verified the running B frontend in isolated Edge with mocked sessions:
+  ADMIN and ADMIN+RESOLVER see both links and reach the queue; USER and RESOLVER
+  do not see these links. No API writes or wallet actions. B build and lint PASS;
+  the existing bundle-size warning remains. Manual Brave acceptance remains open.
+
+### 2026-10-10 — DONE expand current manual acceptance guide
+
+- Rewrote the Brave/MetaMask manual guide against current UI, organization
+  request flow and approved B accounting/deadlines. Added actor setup, detailed
+  G1/G2 steps, organization branches, wallet failures, case/return/refund amounts,
+  coordinated technical fixtures and reviewer/result templates.
+- Added a first-session stopping point and coverage mapping for T01–T18 and
+  O01–O12; removed stale wallet-link/funding assumptions. Checked all seven local
+  documentation links, section order and current CSV:60 rows,0 outcomes.
+- Documentation only; no services, accounts or chain state changed and no new
+  manual PASS claimed. F2/I3/OI1 human evidence remains outstanding.
+
+### 2026-10-10 — DONE consolidate current automated acceptance evidence
+
+- Acceptance inventory now includes organization onboarding and both browser
+  regression reports. Each report must identify the configured B deployment;
+  conflicting identities fail the inventory. Preserve scope, run time, hash and
+  limitations, keeping mocked browser checks separate from HTTP/fork evidence.
+- T01/T02 now cite the dedicated journey report rerun through request-bound
+  verification, not duplicate G1/G2 paths in the older failure report. Each
+  recorded outcome includes its source report and run date; missing/failed
+  primary evidence is not replaced with an older PASS.
+- Fixed empty check maps and contradictory FAIL/PASS fields being accepted as
+  successful evidence. Five report-regression tests PASS. Reran onboarding74
+  HTTP checks and browser14+32 checks with deployment-bound output; inventory
+  contains11 automated reports and still reports IN_PROGRESS, human/reviewer TODO.
+- This step changes reporting/test harnesses only. Historical contract/failure/
+  recovery runs retain their original dates; no claim of rerunning those suites.
+- Final open-item check: GOAL manual/T01–T18 gates and code-plan F2/I3/OI1 still
+  need actual extension/user actions and reviewer decisions. Technical evidence
+  and fixtures are prepared; reviewer observations remain0. The user elected to
+  test later. Goal execution is BLOCKED on that human evidence, not marked DONE;
+  no additional approval or financial-rule decision is pending.
+
+### 2026-10-10 — DONE fresh authorization when reopening approved dossiers
+
+- Updated the F4–F6 browser regression script: its ADMIN route/form mocks still
+  used the removed direct-verification screen. Reproduced that failure first,
+  then replaced the fixtures with submitted requests and request-bound reports.
+- Browser testing found the approved-dossier query inherited the global30-second
+  freshness window. Reopening could reuse private content without a fresh API
+  check. Set this query's staleTime to0 and hide cached content while fetching.
+- Edge/Playwright with intercepted API responses now passes32 checks: deferred
+  authorization,403/503 recovery, snapshot mismatch, exact downloaded bytes,
+  read-only resolver view, ADMIN checks, existing evidence/refund gates and mobile
+  overflow. No API writes, source-chain transactions or extension signing.
+- Full frontend150 tests PASS; lint and B build PASS (existing bundle warning).
+  Report: `.local/workflow-b/ui-review-browser-report.json`; downloaded642 bytes
+  match the synthetic fixture. Reviewer CSV rechecked:60 rows,0 outcomes. I3/OI1
+  remain IN_PROGRESS pending actual user/reviewer results.
+- User confirmed they have not tested yet and asked to continue technical work,
+  with manual testing later. Re-exported the browser fixture from the live B
+  services and reran both suites: organizer14 and review/public/refund32 PASS.
+  Closed only the dedicated Edge test sessions; post-test B preflight PASS.
+
+### 2026-10-10 — DONE resolver access to approved organization dossier
+
+- Campaign review history now opens the original approved organization request
+  and its private documents. The read-only view checks organization/request IDs,
+  verification record, snapshot hash and bytes; legacy records remain readable.
+- Role removal, account switch and failed refetch hide cached private content.
+  Reproduced missing dossier navigation and role-removal rendering with failing
+  component tests before fixing them. Six additional frontend cases pass;
+  full suite149 tests, lint and B build PASS (existing bundle-size warning remains).
+- Real HTTP/PostgreSQL/private-storage smoke now passes74 HTTP checks across9
+  behavior groups, including concurrent create/submit, resolver downloads, role
+  revocation, foreign-organization file references and same-length tampered bytes.
+  Original accounts preserved; no source-chain writes or clock changes.
+- B preflight PASS. Corrected O01–O12 evidence mapping and manual resolver steps.
+  These automated results do not complete OI1/I3 human acceptance.
+
+### 2026-10-10 — DONE onboarding implementation; OI1 human acceptance IN_PROGRESS
+
+- After the simplified design, the user asked to continue the goal. Implemented
+  OB1–OB3/OF1–OF2: private organization profile/documents, request history,
+  immutable submitted content, audit, submit/cancel/resubmit and ADMIN decisions.
+- ADMIN now approves a submitted request. Current roles and ownership are checked
+  inside the serialized transaction; direct VERIFIED creation is rejected. Existing
+  REVOKED records remain valid history and map to SUSPENDED. Material profile
+  changes require reapproval; no campaign obligations or financial state changed.
+- Additive B migrations0014/0015 applied through the database guard. Original
+  accounts/passwords/wallets/roles/organizations/verification records preserved;
+  profile data lives in request.content, leaving the shared organizations schema intact.
+- OpenAPI regenerated with43 paths. OWNER UI includes draft/files/feedback/timeline;
+  ADMIN queue contains actual submitted requests and three decisions. Effective
+  verification/expiry is separate from request status; failed reload hides actions.
+- Verification: backend166 tests; frontend143 tests including7 onboarding component
+  cases; lint and builds PASS. Real Nest/PostgreSQL/MinIO smoke passed60 HTTP checks,
+  including role/private-file access, stale writes, immutable history, concurrent
+  approvals/cancellation and rollback after record insertion.
+- Edge/Playwright against the real API completed draft/reload/upload/submit,
+  changes requested/resubmit/approve, download, and lost-response reconciliation.
+  Found and fixed duplicate React sibling keys. G1/G2 rerun on disposable fork:
+  38 receipts,14 assertions,2 completed outcomes; source chain and original DB preserved.
+- Evidence and O01–O12 scope are in [acceptance](./workflow-b-acceptance.md).
+  Updated the manual guide to the new flow. OI1 human acceptance, I3 extension
+  signing and independent reviewer outcomes remain TODO; the goal is not complete.
+
+### 2026-10-10 — DONE simplify onboarding design to request history and audit
+
+- User chose no explicit organization profile versioning for MVP: request
+  history, audit log and locked material fields/documents while UNDER_REVIEW.
+  Updated onboarding design/code tasks and research direction accordingly.
+- Removed the proposed submissions/version table; each submitted request keeps
+  a small fixed copy of its reviewed data and immutable file references.
+  Resubmission creates a new request; UI presents a timeline, not version numbers.
+- Separated organization status/expiry from request status, added cancel-review
+  race and all-write-path locking to acceptance. Post-approval identity edits and
+  legacy REVOKED to SUSPENDED mapping remain explicitly proposed policy details.
+- Documentation only: no new schema/API/application behavior, permission or
+  financial state changes; no automated suite rerun for this design revision.
+
+### 2026-10-10 — DONE organization status labels; onboarding design prepared
+
+- Organization list/profile now derive their label from API verificationStatus:
+  unverified, verified, revoked or unknown. This displays the recorded decision;
+  validity remains checked at the existing B review/eligibility boundary.
+- Added component regressions for both routes and all four states, including
+  failed query with cached data. Reproduced3 failing cases before the fix;
+  focused public-review34/34 PASS afterward, lint and Workflow B build PASS.
+- User chose design/tasks first for organization onboarding. Added
+  [proposed design](./workflow-b-organization-onboarding-plan.md), six TODO tasks
+  OB1–OB3/OF1–OF2/OI1 and O01–O12 acceptance cases. No request tables, endpoints,
+  roles, verification records or contract rules were changed in this slice.
+- Live B preflight passed before the UI fix; HTTP5174 then confirmed both pages
+  serve the new label mapping. Manual wallet/reviewer acceptance
+  remains incomplete; preparing the onboarding plan does not complete I3.
+
 ### 2026-10-10 — DONE organization profile navigation correction
 
 - Organization selector previously fell back to campaigns from organization
@@ -34,35 +255,12 @@ production readiness DONE; old next-step notes are superseded by this direction.
   while campaign/evidence/milestone switching keeps its section.
 - Added an explicit "Hồ sơ & ví đại diện" sidebar link for the selected
   organization and corrected manual-test navigation instructions.
-
-### 2026-10-10 — DONE public Explore visual refresh
-
-- Improved Workflow B campaign cards, local search and status filters, funding
-  progress, current-step guidance, and campaign detail hierarchy. Technical
-  money movement and indexed transaction history remain available in
-  collapsible sections; existing wallet actions are reused.
-- Clearly labels the local test network and MockUSDC. Search and filters apply
-  only to the campaign list already returned by the API.
-- Navigation stays in the left sidebar. Explore uses a compact campaign heading
-  and list; the large hero artwork/thumbnail was removed. Campaign-card spacing
-  and MockUSDC number formatting remain scoped to the public list.
-- Verification: Workflow B frontend TypeScript and production build passed in
-  the Desktop checkout serving `localhost:5174` after the visual correction.
-  The rendered Explore page with sidebar was visually reviewed in the local
-  in-app browser at 1280×720. Brave account-specific and campaign-flow
-  acceptance remain pending.
 - Profile/list links and representative-wallet rendering covered by regression
   tests; focused suite 30/30 PASS, lint and Workflow B build PASS.
 - Applied to Desktop runtime and d6be. The separate in-app browser is logged out;
   authenticated Brave click behavior was not independently reproduced. Existing
   "Xem hồ sơ" href already targeted the profile; no claim that this anchor was
   the source of the reported redirect. No representative wallet was assigned.
-
-### 2026-10-10 — REVERTED account access dialog
-
-- A temporary centered-dialog presentation was reverted at the user's request.
-  Account and workspace access remain regular routes inside the left-sidebar
-  layout; sign-in, account roles, and linked-wallet actions are unchanged.
 
 ### 2026-10-10 — DONE native extension connection; user reports recovery in Brave
 
@@ -2640,3 +2838,32 @@ keeps the dated implementation history and its verification evidence.
 - Live backend was restarted with the updated build, health returns 200, one process listens on port 3000 and the indexer is ready at block 22. sadas remains bonded/human-approved but chain DRAFT; abc@gmail.com still needs a verified resolver wallet. Existing organizer spendable balance is 878 MockUSDC.
 - IN_PROGRESS: native MetaMask stability and user-signed browser walkthrough. Standalone extension crashes cannot be certified fixed by application tests. Atomic submission remains tested on the isolated deployment only; active deployment cutover is pending existing escrow recovery/decision.
 - Repeatable workflow, current-state snapshot and limitations: [workflow audit](./workflow-audit-2026-10-05.md).
+
+### 2026-10-10 — DONE public Explore visual refresh
+
+- Improved Workflow B campaign cards, local search and status filters, funding
+  progress, current-step guidance, and campaign detail hierarchy. Technical
+  money movement and indexed transaction history remain available in
+  collapsible sections; existing wallet actions are reused.
+- Clearly labels the local test network and MockUSDC. Search and filters apply
+  only to the campaign list already returned by the API.
+- Navigation stays in the left sidebar. Explore uses a compact campaign heading
+  and list; the large hero artwork/thumbnail was removed. Campaign-card spacing
+  and MockUSDC number formatting remain scoped to the public list.
+- Verification: Workflow B frontend TypeScript and production build passed in
+  the Desktop checkout serving `localhost:5174` after the visual correction.
+  The rendered Explore page with sidebar was visually reviewed in the local
+  in-app browser at 1280×720. Brave account-specific and campaign-flow
+  acceptance remain pending.
+- Profile/list links and representative-wallet rendering covered by regression
+  tests; focused suite 30/30 PASS, lint and Workflow B build PASS.
+- Applied to Desktop runtime and d6be. The separate in-app browser is logged out;
+  authenticated Brave click behavior was not independently reproduced. Existing
+  "Xem hồ sơ" href already targeted the profile; no claim that this anchor was
+  the source of the reported redirect. No representative wallet was assigned.
+
+### 2026-10-10 — REVERTED account access dialog
+
+- A temporary centered-dialog presentation was reverted at the user's request.
+  Account and workspace access remain regular routes inside the left-sidebar
+  layout; sign-in, account roles, and linked-wallet actions are unchanged.

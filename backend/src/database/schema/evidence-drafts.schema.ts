@@ -9,7 +9,6 @@ import {
 } from "drizzle-orm/pg-core";
 import { campaignMetadata } from "./campaigns.schema";
 import { users } from "./users.schema";
-import type { EvidenceDraftContent } from "../../modules/evidence/evidence.schema";
 
 export const evidenceDrafts = pgTable(
   "campaign_evidence_drafts",
@@ -25,7 +24,7 @@ export const evidenceDrafts = pgTable(
     evidenceSchemaVersion: varchar("evidence_schema_version", { length: 16 })
       .notNull()
       .default("0.1"),
-    content: jsonb("content").$type<EvidenceDraftContent>().notNull(),
+    content: jsonb("content").$type<Record<string, unknown>>().notNull(),
     revision: integer("revision").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()

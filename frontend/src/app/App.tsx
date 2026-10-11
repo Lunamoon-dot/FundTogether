@@ -4,6 +4,9 @@ import { useAccountSession } from '../features/auth/AccountSessionProvider'
 import { PublicArea } from '../features/explore/PublicArea'
 import { InternalArea } from '../features/review/InternalArea'
 import { OrganizationWorkspace } from '../features/organizations/OrganizationWorkspace'
+import { HedVendorRequests } from '../features/campaigns/hed/HedVendorRequests'
+import { HedPublicCampaign } from '../features/explore/HedPublicCampaign'
+import { isHed } from '../lib/web3/deployment-context'
 import type { AccountSession } from '../lib/api/auth'
 import './App.css'
 
@@ -34,6 +37,12 @@ function App() {
   if (path === '/internal' || path.startsWith('/internal/')) {
     return <InternalArea path={path} session={session} sessionLoading={sessionLoading} />
   }
+
+  if (isHed && path === '/vendor') {
+    return sessionLoading ? <p role="status">Đang kiểm tra phiên đăng nhập…</p> : !session ? <section className="panel"><h1>Vendor HED</h1><a href="#/account">Đăng nhập và link ví vendor</a></section> : <HedVendorRequests />
+  }
+  const hedCampaign = isHed ? /^\/hed\/campaigns\/(\d+)$/.exec(path) : null
+  if (hedCampaign) return <HedPublicCampaign campaignId={hedCampaign[1]} />
 
   const scopedWorkspace = /^\/organizations\/([^/]+)\/workspace(\/.*)?$/.exec(path)
   const workspace = path === '/workspace' || path.startsWith('/workspace/')

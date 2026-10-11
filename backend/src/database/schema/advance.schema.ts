@@ -4,14 +4,13 @@ import { campaignMetadata } from "./campaigns.schema";
 import { organizations } from "./organizations.schema";
 import { users } from "./users.schema";
 import { indexerStreams } from "./indexer.schema";
-import type { GiftDraft } from "../../advance/advance-campaign.schema";
-import type { AdvanceCampaignSnapshot } from "../../advance/advance.types";
+type LegacyJson = Record<string, unknown>;
 
 export const advanceCampaignPlans = pgTable("advance_campaign_plans", {
   campaignMetadataId: uuid("campaign_metadata_id").primaryKey().references(() => campaignMetadata.id),
   deploymentId: varchar("deployment_id", { length: 66 }).notNull(),
   chainId: integer("chain_id").notNull(), contractAddress: varchar("contract_address", { length: 42 }).notNull(),
-  giftConfig: jsonb("gift_config").$type<GiftDraft>().notNull(),
+  giftConfig: jsonb("gift_config").$type<LegacyJson>().notNull(),
   fundingDuration: numeric("funding_duration", { precision: 78, scale: 0 }).notNull(),
   organizerWallet: varchar("organizer_wallet", { length: 42 }), draftKey: varchar("draft_key", { length: 66 }),
   frozenPlanBytes: text("frozen_plan_bytes"), planHash: varchar("plan_hash", { length: 66 }),
@@ -37,6 +36,6 @@ export const advanceCampaignProjection = pgTable("advance_campaign_projection", 
   streamId: text("stream_id").notNull().references(() => indexerStreams.streamId),
   onchainCampaignId: numeric("onchain_campaign_id", { precision: 78, scale: 0 }).notNull(),
   metadataId: uuid("metadata_id").references(() => campaignMetadata.id),
-  snapshot: jsonb("snapshot").$type<AdvanceCampaignSnapshot>().notNull(),
+  snapshot: jsonb("snapshot").$type<LegacyJson>().notNull(),
 }, t => [primaryKey({ columns: [t.streamId, t.onchainCampaignId] }),
   check("advance_projection_id_check", sql`${t.onchainCampaignId} >= 0 AND ${t.onchainCampaignId} <= 115792089237316195423570985008687907853269984665640564039457584007913129639935`)]);

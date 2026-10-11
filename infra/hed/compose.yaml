@@ -1,0 +1,32 @@
+name: fundtogether-hed
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${HED_DATABASE_PASSWORD:?HED database password required}
+      POSTGRES_DB: fundtogether_hed
+    ports:
+      - "127.0.0.1:5435:5432"
+    volumes:
+      - hed-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fundtogether_hed"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+  minio:
+    build: ../minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:?HED storage access key required}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:?HED storage password required}
+    ports:
+      - "127.0.0.1:9200:9000"
+      - "127.0.0.1:9201:9001"
+    volumes:
+      - hed-minio:/data
+volumes:
+  hed-postgres:
+  hed-minio:

@@ -1,9 +1,7 @@
 import axios from 'axios'
 
 export const http = axios.create({
-  baseURL: import.meta.env.MODE === 'workflow-b'
-    ? import.meta.env.VITE_WORKFLOW_B_API_URL ?? 'http://localhost:3001'
-    : import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000',
+  baseURL: import.meta.env.VITE_HED_API_URL ?? 'http://localhost:3002',
   withCredentials: true,
   timeout: 20_000,
   headers: {

@@ -10,7 +10,7 @@
 
     /* Bundler mode */
     "moduleResolution": "bundler",
-    "paths": { "@fundtogether/deployment": ["../backend/src/blockchain/generated/deployment.local.json"] },
+    "paths": { "@fundtogether/deployment": ["../.local/hed/generated/deployment.local.json"] },
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",

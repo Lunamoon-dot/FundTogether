@@ -2,13 +2,7 @@ import { AccountAccess } from '../auth/AccountAccess'
 import type { AccountSession } from '../../lib/api/auth'
 import { OrganizationsPage } from '../organizations/OrganizationsPage'
 import { OrganizationProfile } from '../organizations/OrganizationProfile'
-import { PublicCampaignDetail, PublicCampaignFeed } from './PublicCampaigns'
-import { MyContributions } from './MyContributions'
-import { ReviewPage } from '../review/ReviewPage'
-import { isAdvance } from '../../lib/web3/deployment-context'
-import { AdvanceCampaignDetail, AdvanceCampaignFeed } from './AdvanceCampaignDetail'
-import { AdvanceContributions } from './AdvanceRefundPanel'
-import { AdvanceReview } from '../review/AdvanceReview'
+import { HedCampaignFeed, HedPublicCampaign } from './HedPublicCampaign'
 import './PublicArea.css'
 
 interface PublicAreaProps {
@@ -28,12 +22,12 @@ export function PublicArea({
 }: PublicAreaProps) {
   const feed = path === '/'
   const account = path === '/account' || path === '/workspace'
-  const contributions = path === '/contributions'
   const organizationProfile = /^\/organizations\/([^/]+)$/.exec(path)
   const organizations = path === '/organizations' || Boolean(organizationProfile)
   const detail = /^\/campaigns\/([^/]+)$/.exec(path)
-  const review = /^\/review(?:\/([^/]+))?$/.exec(path)
   const staff = session?.roles.some(role => role === 'ADMIN' || role === 'RESOLVER') ?? false
+  const internalHref = session?.roles.includes('RESOLVER') ? '#/internal/requests' : '#/internal/vendors'
+  const internalLabel = session?.roles.includes('RESOLVER') ? 'Yêu cầu HED · RESOLVER' : 'Vendor HED · ADMIN'
 
   return (
     <div className="public-area">
@@ -43,12 +37,10 @@ export function PublicArea({
         </a>
         <nav className="public-nav" aria-label="Điều hướng người dùng">
           <a href="#/" aria-current={feed ? 'page' : undefined}>Khám phá</a>
-          <a href="#/contributions" aria-current={contributions ? 'page' : undefined}>Đóng góp của tôi</a>
           {session && <a href="#/organizations" aria-current={organizations ? 'page' : undefined}>Tổ chức của tôi</a>}
           {session && <a href="#/workspace" aria-current={path === '/workspace' ? 'page' : undefined}>Quản lý gây quỹ</a>}
-          {staff && <a href={isAdvance && session?.roles.includes('ADMIN') ? '#/internal/organizations' : '#/internal/campaigns'}>
-            {isAdvance && session?.roles.includes('ADMIN') ? 'Xác thực tổ chức · ADMIN' : 'Resolver / nội bộ'}
-          </a>}
+          {session && <a href="#/vendor">Vendor HED</a>}
+          {staff && <a href={internalHref}>{internalLabel}</a>}
         </nav>
         <div className="public-sidebar-account">
           <span className="network-pill">Mạng thử nghiệm · MockUSDC</span>
@@ -65,14 +57,9 @@ export function PublicArea({
             {organizationProfile ? '← Tổ chức của tôi' : '← Về khu vực người dùng'}
           </a>
         )}
-        {feed && (isAdvance ? <AdvanceCampaignFeed /> : <PublicCampaignFeed />)}
+        {feed && <HedCampaignFeed />}
 
-        {detail && (isAdvance ? <AdvanceCampaignDetail key={detail[1]} campaignId={detail[1]} /> : <PublicCampaignDetail key={detail[1]} campaignId={detail[1]} />)}
-        {review && (isAdvance ? sessionLoading ? <p role="status">Đang kiểm tra phiên…</p> : session ? <AdvanceReview key={`${session.userId}:${review[1] ?? 'queue'}`} session={session} metadataId={review[1]} />
-          : <a href="#/account">Đăng nhập tài khoản resolver</a>
-          : <ReviewPage key={`${session?.userId ?? 'anonymous'}:${review[1] ?? 'queue'}`} session={session} sessionLoading={sessionLoading} campaignId={review[1]} />)}
-
-        {contributions && (isAdvance ? <AdvanceContributions key={session?.userId ?? 'anonymous'} /> : <MyContributions session={session} />)}
+        {detail && <HedPublicCampaign key={detail[1]} campaignId={detail[1]} />}
 
         {account && (
           <div className="public-account-page">
@@ -89,7 +76,7 @@ export function PublicArea({
                     <h2>Tài khoản FundTogether</h2>
                     <p className="public-wallet-address">{session.email ?? 'Tài khoản đã liên kết ví'}</p>
                     <a className="button button--secondary" href="#/workspace">Mở quản lý gây quỹ</a>
-                    <a className="button button--secondary" href="#/internal">Mở khu vực nội bộ</a>
+                    {staff && <a className="button button--secondary" href={internalHref}>{internalLabel}</a>}
                   </section>
                 )}
                 <AccountAccess session={session} onSession={onSession} />
@@ -113,7 +100,7 @@ export function PublicArea({
           </section>
         ))}
 
-        {!feed && !account && !contributions && !detail && !organizations && !review && (
+        {!feed && !account && !detail && !organizations && (
           <section className="panel public-empty">
             <h1>Không tìm thấy trang</h1>
             <a className="button button--secondary" href="#/">

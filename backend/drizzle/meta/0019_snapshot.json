@@ -1,0 +1,3283 @@
+{
+  "id": "52f88da8-f83a-4c37-8904-fee5779b6e9b",
+  "prevId": "8fbf56bd-ecd6-4f15-846e-543d7fa7ce28",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.advance_campaign_plans": {
+      "name": "advance_campaign_plans",
+      "schema": "",
+      "columns": {
+        "campaign_metadata_id": {
+          "name": "campaign_metadata_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "deployment_id": {
+          "name": "deployment_id",
+          "type": "varchar(66)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chain_id": {
+          "name": "chain_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contract_address": {
+          "name": "contract_address",
+          "type": "varchar(42)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "gift_config": {
+          "name": "gift_config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "funding_duration": {
+          "name": "funding_duration",
+          "type": "numeric(78, 0)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "organizer_wallet": {
+          "name": "organizer_wallet",
+          "type": "varchar(42)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "draft_key": {
+          "name": "draft_key",
+          "type": "varchar(66)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "frozen_plan_bytes": {
+          "name": "frozen_plan_bytes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "plan_hash": {
+          "name": "plan_hash",
+          "type": "varchar(66)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "frozen_at": {
+          "name": "frozen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "advance_plan_draft_key_idx": {
+          "name": "advance_plan_draft_key_idx",
+          "columns": [
+            {
+              "expression": "deployment_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "organizer_wallet",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "draft_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "advance_campaign_plans_campaign_metadata_id_campaign_metadata_id_fk": {
+          "name": "advance_campaign_plans_campaign_metadata_id_campaign_metadata_id_fk",
+          "tableFrom": "advance_campaign_plans",
+          "tableTo": "campaign_metadata",
+          "columnsFrom": [
+            "campaign_metadata_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "advance_plan_context_check": {
+          "name": "advance_plan_context_check",
+          "value": "\"advance_campaign_plans\".\"chain_id\" = 31338 AND \"advance_campaign_plans\".\"deployment_id\" ~ '^0x[0-9a-f]{64}$' AND \"advance_campaign_plans\".\"deployment_id\" !~ '^0x0+$' AND \"advance_campaign_plans\".\"contract_address\" ~ '^0x[0-9a-f]{40}$' AND \"advance_campaign_plans\".\"contract_address\" !~ '^0x0+$'"
+        },
+        "advance_plan_duration_check": {
+          "name": "advance_plan_duration_check",
+          "value": "\"advance_campaign_plans\".\"funding_duration\" >= 86400 AND \"advance_campaign_plans\".\"funding_duration\" <= 2592000"
+        },
+        "advance_plan_gift_check": {
+          "name": "advance_plan_gift_check",
+          "value": "(\"advance_campaign_plans\".\"gift_config\"->>'activityType' = 'GIFT_DISTRIBUTION' AND \"advance_campaign_plans\".\"gift_config\"->>'channel' IN ('DIRECT', 'INSTITUTION') AND \"advance_campaign_plans\".\"gift_config\"->>'checklistVersion' = 'gift.v1' AND jsonb_typeof(\"advance_campaign_plans\".\"gift_config\"->'stages') = 'array' AND jsonb_array_length(\"advance_campaign_plans\".\"gift_config\"->'stages') > 0) IS TRUE"
+        },
+        "advance_plan_freeze_check": {
+          "name": "advance_plan_freeze_check",
+          "value": "(\"advance_campaign_plans\".\"frozen_at\" IS NULL AND \"advance_campaign_plans\".\"plan_hash\" IS NULL AND \"advance_campaign_plans\".\"frozen_plan_bytes\" IS NULL AND \"advance_campaign_plans\".\"draft_key\" IS NULL AND \"advance_campaign_plans\".\"organizer_wallet\" IS NULL) OR (\"advance_campaign_plans\".\"frozen_at\" IS NOT NULL AND \"advance_campaign_plans\".\"plan_hash\" IS NOT NULL AND \"advance_campaign_plans\".\"plan_hash\" ~ '^0x[0-9a-f]{64}$' AND \"advance_campaign_plans\".\"plan_hash\" !~ '^0x0+$' AND \"advance_campaign_plans\".\"frozen_plan_bytes\" IS NOT NULL AND \"advance_campaign_plans\".\"draft_key\" IS NOT NULL AND \"advance_campaign_plans\".\"draft_key\" ~ '^0x[0-9a-f]{64}$' AND \"advance_campaign_plans\".\"draft_key\" !~ '^0x0+$' AND \"advance_campaign_plans\".\"organizer_wallet\" IS NOT NULL AND \"advance_campaign_plans\".\"organizer_wallet\" ~ '^0x[0-9a-f]{40}$' AND \"advance_campaign_plans\".\"organizer_wallet\" !~ '^0x0+$')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.advance_campaign_projection": {
+      "name": "advance_campaign_projection",
+      "schema": "",
+      "columns": {
+        "stream_id": {
+          "name": "stream_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "onchain_campaign_id": {
+          "name": "onchain_campaign_id",
+          "type": "numeric(78, 0)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "metadata_id": {
+          "name": "metadata_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "snapshot": {
+          "name": "snapshot",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "advance_campaign_projection_stream_id_indexer_streams_stream_id_fk": {
+          "name": "advance_campaign_projection_stream_id_indexer_streams_stream_id_fk",
+          "tableFrom": "advance_campaign_projection",
+          "tableTo": "indexer_streams",
+          "columnsFrom": [
+            "stream_id"
+          ],
+          "columnsTo": [
+            "stream_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "advance_campaign_projection_metadata_id_campaign_metadata_id_fk": {
+          "name": "advance_campaign_projection_metadata_id_campaign_metadata_id_fk",
+          "tableFrom": "advance_campaign_projection",
+          "tableTo": "campaign_metadata",
+          "columnsFrom": [
+            "metadata_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "advance_campaign_projection_stream_id_onchain_campaign_id_pk": {
+          "name": "advance_campaign_projection_stream_id_onchain_campaign_id_pk",
+          "columns": [
+            "stream_id",
+            "onchain_campaign_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "advance_projection_id_check": {
+          "name": "advance_projection_id_check",
+          "value": "\"advance_campaign_projection\".\"onchain_campaign_id\" >= 0 AND \"advance_campaign_projection\".\"onchain_campaign_id\" <= 115792089237316195423570985008687907853269984665640564039457584007913129639935"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.organization_verification_records": {
+      "name": "organization_verification_records",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(16)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "report_bytes": {
+          "name": "report_bytes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hash": {
+          "name": "hash",
+          "type": "varchar(66)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "checked_by": {
+          "name": "checked_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valid_until": {
+          "name": "valid_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "organization_verification_records_organization_id_organizations_id_fk": {
+          "name": "organization_verification_records_organization_id_organizations_id_fk",
+          "tableFrom": "organization_verification_records",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "organization_verification_records_checked_by_users_id_fk": {
+          "name": "organization_verification_records_checked_by_users_id_fk",
+          "tableFrom": "organization_verification_records",
+          "tableTo": "users",
+          "columnsFrom": [
+            "checked_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "organization_verification_records_hash_unique": {
+          "name": "organization_verification_records_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "hash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "organization_verification_status_check": {
+          "name": "organization_verification_status_check",
+          "value": "\"organization_verification_records\".\"status\" IN ('VERIFIED', 'REVOKED')"
+        },
+        "organization_verification_hash_check": {
+          "name": "organization_verification_hash_check",
+          "value": "\"organization_verification_records\".\"hash\" ~ '^0x[0-9a-f]{64}$' AND \"organization_verification_records\".\"hash\" !~ '^0x0+$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.auth_challenges": {
+      "name": "auth_challenges",
+      "schema": "",
+      "columns": {
+        "nonce": {
+          "name": "nonce",
+          "type": "varchar(32)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "session_hash": {
+          "name": "session_hash",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "auth_challenges_session_hash_auth_sessions_token_hash_fk": {
+          "name": "auth_challenges_session_hash_auth_sessions_token_hash_fk",
+          "tableFrom": "auth_challenges",
+          "tableTo": "auth_sessions",
+          "columnsFrom": [
+            "session_hash"
+          ],
+          "columnsTo": [
+            "token_hash"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.auth_sessions": {
+      "name": "auth_sessions",
+      "schema": "",
+      "columns": {
+        "token_hash": {
+          "name": "token_hash",
+          "type": "varchar(64)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "auth_sessions_user_idx": {
+          "name": "auth_sessions_user_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "auth_sessions_user_id_users_id_fk": {
+          "name": "auth_sessions_user_id_users_id_fk",
+          "tableFrom": "auth_sessions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.campaign_milestone_drafts": {
+      "name": "campaign_milestone_drafts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "campaign_metadata_id": {
+          "name": "campaign_metadata_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "milestone_index": {
+          "name": "milestone_index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "budget_units": {
+          "name": "budget_units",
+          "type": "numeric(78, 0)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "acceptance_criteria": {
+          "name": "acceptance_criteria",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "campaign_milestone_drafts_campaign_milestone_idx": {
+          "name": "campaign_milestone_drafts_campaign_milestone_idx",
+          "columns": [
+            {
+              "expression": "campaign_metadata_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "milestone_index",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "campaign_milestone_drafts_campaign_metadata_id_campaign_metadata_id_fk": {
+          "name": "campaign_milestone_drafts_campaign_metadata_id_campaign_metadata_id_fk",
+          "tableFrom": "campaign_milestone_drafts",
+          "tableTo": "campaign_metadata",
+          "columnsFrom": [
+            "campaign_metadata_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "campaign_milestone_drafts_budget_positive": {
+          "name": "campaign_milestone_drafts_budget_positive",
+          "value": "\"campaign_milestone_drafts\".\"budget_units\" > 0 AND \"campaign_milestone_drafts\".\"budget_units\" <= 115792089237316195423570985008687907853269984665640564039457584007913129639935"
+        },
+        "campaign_milestone_drafts_index_nonnegative": {
+          "name": "campaign_milestone_drafts_index_nonnegative",
+          "value": "\"campaign_milestone_drafts\".\"milestone_index\" >= 0"
+        },
+        "campaign_milestone_drafts_criteria_array": {
+          "name": "campaign_milestone_drafts_criteria_array",
+          "value": "jsonb_typeof(\"campaign_milestone_drafts\".\"acceptance_criteria\") = 'array'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.campaign_reviews": {
+      "name": "campaign_reviews",
+      "schema": "",
+      "columns": {
+        "campaign_metadata_id": {
+          "name": "campaign_metadata_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "decision": {
+          "name": "decision",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reviewer_user_id": {
+          "name": "reviewer_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reviewer_wallet": {
+          "name": "reviewer_wallet",
+          "type": "varchar(42)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dossier_hash": {
+          "name": "dossier_hash",
+          "type": "varchar(66)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "checked_block": {
+          "name": "checked_block",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "checked_block_hash": {
+          "name": "checked_block_hash",
+          "type": "varchar(66)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "campaign_reviews_campaign_metadata_id_campaign_metadata_id_fk": {
+          "name": "campaign_reviews_campaign_metadata_id_campaign_metadata_id_fk",
+          "tableFrom": "campaign_reviews",
+          "tableTo": "campaign_metadata",
+          "columnsFrom": [
+            "campaign_metadata_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "campaign_reviews_reviewer_user_id_users_id_fk": {
+          "name": "campaign_reviews_reviewer_user_id_users_id_fk",
+          "tableFrom": "campaign_reviews",
+          "tableTo": "users",
+          "columnsFrom": [
+            "reviewer_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.campaign_revisions": {
+      "name": "campaign_revisions",
+      "schema": "",
+      "columns": {
+        "parent_id": {
+          "name": "parent_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "child_id": {
+          "name": "child_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "campaign_revisions_parent_id_campaign_metadata_id_fk": {
+          "name": "campaign_revisions_parent_id_campaign_metadata_id_fk",
+          "tableFrom": "campaign_revisions",
+          "tableTo": "campaign_metadata",
+          "columnsFrom": [
+            "parent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "campaign_revisions_child_id_campaign_metadata_id_fk": {
+          "name": "campaign_revisions_child_id_campaign_metadata_id_fk",
+          "tableFrom": "campaign_revisions",
+          "tableTo": "campaign_metadata",
+          "columnsFrom": [
+            "child_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "campaign_revisions_child_id_unique": {
+          "name": "campaign_revisions_child_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "child_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.platform_roles": {
+      "name": "platform_roles",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "roles": {
+          "name": "roles",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "platform_roles_user_id_users_id_fk": {
+          "name": "platform_roles_user_id_users_id_fk",
+          "tableFrom": "platform_roles",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.campaign_submissions": {
+      "name": "campaign_submissions",
+      "schema": "",
+      "columns": {
+        "campaign_metadata_id": {
+          "name": "campaign_metadata_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "plan": {
+          "name": "plan",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "campaign_submissions_campaign_metadata_id_campaign_metadata_id_fk": {
+          "name": "campaign_submissions_campaign_metadata_id_campaign_metadata_id_fk",
+          "tableFrom": "campaign_submissions",
+          "tableTo": "campaign_metadata",
+          "columnsFrom": [
+            "campaign_metadata_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.campaign_metadata": {
+      "name": "campaign_metadata",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "organizer_user_id": {
+          "name": "organizer_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'draft'"
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "chain_id": {
+          "name": "chain_id",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contract_address": {
+          "name": "contract_address",
+          "type": "varchar(42)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "onchain_campaign_id": {
+          "name": "onchain_campaign_id",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "campaign_metadata_organization_idx": {
+          "name": "campaign_metadata_organization_idx",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "campaign_metadata_organizer_user_id_users_id_fk": {
+          "name": "campaign_metadata_organizer_user_id_users_id_fk",
+          "tableFrom": "campaign_metadata",
+          "tableTo": "users",
+          "columnsFrom": [
+            "organizer_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "campaign_metadata_organization_id_organizations_id_fk": {
+          "name": "campaign_metadata_organization_id_organizations_id_fk",
+          "tableFrom": "campaign_metadata",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "campaign_metadata_created_by_user_id_users_id_fk": {
+          "name": "campaign_metadata_created_by_user_id_users_id_fk",
+          "tableFrom": "campaign_metadata",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.disbursement_campaign_projection": {
+      "name": "disbursement_campaign_projection",
+      "schema": "",
+      "columns": {
+        "stream_id": {
+          "name": "stream_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "onchain_campaign_id": {
+          "name": "onchain_campaign_id",
+          "type": "numeric(78, 0)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "metadata_id": {
+          "name": "metadata_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "snapshot": {
+          "name": "snapshot",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "disbursement_campaign_projection_stream_id_indexer_streams_stream_id_fk": {
+          "name": "disbursement_campaign_projection_stream_id_indexer_streams_stream_id_fk",
+          "tableFrom": "disbursement_campaign_projection",
+          "tableTo": "indexer_streams",
+          "columnsFrom": [
+            "stream_id"
+          ],
+          "columnsTo": [
+            "stream_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "disbursement_campaign_projection_metadata_id_campaign_metadata_id_fk": {
+          "name": "disbursement_campaign_projection_metadata_id_campaign_metadata_id_fk",
+          "tableFrom": "disbursement_campaign_projection",
+          "tableTo": "campaign_metadata",
+          "columnsFrom": [
+            "metadata_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "disbursement_campaign_projection_stream_id_onchain_campaign_id_pk": {
+          "name": "disbursement_campaign_projection_stream_id_onchain_campaign_id_pk",
+          "columns": [
+            "stream_id",
+            "onchain_campaign_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "disbursement_projection_id_check": {
+          "name": "disbursement_projection_id_check",
+          "value": "\"disbursement_campaign_projection\".\"onchain_campaign_id\" >= 0 AND \"disbursement_campaign_projection\".\"onchain_campaign_id\" <= 115792089237316195423570985008687907853269984665640564039457584007913129639935"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.disbursement_campaigns": {
+      "name": "disbursement_campaigns",
+      "schema": "",
+      "columns": {
+        "campaign_metadata_id": {
+          "name": "campaign_metadata_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "chain_id": {
+          "name": "chain_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deployment_id": {
+          "name": "deployment_id",
+          "type": "varchar(66)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contract_address": {
+          "name": "contract_address",
+          "type": "varchar(42)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "onchain_campaign_id": {
+          "name": "onchain_campaign_id",
+          "type": "numeric(78, 0)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "commitment_hash": {
+          "name": "commitment_hash",
+          "type": "varchar(66)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "disbursement_campaign_identity_idx": {
+          "name": "disbursement_campaign_identity_idx",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "deployment_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "contract_address",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "onchain_campaign_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "disbursement_campaigns_campaign_metadata_id_campaign_metadata_id_fk": {
+          "name": "disbursement_campaigns_campaign_metadata_id_campaign_metadata_id_fk",
+          "tableFrom": "disbursement_campaigns",
+          "tableTo": "campaign_metadata",
+          "columnsFrom": [
+            "campaign_metadata_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "disbursement_campaign_identity_check": {
+          "name": "disbursement_campaign_identity_check",
+          "value": "\"disbursement_campaigns\".\"chain_id\" > 0 AND \"disbursement_campaigns\".\"deployment_id\" ~ '^0x[0-9a-f]{64}$' AND \"disbursement_campaigns\".\"contract_address\" ~ '^0x[0-9a-f]{40}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.disbursement_requests": {
+      "name": "disbursement_requests",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "campaign_metadata_id": {
+          "name": "campaign_metadata_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "onchain_request_id": {
+          "name": "onchain_request_id",
+          "type": "numeric(78, 0)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "request_version": {
+          "name": "request_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "request_hash": {
+          "name": "request_hash",
+          "type": "varchar(66)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vendor_wallet": {
+          "name": "vendor_wallet",
+          "type": "varchar(42)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric(78, 0)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deposit": {
+          "name": "deposit",
+          "type": "numeric(78, 0)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "frozen_at": {
+          "name": "frozen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "disbursement_request_version_idx": {
+          "name": "disbursement_request_version_idx",
+          "columns": [
+            {
+              "expression": "campaign_metadata_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "onchain_request_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "request_version",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "disbursement_requests_campaign_metadata_id_disbursement_campaigns_campaign_metadata_id_fk": {
+          "name": "disbursement_requests_campaign_metadata_id_disbursement_campaigns_campaign_metadata_id_fk",
+          "tableFrom": "disbursement_requests",
+          "tableTo": "disbursement_campaigns",
+          "columnsFrom": [
+            "campaign_metadata_id"
+          ],
+          "columnsTo": [
+            "campaign_metadata_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "disbursement_request_values_check": {
+          "name": "disbursement_request_values_check",
+          "value": "\"disbursement_requests\".\"request_version\" > 0 AND \"disbursement_requests\".\"amount\" > 0 AND \"disbursement_requests\".\"deposit\" >= 0 AND \"disbursement_requests\".\"deposit\" <= \"disbursement_requests\".\"amount\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.disbursement_review_records": {
+      "name": "disbursement_review_records",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "request_id": {
+          "name": "request_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "evidence_version": {
+          "name": "evidence_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "criterion_id": {
+          "name": "criterion_id",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "outcome": {
+          "name": "outcome",
+          "type": "varchar(16)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason_code": {
+          "name": "reason_code",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "manifest_hash": {
+          "name": "manifest_hash",
+          "type": "varchar(66)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "public_hash": {
+          "name": "public_hash",
+          "type": "varchar(66)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reviewed_by": {
+          "name": "reviewed_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "disbursement_review_criterion_version_idx": {
+          "name": "disbursement_review_criterion_version_idx",
+          "columns": [
+            {
+              "expression": "request_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "evidence_version",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "criterion_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "disbursement_review_records_request_id_disbursement_requests_id_fk": {
+          "name": "disbursement_review_records_request_id_disbursement_requests_id_fk",
+          "tableFrom": "disbursement_review_records",
+          "tableTo": "disbursement_requests",
+          "columnsFrom": [
+            "request_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "disbursement_review_records_reviewed_by_users_id_fk": {
+          "name": "disbursement_review_records_reviewed_by_users_id_fk",
+          "tableFrom": "disbursement_review_records",
+          "tableTo": "users",
+          "columnsFrom": [
+            "reviewed_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "disbursement_review_outcome_check": {
+          "name": "disbursement_review_outcome_check",
+          "value": "\"disbursement_review_records\".\"outcome\" IN ('MET', 'NOT_MET', 'NEEDS_INFO') AND \"disbursement_review_records\".\"evidence_version\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.hed_campaign_drafts": {
+      "name": "hed_campaign_drafts",
+      "schema": "",
+      "columns": {
+        "campaign_metadata_id": {
+          "name": "campaign_metadata_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "content": {
+          "name": "content",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "goal": {
+          "name": "goal",
+          "type": "numeric(78, 0)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "funding_duration": {
+          "name": "funding_duration",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "commitment_hash": {
+          "name": "commitment_hash",
+          "type": "varchar(66)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "frozen_at": {
+          "name": "frozen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "hed_campaign_drafts_campaign_metadata_id_campaign_metadata_id_fk": {
+          "name": "hed_campaign_drafts_campaign_metadata_id_campaign_metadata_id_fk",
+          "tableFrom": "hed_campaign_drafts",
+          "tableTo": "campaign_metadata",
+          "columnsFrom": [
+            "campaign_metadata_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "hed_campaign_draft_value_check": {
+          "name": "hed_campaign_draft_value_check",
+          "value": "\"hed_campaign_drafts\".\"goal\" > 0 AND \"hed_campaign_drafts\".\"funding_duration\" >= 86400 AND \"hed_campaign_drafts\".\"funding_duration\" <= 2592000"
+        },
+        "hed_campaign_draft_freeze_check": {
+          "name": "hed_campaign_draft_freeze_check",
+          "value": "(\"hed_campaign_drafts\".\"frozen_at\" IS NULL AND \"hed_campaign_drafts\".\"commitment_hash\" IS NULL) OR (\"hed_campaign_drafts\".\"frozen_at\" IS NOT NULL AND \"hed_campaign_drafts\".\"commitment_hash\" ~ '^0x[0-9a-f]{64}$' AND \"hed_campaign_drafts\".\"commitment_hash\" !~ '^0x0+$')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.hed_request_drafts": {
+      "name": "hed_request_drafts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "campaign_metadata_id": {
+          "name": "campaign_metadata_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vendor_verification_id": {
+          "name": "vendor_verification_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "name": "content",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "request_hash": {
+          "name": "request_hash",
+          "type": "varchar(66)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "frozen_at": {
+          "name": "frozen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "hed_request_campaign_idx": {
+          "name": "hed_request_campaign_idx",
+          "columns": [
+            {
+              "expression": "campaign_metadata_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "hed_request_drafts_campaign_metadata_id_campaign_metadata_id_fk": {
+          "name": "hed_request_drafts_campaign_metadata_id_campaign_metadata_id_fk",
+          "tableFrom": "hed_request_drafts",
+          "tableTo": "campaign_metadata",
+          "columnsFrom": [
+            "campaign_metadata_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "hed_request_drafts_vendor_verification_id_hed_vendor_verifications_id_fk": {
+          "name": "hed_request_drafts_vendor_verification_id_hed_vendor_verifications_id_fk",
+          "tableFrom": "hed_request_drafts",
+          "tableTo": "hed_vendor_verifications",
+          "columnsFrom": [
+            "vendor_verification_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "hed_request_drafts_created_by_users_id_fk": {
+          "name": "hed_request_drafts_created_by_users_id_fk",
+          "tableFrom": "hed_request_drafts",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "hed_request_draft_value_check": {
+          "name": "hed_request_draft_value_check",
+          "value": "\"hed_request_drafts\".\"version\" > 0 AND (\"hed_request_drafts\".\"content\"->>'amount') ~ '^[1-9][0-9]*$' AND (\"hed_request_drafts\".\"content\"->>'deposit') ~ '^(0|[1-9][0-9]*)$' AND ((\"hed_request_drafts\".\"content\"->>'deposit')::numeric <= (\"hed_request_drafts\".\"content\"->>'amount')::numeric)"
+        },
+        "hed_request_draft_freeze_check": {
+          "name": "hed_request_draft_freeze_check",
+          "value": "(\"hed_request_drafts\".\"frozen_at\" IS NULL AND \"hed_request_drafts\".\"request_hash\" IS NULL) OR (\"hed_request_drafts\".\"frozen_at\" IS NOT NULL AND \"hed_request_drafts\".\"request_hash\" ~ '^0x[0-9a-f]{64}$' AND \"hed_request_drafts\".\"request_hash\" !~ '^0x0+$')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.hed_vendor_verifications": {
+      "name": "hed_vendor_verifications",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "vendor_wallet": {
+          "name": "vendor_wallet",
+          "type": "varchar(42)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "name": "content",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(16)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "report_bytes": {
+          "name": "report_bytes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "report_hash": {
+          "name": "report_hash",
+          "type": "varchar(66)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "checked_by": {
+          "name": "checked_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valid_until": {
+          "name": "valid_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "hed_vendor_wallet_history_idx": {
+          "name": "hed_vendor_wallet_history_idx",
+          "columns": [
+            {
+              "expression": "vendor_wallet",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "hed_vendor_verifications_checked_by_users_id_fk": {
+          "name": "hed_vendor_verifications_checked_by_users_id_fk",
+          "tableFrom": "hed_vendor_verifications",
+          "tableTo": "users",
+          "columnsFrom": [
+            "checked_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "hed_vendor_verifications_report_hash_unique": {
+          "name": "hed_vendor_verifications_report_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "report_hash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "hed_vendor_verification_status_check": {
+          "name": "hed_vendor_verification_status_check",
+          "value": "\"hed_vendor_verifications\".\"status\" IN ('VERIFIED', 'REVOKED')"
+        },
+        "hed_vendor_wallet_check": {
+          "name": "hed_vendor_wallet_check",
+          "value": "\"hed_vendor_verifications\".\"vendor_wallet\" ~ '^0x[0-9a-f]{40}$' AND \"hed_vendor_verifications\".\"vendor_wallet\" !~ '^0x0+$'"
+        },
+        "hed_vendor_report_hash_check": {
+          "name": "hed_vendor_report_hash_check",
+          "value": "\"hed_vendor_verifications\".\"report_hash\" ~ '^0x[0-9a-f]{64}$' AND \"hed_vendor_verifications\".\"report_hash\" !~ '^0x0+$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.campaign_evidence_drafts": {
+      "name": "campaign_evidence_drafts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "campaign_metadata_id": {
+          "name": "campaign_metadata_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "milestone_index": {
+          "name": "milestone_index",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "organizer_user_id": {
+          "name": "organizer_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "evidence_schema_version": {
+          "name": "evidence_schema_version",
+          "type": "varchar(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0.1'"
+        },
+        "content": {
+          "name": "content",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "campaign_evidence_drafts_campaign_milestone_idx": {
+          "name": "campaign_evidence_drafts_campaign_milestone_idx",
+          "columns": [
+            {
+              "expression": "campaign_metadata_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "milestone_index",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "campaign_evidence_drafts_campaign_metadata_id_campaign_metadata_id_fk": {
+          "name": "campaign_evidence_drafts_campaign_metadata_id_campaign_metadata_id_fk",
+          "tableFrom": "campaign_evidence_drafts",
+          "tableTo": "campaign_metadata",
+          "columnsFrom": [
+            "campaign_metadata_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "campaign_evidence_drafts_organizer_user_id_users_id_fk": {
+          "name": "campaign_evidence_drafts_organizer_user_id_users_id_fk",
+          "tableFrom": "campaign_evidence_drafts",
+          "tableTo": "users",
+          "columnsFrom": [
+            "organizer_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.campaign_evidence_packages": {
+      "name": "campaign_evidence_packages",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "campaign_metadata_id": {
+          "name": "campaign_metadata_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "milestone_index": {
+          "name": "milestone_index",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "organizer_user_id": {
+          "name": "organizer_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "submission_version": {
+          "name": "submission_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "draft_revision": {
+          "name": "draft_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "manifest_bytes": {
+          "name": "manifest_bytes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "evidence_hash": {
+          "name": "evidence_hash",
+          "type": "varchar(66)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "evidence_packages_draft_version_idx": {
+          "name": "evidence_packages_draft_version_idx",
+          "columns": [
+            {
+              "expression": "campaign_metadata_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "milestone_index",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "draft_revision",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "submission_version",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "evidence_packages_hash_idx": {
+          "name": "evidence_packages_hash_idx",
+          "columns": [
+            {
+              "expression": "evidence_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "campaign_evidence_packages_campaign_metadata_id_campaign_metadata_id_fk": {
+          "name": "campaign_evidence_packages_campaign_metadata_id_campaign_metadata_id_fk",
+          "tableFrom": "campaign_evidence_packages",
+          "tableTo": "campaign_metadata",
+          "columnsFrom": [
+            "campaign_metadata_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "campaign_evidence_packages_organizer_user_id_users_id_fk": {
+          "name": "campaign_evidence_packages_organizer_user_id_users_id_fk",
+          "tableFrom": "campaign_evidence_packages",
+          "tableTo": "users",
+          "columnsFrom": [
+            "organizer_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(254)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.wallet_links": {
+      "name": "wallet_links",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chain_id": {
+          "name": "chain_id",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "address": {
+          "name": "address",
+          "type": "varchar(42)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_primary": {
+          "name": "is_primary",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "linked_at": {
+          "name": "linked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "wallet_links_chain_address_idx": {
+          "name": "wallet_links_chain_address_idx",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "address",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "wallet_links_user_id_users_id_fk": {
+          "name": "wallet_links_user_id_users_id_fk",
+          "tableFrom": "wallet_links",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.organization_members": {
+      "name": "organization_members",
+      "schema": "",
+      "columns": {
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'OWNER'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "organization_members_user_idx": {
+          "name": "organization_members_user_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "organization_members_organization_id_organizations_id_fk": {
+          "name": "organization_members_organization_id_organizations_id_fk",
+          "tableFrom": "organization_members",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "organization_members_user_id_users_id_fk": {
+          "name": "organization_members_user_id_users_id_fk",
+          "tableFrom": "organization_members",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "organization_members_organization_id_user_id_pk": {
+          "name": "organization_members_organization_id_user_id_pk",
+          "columns": [
+            "organization_id",
+            "user_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "organization_members_role_check": {
+          "name": "organization_members_role_check",
+          "value": "\"organization_members\".\"role\" = 'OWNER'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.organizations": {
+      "name": "organizations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "representative_wallet_link_id": {
+          "name": "representative_wallet_link_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "verification_status": {
+          "name": "verification_status",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'unverified'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "organizations_created_by_user_id_users_id_fk": {
+          "name": "organizations_created_by_user_id_users_id_fk",
+          "tableFrom": "organizations",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "organizations_representative_wallet_link_id_wallet_links_id_fk": {
+          "name": "organizations_representative_wallet_link_id_wallet_links_id_fk",
+          "tableFrom": "organizations",
+          "tableTo": "wallet_links",
+          "columnsFrom": [
+            "representative_wallet_link_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.campaign_chain_projection": {
+      "name": "campaign_chain_projection",
+      "schema": "",
+      "columns": {
+        "stream_id": {
+          "name": "stream_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "onchain_campaign_id": {
+          "name": "onchain_campaign_id",
+          "type": "numeric(78, 0)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "metadata_id": {
+          "name": "metadata_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "snapshot": {
+          "name": "snapshot",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "campaign_chain_projection_stream_id_indexer_streams_stream_id_fk": {
+          "name": "campaign_chain_projection_stream_id_indexer_streams_stream_id_fk",
+          "tableFrom": "campaign_chain_projection",
+          "tableTo": "indexer_streams",
+          "columnsFrom": [
+            "stream_id"
+          ],
+          "columnsTo": [
+            "stream_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "campaign_chain_projection_stream_id_onchain_campaign_id_pk": {
+          "name": "campaign_chain_projection_stream_id_onchain_campaign_id_pk",
+          "columns": [
+            "stream_id",
+            "onchain_campaign_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.chain_events": {
+      "name": "chain_events",
+      "schema": "",
+      "columns": {
+        "stream_id": {
+          "name": "stream_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "transaction_hash": {
+          "name": "transaction_hash",
+          "type": "varchar(66)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "log_index": {
+          "name": "log_index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "block_hash": {
+          "name": "block_hash",
+          "type": "varchar(66)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "block_number": {
+          "name": "block_number",
+          "type": "numeric(78, 0)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event_name": {
+          "name": "event_name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "args": {
+          "name": "args",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "canonical": {
+          "name": "canonical",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "chain_events_stream_id_indexer_streams_stream_id_fk": {
+          "name": "chain_events_stream_id_indexer_streams_stream_id_fk",
+          "tableFrom": "chain_events",
+          "tableTo": "indexer_streams",
+          "columnsFrom": [
+            "stream_id"
+          ],
+          "columnsTo": [
+            "stream_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "chain_events_stream_id_transaction_hash_log_index_block_hash_pk": {
+          "name": "chain_events_stream_id_transaction_hash_log_index_block_hash_pk",
+          "columns": [
+            "stream_id",
+            "transaction_hash",
+            "log_index",
+            "block_hash"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.indexer_streams": {
+      "name": "indexer_streams",
+      "schema": "",
+      "columns": {
+        "stream_id": {
+          "name": "stream_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "last_block": {
+          "name": "last_block",
+          "type": "numeric(78, 0)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_block_hash": {
+          "name": "last_block_hash",
+          "type": "varchar(66)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "head_block": {
+          "name": "head_block",
+          "type": "numeric(78, 0)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'syncing'"
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.evidence_access_log": {
+      "name": "evidence_access_log",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "package_id": {
+          "name": "package_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "document_id": {
+          "name": "document_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "accessed_at": {
+          "name": "accessed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "evidence_access_log_package_id_campaign_evidence_packages_id_fk": {
+          "name": "evidence_access_log_package_id_campaign_evidence_packages_id_fk",
+          "tableFrom": "evidence_access_log",
+          "tableTo": "campaign_evidence_packages",
+          "columnsFrom": [
+            "package_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "evidence_access_log_user_id_users_id_fk": {
+          "name": "evidence_access_log_user_id_users_id_fk",
+          "tableFrom": "evidence_access_log",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.evidence_publications": {
+      "name": "evidence_publications",
+      "schema": "",
+      "columns": {
+        "hash": {
+          "name": "hash",
+          "type": "varchar(66)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "package_id": {
+          "name": "package_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "manifest_bytes": {
+          "name": "manifest_bytes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "evidence_publications_package_id_campaign_evidence_packages_id_fk": {
+          "name": "evidence_publications_package_id_campaign_evidence_packages_id_fk",
+          "tableFrom": "evidence_publications",
+          "tableTo": "campaign_evidence_packages",
+          "columnsFrom": [
+            "package_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "evidence_publications_created_by_users_id_fk": {
+          "name": "evidence_publications_created_by_users_id_fk",
+          "tableFrom": "evidence_publications",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "evidence_publications_package_id_unique": {
+          "name": "evidence_publications_package_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "package_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.milestone_records": {
+      "name": "milestone_records",
+      "schema": "",
+      "columns": {
+        "hash": {
+          "name": "hash",
+          "type": "varchar(66)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "record_bytes": {
+          "name": "record_bytes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "milestone_records_created_by_users_id_fk": {
+          "name": "milestone_records_created_by_users_id_fk",
+          "tableFrom": "milestone_records",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.organization_verification_audit": {
+      "name": "organization_verification_audit",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "request_id": {
+          "name": "request_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "action": {
+          "name": "action",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "changed_fields": {
+          "name": "changed_fields",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "happened_at": {
+          "name": "happened_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "organization_verification_audit_org_idx": {
+          "name": "organization_verification_audit_org_idx",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "happened_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "organization_verification_audit_organization_id_organizations_id_fk": {
+          "name": "organization_verification_audit_organization_id_organizations_id_fk",
+          "tableFrom": "organization_verification_audit",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "organization_verification_audit_request_id_organization_verification_requests_id_fk": {
+          "name": "organization_verification_audit_request_id_organization_verification_requests_id_fk",
+          "tableFrom": "organization_verification_audit",
+          "tableTo": "organization_verification_requests",
+          "columnsFrom": [
+            "request_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "organization_verification_audit_actor_id_users_id_fk": {
+          "name": "organization_verification_audit_actor_id_users_id_fk",
+          "tableFrom": "organization_verification_audit",
+          "tableTo": "users",
+          "columnsFrom": [
+            "actor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "organization_verification_audit_action_check": {
+          "name": "organization_verification_audit_action_check",
+          "value": "\"organization_verification_audit\".\"action\" IN ('CREATED','SAVED','DOCUMENT_ADDED','SUBMITTED','CANCELLED','APPROVED','CHANGES_REQUESTED','REJECTED')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.organization_verification_documents": {
+      "name": "organization_verification_documents",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "request_id": {
+          "name": "request_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "uploaded_by": {
+          "name": "uploaded_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "varchar(24)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "original_name": {
+          "name": "original_name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "media_type": {
+          "name": "media_type",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "byte_size": {
+          "name": "byte_size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hash": {
+          "name": "hash",
+          "type": "varchar(66)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "organization_documents_org_idx": {
+          "name": "organization_documents_org_idx",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "organization_verification_documents_organization_id_organizations_id_fk": {
+          "name": "organization_verification_documents_organization_id_organizations_id_fk",
+          "tableFrom": "organization_verification_documents",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "organization_verification_documents_request_id_organization_verification_requests_id_fk": {
+          "name": "organization_verification_documents_request_id_organization_verification_requests_id_fk",
+          "tableFrom": "organization_verification_documents",
+          "tableTo": "organization_verification_requests",
+          "columnsFrom": [
+            "request_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "organization_verification_documents_uploaded_by_users_id_fk": {
+          "name": "organization_verification_documents_uploaded_by_users_id_fk",
+          "tableFrom": "organization_verification_documents",
+          "tableTo": "users",
+          "columnsFrom": [
+            "uploaded_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "organization_documents_kind_check": {
+          "name": "organization_documents_kind_check",
+          "value": "\"organization_verification_documents\".\"kind\" IN ('IDENTITY','REPRESENTATION','ACTIVITY','OTHER')"
+        },
+        "organization_documents_size_check": {
+          "name": "organization_documents_size_check",
+          "value": "\"organization_verification_documents\".\"byte_size\" > 0 AND \"organization_verification_documents\".\"byte_size\" <= 10485760"
+        },
+        "organization_documents_hash_check": {
+          "name": "organization_documents_hash_check",
+          "value": "\"organization_verification_documents\".\"hash\" ~ '^0x[0-9a-f]{64}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.organization_verification_requests": {
+      "name": "organization_verification_requests",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'DRAFT'"
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "content": {
+          "name": "content",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "policy_id": {
+          "name": "policy_id",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "snapshot_bytes": {
+          "name": "snapshot_bytes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "snapshot_hash": {
+          "name": "snapshot_hash",
+          "type": "varchar(66)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "submitted_at": {
+          "name": "submitted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reviewed_at": {
+          "name": "reviewed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reviewed_by": {
+          "name": "reviewed_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "review_note": {
+          "name": "review_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "missing_items": {
+          "name": "missing_items",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "verification_record_id": {
+          "name": "verification_record_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "organization_requests_history_idx": {
+          "name": "organization_requests_history_idx",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "organization_requests_one_open_idx": {
+          "name": "organization_requests_one_open_idx",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"organization_verification_requests\".\"status\" IN ('DRAFT', 'UNDER_REVIEW')",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "organization_verification_requests_organization_id_organizations_id_fk": {
+          "name": "organization_verification_requests_organization_id_organizations_id_fk",
+          "tableFrom": "organization_verification_requests",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "organization_verification_requests_reviewed_by_users_id_fk": {
+          "name": "organization_verification_requests_reviewed_by_users_id_fk",
+          "tableFrom": "organization_verification_requests",
+          "tableTo": "users",
+          "columnsFrom": [
+            "reviewed_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "organization_verification_requests_verification_record_id_organization_verification_records_id_fk": {
+          "name": "organization_verification_requests_verification_record_id_organization_verification_records_id_fk",
+          "tableFrom": "organization_verification_requests",
+          "tableTo": "organization_verification_records",
+          "columnsFrom": [
+            "verification_record_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "organization_verification_requests_created_by_users_id_fk": {
+          "name": "organization_verification_requests_created_by_users_id_fk",
+          "tableFrom": "organization_verification_requests",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "organization_verification_requests_verification_record_id_unique": {
+          "name": "organization_verification_requests_verification_record_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "verification_record_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "organization_requests_status_check": {
+          "name": "organization_requests_status_check",
+          "value": "\"organization_verification_requests\".\"status\" IN ('DRAFT','UNDER_REVIEW','CHANGES_REQUESTED','APPROVED','REJECTED','CANCELLED')"
+        },
+        "organization_requests_revision_check": {
+          "name": "organization_requests_revision_check",
+          "value": "\"organization_verification_requests\".\"revision\" > 0"
+        },
+        "organization_requests_submission_check": {
+          "name": "organization_requests_submission_check",
+          "value": "(\"organization_verification_requests\".\"status\" = 'DRAFT' AND \"organization_verification_requests\".\"submitted_at\" IS NULL AND \"organization_verification_requests\".\"snapshot_bytes\" IS NULL AND \"organization_verification_requests\".\"snapshot_hash\" IS NULL) OR (\"organization_verification_requests\".\"status\" <> 'DRAFT' AND \"organization_verification_requests\".\"submitted_at\" IS NOT NULL AND \"organization_verification_requests\".\"snapshot_bytes\" IS NOT NULL AND \"organization_verification_requests\".\"snapshot_hash\" IS NOT NULL AND \"organization_verification_requests\".\"snapshot_hash\" ~ '^0x[0-9a-f]{64}$')"
+        },
+        "organization_requests_decision_check": {
+          "name": "organization_requests_decision_check",
+          "value": "(\"organization_verification_requests\".\"status\" IN ('APPROVED','CHANGES_REQUESTED','REJECTED') AND \"organization_verification_requests\".\"reviewed_at\" IS NOT NULL AND \"organization_verification_requests\".\"reviewed_by\" IS NOT NULL AND \"organization_verification_requests\".\"review_note\" IS NOT NULL AND length(\"organization_verification_requests\".\"review_note\") > 0) OR (\"organization_verification_requests\".\"status\" NOT IN ('APPROVED','CHANGES_REQUESTED','REJECTED') AND \"organization_verification_requests\".\"reviewed_at\" IS NULL AND \"organization_verification_requests\".\"reviewed_by\" IS NULL AND \"organization_verification_requests\".\"review_note\" IS NULL)"
+        },
+        "organization_requests_approval_check": {
+          "name": "organization_requests_approval_check",
+          "value": "(\"organization_verification_requests\".\"status\" = 'APPROVED') = (\"organization_verification_requests\".\"verification_record_id\" IS NOT NULL)"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

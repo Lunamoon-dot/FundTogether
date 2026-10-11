@@ -5,7 +5,29 @@
 > Trạng thái: Định hướng do người dùng yêu cầu lưu và ưu tiên đọc.
 > Phạm vi: mục tiêu, nội dung và kết quả nghiên cứu dự kiến; các quyết định nghiệp vụ còn mở.
 
+> Quyết định mới ngày 2026-10-11: người dùng chọn chuyển hẳn sản phẩm sang
+> yêu cầu cấp vốn có căn cứ thay cho chia milestone cố định, trên codebase/nhánh
+> hiện tại. Trước mắt lưu checkpoint và lập kế hoạch giữ/sửa/xóa; chưa triển khai
+> quy tắc tiền mới. Các mô tả B bên dưới là baseline đã duyệt, không phải spec
+> của hướng mới. Xem [kế hoạch chuyển đổi](./superpowers/plans/2026-10-11-funding-requests-cleanup.md).
+> Vẫn giữ mục tiêu xác minh sử dụng tiền sau cấp; điều kiện funding, xét duyệt,
+> reserve, timeout và refund mới phải được đặc tả trước khi sửa tài chính.
+
+> Tiếp nối ngày 2026-10-11: người dùng chọn phương án đề xuất cho sáu điểm
+> (cấp từ tiền đã huy động, ví tổ chức cố định, một khoản chưa đối chiếu, resolver
+> duyệt, kiểm sau chi trước cấp tiếp, hoàn escrow khi kết thúc) và yêu cầu viết
+> [kế hoạch cấp vốn](./funding-request-plan.md). Các chi tiết thời hạn, case,
+> reserve và phân bổ khi donor góp muộn được nêu là thiết kế cần đặc tả;
+> chưa phải implementation hoặc kết quả nghiệm thu. Không hỏi lại sáu lựa chọn đã chọn.
+
 ## 1. Quy tắc sử dụng — đọc trước khi quyết định
+
+Thiết kế đề xuất mới theo yêu cầu người dùng ngày 2026-10-11:
+[MVP P1](./hed-mvp-design.md) và [post-MVP](./hed-post-mvp-design.md).
+MVP đề xuất full funding, trả vendor, cọc giới hạn và tách delivery/outcome;
+đây là delta so với kế hoạch request trước. Các tham số và giới hạn được viết
+để review, chưa triển khai hoặc kiểm chứng. Ưu tiên MVP; backlog post-MVP không
+trở thành điều kiện hoàn thành MVP. Giữ các quyết định lịch sử bên dưới để đối chiếu.
 
 Đọc tài liệu này trước khi phân tích, suy luận, đề xuất hoặc chốt quyết định
 cho FundTogether, đặc biệt về nghiệp vụ, kiến trúc, dòng tiền, phạm vi phát triển
@@ -155,6 +177,24 @@ hiện tại, môi trường B riêng; không đổi obligations, account hoặc
 Hash/chữ ký vẫn không chứng minh sự thật ngoài đời. Khảo sát, dữ liệu nhãn độc
 lập và nghiệm thu MetaMask vẫn cần thực hiện. Test contract/integration đã có
 bằng chứng theo [acceptance](./workflow-b-acceptance.md), không thay khảo sát.
+
+### 6.5. Hồ sơ tổ chức — hướng MVP đơn giản hóa ngày2026-10-10
+
+Người dùng chốt không xây explicit profile versioning cho xác thực tổ chức.
+Giữ lịch sử yêu cầu gửi duyệt và audit log; khóa thông tin/tài liệu quan trọng
+khi UNDER_REVIEW. ADMIN duyệt/yêu cầu bổ sung/từ chối, không chỉnh hộ hồ sơ;
+organizer sửa sau yêu cầu bổ sung hoặc hủy yêu cầu đang chờ rồi gửi lại.
+
+Tách trạng thái tổ chức khỏi trạng thái request; có thời điểm xác minh và hết
+hạn. Badge xác minh thuộc Web2 trust layer, chỉ thể hiện đã kiểm hồ sơ theo
+policy, không chứng minh campaign hoặc evidence trung thực. Các gate và dòng
+tiền campaign/milestone/challenge đã duyệt giữ riêng.
+
+[Thiết kế onboarding](./workflow-b-organization-onboarding-plan.md) đã sửa theo
+hướng này. Sau yêu cầu tiếp tục goal ngày2026-10-10, đã triển khai snapshot nhỏ
+trong request, audit/history, khóa hồ sơ đang duyệt và hiệu lực xác minh riêng.
+Sửa thông tin cốt lõi cần duyệt lại; REVOKED ánh xạ SUSPENDED, không tự phục hồi.
+Kiểm thử tự động được ghi ở acceptance; nghiệm thu người dùng còn thiếu.
 
 ## 7. Cách chốt và đánh giá một thay đổi
 

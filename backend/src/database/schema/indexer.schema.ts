@@ -1,5 +1,4 @@
 import { boolean, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
-import type { CampaignSnapshot } from '../../blockchain/blockchain.service';
 
 export const indexerStreams = pgTable('indexer_streams', {
   streamId: text('stream_id').primaryKey(),
@@ -27,5 +26,5 @@ export const campaignChainProjection = pgTable('campaign_chain_projection', {
   onchainCampaignId: numeric('onchain_campaign_id', { precision: 78, scale: 0 }).notNull(),
   // Derived association, revalidated through the organizer-scoped on-chain draft key.
   metadataId: uuid('metadata_id'),
-  snapshot: jsonb('snapshot').$type<CampaignSnapshot>().notNull(),
+  snapshot: jsonb('snapshot').$type<Record<string, unknown>>().notNull(),
 }, table => [primaryKey({ columns: [table.streamId, table.onchainCampaignId] })]);
