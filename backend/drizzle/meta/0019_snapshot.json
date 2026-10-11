@@ -1631,7 +1631,7 @@
       "checkConstraints": {
         "hed_request_draft_value_check": {
           "name": "hed_request_draft_value_check",
-          "value": "$1 AND (\"hed_request_drafts\".\"content\"->>'amount') ~ '^[1-9][0-9]*$' AND (\"hed_request_drafts\".\"content\"->>'deposit') ~ '^(0|[1-9][0-9]*)$' AND ((\"hed_request_drafts\".\"content\"->>'deposit')::numeric <= (\"hed_request_drafts\".\"content\"->>'amount')::numeric)"
+          "value": "\"hed_request_drafts\".\"version\" > 0 AND (\"hed_request_drafts\".\"content\"->>'amount') ~ '^[1-9][0-9]*$' AND (\"hed_request_drafts\".\"content\"->>'deposit') ~ '^(0|[1-9][0-9]*)$' AND ((\"hed_request_drafts\".\"content\"->>'deposit')::numeric <= (\"hed_request_drafts\".\"content\"->>'amount')::numeric)"
         },
         "hed_request_draft_freeze_check": {
           "name": "hed_request_draft_freeze_check",
