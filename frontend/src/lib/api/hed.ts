@@ -40,3 +40,12 @@ export async function uploadHedRequestEvidence(campaignId: string, requestId: st
 export async function freezeHedRequestDraft(campaignId: string, requestId: string) {
   return (await http.post<HedRequestDraft>(`/v1/disbursement/campaigns/${campaignId}/requests/${requestId}/freeze`)).data
 }
+
+export interface HedReviewInput { evidenceVersion: number; criterionId: string; outcome: 'MET' | 'NOT_MET' | 'NEEDS_INFO';
+  reasonCode: string; reason: string; manifestHash: `0x${string}`; publicHash?: `0x${string}`; sourceReferences: string[] }
+export async function listHedReviews(requestId: string, signal?: AbortSignal) {
+  return (await http.get<HedReviewInput[]>(`/v1/disbursement/requests/${requestId}/reviews`, { signal })).data
+}
+export async function recordHedReview(requestId: string, review: HedReviewInput) {
+  return (await http.post(`/v1/disbursement/requests/${requestId}/reviews`, review)).data
+}
