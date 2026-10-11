@@ -1,5 +1,10 @@
 import { http } from './http'
 
+export interface HedPublicSnapshot { campaignId: string; checkpoint: { blockNumber: string; blockHash: string; chainTimestamp: string }; campaign: { goal: string; contributed: string; available: string; reserved: string; grossPaid: string; state: string }; requests: { requestHash: `0x${string}`; approvedAmount: string; depositAmount: string; grossPaid: string; acceptedDeliveryValue: string; challengeEnd: string; state: string }[] }
+export async function getHedPublicCampaign(campaignId: string, signal?: AbortSignal) {
+  return (await http.get<HedPublicSnapshot>(`/v1/disbursement/public/campaigns/${campaignId}`, { signal })).data
+}
+
 export interface HedCampaignDraftInput {
   title: string; description: string; purpose: string; beneficiaryScope: string; allowedExpenseCategories: string[];
   outcomeCriteria: string[]; goal: string; fundingDuration: number; policyHash: `0x${string}`
