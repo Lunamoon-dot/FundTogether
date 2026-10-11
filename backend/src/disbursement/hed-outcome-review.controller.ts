@@ -12,7 +12,7 @@ export class HedOutcomeReviewController {
     const parsed = hedReviewSchema.safeParse(body); if (!parsed.success) throw new BadRequestException({ message: "Invalid HED outcome review", issues: parsed.error.issues });
     return this.reviews.recordOutcome(activityId, request.account!.userId, parsed.data);
   }
-  @Post("outcome/:packageId") prepare(@Param("packageId", new ParseUUIDPipe()) packageId: string, @Req() request: Request) {
-    return this.reviews.prepareOutcome(packageId, request.account!.userId);
+  @Post("outcome/:packageId") prepare(@Param("activityId", new ParseUUIDPipe()) activityId: string, @Param("packageId", new ParseUUIDPipe()) packageId: string, @Req() request: Request) {
+    return this.reviews.prepareOutcome(activityId, packageId, request.account!.userId);
   }
 }

@@ -146,10 +146,10 @@ export class HedReviewService {
     return this.db.insert(schema.hedActivityReviews).values({ activityId, content: parsed.data, reviewedBy: userId }).returning();
   }
 
-  async prepareOutcome(packageId: string, userId: string) {
+  async prepareOutcome(activityId: string, packageId: string, userId: string) {
     await this.resolver(userId);
     const [evidence] = await this.db.select().from(schema.hedEvidencePackages).where(eq(schema.hedEvidencePackages.id, packageId)).limit(1);
-    if (!evidence || evidence.content.kind !== "OUTCOME") throw new NotFoundException("HED outcome package not found");
+    if (!evidence || evidence.content.kind !== "OUTCOME" || evidence.content.activityId !== activityId) throw new NotFoundException("HED outcome package not found");
     const [row] = await this.db.select({ activity: schema.hedActivities, campaign: schema.disbursementCampaigns })
       .from(schema.hedActivities).innerJoin(schema.disbursementCampaigns, eq(schema.disbursementCampaigns.campaignMetadataId, schema.hedActivities.campaignMetadataId))
       .where(and(eq(schema.hedActivities.id, evidence.content.activityId), eq(schema.hedActivities.campaignMetadataId, evidence.campaignMetadataId!))).limit(1);
