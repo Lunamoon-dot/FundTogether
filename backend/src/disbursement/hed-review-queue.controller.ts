@@ -13,6 +13,7 @@ export class HedReviewQueueController {
     return this.reviews.prepareActivation(campaignId, request.account!.userId);
   }
   @Get("delivery/pending") pendingDelivery(@Req() request: Request) { return this.reviews.pendingDelivery(request.account!.userId); }
+  @Get("outcomes/pending") pendingOutcomes(@Req() request: Request) { return this.reviews.pendingOutcomes(request.account!.userId); }
   @Post("delivery/:packageId/prepare") prepareDelivery(@Param("packageId", new ParseUUIDPipe()) packageId: string, @Req() request: Request) {
     return this.reviews.prepareDelivery(packageId, request.account!.userId);
   }

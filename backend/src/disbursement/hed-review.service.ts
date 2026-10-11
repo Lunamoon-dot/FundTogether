@@ -161,4 +161,17 @@ export class HedReviewService {
     if (snapshot.campaign.state !== "ACTIVE" || snapshot.requests.some(request => request.state !== "FINANCIALLY_SETTLED" && request.state !== "CANCELLED")) throw new ConflictException("HED activity still has an open financial request");
     return { onchainCampaignId: row.campaign.onchainCampaignId, onchainActivityId: row.activity.onchainActivityId, reportHash: evidence.content.publicHash, checkpoint: snapshot.checkpoint };
   }
+
+  async pendingOutcomes(userId: string) {
+    await this.resolver(userId);
+    const rows = await this.db.select({ evidence: schema.hedEvidencePackages, activity: schema.hedActivities, campaign: schema.disbursementCampaigns })
+      .from(schema.hedEvidencePackages).innerJoin(schema.hedActivities, eq(schema.hedActivities.id, sql`${schema.hedEvidencePackages.content}->>'activityId'`))
+      .innerJoin(schema.disbursementCampaigns, eq(schema.disbursementCampaigns.campaignMetadataId, schema.hedActivities.campaignMetadataId))
+      .where(and(eq(sql`${schema.hedEvidencePackages.content}->>'kind'`, "OUTCOME"), isNotNull(schema.disbursementCampaigns.onchainCampaignId), isNotNull(schema.hedActivities.onchainActivityId)));
+    const block = await this.chain.client.getBlock({ blockTag: "latest" });
+    const snapshots = new Map<string, Awaited<ReturnType<HedBlockchainService["snapshot"]>>>();
+    for (const row of rows) if (!snapshots.has(row.campaign.onchainCampaignId!)) snapshots.set(row.campaign.onchainCampaignId!, await this.chain.snapshot(BigInt(row.campaign.onchainCampaignId!), block.number));
+    return rows.filter(row => { const snapshot = snapshots.get(row.campaign.onchainCampaignId!); return snapshot?.campaign.state === "ACTIVE" && snapshot.requests.every(request => request.state === "FINANCIALLY_SETTLED" || request.state === "CANCELLED"); })
+      .map(row => ({ packageId: row.evidence.id, activityId: row.activity.id, onchainCampaignId: row.campaign.onchainCampaignId, onchainActivityId: row.activity.onchainActivityId, content: row.evidence.content }));
+  }
 }
