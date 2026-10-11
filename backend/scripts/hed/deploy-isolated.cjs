@@ -17,6 +17,7 @@ async function main() {
   if (fs.existsSync(manifestPath)) {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     await verifyDeployment(client, manifest, artifacts.disbursement.abi, artifacts.token.abi);
+    if (manifest.rpcUrl !== rpcUrl) atomicWrite(manifestPath, { ...manifest, rpcUrl });
     return console.log('HED existing deployment verified:', manifest.contractAddress);
   }
   if (process.argv.includes('--verify-only')) throw new Error('HED manifest missing; listener identity not assumed safe');

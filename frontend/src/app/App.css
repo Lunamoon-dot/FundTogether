@@ -481,13 +481,6 @@ textarea:focus {
   align-items: end;
   gap: 12px;
 }
-.milestone-picker {
-  padding-bottom: 16px;
-  border-bottom: 1px solid #edf0ed;
-}
-.milestone-help {
-  margin: 12px 0 24px;
-}
 .date-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -756,57 +749,6 @@ textarea[aria-invalid='true'] {
 }
 .wizard-fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 .wizard-final-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
-.milestone-card {
-  padding: 0;
-  overflow: hidden;
-}
-.milestone-card-heading {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-}
-.milestone-card-heading > .button {
-  min-height: 32px;
-  padding: 0 12px;
-}
-.milestone-toggle {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  flex: 1;
-  padding: 0;
-  border: 0;
-  background: none;
-  text-align: left;
-  color: #405c46;
-  font-size: 13px;
-}
-.milestone-number {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  border-radius: 7px;
-  background: #edf4e9;
-  color: #42734e;
-}
-.milestone-preview {
-  display: block;
-  margin-top: 4px;
-  color: #7d8c80;
-  font-size: 12px;
-  overflow-wrap: anywhere;
-}
-.milestone-chevron {
-  margin-left: auto;
-  font-size: 18px;
-}
-.milestone-fields {
-  padding: 8px 20px 20px;
-}
 .criteria-editor {
   min-width: 0;
   margin: 0;
@@ -841,20 +783,6 @@ textarea[aria-invalid='true'] {
   font-size: 13px;
   font-weight: 600;
 }
-.add-milestone {
-  width: 100%;
-  min-height: 44px;
-  margin-top: 12px;
-  border: 1px dashed #a9c1a9;
-  border-radius: 8px;
-  background: #f7faf5;
-  color: #39724b;
-  font-size: 13px;
-  font-weight: 600;
-}
-.add-milestone:hover {
-  background: #edf4e9;
-}
 .review-description {
   margin: 12px 0;
   color: #627467;
@@ -863,19 +791,7 @@ textarea[aria-invalid='true'] {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.review-milestone {
-  border-top: 1px solid #e7ede3;
-  padding: 8px 0;
-}
-.review-milestone h3,
 .campaign-review h3 {
-  overflow-wrap: anywhere;
-}
-.review-milestone ul {
-  padding-left: 20px;
-  color: #627467;
-  font-size: 13px;
-  line-height: 1.7;
   overflow-wrap: anywhere;
 }
 .confirmation-check {
@@ -922,9 +838,6 @@ textarea[aria-invalid='true'] {
   }
   .wizard-panel {
     padding: 18px;
-  }
-  .milestone-fields {
-    padding: 8px 16px 18px;
   }
 }
 .campaign-start {

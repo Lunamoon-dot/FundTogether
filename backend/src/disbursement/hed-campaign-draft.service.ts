@@ -66,12 +66,14 @@ export class HedCampaignDraftService {
 
   async registerOnchain(campaignId: string, userId: string, onchainCampaignId: string) {
     const [row] = await this.db.select({ organizationId: campaignMetadata.organizationId, commitmentHash: hedCampaignDrafts.commitmentHash,
+      verificationStatus: organizations.verificationStatus,
       goal: hedCampaignDrafts.goal, frozenAt: hedCampaignDrafts.frozenAt, representativeWallet: walletLinks.address })
       .from(hedCampaignDrafts).innerJoin(campaignMetadata, eq(campaignMetadata.id, hedCampaignDrafts.campaignMetadataId))
       .innerJoin(organizations, eq(organizations.id, campaignMetadata.organizationId))
       .innerJoin(walletLinks, eq(walletLinks.id, organizations.representativeWalletLinkId))
       .where(eq(campaignMetadata.id, campaignId)).limit(1);
     if (!row?.organizationId || !row.frozenAt || !row.commitmentHash) throw new ConflictException("Freeze the HED campaign before registering its on-chain identity");
+    if (row.verificationStatus !== "verified") throw new ForbiddenException("Only a verified organization can publish an HED campaign");
     await this.owner(row.organizationId, userId);
     const block = await this.chain.client.getBlock({ blockTag: "latest" });
     const snapshot = await this.chain.snapshot(BigInt(onchainCampaignId), block.number);

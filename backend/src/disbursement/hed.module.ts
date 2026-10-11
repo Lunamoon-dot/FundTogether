@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { DatabaseModule } from "../database/database.module";
 import { AuthModule } from "../modules/auth/auth.module";
 import { EvidenceStorageModule } from "../modules/evidence/evidence-storage.module";
-import { backendRoot } from "../advance/backend-root";
+import { backendRoot } from "../backend-root";
 import { HedBlockchainService } from "./hed-blockchain.service";
 import { HedIndexerService } from "./hed-indexer.service";
 import { HED_DEPLOYMENT } from "./hed.types";
@@ -27,10 +27,12 @@ import { HedVendorController } from "./hed-vendor.controller";
 import { HedVendorService } from "./hed-vendor.service";
 import { HedEvidencePackageController } from "./hed-evidence-package.controller";
 import { HedEvidencePackageService } from "./hed-evidence-package.service";
+import { HedOrganizationVerificationController } from "./hed-organization-verification.controller";
+import { HedOrganizationVerificationService } from "./hed-organization-verification.service";
 
 @Module({
   imports: [AuthModule, DatabaseModule, EvidenceStorageModule],
-  controllers: [HedHealthController, HedPublicController, HedCampaignDraftController, HedActivityController, HedCampaignVendorController, HedRequestDraftController, HedVendorVerificationController, HedReviewController, HedOutcomeReviewController, HedReviewQueueController, HedVendorController, HedEvidencePackageController],
+  controllers: [HedHealthController, HedPublicController, HedCampaignDraftController, HedActivityController, HedCampaignVendorController, HedRequestDraftController, HedVendorVerificationController, HedReviewController, HedOutcomeReviewController, HedReviewQueueController, HedVendorController, HedEvidencePackageController, HedOrganizationVerificationController],
   providers: [{
     provide: HED_DEPLOYMENT,
     useFactory: (): HedDeployment => {
@@ -40,7 +42,7 @@ import { HedEvidencePackageService } from "./hed-evidence-package.service";
       if (manifest.rpcUrl !== process.env.HED_BLOCKCHAIN_RPC_URL) throw new Error("HED manifest/RPC configuration mismatch");
       return Object.freeze(manifest);
     },
-  }, HedBlockchainService, HedIndexerService, HedCampaignDraftService, HedActivityService, HedRequestDraftService, HedVendorVerificationService, HedReviewService, HedVendorService, HedEvidencePackageService],
+  }, HedBlockchainService, HedIndexerService, HedCampaignDraftService, HedActivityService, HedRequestDraftService, HedVendorVerificationService, HedOrganizationVerificationService, HedReviewService, HedVendorService, HedEvidencePackageService],
   exports: [HedBlockchainService, HedIndexerService, HED_DEPLOYMENT],
 })
 export class HedModule {}

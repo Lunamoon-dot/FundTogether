@@ -13,7 +13,21 @@
 > Vẫn giữ mục tiêu xác minh sử dụng tiền sau cấp; điều kiện funding, xét duyệt,
 > reserve, timeout và refund mới phải được đặc tả trước khi sửa tài chính.
 
+> Tiếp nối ngày 2026-10-11: người dùng chọn phương án đề xuất cho sáu điểm
+> (cấp từ tiền đã huy động, ví tổ chức cố định, một khoản chưa đối chiếu, resolver
+> duyệt, kiểm sau chi trước cấp tiếp, hoàn escrow khi kết thúc) và yêu cầu viết
+> [kế hoạch cấp vốn](./funding-request-plan.md). Các chi tiết thời hạn, case,
+> reserve và phân bổ khi donor góp muộn được nêu là thiết kế cần đặc tả;
+> chưa phải implementation hoặc kết quả nghiệm thu. Không hỏi lại sáu lựa chọn đã chọn.
+
 ## 1. Quy tắc sử dụng — đọc trước khi quyết định
+
+Thiết kế đề xuất mới theo yêu cầu người dùng ngày 2026-10-11:
+[MVP P1](./hed-mvp-design.md) và [post-MVP](./hed-post-mvp-design.md).
+MVP đề xuất full funding, trả vendor, cọc giới hạn và tách delivery/outcome;
+đây là delta so với kế hoạch request trước. Các tham số và giới hạn được viết
+để review, chưa triển khai hoặc kiểm chứng. Ưu tiên MVP; backlog post-MVP không
+trở thành điều kiện hoàn thành MVP. Giữ các quyết định lịch sử bên dưới để đối chiếu.
 
 Đọc tài liệu này trước khi phân tích, suy luận, đề xuất hoặc chốt quyết định
 cho FundTogether, đặc biệt về nghiệp vụ, kiến trúc, dòng tiền, phạm vi phát triển

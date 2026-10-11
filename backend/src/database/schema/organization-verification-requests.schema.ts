@@ -3,14 +3,13 @@ import { check, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uu
 import { organizations } from "./organizations.schema";
 import { users } from "./users.schema";
 import { organizationVerificationRecords } from "./advance.schema";
-import type { OrganizationRequestContent } from "../../advance/organization-request.schema";
 
 export const organizationVerificationRequests = pgTable("organization_verification_requests", {
   id: uuid("id").defaultRandom().primaryKey(),
   organizationId: uuid("organization_id").notNull().references(() => organizations.id),
   status: varchar("status", { length: 32 }).notNull().default("DRAFT"),
   revision: integer("revision").notNull().default(1),
-  content: jsonb("content").$type<OrganizationRequestContent>().notNull(),
+  content: jsonb("content").$type<Record<string, unknown>>().notNull(),
   policyId: varchar("policy_id", { length: 100 }).notNull(),
   snapshotBytes: text("snapshot_bytes"), snapshotHash: varchar("snapshot_hash", { length: 66 }),
   submittedAt: timestamp("submitted_at", { withTimezone: true }),

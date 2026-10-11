@@ -47,6 +47,10 @@
 
 ## 3. Những quyết định tiền phải chốt trước task contract
 
+**Cập nhật cùng ngày:** người dùng đã chọn sáu phương án đề xuất; xem
+[kế hoạch nghiệp vụ mới](../../funding-request-plan.md). Bảng dưới giữ các điểm
+cần cụ thể hóa thành spec, không dùng nó để hỏi lại sáu lựa chọn đã được chọn.
+
 Không mở thêm hỏi đáp ở lượt lập kế hoạch này. Các điểm sau gom vào một đặc tả để review trước khi code phụ thuộc chúng:
 
 | Quyết định | Phương án tối giản đề xuất — chưa được coi là đã duyệt |

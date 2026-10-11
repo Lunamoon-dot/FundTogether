@@ -16,3 +16,8 @@ test('isolated HED runtime is ready and matches its immutable manifest', async (
   for (const key of ['protocolKind', 'chainId', 'contractAddress', 'tokenAddress', 'policyHash', 'abiVersion', 'resolver', 'backupResolver'])
     assert.equal(String(health.context?.[key]).toLowerCase(), String(manifest[key]).toLowerCase(), `health ${key}`);
 });
+
+test('isolated HED runtime exposes the organization API', async () => {
+  const response = await fetch(`${apiUrl}/organizations`);
+  assert.equal(response.status, 401, 'organization API must be registered and require a session');
+});

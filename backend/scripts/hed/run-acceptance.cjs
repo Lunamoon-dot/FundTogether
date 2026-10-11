@@ -14,7 +14,7 @@ const wslPath = value => `/mnt/${value.slice(0, 1).toLowerCase()}${value.slice(2
 if (process.platform === 'win32') run('wsl.exe', ['-d', 'Ubuntu-24.04', '--exec', 'sh', '-lc', `cd '${wslPath(path.join(root, 'contracts'))}' && forge test --match-contract HedFundingAndReservationTest`]);
 else run('forge', ['test', '--match-contract', 'HedFundingAndReservationTest'], path.join(root, 'contracts'));
 run(process.execPath, [npmCli, 'run', 'artifacts:hed'], backend);
-run(process.execPath, ['scripts/hed/artifact-contract.test.cjs'], backend);
+run(process.execPath, ['--test', 'scripts/hed/artifact-contract.test.cjs', 'scripts/hed/local-rpc-endpoint.test.cjs'], backend);
 run(process.execPath, [npmCli, 'run', 'build'], backend);
 run(process.execPath, [npmCli, 'run', 'test:hed'], backend);
 run(process.execPath, [npmCli, '--prefix', 'frontend', 'run', 'build'], root);

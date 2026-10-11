@@ -5,7 +5,7 @@ import generatedAbi = require("../blockchain/generated/hed/fund-together-disburs
 import tokenAbi = require("../blockchain/generated/hed/mock-usdc.abi.json");
 import { HED_ACTIVITY_STATES, HED_CAMPAIGN_STATES, HED_DEPLOYMENT, HED_REQUEST_STATES } from "./hed.types";
 import type { HedCampaignSnapshot, HedCampaignView, HedDeployment, HedRequestView, HedActivityView } from "./hed.types";
-import { backendRoot } from "../advance/backend-root";
+import { backendRoot } from "../backend-root";
 import { resolve } from "node:path";
 
 const identity = require(resolve(backendRoot, "scripts/hed/generate-artifacts.cjs"));

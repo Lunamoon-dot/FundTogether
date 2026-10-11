@@ -280,9 +280,9 @@
 .campaign-detail-main { display: grid; gap: 16px; min-width: 0; }
 .campaign-detail-aside { display: grid; gap: 16px; position: sticky; top: 92px; }
 .campaign-detail-layout .panel { margin: 0; }
-.campaign-detail-layout .advance-plan-form { gap: 14px; }
-.campaign-detail-layout .advance-plan-form label { display: grid; gap: 6px; }
-.campaign-detail-layout .advance-plan-form input { width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #cedcd1; border-radius: 8px; font: inherit; }
+.campaign-detail-layout .hed-plan-form { gap: 14px; }
+.campaign-detail-layout .hed-plan-form label { display: grid; gap: 6px; }
+.campaign-detail-layout .hed-plan-form input { width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #cedcd1; border-radius: 8px; font: inherit; }
 .campaign-aside-summary p { color: #69776e; }
 .current-step { padding: 22px 24px; border: 1px solid #d8e5da; border-left: 4px solid #267450; border-radius: 12px; background: #f7faf7; }
 .current-step h2 { margin: 8px 0; }
@@ -292,7 +292,7 @@
 .campaign-detail-main h2 { margin-bottom: 12px; }
 .campaign-detail-main > section > details { padding: 14px 0; border-top: 1px solid #edf0ec; }
 .campaign-detail-main > section > details > summary { cursor: pointer; font-weight: 600; }
-.campaign-detail-main .advance-hash { overflow-wrap: anywhere; }
+.campaign-detail-main .hed-hash { overflow-wrap: anywhere; }
 .muted { color: #768278; }
 @media (min-width: 721px) and (max-width: 1240px) {
   .public-header { position: static; flex-wrap: wrap; gap: 8px 14px; padding: 12px 24px; }
