@@ -20,6 +20,7 @@ library DisbursementTypes {
     }
 
     struct RequestView {
+        uint256 activityId;
         bytes32 requestHash;
         address vendor;
         bytes32 termsHash;
@@ -30,5 +31,11 @@ library DisbursementTypes {
         uint256 acceptedDeliveryValue;
         uint256 challengeEnd;
         RequestState state;
+    }
+
+    struct ActivityView {
+        bytes32 commitmentHash;
+        uint256 ceiling;
+        uint256 approved;
     }
 }
