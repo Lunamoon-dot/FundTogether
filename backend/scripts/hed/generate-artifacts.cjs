@@ -1,6 +1,9 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { toFunctionSignature } = require('viem');
+const { keccak256, toFunctionSignature, toHex } = require('viem');
+
+const bytes = value => JSON.stringify(value, null, 2) + '\n';
+const hashJson = value => keccak256(toHex(bytes(value)));
 
 function validateManifest(manifest) {
   const fail = () => { throw new Error('HED manifest identity/configuration invalid'); };
@@ -19,6 +22,26 @@ function validateManifest(manifest) {
   for (const key of ['genesisHash', 'contractCodeHash', 'tokenCodeHash', 'deploymentBlockHash', 'abiHash', 'policyHash']) {
     if (!/^0x[0-9a-fA-F]{64}$/.test(manifest[key]) || /^0x0+$/.test(manifest[key])) fail();
   }
+}
+
+async function verifyDeployment(client, manifest, abi, tokenAbi) {
+  validateManifest(manifest);
+  if (manifest.abiHash !== hashJson(abi)) throw new Error('HED ABI hash changed');
+  if (await client.getChainId() !== manifest.chainId) throw new Error('HED chain mismatch');
+  if ((await client.getBlock({ blockNumber: 0n })).hash !== manifest.genesisHash) throw new Error('HED genesis mismatch');
+  if ((await client.getBlock({ blockNumber: BigInt(manifest.deploymentBlockNumber) })).hash !== manifest.deploymentBlockHash)
+    throw new Error('HED deployment anchor mismatch');
+  for (const [addressKey, codeKey] of [['contractAddress', 'contractCodeHash'], ['tokenAddress', 'tokenCodeHash']]) {
+    const code = await client.getCode({ address: manifest[addressKey] });
+    if (!code || code === '0x' || keccak256(code) !== manifest[codeKey]) throw new Error(`HED ${codeKey} mismatch`);
+  }
+  const read = functionName => client.readContract({ address: manifest.contractAddress, abi, functionName });
+  for (const [functionName, expected] of Object.entries({ supportedToken: manifest.tokenAddress, resolver: manifest.resolver,
+    backupResolver: manifest.backupResolver, policyHash: manifest.policyHash })) {
+    if (String(await read(functionName)).toLowerCase() !== expected.toLowerCase()) throw new Error(`HED ${functionName} mismatch`);
+  }
+  if (await client.readContract({ address: manifest.tokenAddress, abi: tokenAbi || abi, functionName: 'decimals' }) !== 6)
+    throw new Error('HED token decimals mismatch');
 }
 
 function artifacts(root) {
@@ -69,4 +92,4 @@ if (require.main === module) {
   console.log(JSON.stringify({ runtimeBytes: result.runtimeBytes }));
 }
 
-module.exports = { artifacts, generate, atomicWrite, validateManifest };
+module.exports = { artifacts, generate, atomicWrite, validateManifest, hashJson, verifyDeployment };

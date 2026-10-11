@@ -3,14 +3,14 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { artifacts, generate, validateManifest } = require('./generate-artifacts.cjs');
+const { artifacts, generate, validateManifest, hashJson, verifyDeployment } = require('./generate-artifacts.cjs');
 
 const hash = n => `0x${n.toString(16).padStart(64, '0')}`;
 const address = n => `0x${n.toString(16).padStart(40, '0')}`;
 const manifest = () => ({ protocolKind: 'HED', chainId: 31339, rpcUrl: 'http://127.0.0.1:9548',
   contractAddress: address(1), tokenAddress: address(2), resolver: address(3), backupResolver: address(4),
   genesisHash: hash(5), contractCodeHash: hash(6), tokenCodeHash: hash(7), deploymentBlockNumber: '2',
-  deploymentBlockHash: hash(8), tokenDecimals: 6, confirmations: 1, abiVersion: '1', abiHash: hash(9), policyHash: hash(10) });
+  deploymentBlockHash: hash(8), tokenDecimals: 6, confirmations: 1, abiVersion: '1', abiHash: hashJson([]), policyHash: hash(10) });
 
 test('HED artifact generator rejects incomplete or oversized Foundry artifacts', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ft-hed-artifacts-'));
@@ -56,4 +56,30 @@ test('HED manifest rejects Workflow B endpoint and malformed deployment identity
     { contractAddress: address(0) }, { backupResolver: address(3) }, { deploymentBlockNumber: '0' }, { tokenDecimals: 18 }]) {
     assert.throws(() => validateManifest({ ...manifest(), ...delta }), /HED manifest/);
   }
+});
+
+function client(manifestValue = manifest()) {
+  return {
+    getChainId: async () => 31339,
+    getBlock: async ({ blockNumber }) => ({ hash: blockNumber === 0n ? manifestValue.genesisHash : manifestValue.deploymentBlockHash }),
+    getCode: async ({ address: value }) => value === manifestValue.contractAddress ? '0x6000' : '0x6001',
+    readContract: async ({ functionName }) => {
+      if (functionName === 'supportedToken') return manifestValue.tokenAddress;
+      if (functionName === 'resolver') return manifestValue.resolver;
+      if (functionName === 'backupResolver') return manifestValue.backupResolver;
+      if (functionName === 'policyHash') return manifestValue.policyHash;
+      if (functionName === 'decimals') return 6;
+      throw new Error('unexpected read');
+    },
+  };
+}
+
+test('HED runtime verification binds endpoint, code, ABI, token and both resolvers', async () => {
+  const current = manifest();
+  current.contractCodeHash = require('viem').keccak256('0x6000');
+  current.tokenCodeHash = require('viem').keccak256('0x6001');
+  await verifyDeployment(client(current), current, []);
+  const wrong = client(current);
+  wrong.readContract = async () => address(99);
+  await assert.rejects(verifyDeployment(wrong, current, []), /HED/);
 });
