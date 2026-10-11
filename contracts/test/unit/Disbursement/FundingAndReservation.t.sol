@@ -152,6 +152,7 @@ contract HedFundingAndReservationTest is Test {
         assertEq(campaign.reserved, 800e6);
         assertEq(campaign.grossPaid, 200e6);
         assertEq(request.grossPaid, 200e6);
+        assertEq(request.termsHash, keccak256("request"));
     }
 
     function test_secondRequestCannotBypassTheSingleOpenFinancialSlot() public {
