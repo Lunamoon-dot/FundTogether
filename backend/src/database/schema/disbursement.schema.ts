@@ -4,6 +4,20 @@ import { campaignMetadata } from "./campaigns.schema";
 import { indexerStreams } from "./indexer.schema";
 import { users } from "./users.schema";
 import type { HedCampaignSnapshot } from "../../disbursement/hed.types";
+import type { HedCampaignDraftInput } from "../../disbursement/hed-campaign-draft.schema";
+
+export const hedCampaignDrafts = pgTable("hed_campaign_drafts", {
+  campaignMetadataId: uuid("campaign_metadata_id").primaryKey().references(() => campaignMetadata.id),
+  content: jsonb("content").$type<HedCampaignDraftInput>().notNull(),
+  goal: numeric("goal", { precision: 78, scale: 0 }).notNull(),
+  fundingDuration: integer("funding_duration").notNull(),
+  commitmentHash: varchar("commitment_hash", { length: 66 }),
+  frozenAt: timestamp("frozen_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, table => [
+  check("hed_campaign_draft_value_check", sql`${table.goal} > 0 AND ${table.fundingDuration} >= 86400 AND ${table.fundingDuration} <= 2592000`),
+  check("hed_campaign_draft_freeze_check", sql`(${table.frozenAt} IS NULL AND ${table.commitmentHash} IS NULL) OR (${table.frozenAt} IS NOT NULL AND ${table.commitmentHash} ~ '^0x[0-9a-f]{64}$' AND ${table.commitmentHash} !~ '^0x0+$')`),
+]);
 
 export const disbursementCampaigns = pgTable("disbursement_campaigns", {
   campaignMetadataId: uuid("campaign_metadata_id").primaryKey().references(() => campaignMetadata.id),

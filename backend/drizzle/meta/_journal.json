@@ -127,6 +127,13 @@
       "when": 1791714898388,
       "tag": "0017_typical_polaris",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791715864687,
+      "tag": "0018_lumpy_risque",
+      "breakpoints": true
     }
   ]
 }
