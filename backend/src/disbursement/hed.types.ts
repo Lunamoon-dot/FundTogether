@@ -31,7 +31,7 @@ export interface HedCheckpoint { blockNumber: string; blockHash: Hex; chainTimes
 export interface HedCampaignView {
   organizer: Address; commitmentHash: Hex; goal: string; fundingEnd: string; fullyFundedAt: string;
   state: typeof HED_CAMPAIGN_STATES[number]; contributed: string; available: string; reserved: string;
-  grossPaid: string; basePool: string; refunded: string; refundSnapshotted: boolean;
+  grossPaid: string; basePool: string; supplementPool: string; refunded: string; refundSnapshotted: boolean;
 }
 export interface HedActivityView { commitmentHash: Hex; ceiling: string; approved: string }
 export interface HedRequestView {

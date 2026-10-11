@@ -332,6 +332,11 @@
             "internalType": "uint256"
           },
           {
+            "name": "supplementPool",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
             "name": "refunded",
             "type": "uint256",
             "internalType": "uint256"
@@ -1629,7 +1634,13 @@
         "internalType": "address"
       },
       {
-        "name": "amount",
+        "name": "baseAmount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "supplementAmount",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"

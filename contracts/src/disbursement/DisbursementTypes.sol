@@ -19,6 +19,7 @@ library DisbursementTypes {
         uint256 reserved;
         uint256 grossPaid;
         uint256 basePool;
+        uint256 supplementPool;
         uint256 refunded;
         bool refundSnapshotted;
     }

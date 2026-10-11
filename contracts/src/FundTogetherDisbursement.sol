@@ -40,6 +40,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     mapping(uint256 => mapping(uint256 => bool)) public outcomeCaseOpen;
     mapping(uint256 => mapping(address => uint256)) public contributions;
     mapping(uint256 => mapping(address => bool)) private _refundClaimed;
+    mapping(uint256 => mapping(address => uint256)) private _supplementClaimed;
 
     event CampaignCreated(uint256 indexed campaignId, address indexed organizer, bytes32 commitmentHash, uint256 goal, uint256 fundingEnd);
     event Donated(uint256 indexed campaignId, address indexed donor, uint256 amount, uint256 contributed);
@@ -61,7 +62,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     event DeliveryCaseUpheld(uint256 indexed campaignId, uint256 indexed requestId, bytes32 decisionHash, uint256 challengeEnd);
     event FundingFailed(uint256 indexed campaignId, uint256 basePool);
     event WindDownStarted(uint256 indexed campaignId, uint256 basePool);
-    event RefundClaimed(uint256 indexed campaignId, address indexed donor, uint256 amount);
+    event RefundClaimed(uint256 indexed campaignId, address indexed donor, uint256 baseAmount, uint256 supplementAmount);
     event FundsReturned(uint256 indexed campaignId, uint256 indexed requestId, address indexed vendor, uint256 amount);
     event DeliveryAuthorizationInvalidated(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
     event UncommittedRequestCancelled(uint256 indexed campaignId, uint256 indexed requestId, uint256 amount, bytes32 reasonHash);
@@ -133,11 +134,19 @@ contract FundTogetherDisbursement is ReentrancyGuard {
 
     function claimRefund(uint256 id) external nonReentrant {
         T.CampaignView storage c = _campaign(id);
-        if (!c.refundSnapshotted || _refundClaimed[id][msg.sender] || contributions[id][msg.sender] == 0) revert WrongState();
-        _refundClaimed[id][msg.sender] = true;
-        uint256 amount = Math.mulDiv(contributions[id][msg.sender], c.basePool, c.contributed);
+        if (!c.refundSnapshotted || contributions[id][msg.sender] == 0) revert WrongState();
+        uint256 baseAmount;
+        if (!_refundClaimed[id][msg.sender]) {
+            _refundClaimed[id][msg.sender] = true;
+            baseAmount = Math.mulDiv(contributions[id][msg.sender], c.basePool, c.contributed);
+        }
+        uint256 supplementEntitlement = Math.mulDiv(contributions[id][msg.sender], c.supplementPool, c.contributed);
+        uint256 supplementAmount = supplementEntitlement - _supplementClaimed[id][msg.sender];
+        if (baseAmount == 0 && supplementAmount == 0) revert WrongState();
+        _supplementClaimed[id][msg.sender] += supplementAmount;
+        uint256 amount = baseAmount + supplementAmount;
         c.refunded += amount;
-        emit RefundClaimed(id, msg.sender, amount);
+        emit RefundClaimed(id, msg.sender, baseAmount, supplementAmount);
         if (amount != 0) _sendExact(msg.sender, amount);
     }
 
@@ -170,7 +179,8 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         if (amount == 0 || amount > r.grossPaid - r.returned) revert InvalidInput();
         if (r.state == T.RequestState.DELIVERY_CANDIDATE && deliveryCaseOpen[campaignId][requestId]) revert WrongState();
         r.returned += amount;
-        c.available += amount;
+        if (c.refundSnapshotted) c.supplementPool += amount;
+        else c.available += amount;
         emit FundsReturned(campaignId, requestId, msg.sender, amount);
         if (r.state == T.RequestState.DELIVERY_CANDIDATE) {
             r.acceptedDeliveryValue = 0;

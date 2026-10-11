@@ -286,6 +286,25 @@ contract HedFundingAndReservationTest is Test {
         assertEq(token.balanceOf(donor), before + 2_000e6);
     }
 
+    function test_lateVendorReturnAfterWindDownBecomesClaimableSupplementWithoutReopeningCampaign() public {
+        uint256 campaignId = _activeCampaign();
+        uint256 requestId = _settleRequest(campaignId, 1_000e6, keccak256("purchase"));
+        vm.warp(block.timestamp + 180 days);
+        disbursement.startWindDown(campaignId);
+        vm.prank(vendor);
+        token.approve(address(disbursement), 200e6);
+        vm.prank(vendor);
+        disbursement.returnFunds(campaignId, requestId, 200e6);
+        T.CampaignView memory beforeClaim = disbursement.campaign(campaignId);
+        assertEq(beforeClaim.basePool, 1_000e6);
+        assertEq(beforeClaim.supplementPool, 200e6);
+        uint256 before = token.balanceOf(donor);
+        vm.prank(donor);
+        disbursement.claimRefund(campaignId);
+        assertEq(token.balanceOf(donor), before + 1_200e6);
+        assertEq(uint256(disbursement.campaign(campaignId).state), uint256(T.CampaignState.STOPPED));
+    }
+
     function test_vendorReturnRequiresActualTokenInflowAndCannotExceedGrossPaid() public {
         uint256 campaignId = _activeCampaign();
         vm.prank(organizer);
