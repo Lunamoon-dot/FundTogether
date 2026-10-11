@@ -102,6 +102,17 @@ export const hedRequestReviews = pgTable("hed_request_reviews", {
   check("hed_request_review_outcome_check", sql`(${table.content}->>'outcome') IN ('MET','NOT_MET','NEEDS_INFO')`),
 ]);
 
+export const hedActivityReviews = pgTable("hed_activity_reviews", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  activityId: uuid("activity_id").notNull().references(() => hedActivities.id),
+  content: jsonb("content").$type<HedReviewInput>().notNull(),
+  reviewedBy: uuid("reviewed_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, table => [
+  uniqueIndex("hed_activity_review_criterion_version_idx").on(table.activityId, sql`(${table.content}->>'evidenceVersion')`, sql`(${table.content}->>'criterionId')`),
+  check("hed_activity_review_outcome_check", sql`(${table.content}->>'outcome') IN ('MET','NOT_MET','NEEDS_INFO')`),
+]);
+
 export const hedEvidencePackages = pgTable("hed_evidence_packages", {
   id: uuid("id").defaultRandom().primaryKey(),
   campaignMetadataId: uuid("campaign_metadata_id").references(() => campaignMetadata.id),
