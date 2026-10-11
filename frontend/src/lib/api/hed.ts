@@ -17,6 +17,9 @@ export async function createHedCampaignDraft(organizationId: string, value: HedC
 export async function freezeHedCampaignDraft(id: string) {
   return (await http.post<{ campaignId: string; commitmentHash: string; frozenAt: string }>(`/v1/disbursement/campaigns/${id}/freeze`)).data
 }
+export async function registerHedOnchainCampaign(id: string, onchainCampaignId: string) {
+  return (await http.post<{ campaignId: string; onchainCampaignId: string }>(`/v1/disbursement/campaigns/${id}/onchain`, { onchainCampaignId })).data
+}
 
 export interface HedVendorOption { id: string; vendorWallet: string; content: { legalName: string; categories: string[] }; validUntil: string }
 export interface HedRequestDraftInput { vendorVerificationId: string; activityReference: string; purpose: string;

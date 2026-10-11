@@ -22,4 +22,9 @@ export class HedCampaignDraftController {
   freeze(@Param("campaignId", new ParseUUIDPipe()) campaignId: string, @Req() request: Request) {
     return this.drafts.freeze(campaignId, request.account!.userId);
   }
+  @Post(":campaignId/onchain")
+  registerOnchain(@Param("campaignId", new ParseUUIDPipe()) campaignId: string, @Body("onchainCampaignId") onchainCampaignId: unknown, @Req() request: Request) {
+    if (typeof onchainCampaignId !== "string" || !/^\d+$/.test(onchainCampaignId)) throw new BadRequestException("HED on-chain campaign ID is invalid");
+    return this.drafts.registerOnchain(campaignId, request.account!.userId, onchainCampaignId);
+  }
 }
