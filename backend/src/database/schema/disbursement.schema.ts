@@ -1,10 +1,12 @@
 import { sql } from "drizzle-orm";
-import { check, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { check, index, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 import { campaignMetadata } from "./campaigns.schema";
 import { indexerStreams } from "./indexer.schema";
 import { users } from "./users.schema";
 import type { HedCampaignSnapshot } from "../../disbursement/hed.types";
 import type { HedCampaignDraftInput } from "../../disbursement/hed-campaign-draft.schema";
+import type { HedRequestDraftInput } from "../../disbursement/hed-request-draft.schema";
+import type { HedVendorVerificationInput } from "../../disbursement/hed-vendor-verification.schema";
 
 export const hedCampaignDrafts = pgTable("hed_campaign_drafts", {
   campaignMetadataId: uuid("campaign_metadata_id").primaryKey().references(() => campaignMetadata.id),
@@ -17,6 +19,40 @@ export const hedCampaignDrafts = pgTable("hed_campaign_drafts", {
 }, table => [
   check("hed_campaign_draft_value_check", sql`${table.goal} > 0 AND ${table.fundingDuration} >= 86400 AND ${table.fundingDuration} <= 2592000`),
   check("hed_campaign_draft_freeze_check", sql`(${table.frozenAt} IS NULL AND ${table.commitmentHash} IS NULL) OR (${table.frozenAt} IS NOT NULL AND ${table.commitmentHash} ~ '^0x[0-9a-f]{64}$' AND ${table.commitmentHash} !~ '^0x0+$')`),
+]);
+
+export const hedVendorVerifications = pgTable("hed_vendor_verifications", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  vendorWallet: varchar("vendor_wallet", { length: 42 }).notNull(),
+  content: jsonb("content").$type<HedVendorVerificationInput>().notNull(),
+  status: varchar("status", { length: 16 }).notNull(),
+  reportBytes: text("report_bytes").notNull(),
+  reportHash: varchar("report_hash", { length: 66 }).notNull().unique(),
+  checkedBy: uuid("checked_by").notNull().references(() => users.id),
+  validUntil: timestamp("valid_until", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, table => [
+  index("hed_vendor_wallet_history_idx").on(table.vendorWallet, table.createdAt),
+  check("hed_vendor_verification_status_check", sql`${table.status} IN ('VERIFIED', 'REVOKED')`),
+  check("hed_vendor_wallet_check", sql`${table.vendorWallet} ~ '^0x[0-9a-f]{40}$' AND ${table.vendorWallet} !~ '^0x0+$'`),
+  check("hed_vendor_report_hash_check", sql`${table.reportHash} ~ '^0x[0-9a-f]{64}$' AND ${table.reportHash} !~ '^0x0+$'`),
+]);
+
+export const hedRequestDrafts = pgTable("hed_request_drafts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  campaignMetadataId: uuid("campaign_metadata_id").notNull().references(() => campaignMetadata.id),
+  vendorVerificationId: uuid("vendor_verification_id").notNull().references(() => hedVendorVerifications.id),
+  content: jsonb("content").$type<HedRequestDraftInput>().notNull(),
+  version: integer("version").notNull().default(1),
+  requestHash: varchar("request_hash", { length: 66 }),
+  frozenAt: timestamp("frozen_at", { withTimezone: true }),
+  createdBy: uuid("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, table => [
+  index("hed_request_campaign_idx").on(table.campaignMetadataId, table.createdAt),
+  check("hed_request_draft_value_check", sql`${table.version} > 0 AND (${table.content}->>'amount') ~ '^[1-9][0-9]*$' AND (${table.content}->>'deposit') ~ '^(0|[1-9][0-9]*)$' AND ((${table.content}->>'deposit')::numeric <= (${table.content}->>'amount')::numeric)`),
+  check("hed_request_draft_freeze_check", sql`(${table.frozenAt} IS NULL AND ${table.requestHash} IS NULL) OR (${table.frozenAt} IS NOT NULL AND ${table.requestHash} ~ '^0x[0-9a-f]{64}$' AND ${table.requestHash} !~ '^0x0+$')`),
 ]);
 
 export const disbursementCampaigns = pgTable("disbursement_campaigns", {
