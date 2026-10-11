@@ -95,7 +95,7 @@ export function OrganizationWorkspace({ organizationId, section, session, sessio
             : <OrganizationsPage key={session.userId} userId={session.userId} />}
         </> : organizationId && !organization ? <section className="panel"><h2>Tổ chức không khả dụng</h2>
           <p>Tổ chức không tồn tại hoặc tài khoản này không có quyền quản lý.</p><a href="#/organizations">Chọn tổ chức khác</a></section>
-          : drafts && !isAdvance ? <UnassignedCampaignDrafts key={`${session.userId}:${drafts[1]}`} userId={session.userId} campaignId={drafts[1]} editing={Boolean(drafts[2])} onDeleted={setNotice} basePath={basePath} />
+          : drafts && !isAdvance && !isHed ? <UnassignedCampaignDrafts key={`${session.userId}:${drafts[1]}`} userId={session.userId} campaignId={drafts[1]} editing={Boolean(drafts[2])} onDeleted={setNotice} basePath={basePath} />
           : !currentSection ? <section className="panel"><h2>Không tìm thấy trang</h2></section>
             : <>
                 {!organization ? <section className="panel"><h1>Bắt đầu quản lý campaign</h1>
