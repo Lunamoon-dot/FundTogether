@@ -49,6 +49,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     event FundingFailed(uint256 indexed campaignId, uint256 basePool);
     event RefundClaimed(uint256 indexed campaignId, address indexed donor, uint256 amount);
     event FundsReturned(uint256 indexed campaignId, uint256 indexed requestId, address indexed vendor, uint256 amount);
+    event DeliveryAuthorizationInvalidated(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
     event UncommittedRequestCancelled(uint256 indexed campaignId, uint256 indexed requestId, uint256 amount, bytes32 reasonHash);
 
     constructor(address token, address resolver_, bytes32 policyHash_) {
@@ -136,9 +137,16 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         T.RequestView storage r = _requests[campaignId][requestId];
         if (msg.sender != r.vendor) revert WrongCaller();
         if (amount == 0 || amount > r.grossPaid - r.returned) revert InvalidInput();
+        if (r.state == T.RequestState.DELIVERY_CANDIDATE && deliveryCaseOpen[campaignId][requestId]) revert WrongState();
         r.returned += amount;
         c.available += amount;
         emit FundsReturned(campaignId, requestId, msg.sender, amount);
+        if (r.state == T.RequestState.DELIVERY_CANDIDATE) {
+            r.acceptedDeliveryValue = 0;
+            r.challengeEnd = 0;
+            r.state = T.RequestState.VENDOR_COMMITTED;
+            emit DeliveryAuthorizationInvalidated(campaignId, requestId, keccak256("RETURN_AFTER_CANDIDATE"));
+        }
         _receiveExact(msg.sender, amount);
     }
 
@@ -220,7 +228,8 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         if (requestId >= requestCount[campaignId]) revert InvalidReference();
         T.RequestView storage r = _requests[campaignId][requestId];
         if (r.state != T.RequestState.DELIVERY_CANDIDATE || block.timestamp < r.challengeEnd || deliveryCaseOpen[campaignId][requestId]) revert WrongState();
-        uint256 due = r.acceptedDeliveryValue > r.grossPaid ? r.acceptedDeliveryValue - r.grossPaid : 0;
+        uint256 netPaid = r.grossPaid - r.returned;
+        uint256 due = r.acceptedDeliveryValue > netPaid ? r.acceptedDeliveryValue - netPaid : 0;
         uint256 payout = due < c.reserved ? due : c.reserved;
         if (payout != 0) {
             c.reserved -= payout;

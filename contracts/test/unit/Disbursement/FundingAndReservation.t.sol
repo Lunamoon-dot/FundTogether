@@ -216,6 +216,31 @@ contract HedFundingAndReservationTest is Test {
         disbursement.returnFunds(campaignId, requestId, 101e6);
     }
 
+    function test_returnAfterCandidateInvalidatesDeliveryDecisionAndUsesNetPaidForReplacementFinal() public {
+        uint256 campaignId = _activeCampaign();
+        vm.prank(organizer);
+        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), vendor, 1_000e6, 200e6);
+        vm.prank(resolver);
+        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
+        vm.prank(vendor);
+        disbursement.acknowledgeVendor(campaignId, requestId, keccak256("terms"));
+        disbursement.payDeposit(campaignId, requestId);
+        vm.prank(resolver);
+        disbursement.candidateDelivery(campaignId, requestId, 700e6, keccak256("delivery-one"));
+        vm.prank(vendor);
+        token.approve(address(disbursement), 100e6);
+        vm.prank(vendor);
+        disbursement.returnFunds(campaignId, requestId, 100e6);
+        vm.warp(block.timestamp + 3 days);
+        vm.expectRevert(FundTogetherDisbursement.WrongState.selector);
+        disbursement.executeFinal(campaignId, requestId);
+        vm.prank(resolver);
+        disbursement.candidateDelivery(campaignId, requestId, 700e6, keccak256("delivery-two"));
+        vm.warp(block.timestamp + 3 days);
+        disbursement.executeFinal(campaignId, requestId);
+        assertEq(token.balanceOf(vendor), 700e6);
+    }
+
     function test_organizerCanCancelOnlyAnUncommittedReservedRequest() public {
         uint256 campaignId = _activeCampaign();
         vm.prank(organizer);

@@ -884,6 +884,31 @@
   },
   {
     "type": "event",
+    "name": "DeliveryAuthorizationInvalidated",
+    "inputs": [
+      {
+        "name": "campaignId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "requestId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "reasonHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "DeliveryCandidate",
     "inputs": [
       {
