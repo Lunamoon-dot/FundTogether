@@ -104,12 +104,32 @@ export const hedRequestReviews = pgTable("hed_request_reviews", {
 
 export const hedEvidencePackages = pgTable("hed_evidence_packages", {
   id: uuid("id").defaultRandom().primaryKey(),
+  campaignMetadataId: uuid("campaign_metadata_id").references(() => campaignMetadata.id),
   content: jsonb("content").$type<HedEvidencePackageInput>().notNull(),
   createdBy: uuid("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, table => [
   uniqueIndex("hed_evidence_package_manifest_idx").on(sql`(${table.content}->>'manifestHash')`),
   check("hed_evidence_package_kind_check", sql`(${table.content}->>'kind') IN ('DELIVERY','OUTCOME')`),
+]);
+
+export const hedEvidenceDocuments = pgTable("hed_evidence_documents", {
+  id: uuid("id").primaryKey(),
+  campaignMetadataId: uuid("campaign_metadata_id").notNull().references(() => campaignMetadata.id),
+  activityId: uuid("activity_id").notNull().references(() => hedActivities.id),
+  requestDraftId: uuid("request_draft_id").references(() => hedRequestDrafts.id),
+  uploadedBy: uuid("uploaded_by").notNull().references(() => users.id),
+  kind: varchar("kind", { length: 16 }).notNull(),
+  originalName: varchar("original_name", { length: 200 }).notNull(),
+  mediaType: varchar("media_type", { length: 100 }).notNull(),
+  byteSize: integer("byte_size").notNull(),
+  sha256: varchar("sha256", { length: 66 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, table => [
+  index("hed_evidence_document_scope_idx").on(table.campaignMetadataId, table.activityId, table.createdAt),
+  check("hed_evidence_document_kind_check", sql`${table.kind} IN ('DELIVERY', 'OUTCOME')`),
+  check("hed_evidence_document_size_check", sql`${table.byteSize} > 0 AND ${table.byteSize} <= 10485760`),
+  check("hed_evidence_document_hash_check", sql`${table.sha256} ~ '^0x[0-9a-f]{64}$' AND ${table.sha256} !~ '^0x0+$'`),
 ]);
 
 export const disbursementCampaigns = pgTable("disbursement_campaigns", {
