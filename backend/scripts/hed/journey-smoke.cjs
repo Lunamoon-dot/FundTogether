@@ -36,9 +36,10 @@ async function main() {
   await client.request({ method: 'evm_increaseTime', params: [3 * 24 * 60 * 60] }); await client.request({ method: 'evm_mine' });
   await send(1, disbursement.abi, manifest.contractAddress, 'executeFinal', [campaignId, 0n]);
   assert.equal(await client.readContract({ address: manifest.tokenAddress, abi: token.abi, functionName: 'balanceOf', args: [accounts[3]] }), vendorBalanceBefore + request);
-  await send(0, disbursement.abi, manifest.contractAddress, 'candidateOutcome', [campaignId, 0n, hash('outcome')]);
+  const outcomeReportHash = hash('outcome');
+  await send(0, disbursement.abi, manifest.contractAddress, 'candidateOutcome', [campaignId, 0n, outcomeReportHash]);
   await client.request({ method: 'evm_increaseTime', params: [3 * 24 * 60 * 60] }); await client.request({ method: 'evm_mine' });
-  await send(0, disbursement.abi, manifest.contractAddress, 'verifyOutcome', [campaignId, 0n, hash('outcome-final')]);
+  await send(0, disbursement.abi, manifest.contractAddress, 'verifyOutcome', [campaignId, 0n, outcomeReportHash]);
   const activity = await client.readContract({ address: manifest.contractAddress, abi: disbursement.abi, functionName: 'activity', args: [campaignId, 0n] });
   assert.equal(activity.state, 2); console.log(JSON.stringify({ campaignId: campaignId.toString(), vendorPaid: request.toString(), outcomeState: 'VERIFIED' }));
 }

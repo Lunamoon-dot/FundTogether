@@ -6,6 +6,8 @@ const root = path.resolve(__dirname, '../../..');
 const envFile = path.join(root, '.local/hed/backend.env');
 if (fs.existsSync(envFile)) require('dotenv').config({ path: envFile, quiet: true });
 guardEnvironment(process.env);
+const manifestPath = path.join(root, '.local/hed/generated/deployment.local.json');
+if (fs.existsSync(manifestPath)) process.env.HED_BLOCKCHAIN_RPC_URL = JSON.parse(fs.readFileSync(manifestPath, 'utf8')).rpcUrl;
 const child = spawn(process.execPath, [path.join(root, 'backend/dist/src/disbursement/hed-main.js')], {
   cwd: path.join(root, 'backend'), env: process.env, stdio: 'inherit',
 });

@@ -3,7 +3,7 @@ import { createPublicClient, defineChain, http } from "viem";
 import type { Abi } from "viem";
 import generatedAbi = require("../blockchain/generated/hed/fund-together-disbursement.abi.json");
 import tokenAbi = require("../blockchain/generated/hed/mock-usdc.abi.json");
-import { HED_CAMPAIGN_STATES, HED_DEPLOYMENT, HED_REQUEST_STATES } from "./hed.types";
+import { HED_ACTIVITY_STATES, HED_CAMPAIGN_STATES, HED_DEPLOYMENT, HED_REQUEST_STATES } from "./hed.types";
 import type { HedCampaignSnapshot, HedCampaignView, HedDeployment, HedRequestView, HedActivityView } from "./hed.types";
 import { backendRoot } from "../advance/backend-root";
 import { resolve } from "node:path";
@@ -61,7 +61,9 @@ export class HedBlockchainService implements OnModuleInit {
       }
       const activities: HedActivityView[] = [];
       for (let activityId = 0n; activityId < (activityCount as bigint); activityId++) {
-        activities.push(json<HedActivityView>(await this.read("activity", [id, activityId], blockNumber)));
+        const activity = json<HedActivityView>(await this.read("activity", [id, activityId], blockNumber));
+        activity.state = label(HED_ACTIVITY_STATES, activity.state);
+        activities.push(activity);
       }
       await this.verifyDeployment();
       const after = await this.client.getBlock({ blockNumber });

@@ -1,9 +1,12 @@
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 $deploy = Join-Path $PSScriptRoot 'deploy-isolated.cjs'
+$wslIp = ((& wsl.exe -d Ubuntu-24.04 --exec hostname -I) -join '' -replace '\s', '')
+if ($wslIp -notmatch '^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$') { throw 'HED WSL NAT address invalid.' }
+$env:HED_BLOCKCHAIN_RPC_URL = "http://${wslIp}:9548"
 $listeners = Get-NetTCPConnection -LocalPort 9548 -State Listen -ErrorAction SilentlyContinue
 $responding = $false
-try { Invoke-WebRequest -Uri 'http://127.0.0.1:9548' -Method Post -ContentType 'application/json' -Body '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' -TimeoutSec 2 | Out-Null; $responding = $true }
+try { Invoke-WebRequest -Uri $env:HED_BLOCKCHAIN_RPC_URL -Method Post -ContentType 'application/json' -Body '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' -TimeoutSec 2 | Out-Null; $responding = $true }
 catch { if ($_.Exception.Response) { $responding = $true } }
 if ($listeners -or $responding) {
     & node $deploy --verify-only

@@ -5,7 +5,7 @@ const { generate, atomicWrite, verifyDeployment } = require('./generate-artifact
 
 const root = path.resolve(__dirname, '../../..');
 const manifestPath = path.join(root, '.local/hed/generated/deployment.local.json');
-const rpcUrl = 'http://127.0.0.1:9548';
+const rpcUrl = process.env.HED_BLOCKCHAIN_RPC_URL || 'http://127.0.0.1:9548';
 const chain = defineChain({ id: 31339, name: 'FundTogether HED', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
   rpcUrls: { default: { http: [rpcUrl] } } });
 

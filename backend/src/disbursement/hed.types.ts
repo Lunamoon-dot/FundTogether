@@ -3,6 +3,7 @@ import type { Address, Hex } from "viem";
 export const HED_DEPLOYMENT = Symbol("HED_DEPLOYMENT");
 export const HED_CAMPAIGN_STATES = ["FUNDING", "ACTIVE", "WIND_DOWN", "COMPLETED", "STOPPED"] as const;
 export const HED_REQUEST_STATES = ["DRAFT", "SUBMITTED", "APPROVED_RESERVED", "VENDOR_COMMITTED", "DELIVERY_CANDIDATE", "FINANCIALLY_SETTLED", "CANCELLED"] as const;
+export const HED_ACTIVITY_STATES = ["OPEN", "OUTCOME_CANDIDATE", "VERIFIED", "CANCELLED_NO_SPEND", "FAILED"] as const;
 
 export interface HedContext {
   protocolKind: "HED";
@@ -33,7 +34,7 @@ export interface HedCampaignView {
   state: typeof HED_CAMPAIGN_STATES[number]; contributed: string; available: string; reserved: string;
   grossPaid: string; basePool: string; supplementPool: string; refunded: string; refundSnapshotted: boolean;
 }
-export interface HedActivityView { commitmentHash: Hex; ceiling: string; approved: string }
+export interface HedActivityView { commitmentHash: Hex; outcomeReportHash: Hex; ceiling: string; approved: string; createdAt: string; challengeEnd: string; state: typeof HED_ACTIVITY_STATES[number] }
 export interface HedRequestView {
   activityId: string; requestHash: Hex; vendor: Address; termsHash: Hex; approvedAmount: string;
   depositAmount: string; grossPaid: string; returned: string; acceptedDeliveryValue: string;

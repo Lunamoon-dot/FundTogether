@@ -14,7 +14,7 @@ function validateManifest(manifest) {
   try { url = new URL(manifest.rpcUrl); } catch { fail(); }
   if (manifest.protocolKind !== 'HED' || manifest.chainId !== 31339 || manifest.tokenDecimals !== 6
     || manifest.confirmations !== 1 || manifest.abiVersion !== '1' || url.protocol !== 'http:'
-    || !['localhost', '127.0.0.1'].includes(url.hostname) || url.port !== '9548' || url.username
+    || !(['localhost', '127.0.0.1'].includes(url.hostname) || /^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(url.hostname)) || url.port !== '9548' || url.username
     || url.password || url.pathname !== '/' || url.search || url.hash || !/^\d+$/.test(manifest.deploymentBlockNumber)
     || BigInt(manifest.deploymentBlockNumber) === 0n) fail();
   if (manifest.policyHash !== hashJson(policy)) fail();

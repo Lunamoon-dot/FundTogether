@@ -43,6 +43,7 @@ library DisbursementTypes {
 
     struct ActivityView {
         bytes32 commitmentHash;
+        bytes32 outcomeReportHash;
         uint256 ceiling;
         uint256 approved;
         uint256 createdAt;

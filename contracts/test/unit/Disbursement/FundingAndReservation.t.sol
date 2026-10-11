@@ -184,8 +184,11 @@ contract HedFundingAndReservationTest is Test {
         vm.prank(resolver);
         disbursement.candidateOutcome(campaignId, 0, keccak256("outcome"));
         vm.warp(block.timestamp + 3 days);
+        vm.expectRevert(FundTogetherDisbursement.WrongState.selector);
         vm.prank(resolver);
-        disbursement.verifyOutcome(campaignId, 0, keccak256("outcome-final"));
+        disbursement.verifyOutcome(campaignId, 0, keccak256("other-outcome"));
+        vm.prank(resolver);
+        disbursement.verifyOutcome(campaignId, 0, keccak256("outcome"));
         vm.prank(organizer);
         disbursement.createActivity(campaignId, keccak256("next"), 1_000e6);
     }
@@ -199,7 +202,7 @@ contract HedFundingAndReservationTest is Test {
         vm.warp(block.timestamp + 3 days);
         vm.expectRevert(FundTogetherDisbursement.WrongState.selector);
         vm.prank(resolver);
-        disbursement.verifyOutcome(campaignId, 0, keccak256("final"));
+        disbursement.verifyOutcome(campaignId, 0, keccak256("outcome"));
         vm.prank(resolver);
         disbursement.upholdOutcomeCase(campaignId, 0, keccak256("decision"));
         vm.expectRevert(FundTogetherDisbursement.WrongState.selector);
@@ -207,10 +210,10 @@ contract HedFundingAndReservationTest is Test {
         disbursement.openOutcomeCase(campaignId, 0, keccak256("replay"));
         vm.expectRevert(FundTogetherDisbursement.WrongState.selector);
         vm.prank(resolver);
-        disbursement.verifyOutcome(campaignId, 0, keccak256("final"));
+        disbursement.verifyOutcome(campaignId, 0, keccak256("outcome"));
         vm.warp(block.timestamp + 3 days);
         vm.prank(resolver);
-        disbursement.verifyOutcome(campaignId, 0, keccak256("final"));
+        disbursement.verifyOutcome(campaignId, 0, keccak256("outcome"));
     }
 
     function test_approvalRejectsDepositAboveRequestOrCampaignPolicyCap() public {

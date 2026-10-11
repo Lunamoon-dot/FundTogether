@@ -189,7 +189,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         if (c.state != T.CampaignState.ACTIVE || hasOpenActivity[campaignId]) revert WrongState();
         if (commitmentHash == bytes32(0) || ceiling == 0 || ceiling > c.goal / 2) revert InvalidInput();
         activityId = activityCount[campaignId]++;
-        _activities[campaignId][activityId] = T.ActivityView(commitmentHash, ceiling, 0, block.timestamp, 0, T.ActivityState.OPEN);
+        _activities[campaignId][activityId] = T.ActivityView(commitmentHash, bytes32(0), ceiling, 0, block.timestamp, 0, T.ActivityState.OPEN);
         hasOpenActivity[campaignId] = true;
         emit ActivityCreated(campaignId, activityId, commitmentHash, ceiling);
     }
@@ -413,6 +413,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         if ((msg.sender != resolver || outcomeReviewTakenOver[campaignId][activityId])
             && (msg.sender != backupResolver || !outcomeReviewTakenOver[campaignId][activityId])) revert WrongCaller();
         if (c.state != T.CampaignState.ACTIVE || a.state != T.ActivityState.OPEN) revert WrongState();
+        a.outcomeReportHash = reportHash;
         a.challengeEnd = block.timestamp + 3 days;
         a.state = T.ActivityState.OUTCOME_CANDIDATE;
         emit OutcomeCandidate(campaignId, activityId, reportHash, a.challengeEnd);
@@ -432,7 +433,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         if (msg.sender != resolver) revert WrongCaller();
         if (activityId >= activityCount[campaignId] || reportHash == bytes32(0)) revert InvalidReference();
         T.ActivityView storage a = _activities[campaignId][activityId];
-        if (a.state != T.ActivityState.OUTCOME_CANDIDATE || block.timestamp < a.challengeEnd || outcomeCaseOpen[campaignId][activityId]) revert WrongState();
+        if (a.state != T.ActivityState.OUTCOME_CANDIDATE || block.timestamp < a.challengeEnd || outcomeCaseOpen[campaignId][activityId] || a.outcomeReportHash != reportHash) revert WrongState();
         a.state = T.ActivityState.VERIFIED;
         hasOpenActivity[campaignId] = false;
         emit OutcomeVerified(campaignId, activityId, reportHash);
