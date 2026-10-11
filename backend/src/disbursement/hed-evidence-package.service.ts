@@ -42,7 +42,7 @@ export class HedEvidencePackageService {
     return activity;
   }
 
-  async upload(campaignId: string, userId: string, kind: "DELIVERY" | "OUTCOME", activityId: string, requestDraftId: string | undefined, file?: EvidenceUploadFile) {
+  async upload(campaignId: string, userId: string, kind: "DELIVERY" | "OUTCOME", activityId: string, requestDraftId: string | undefined, visibility: "PRIVATE" | "PUBLIC", file?: EvidenceUploadFile) {
     await this.owner(campaignId, userId); await this.activity(campaignId, activityId);
     if (kind === "DELIVERY" && !requestDraftId) throw new ConflictException("Delivery evidence requires a request");
     if (requestDraftId) {
@@ -54,7 +54,7 @@ export class HedEvidencePackageService {
     try {
       await this.storage.put(id, file!.buffer, mediaType); stored = true;
       const [document] = await this.db.insert(schema.hedEvidenceDocuments).values({ id, campaignMetadataId: campaignId, activityId, requestDraftId,
-        uploadedBy: userId, kind, originalName: file!.originalname.replace(/[\\/\u0000-\u001f\u007f]/g, "_").slice(0, 200) || "document",
+        uploadedBy: userId, kind, visibility, originalName: file!.originalname.replace(/[\\/\u0000-\u001f\u007f]/g, "_").slice(0, 200) || "document",
         mediaType, byteSize: file!.buffer.length, sha256: `0x${createHash("sha256").update(file!.buffer).digest("hex")}` }).returning();
       return document;
     } catch (error) { if (stored) await this.storage.remove(id).catch(() => undefined); throw error; }
@@ -71,10 +71,15 @@ export class HedEvidencePackageService {
     const documents = await this.db.select().from(schema.hedEvidenceDocuments).where(and(eq(schema.hedEvidenceDocuments.campaignMetadataId, campaignId),
       eq(schema.hedEvidenceDocuments.activityId, parsed.activityId), inArray(schema.hedEvidenceDocuments.id, parsed.documentIds)));
     if (documents.length !== parsed.documentIds.length || documents.some(document => document.kind !== parsed.kind
-      || (parsed.kind === "DELIVERY" && document.requestDraftId !== parsed.requestDraftId)))
+      || document.visibility !== "PRIVATE" || (parsed.kind === "DELIVERY" && document.requestDraftId !== parsed.requestDraftId)))
       throw new ConflictException("Evidence package documents are not server-owned for this HED delivery or outcome");
+    const [publicDocument] = await this.db.select().from(schema.hedEvidenceDocuments).where(and(eq(schema.hedEvidenceDocuments.id, parsed.publicDocumentId),
+      eq(schema.hedEvidenceDocuments.campaignMetadataId, campaignId), eq(schema.hedEvidenceDocuments.activityId, parsed.activityId))).limit(1);
+    if (!publicDocument || publicDocument.kind !== parsed.kind || publicDocument.visibility !== "PUBLIC"
+      || (parsed.kind === "DELIVERY" && publicDocument.requestDraftId !== parsed.requestDraftId)) throw new ConflictException("Public evidence bundle is not server-owned for this package");
     const hashes = new Map(documents.map(document => [document.id, document.sha256]));
-    const content = { ...parsed, manifestHash: hedEvidencePackageHash(parsed, parsed.documentIds.map(id => ({ id, sha256: hashes.get(id)! }))) };
+    const sealed = { ...parsed, publicHash: publicDocument.sha256 };
+    const content = { ...sealed, manifestHash: hedEvidencePackageHash(sealed, parsed.documentIds.map(id => ({ id, sha256: hashes.get(id)! }))) };
     const [saved] = await this.db.insert(schema.hedEvidencePackages).values({ campaignMetadataId: campaignId, content, createdBy: userId }).returning();
     return saved;
   }

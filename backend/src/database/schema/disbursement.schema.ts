@@ -131,6 +131,7 @@ export const hedEvidenceDocuments = pgTable("hed_evidence_documents", {
   requestDraftId: uuid("request_draft_id").references(() => hedRequestDrafts.id),
   uploadedBy: uuid("uploaded_by").notNull().references(() => users.id),
   kind: varchar("kind", { length: 16 }).notNull(),
+  visibility: varchar("visibility", { length: 16 }).notNull().default("PRIVATE"),
   originalName: varchar("original_name", { length: 200 }).notNull(),
   mediaType: varchar("media_type", { length: 100 }).notNull(),
   byteSize: integer("byte_size").notNull(),
@@ -139,6 +140,7 @@ export const hedEvidenceDocuments = pgTable("hed_evidence_documents", {
 }, table => [
   index("hed_evidence_document_scope_idx").on(table.campaignMetadataId, table.activityId, table.createdAt),
   check("hed_evidence_document_kind_check", sql`${table.kind} IN ('DELIVERY', 'OUTCOME')`),
+  check("hed_evidence_document_visibility_check", sql`${table.visibility} IN ('PRIVATE', 'PUBLIC')`),
   check("hed_evidence_document_size_check", sql`${table.byteSize} > 0 AND ${table.byteSize} <= 10485760`),
   check("hed_evidence_document_hash_check", sql`${table.sha256} ~ '^0x[0-9a-f]{64}$' AND ${table.sha256} !~ '^0x0+$'`),
 ]);

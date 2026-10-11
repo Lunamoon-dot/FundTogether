@@ -22,9 +22,9 @@ export class HedEvidencePackageController {
       disposition: `attachment; filename*=UTF-8''${encodeURIComponent(document.originalName)}` });
   }
   @Post("upload") @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_EVIDENCE_FILE_BYTES, files: 1, fields: 4, parts: 5, fieldSize: 64 } }))
-  upload(@Param("campaignId", new ParseUUIDPipe()) campaignId: string, @Body("kind") kind: unknown, @Body("activityId") activityId: unknown, @Body("requestDraftId") requestDraftId: unknown, @UploadedFile() file: EvidenceUploadFile | undefined, @Req() request: Request) {
-    if ((kind !== "DELIVERY" && kind !== "OUTCOME") || typeof activityId !== "string") throw new BadRequestException("Invalid HED evidence scope");
-    return this.evidence.upload(campaignId, request.account!.userId, kind, activityId, typeof requestDraftId === "string" ? requestDraftId : undefined, file);
+  upload(@Param("campaignId", new ParseUUIDPipe()) campaignId: string, @Body("kind") kind: unknown, @Body("activityId") activityId: unknown, @Body("requestDraftId") requestDraftId: unknown, @Body("visibility") visibility: unknown, @UploadedFile() file: EvidenceUploadFile | undefined, @Req() request: Request) {
+    if ((kind !== "DELIVERY" && kind !== "OUTCOME") || typeof activityId !== "string" || (visibility !== "PRIVATE" && visibility !== "PUBLIC")) throw new BadRequestException("Invalid HED evidence scope");
+    return this.evidence.upload(campaignId, request.account!.userId, kind, activityId, typeof requestDraftId === "string" ? requestDraftId : undefined, visibility, file);
   }
   @Post() create(@Param("campaignId", new ParseUUIDPipe()) campaignId: string, @Body() body: unknown, @Req() request: Request) {
     const parsed = hedEvidencePackageSchema.safeParse(body); if (!parsed.success) throw new BadRequestException({ message: "Invalid HED evidence package", issues: parsed.error.issues });
