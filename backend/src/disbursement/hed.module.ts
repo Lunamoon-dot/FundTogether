@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { DatabaseModule } from "../database/database.module";
 import { AuthModule } from "../modules/auth/auth.module";
+import { EvidenceModule } from "../modules/evidence/evidence.module";
 import { backendRoot } from "../advance/backend-root";
 import { HedBlockchainService } from "./hed-blockchain.service";
 import { HedIndexerService } from "./hed-indexer.service";
@@ -18,7 +19,7 @@ import { HedVendorVerificationController } from "./hed-vendor-verification.contr
 import { HedVendorVerificationService } from "./hed-vendor-verification.service";
 
 @Module({
-  imports: [AuthModule, DatabaseModule],
+  imports: [AuthModule, DatabaseModule, EvidenceModule],
   controllers: [HedHealthController, HedPublicController, HedCampaignDraftController, HedCampaignVendorController, HedRequestDraftController, HedVendorVerificationController],
   providers: [{
     provide: HED_DEPLOYMENT,

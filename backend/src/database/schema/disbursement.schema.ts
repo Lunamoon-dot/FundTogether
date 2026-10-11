@@ -55,6 +55,23 @@ export const hedRequestDrafts = pgTable("hed_request_drafts", {
   check("hed_request_draft_freeze_check", sql`(${table.frozenAt} IS NULL AND ${table.requestHash} IS NULL) OR (${table.frozenAt} IS NOT NULL AND ${table.requestHash} ~ '^0x[0-9a-f]{64}$' AND ${table.requestHash} !~ '^0x0+$')`),
 ]);
 
+export const hedRequestEvidenceDocuments = pgTable("hed_request_evidence_documents", {
+  id: uuid("id").primaryKey(),
+  requestDraftId: uuid("request_draft_id").notNull().references(() => hedRequestDrafts.id),
+  uploadedBy: uuid("uploaded_by").notNull().references(() => users.id),
+  kind: varchar("kind", { length: 32 }).notNull(),
+  originalName: varchar("original_name", { length: 200 }).notNull(),
+  mediaType: varchar("media_type", { length: 100 }).notNull(),
+  byteSize: integer("byte_size").notNull(),
+  sha256: varchar("sha256", { length: 66 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, table => [
+  index("hed_request_evidence_idx").on(table.requestDraftId, table.createdAt),
+  check("hed_request_evidence_kind_check", sql`${table.kind} IN ('QUOTE', 'NEED', 'TERMS', 'OTHER')`),
+  check("hed_request_evidence_size_check", sql`${table.byteSize} > 0 AND ${table.byteSize} <= 10485760`),
+  check("hed_request_evidence_hash_check", sql`${table.sha256} ~ '^0x[0-9a-f]{64}$' AND ${table.sha256} !~ '^0x0+$'`),
+]);
+
 export const disbursementCampaigns = pgTable("disbursement_campaigns", {
   campaignMetadataId: uuid("campaign_metadata_id").primaryKey().references(() => campaignMetadata.id),
   chainId: integer("chain_id").notNull(),

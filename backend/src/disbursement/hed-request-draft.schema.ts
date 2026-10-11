@@ -14,7 +14,7 @@ export const hedRequestDraftSchema = z.object({
   expectedDeliveryAt: z.iso.datetime({ offset: true }),
   acceptanceCriteria: z.array(z.string().trim().min(5).max(1_000)).min(1).max(20),
   terms: z.string().trim().min(10).max(10_000),
-  needEvidenceReferences: z.array(z.string().uuid()).min(1).max(20),
+  needEvidenceReferences: z.array(z.string().uuid()).max(20),
 }).strict().superRefine((value, context) => {
   if (BigInt(value.deposit) > BigInt(value.amount)) context.addIssue({ code: "custom", path: ["deposit"], message: "Deposit cannot exceed amount" });
   const total = value.itemLines.reduce((sum, line) => sum + BigInt(line.quantity) * BigInt(line.unitAmount), 0n);

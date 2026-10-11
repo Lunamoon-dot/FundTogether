@@ -1,4 +1,5 @@
 import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { createHash, randomUUID } from "node:crypto";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { keccak256, toHex } from "viem";
@@ -7,6 +8,9 @@ import * as schema from "../database/schema";
 import { campaignMetadata, hedCampaignDrafts, organizationMembers } from "../database/schema";
 import { hedRequestDraftSchema } from "./hed-request-draft.schema";
 import type { HedRequestDraftInput } from "./hed-request-draft.schema";
+import { EvidenceStorageService } from "../modules/evidence/evidence-storage.service";
+import { validateEvidenceFile } from "../modules/evidence/evidence-file-validation";
+import type { EvidenceUploadFile } from "../modules/evidence/evidence-file-validation";
 
 export const hedRequestHash = (campaignCommitmentHash: string, vendorReportHash: string, content: HedRequestDraftInput) => keccak256(toHex(JSON.stringify({
   version: "hed-mvp-1", campaignCommitmentHash, vendorReportHash, activityReference: content.activityReference,
@@ -17,7 +21,7 @@ export const hedRequestHash = (campaignCommitmentHash: string, vendorReportHash:
 
 @Injectable()
 export class HedRequestDraftService {
-  constructor(@Inject(DRIZZLE_DB) private readonly db: NodePgDatabase<typeof schema>) {}
+  constructor(@Inject(DRIZZLE_DB) private readonly db: NodePgDatabase<typeof schema>, private readonly storage: EvidenceStorageService) {}
 
   private async campaign(campaignId: string, userId: string) {
     const [row] = await this.db.select({ campaign: campaignMetadata, draft: hedCampaignDrafts }).from(hedCampaignDrafts)
@@ -60,6 +64,33 @@ export class HedRequestDraftService {
       content: parsed, createdBy: userId }).returning();
   }
 
+  async uploadEvidence(campaignId: string, requestId: string, userId: string, kind: "QUOTE" | "NEED" | "TERMS" | "OTHER", file?: EvidenceUploadFile) {
+    await this.campaign(campaignId, userId);
+    const mediaType = await validateEvidenceFile(file), id = randomUUID();
+    let stored = false;
+    try {
+      return await this.db.transaction(async tx => {
+        const [draft] = await tx.select().from(schema.hedRequestDrafts).where(and(eq(schema.hedRequestDrafts.id, requestId),
+          eq(schema.hedRequestDrafts.campaignMetadataId, campaignId))).for("update");
+        if (!draft) throw new NotFoundException("HED request draft not found");
+        if (draft.frozenAt) throw new ConflictException("Frozen HED request cannot receive more evidence");
+        const documents = await tx.select().from(schema.hedRequestEvidenceDocuments).where(eq(schema.hedRequestEvidenceDocuments.requestDraftId, requestId));
+        if (documents.length >= 20) throw new ConflictException("At most 20 HED request evidence documents");
+        await this.storage.put(id, file!.buffer, mediaType); stored = true;
+        const document = { id, requestDraftId: requestId, uploadedBy: userId, kind,
+          originalName: file!.originalname.replace(/[\\/\u0000-\u001f\u007f]/g, "_").slice(0, 200) || "document",
+          mediaType, byteSize: file!.buffer.length, sha256: `0x${createHash("sha256").update(file!.buffer).digest("hex")}` };
+        await tx.insert(schema.hedRequestEvidenceDocuments).values(document);
+        await tx.update(schema.hedRequestDrafts).set({ content: { ...draft.content, needEvidenceReferences: [...draft.content.needEvidenceReferences, id] },
+          version: draft.version + 1, updatedAt: new Date() }).where(eq(schema.hedRequestDrafts.id, requestId));
+        return document;
+      });
+    } catch (error) {
+      if (stored) await this.storage.remove(id).catch(() => undefined);
+      throw error;
+    }
+  }
+
   async freeze(campaignId: string, requestId: string, userId: string) {
     const campaign = await this.campaign(campaignId, userId);
     return this.db.transaction(async tx => {
@@ -67,6 +98,11 @@ export class HedRequestDraftService {
         eq(schema.hedRequestDrafts.campaignMetadataId, campaign.campaign.id))).for("update");
       if (!draft) throw new NotFoundException("HED request draft not found");
       if (draft.frozenAt) throw new ConflictException("HED request draft is already frozen");
+      const documents = await tx.select({ id: schema.hedRequestEvidenceDocuments.id }).from(schema.hedRequestEvidenceDocuments)
+        .where(eq(schema.hedRequestEvidenceDocuments.requestDraftId, draft.id));
+      if (!documents.length || documents.length !== draft.content.needEvidenceReferences.length
+        || documents.some(document => !draft.content.needEvidenceReferences.includes(document.id)))
+        throw new ConflictException("Upload and reload the server-owned request evidence before freezing");
       const [vendor] = await tx.select().from(schema.hedVendorVerifications).where(eq(schema.hedVendorVerifications.id, draft.vendorVerificationId)).for("share");
       if (!vendor || vendor.status !== "VERIFIED" || vendor.validUntil.getTime() <= Date.now()) throw new ConflictException("Vendor verification is no longer valid");
       const requestHash = hedRequestHash(campaign.draft.commitmentHash!, vendor.reportHash, draft.content);

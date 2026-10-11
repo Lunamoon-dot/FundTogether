@@ -17,6 +17,6 @@ import { MilestoneWorkflowController } from './milestone-workflow.controller';
   imports: [AuthModule, BlockchainModule, IndexerModule],
   controllers: [EvidenceDraftsController, EvidenceFilesController, MilestoneWorkflowController],
   providers: [AuthGuard, EvidenceAccessService, EvidenceDraftsService, EvidencePackagesService, EvidenceFileAccessGuard, EvidenceFilesService, EvidenceStorageService, MilestoneWorkflowService],
-  exports: [EvidenceAccessService, EvidenceDraftsService],
+  exports: [EvidenceAccessService, EvidenceDraftsService, EvidenceStorageService],
 })
 export class EvidenceModule {}
