@@ -34,6 +34,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     mapping(uint256 => uint256) public requestCount;
     mapping(uint256 => uint256) public activityCount;
     mapping(uint256 => bool) public hasOpenRequest;
+    mapping(uint256 => bool) public eligibilityTakenOver;
     mapping(uint256 => mapping(uint256 => bool)) public requestApprovalTakenOver;
     mapping(uint256 => bool) public hasOpenActivity;
     mapping(uint256 => mapping(uint256 => bool)) public deliveryCaseOpen;
@@ -45,6 +46,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     event CampaignCreated(uint256 indexed campaignId, address indexed organizer, bytes32 commitmentHash, uint256 goal, uint256 fundingEnd);
     event Donated(uint256 indexed campaignId, address indexed donor, uint256 amount, uint256 contributed);
     event CampaignActivated(uint256 indexed campaignId, bytes32 eligibilityHash);
+    event EligibilityTakenOver(uint256 indexed campaignId, bytes32 reasonHash);
     event RequestSubmitted(uint256 indexed campaignId, uint256 indexed requestId, bytes32 requestHash, uint256 amount, uint256 deposit);
     event ActivityCreated(uint256 indexed campaignId, uint256 indexed activityId, bytes32 commitmentHash, uint256 ceiling);
     event OutcomeCandidate(uint256 indexed campaignId, uint256 indexed activityId, bytes32 reportHash, uint256 challengeEnd);
@@ -113,13 +115,22 @@ contract FundTogetherDisbursement is ReentrancyGuard {
 
     function activateCampaign(uint256 id, bytes32 eligibilityHash) external {
         T.CampaignView storage c = _campaign(id);
-        if (msg.sender != resolver && (msg.sender != backupResolver || block.timestamp < c.fullyFundedAt + PRIMARY_REVIEW_WINDOW)) revert WrongCaller();
+        if ((msg.sender != resolver || eligibilityTakenOver[id]) && (msg.sender != backupResolver || !eligibilityTakenOver[id])) revert WrongCaller();
         if (c.state != T.CampaignState.FUNDING || c.contributed != c.goal) revert WrongState();
         if (eligibilityHash == bytes32(0)) revert InvalidInput();
         c.state = T.CampaignState.ACTIVE;
         c.activeAt = block.timestamp;
         c.executionEnd = block.timestamp + EXECUTION_HORIZON;
         emit CampaignActivated(id, eligibilityHash);
+    }
+
+    function takeOverEligibility(uint256 id, bytes32 reasonHash) external {
+        T.CampaignView storage c = _campaign(id);
+        if (msg.sender != backupResolver) revert WrongCaller();
+        if (c.state != T.CampaignState.FUNDING || c.contributed != c.goal || eligibilityTakenOver[id]
+            || block.timestamp < c.fullyFundedAt + PRIMARY_REVIEW_WINDOW || reasonHash == bytes32(0)) revert WrongState();
+        eligibilityTakenOver[id] = true;
+        emit EligibilityTakenOver(id, reasonHash);
     }
 
     function finalizeFundingFailure(uint256 id) external {

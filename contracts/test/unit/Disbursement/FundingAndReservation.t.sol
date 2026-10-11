@@ -52,6 +52,14 @@ contract HedFundingAndReservationTest is Test {
         vm.prank(backupResolver);
         disbursement.activateCampaign(campaignId, keccak256("eligibility"));
         vm.warp(block.timestamp + 3 days);
+        vm.expectRevert(FundTogetherDisbursement.WrongCaller.selector);
+        vm.prank(backupResolver);
+        disbursement.activateCampaign(campaignId, keccak256("eligibility"));
+        vm.prank(backupResolver);
+        disbursement.takeOverEligibility(campaignId, keccak256("takeover"));
+        vm.expectRevert(FundTogetherDisbursement.WrongCaller.selector);
+        vm.prank(resolver);
+        disbursement.activateCampaign(campaignId, keccak256("eligibility"));
         vm.prank(backupResolver);
         disbursement.activateCampaign(campaignId, keccak256("eligibility"));
         assertEq(uint256(disbursement.campaign(campaignId).state), uint256(T.CampaignState.ACTIVE));

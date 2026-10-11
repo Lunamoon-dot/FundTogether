@@ -60,7 +60,7 @@ function artifacts(root) {
   }
   const signatures = disbursement.abi.filter(item => item.type === 'function').map(toFunctionSignature);
   const expected = [
-    'createCampaign(bytes32,uint256,uint256)', 'donate(uint256,uint256)', 'activateCampaign(uint256,bytes32)',
+    'createCampaign(bytes32,uint256,uint256)', 'donate(uint256,uint256)', 'activateCampaign(uint256,bytes32)', 'takeOverEligibility(uint256,bytes32)',
     'finalizeFundingFailure(uint256)', 'claimRefund(uint256)', 'startWindDown(uint256)', 'createActivity(uint256,bytes32,uint256)',
     'submitRequest(uint256,uint256,bytes32,address,uint256,uint256)', 'approveRequest(uint256,uint256,bytes32)',
     'takeOverRequestApproval(uint256,uint256,bytes32)',
