@@ -12,6 +12,8 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     uint256 public constant MAX_DEPOSIT_BPS = 2_000;
     uint256 public constant MAX_CAMPAIGN_DEPOSIT_BPS = 1_000;
     uint256 public constant PRIMARY_REVIEW_WINDOW = 3 days;
+    uint256 public constant VENDOR_ACK_WINDOW = 3 days;
+    uint256 public constant DEPOSIT_WINDOW = 3 days;
 
     error InvalidInput();
     error WrongCaller();
@@ -59,6 +61,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     event FundsReturned(uint256 indexed campaignId, uint256 indexed requestId, address indexed vendor, uint256 amount);
     event DeliveryAuthorizationInvalidated(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
     event UncommittedRequestCancelled(uint256 indexed campaignId, uint256 indexed requestId, uint256 amount, bytes32 reasonHash);
+    event RequestExpired(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
 
     constructor(address token, address resolver_, address backupResolver_, bytes32 policyHash_) {
         if (token == address(0) || resolver_ == address(0) || backupResolver_ == address(0) || resolver_ == backupResolver_ || policyHash_ == bytes32(0)) revert InvalidInput();
@@ -184,7 +187,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         if (_activities[campaignId][activityId].state != T.ActivityState.OPEN) revert WrongState();
         requestId = requestCount[campaignId]++;
         hasOpenRequest[campaignId] = true;
-        _requests[campaignId][requestId] = T.RequestView(activityId, requestHash, vendor, bytes32(0), amount, deposit, 0, 0, 0, 0, T.RequestState.SUBMITTED);
+        _requests[campaignId][requestId] = T.RequestView(activityId, requestHash, vendor, bytes32(0), amount, deposit, 0, 0, 0, 0, 0, 0, T.RequestState.SUBMITTED);
         emit RequestSubmitted(campaignId, requestId, requestHash, amount, deposit);
     }
 
@@ -199,6 +202,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         c.available -= r.approvedAmount;
         c.reserved += r.approvedAmount;
         a.approved += r.approvedAmount;
+        r.approvedAt = block.timestamp;
         r.state = T.RequestState.APPROVED_RESERVED;
         emit RequestReserved(campaignId, requestId, r.approvedAmount, c.available, c.reserved);
     }
@@ -207,8 +211,9 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         if (requestId >= requestCount[campaignId]) revert InvalidReference();
         T.RequestView storage r = _requests[campaignId][requestId];
         if (msg.sender != r.vendor) revert WrongCaller();
-        if (r.state != T.RequestState.APPROVED_RESERVED || termsHash == bytes32(0)) revert WrongState();
+        if (r.state != T.RequestState.APPROVED_RESERVED || block.timestamp >= r.approvedAt + VENDOR_ACK_WINDOW || termsHash == bytes32(0)) revert WrongState();
         r.termsHash = termsHash;
+        r.committedAt = block.timestamp;
         r.state = T.RequestState.VENDOR_COMMITTED;
         emit VendorAcknowledged(campaignId, requestId, msg.sender, termsHash);
     }
@@ -217,7 +222,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         T.CampaignView storage c = _campaign(campaignId);
         if (requestId >= requestCount[campaignId]) revert InvalidReference();
         T.RequestView storage r = _requests[campaignId][requestId];
-        if (c.state != T.CampaignState.ACTIVE || r.state != T.RequestState.VENDOR_COMMITTED || r.grossPaid != 0 || r.depositAmount == 0) revert WrongState();
+        if (c.state != T.CampaignState.ACTIVE || r.state != T.RequestState.VENDOR_COMMITTED || block.timestamp >= r.committedAt + DEPOSIT_WINDOW || r.grossPaid != 0 || r.depositAmount == 0) revert WrongState();
         c.reserved -= r.depositAmount;
         c.grossPaid += r.depositAmount;
         r.grossPaid = r.depositAmount;
@@ -288,6 +293,31 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         r.state = T.RequestState.FINANCIALLY_SETTLED;
         hasOpenRequest[campaignId] = false;
         emit ResidualReleased(campaignId, requestId, residual, reasonHash);
+    }
+
+    function expireUncommittedRequest(uint256 campaignId, uint256 requestId, bytes32 reasonHash) external {
+        T.CampaignView storage c = _campaign(campaignId);
+        if (requestId >= requestCount[campaignId]) revert InvalidReference();
+        T.RequestView storage r = _requests[campaignId][requestId];
+        if (r.state != T.RequestState.APPROVED_RESERVED || block.timestamp < r.approvedAt + VENDOR_ACK_WINDOW || reasonHash == bytes32(0)) revert WrongState();
+        c.reserved -= r.approvedAmount;
+        c.available += r.approvedAmount;
+        r.state = T.RequestState.CANCELLED;
+        hasOpenRequest[campaignId] = false;
+        emit RequestExpired(campaignId, requestId, reasonHash);
+    }
+
+    function expireUnpaidDeposit(uint256 campaignId, uint256 requestId, bytes32 reasonHash) external {
+        T.CampaignView storage c = _campaign(campaignId);
+        if (requestId >= requestCount[campaignId]) revert InvalidReference();
+        T.RequestView storage r = _requests[campaignId][requestId];
+        if (r.state != T.RequestState.VENDOR_COMMITTED || r.depositAmount == 0 || r.grossPaid != 0
+            || block.timestamp < r.committedAt + DEPOSIT_WINDOW || reasonHash == bytes32(0)) revert WrongState();
+        c.reserved -= r.approvedAmount;
+        c.available += r.approvedAmount;
+        r.state = T.RequestState.CANCELLED;
+        hasOpenRequest[campaignId] = false;
+        emit RequestExpired(campaignId, requestId, reasonHash);
     }
 
     function candidateOutcome(uint256 campaignId, uint256 activityId, bytes32 reportHash) external {

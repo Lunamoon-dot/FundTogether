@@ -316,6 +316,32 @@ contract HedFundingAndReservationTest is Test {
         assertFalse(disbursement.hasOpenRequest(campaignId));
     }
 
+    function test_expiredAcknowledgementAndUnpaidDepositReleaseReserveWithoutReopeningGrossCap() public {
+        uint256 campaignId = _activeCampaign();
+        vm.prank(organizer);
+        uint256 pending = disbursement.submitRequest(campaignId, 0, keccak256("pending"), vendor, 200e6, 0);
+        vm.prank(resolver);
+        disbursement.approveRequest(campaignId, pending, keccak256("pending"));
+        vm.warp(block.timestamp + 3 days);
+        disbursement.expireUncommittedRequest(campaignId, pending, keccak256("ack-timeout"));
+        assertFalse(disbursement.hasOpenRequest(campaignId));
+        assertEq(disbursement.campaign(campaignId).available, 2_000e6);
+
+        vm.prank(organizer);
+        uint256 committed = disbursement.submitRequest(campaignId, 0, keccak256("committed"), vendor, 800e6, 160e6);
+        vm.prank(resolver);
+        disbursement.approveRequest(campaignId, committed, keccak256("committed"));
+        vm.prank(vendor);
+        disbursement.acknowledgeVendor(campaignId, committed, keccak256("terms"));
+        vm.warp(block.timestamp + 3 days);
+        disbursement.expireUnpaidDeposit(campaignId, committed, keccak256("deposit-timeout"));
+        vm.prank(organizer);
+        uint256 overCap = disbursement.submitRequest(campaignId, 0, keccak256("over-cap"), vendor, 300e6, 0);
+        vm.expectRevert(FundTogetherDisbursement.InvalidInput.selector);
+        vm.prank(resolver);
+        disbursement.approveRequest(campaignId, overCap, keccak256("over-cap"));
+    }
+
     function test_cancelDoesNotReopenActivityGrossApprovalCeiling() public {
         uint256 campaignId = _activeCampaign();
         vm.prank(organizer);

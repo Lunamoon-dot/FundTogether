@@ -63,7 +63,8 @@ function artifacts(root) {
     'candidateDelivery(uint256,uint256,uint256,bytes32)', 'openDeliveryCase(uint256,uint256,bytes32)',
     'upholdDeliveryCase(uint256,uint256,bytes32)', 'executeFinal(uint256,uint256)',
     'releaseResidual(uint256,uint256,bytes32)', 'returnFunds(uint256,uint256,uint256)',
-    'cancelUncommittedRequest(uint256,uint256,bytes32)', 'candidateOutcome(uint256,uint256,bytes32)',
+    'cancelUncommittedRequest(uint256,uint256,bytes32)', 'expireUncommittedRequest(uint256,uint256,bytes32)',
+    'expireUnpaidDeposit(uint256,uint256,bytes32)', 'candidateOutcome(uint256,uint256,bytes32)',
     'verifyOutcome(uint256,uint256,bytes32)', 'openOutcomeCase(uint256,uint256,bytes32)',
     'upholdOutcomeCase(uint256,uint256,bytes32)', 'campaign(uint256)', 'request(uint256,uint256)', 'activity(uint256,uint256)',
   ];

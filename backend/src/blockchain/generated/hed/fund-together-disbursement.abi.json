@@ -27,6 +27,19 @@
   },
   {
     "type": "function",
+    "name": "DEPOSIT_WINDOW",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "MAX_CAMPAIGN_DEPOSIT_BPS",
     "inputs": [],
     "outputs": [
@@ -54,6 +67,19 @@
   {
     "type": "function",
     "name": "PRIMARY_REVIEW_WINDOW",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "VENDOR_ACK_WINDOW",
     "inputs": [],
     "outputs": [
       {
@@ -528,6 +554,52 @@
   },
   {
     "type": "function",
+    "name": "expireUncommittedRequest",
+    "inputs": [
+      {
+        "name": "campaignId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "requestId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "reasonHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "expireUnpaidDeposit",
+    "inputs": [
+      {
+        "name": "campaignId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "requestId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "reasonHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "finalizeFundingFailure",
     "inputs": [
       {
@@ -782,6 +854,16 @@
           },
           {
             "name": "challengeEnd",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "approvedAt",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "committedAt",
             "type": "uint256",
             "internalType": "uint256"
           },
@@ -1463,6 +1545,31 @@
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "RequestExpired",
+    "inputs": [
+      {
+        "name": "campaignId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "requestId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "reasonHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
       }
     ],
     "anonymous": false

@@ -32,6 +32,8 @@ library DisbursementTypes {
         uint256 returned;
         uint256 acceptedDeliveryValue;
         uint256 challengeEnd;
+        uint256 approvedAt;
+        uint256 committedAt;
         RequestState state;
     }
 
