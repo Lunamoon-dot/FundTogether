@@ -103,6 +103,18 @@ contract HedFundingAndReservationTest is Test {
         disbursement.candidateDelivery(campaignId, requestId, 500e6, keccak256("delivery"));
     }
 
+    function test_backupOutcomeTakeoverIsBoundToTheOpenActivity() public {
+        uint256 campaignId = _activeCampaign();
+        vm.warp(block.timestamp + 3 days);
+        vm.prank(backupResolver);
+        disbursement.takeOverOutcomeReview(campaignId, 0, keccak256("takeover"));
+        vm.expectRevert(FundTogetherDisbursement.WrongCaller.selector);
+        vm.prank(resolver);
+        disbursement.candidateOutcome(campaignId, 0, keccak256("outcome"));
+        vm.prank(backupResolver);
+        disbursement.candidateOutcome(campaignId, 0, keccak256("outcome"));
+    }
+
     function test_vendorAcknowledgementLocksRecipientAndPaysOnlyExactDeposit() public {
         uint256 campaignId = _activeCampaign();
         vm.prank(organizer);

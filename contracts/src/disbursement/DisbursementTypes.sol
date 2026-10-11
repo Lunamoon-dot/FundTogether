@@ -45,6 +45,7 @@ library DisbursementTypes {
         bytes32 commitmentHash;
         uint256 ceiling;
         uint256 approved;
+        uint256 createdAt;
         uint256 challengeEnd;
         ActivityState state;
     }

@@ -37,6 +37,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     mapping(uint256 => bool) public eligibilityTakenOver;
     mapping(uint256 => mapping(uint256 => bool)) public requestApprovalTakenOver;
     mapping(uint256 => mapping(uint256 => bool)) public deliveryReviewTakenOver;
+    mapping(uint256 => mapping(uint256 => bool)) public outcomeReviewTakenOver;
     mapping(uint256 => bool) public hasOpenActivity;
     mapping(uint256 => mapping(uint256 => bool)) public deliveryCaseOpen;
     mapping(uint256 => mapping(uint256 => bool)) public deliveryCaseUsed;
@@ -59,6 +60,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     event RequestReserved(uint256 indexed campaignId, uint256 indexed requestId, uint256 amount, uint256 available, uint256 reserved);
     event RequestApprovalTakenOver(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
     event DeliveryReviewTakenOver(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
+    event OutcomeReviewTakenOver(uint256 indexed campaignId, uint256 indexed activityId, bytes32 reasonHash);
     event VendorAcknowledged(uint256 indexed campaignId, uint256 indexed requestId, address indexed vendor, bytes32 termsHash);
     event DepositPaid(uint256 indexed campaignId, uint256 indexed requestId, address indexed vendor, uint256 amount);
     event DeliveryCandidate(uint256 indexed campaignId, uint256 indexed requestId, uint256 acceptedValue, bytes32 reportHash);
@@ -181,7 +183,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         if (c.state != T.CampaignState.ACTIVE || hasOpenActivity[campaignId]) revert WrongState();
         if (commitmentHash == bytes32(0) || ceiling == 0 || ceiling > c.goal / 2) revert InvalidInput();
         activityId = activityCount[campaignId]++;
-        _activities[campaignId][activityId] = T.ActivityView(commitmentHash, ceiling, 0, 0, T.ActivityState.OPEN);
+        _activities[campaignId][activityId] = T.ActivityView(commitmentHash, ceiling, 0, block.timestamp, 0, T.ActivityState.OPEN);
         hasOpenActivity[campaignId] = true;
         emit ActivityCreated(campaignId, activityId, commitmentHash, ceiling);
     }
@@ -387,13 +389,24 @@ contract FundTogetherDisbursement is ReentrancyGuard {
 
     function candidateOutcome(uint256 campaignId, uint256 activityId, bytes32 reportHash) external {
         T.CampaignView storage c = _campaign(campaignId);
-        if (msg.sender != resolver) revert WrongCaller();
         if (activityId >= activityCount[campaignId] || hasOpenRequest[campaignId] || reportHash == bytes32(0)) revert WrongState();
         T.ActivityView storage a = _activities[campaignId][activityId];
+        if ((msg.sender != resolver || outcomeReviewTakenOver[campaignId][activityId])
+            && (msg.sender != backupResolver || !outcomeReviewTakenOver[campaignId][activityId])) revert WrongCaller();
         if (c.state != T.CampaignState.ACTIVE || a.state != T.ActivityState.OPEN) revert WrongState();
         a.challengeEnd = block.timestamp + 3 days;
         a.state = T.ActivityState.OUTCOME_CANDIDATE;
         emit OutcomeCandidate(campaignId, activityId, reportHash, a.challengeEnd);
+    }
+
+    function takeOverOutcomeReview(uint256 campaignId, uint256 activityId, bytes32 reasonHash) external {
+        _campaign(campaignId);
+        if (msg.sender != backupResolver || activityId >= activityCount[campaignId]) revert WrongCaller();
+        T.ActivityView storage a = _activities[campaignId][activityId];
+        if (a.state != T.ActivityState.OPEN || outcomeReviewTakenOver[campaignId][activityId]
+            || block.timestamp < a.createdAt + PRIMARY_REVIEW_WINDOW || reasonHash == bytes32(0)) revert WrongState();
+        outcomeReviewTakenOver[campaignId][activityId] = true;
+        emit OutcomeReviewTakenOver(campaignId, activityId, reasonHash);
     }
 
     function verifyOutcome(uint256 campaignId, uint256 activityId, bytes32 reportHash) external {
