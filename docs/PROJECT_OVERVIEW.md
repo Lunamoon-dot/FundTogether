@@ -5,6 +5,18 @@
 
 ## Current direction — 2026-10-06
 
+### HED-MVP-1 local implementation — 2026-10-11
+
+New-campaign HED mode is a separate local MockUSDC deployment on chain `31339`
+with RPC `9548`, API `3002`, frontend `5175`, PostgreSQL `5435` and MinIO
+`9200`. It implements full funding before vendor reserve, frozen vendor terms,
+delivery/outcome evidence, bounded challenge handling, wind-down/refund and a
+deployment-bound event projection. It does not rewrite baseline/Workflow B
+contracts, data or obligations. Run `npm.cmd --prefix backend run
+acceptance:hed` after the HED runbook start command for repeatable local
+evidence. Manual wallet/reviewer acceptance and production/legal readiness are
+still TODO. See [HED status](./hed-implementation-status.md).
+
 Update2026-10-10: B organization verification now starts with an OWNER request
 (private draft/documents → submit → ADMIN approve/request changes/reject).
 Submitted content and file references are immutable; changes use a new request
