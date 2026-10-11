@@ -99,6 +99,18 @@ export interface HedDeliveryPayload { onchainCampaignId: string; onchainRequestI
 export async function prepareHedDelivery(packageId: string) {
   return (await http.post<HedDeliveryPayload>(`/v1/disbursement/reviews/delivery/${packageId}/prepare`)).data
 }
+export interface HedOutcomePackage { kind: 'OUTCOME'; activityId: string; evidenceVersion: number; manifestHash: `0x${string}`; publicHash: `0x${string}`; deliveredQuantity: number; documentIds: string[] }
+export interface HedOutcomeQueueItem { packageId: string; activityId: string; onchainCampaignId: string; onchainActivityId: string; content: HedOutcomePackage }
+export interface HedOutcomePayload { onchainCampaignId: string; onchainActivityId: string; reportHash: `0x${string}` }
+export async function listHedPendingOutcomes(signal?: AbortSignal) {
+  return (await http.get<HedOutcomeQueueItem[]>('/v1/disbursement/reviews/outcomes/pending', { signal })).data
+}
+export async function recordHedOutcomeReview(activityId: string, review: HedReviewInput) {
+  return (await http.post(`/v1/disbursement/activities/${activityId}/reviews`, review)).data
+}
+export async function prepareHedOutcome(activityId: string, packageId: string) {
+  return (await http.post<HedOutcomePayload>(`/v1/disbursement/activities/${activityId}/reviews/outcome/${packageId}`)).data
+}
 export interface HedEvidenceDocument { id: string; sha256: `0x${string}`; originalName: string; mediaType: string; byteSize: number }
 export interface HedDeliveryPackageInput { kind: 'DELIVERY'; requestDraftId: string; activityId: string; evidenceVersion: number; publicHash: `0x${string}`; acceptedValue: string; documentIds: string[] }
 export interface HedOutcomePackageInput { kind: 'OUTCOME'; activityId: string; evidenceVersion: number; publicHash: `0x${string}`; deliveredQuantity: number; documentIds: string[] }
