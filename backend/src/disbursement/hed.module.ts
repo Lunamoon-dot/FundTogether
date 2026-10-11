@@ -2,16 +2,19 @@ import { Module } from "@nestjs/common";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { DatabaseModule } from "../database/database.module";
+import { AuthModule } from "../modules/auth/auth.module";
 import { backendRoot } from "../advance/backend-root";
 import { HedBlockchainService } from "./hed-blockchain.service";
 import { HedIndexerService } from "./hed-indexer.service";
 import { HED_DEPLOYMENT } from "./hed.types";
 import type { HedDeployment } from "./hed.types";
 import { HedHealthController, HedPublicController } from "./hed-public.controller";
+import { HedCampaignDraftController } from "./hed-campaign-draft.controller";
+import { HedCampaignDraftService } from "./hed-campaign-draft.service";
 
 @Module({
-  imports: [DatabaseModule],
-  controllers: [HedHealthController, HedPublicController],
+  imports: [AuthModule, DatabaseModule],
+  controllers: [HedHealthController, HedPublicController, HedCampaignDraftController],
   providers: [{
     provide: HED_DEPLOYMENT,
     useFactory: (): HedDeployment => {
@@ -21,7 +24,7 @@ import { HedHealthController, HedPublicController } from "./hed-public.controlle
       if (manifest.rpcUrl !== process.env.HED_BLOCKCHAIN_RPC_URL) throw new Error("HED manifest/RPC configuration mismatch");
       return Object.freeze(manifest);
     },
-  }, HedBlockchainService, HedIndexerService],
+  }, HedBlockchainService, HedIndexerService, HedCampaignDraftService],
   exports: [HedBlockchainService, HedIndexerService, HED_DEPLOYMENT],
 })
 export class HedModule {}
