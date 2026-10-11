@@ -29,6 +29,9 @@ for ($attempt = 0; $attempt -lt 30; $attempt++) {
     Start-Sleep -Seconds 1
 }
 if (-not $ready) { throw 'HED startup still pending under its original handle; do not launch another node.' }
+if (Test-Path -LiteralPath (Join-Path $projectRoot '.local\hed\generated\deployment.local.json')) {
+    Remove-Item -LiteralPath (Join-Path $projectRoot '.local\hed\generated\deployment.local.json') -Force
+}
 & node $deploy --create
 if ($LASTEXITCODE -ne 0) { throw 'HED deployment failed; keep launched node/state for diagnosis.' }
 Write-Output "HED ready on9548; launcher handle $($process.Id), native state $state"

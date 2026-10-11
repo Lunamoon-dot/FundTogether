@@ -5,8 +5,10 @@ import generatedAbi = require("../blockchain/generated/hed/fund-together-disburs
 import tokenAbi = require("../blockchain/generated/hed/mock-usdc.abi.json");
 import { HED_CAMPAIGN_STATES, HED_DEPLOYMENT, HED_REQUEST_STATES } from "./hed.types";
 import type { HedCampaignSnapshot, HedCampaignView, HedDeployment, HedRequestView, HedActivityView } from "./hed.types";
+import { backendRoot } from "../advance/backend-root";
+import { resolve } from "node:path";
 
-const identity = require("../../scripts/hed/generate-artifacts.cjs");
+const identity = require(resolve(backendRoot, "scripts/hed/generate-artifacts.cjs"));
 const json = <T>(value: unknown): T => JSON.parse(JSON.stringify(value,
   (_key, field) => typeof field === "bigint" ? field.toString() : field)) as T;
 function label<T extends string>(labels: readonly T[], index: unknown): T {

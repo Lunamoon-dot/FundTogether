@@ -978,30 +978,6 @@
   },
   {
     "type": "function",
-    "name": "outcomeVerificationTakenOver",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "payDeposit",
     "inputs": [
       {
@@ -1389,29 +1365,6 @@
   {
     "type": "function",
     "name": "takeOverOutcomeReview",
-    "inputs": [
-      {
-        "name": "campaignId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "activityId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "reasonHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "takeOverOutcomeVerification",
     "inputs": [
       {
         "name": "campaignId",
@@ -2062,31 +2015,6 @@
   {
     "type": "event",
     "name": "OutcomeReviewTakenOver",
-    "inputs": [
-      {
-        "name": "campaignId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "activityId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "reasonHash",
-        "type": "bytes32",
-        "indexed": false,
-        "internalType": "bytes32"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "OutcomeVerificationTakenOver",
     "inputs": [
       {
         "name": "campaignId",
