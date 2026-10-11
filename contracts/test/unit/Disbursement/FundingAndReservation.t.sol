@@ -83,6 +83,32 @@ contract HedFundingAndReservationTest is Test {
         vm.stopPrank();
     }
 
+    function test_purchaseThenTransportStaysInOneActivityUntilOutcomeVerification() public {
+        uint256 campaignId = _activeCampaign();
+        uint256 first = _settleRequest(campaignId, 800e6, keccak256("purchase"));
+        assertEq(uint256(disbursement.request(campaignId, first).state), uint256(T.RequestState.FINANCIALLY_SETTLED));
+        vm.prank(organizer);
+        uint256 second = disbursement.submitRequest(campaignId, 0, keccak256("transport"), vendor, 200e6, 0);
+        vm.prank(resolver);
+        disbursement.approveRequest(campaignId, second, keccak256("transport"));
+        vm.prank(vendor);
+        disbursement.acknowledgeVendor(campaignId, second, keccak256("terms-transport"));
+        vm.prank(resolver);
+        disbursement.candidateDelivery(campaignId, second, 200e6, keccak256("transport-delivery"));
+        vm.warp(block.timestamp + 3 days);
+        disbursement.executeFinal(campaignId, second);
+        vm.expectRevert(FundTogetherDisbursement.WrongState.selector);
+        vm.prank(organizer);
+        disbursement.createActivity(campaignId, keccak256("next"), 1_000e6);
+        vm.prank(resolver);
+        disbursement.candidateOutcome(campaignId, 0, keccak256("outcome"));
+        vm.warp(block.timestamp + 3 days);
+        vm.prank(resolver);
+        disbursement.verifyOutcome(campaignId, 0, keccak256("outcome-final"));
+        vm.prank(organizer);
+        disbursement.createActivity(campaignId, keccak256("next"), 1_000e6);
+    }
+
     function test_approvalRejectsDepositAboveRequestOrCampaignPolicyCap() public {
         uint256 campaignId = _activeCampaign();
         vm.prank(organizer);
@@ -294,5 +320,18 @@ contract HedFundingAndReservationTest is Test {
         disbursement.activateCampaign(campaignId, keccak256("eligibility"));
         vm.prank(organizer);
         disbursement.createActivity(campaignId, keccak256("activity"), 1_000e6);
+    }
+
+    function _settleRequest(uint256 campaignId, uint256 amount, bytes32 requestHash) private returns (uint256 requestId) {
+        vm.prank(organizer);
+        requestId = disbursement.submitRequest(campaignId, 0, requestHash, vendor, amount, 0);
+        vm.prank(resolver);
+        disbursement.approveRequest(campaignId, requestId, requestHash);
+        vm.prank(vendor);
+        disbursement.acknowledgeVendor(campaignId, requestId, keccak256("terms"));
+        vm.prank(resolver);
+        disbursement.candidateDelivery(campaignId, requestId, amount, keccak256("delivery"));
+        vm.warp(block.timestamp + 3 days);
+        disbursement.executeFinal(campaignId, requestId);
     }
 }

@@ -63,7 +63,8 @@ function artifacts(root) {
     'candidateDelivery(uint256,uint256,uint256,bytes32)', 'openDeliveryCase(uint256,uint256,bytes32)',
     'upholdDeliveryCase(uint256,uint256,bytes32)', 'executeFinal(uint256,uint256)',
     'releaseResidual(uint256,uint256,bytes32)', 'returnFunds(uint256,uint256,uint256)',
-    'cancelUncommittedRequest(uint256,uint256,bytes32)', 'campaign(uint256)', 'request(uint256,uint256)', 'activity(uint256,uint256)',
+    'cancelUncommittedRequest(uint256,uint256,bytes32)', 'candidateOutcome(uint256,uint256,bytes32)',
+    'verifyOutcome(uint256,uint256,bytes32)', 'campaign(uint256)', 'request(uint256,uint256)', 'activity(uint256,uint256)',
   ];
   for (const signature of expected) if (!signatures.includes(signature)) throw new Error(`HED ABI drift: ${signature}`);
   const runtimeBytes = (disbursement.deployedBytecode.object.length - 2) / 2;
