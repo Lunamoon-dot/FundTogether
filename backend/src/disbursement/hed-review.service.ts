@@ -48,6 +48,30 @@ export class HedReviewService {
     return rows.filter(row => snapshots.get(row.onchainCampaignId!)?.requests[Number(row.onchainRequestId!)]?.state === "SUBMITTED");
   }
 
+  async pendingCampaigns(userId: string) {
+    await this.resolver(userId);
+    const rows = await this.db.select({ campaignId: schema.disbursementCampaigns.campaignMetadataId,
+      onchainCampaignId: schema.disbursementCampaigns.onchainCampaignId, commitmentHash: schema.hedCampaignDrafts.commitmentHash })
+      .from(schema.disbursementCampaigns).innerJoin(schema.hedCampaignDrafts, eq(schema.hedCampaignDrafts.campaignMetadataId, schema.disbursementCampaigns.campaignMetadataId))
+      .where(and(isNotNull(schema.disbursementCampaigns.onchainCampaignId), isNotNull(schema.hedCampaignDrafts.commitmentHash)));
+    const block = await this.chain.client.getBlock({ blockTag: "latest" });
+    return (await Promise.all(rows.map(async row => ({ row, snapshot: await this.chain.snapshot(BigInt(row.onchainCampaignId!), block.number) }))))
+      .filter(({ snapshot }) => snapshot.campaign.state === "FUNDING" && snapshot.campaign.contributed === snapshot.campaign.goal)
+      .map(({ row, snapshot }) => ({ campaignId: row.campaignId, onchainCampaignId: row.onchainCampaignId, eligibilityHash: row.commitmentHash, checkpoint: snapshot.checkpoint }));
+  }
+
+  async prepareActivation(campaignId: string, userId: string) {
+    await this.resolver(userId);
+    const [row] = await this.db.select({ onchainCampaignId: schema.disbursementCampaigns.onchainCampaignId, commitmentHash: schema.hedCampaignDrafts.commitmentHash })
+      .from(schema.disbursementCampaigns).innerJoin(schema.hedCampaignDrafts, eq(schema.hedCampaignDrafts.campaignMetadataId, schema.disbursementCampaigns.campaignMetadataId))
+      .where(eq(schema.disbursementCampaigns.campaignMetadataId, campaignId)).limit(1);
+    if (!row?.onchainCampaignId || !row.commitmentHash) throw new ConflictException("HED campaign is not frozen and mapped on chain");
+    const block = await this.chain.client.getBlock({ blockTag: "latest" });
+    const snapshot = await this.chain.snapshot(BigInt(row.onchainCampaignId), block.number);
+    if (snapshot.campaign.state !== "FUNDING" || snapshot.campaign.contributed !== snapshot.campaign.goal) throw new ConflictException("HED campaign is not ready for resolver activation");
+    return { onchainCampaignId: row.onchainCampaignId, eligibilityHash: row.commitmentHash, checkpoint: snapshot.checkpoint };
+  }
+
   async prepareApproval(requestId: string, userId: string) {
     await this.resolver(userId);
     const [request] = await this.db.select({ draft: schema.hedRequestDrafts, chain: schema.disbursementRequests, campaign: schema.disbursementCampaigns })

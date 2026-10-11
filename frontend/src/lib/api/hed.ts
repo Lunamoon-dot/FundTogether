@@ -79,6 +79,13 @@ export interface HedReviewQueueItem { requestId: string; requestHash: string; on
 export async function listHedPendingReviews(signal?: AbortSignal) {
   return (await http.get<HedReviewQueueItem[]>('/v1/disbursement/reviews/pending', { signal })).data
 }
+export interface HedCampaignActivation { campaignId: string; onchainCampaignId: string; eligibilityHash: `0x${string}` }
+export async function listHedPendingCampaigns(signal?: AbortSignal) {
+  return (await http.get<HedCampaignActivation[]>('/v1/disbursement/reviews/campaigns/pending', { signal })).data
+}
+export async function prepareHedCampaignActivation(campaignId: string) {
+  return (await http.post<HedCampaignActivation>(`/v1/disbursement/reviews/campaigns/${campaignId}/activation`)).data
+}
 export interface HedApprovalPayload { onchainCampaignId: string; onchainRequestId: string; expectedRequestHash: `0x${string}` }
 export async function prepareHedRequestApproval(requestId: string) {
   return (await http.post<HedApprovalPayload>(`/v1/disbursement/requests/${requestId}/reviews/approval`)).data
