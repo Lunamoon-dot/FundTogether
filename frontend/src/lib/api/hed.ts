@@ -4,6 +4,9 @@ export interface HedPublicSnapshot { campaignId: string; checkpoint: { blockNumb
 export async function getHedPublicCampaign(campaignId: string, signal?: AbortSignal) {
   return (await http.get<HedPublicSnapshot>(`/v1/disbursement/public/campaigns/${campaignId}`, { signal })).data
 }
+export async function listHedPublicCampaigns(signal?: AbortSignal) {
+  return (await http.get<HedPublicSnapshot[]>('/v1/disbursement/public/campaigns', { signal })).data
+}
 
 export interface HedCampaignDraftInput {
   title: string; description: string; purpose: string; beneficiaryScope: string; allowedExpenseCategories: string[];

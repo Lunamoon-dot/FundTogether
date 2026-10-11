@@ -6,10 +6,19 @@ import type { Abi } from 'viem'
 import deployment from '../../lib/web3/deployment-context'
 import disbursementAbiJson from '../../../../backend/src/blockchain/generated/hed/fund-together-disbursement.abi.json'
 import tokenAbiJson from '../../../../backend/src/blockchain/generated/hed/mock-usdc.abi.json'
-import { getHedPublicCampaign } from '../../lib/api/hed'
+import { getHedPublicCampaign, listHedPublicCampaigns } from '../../lib/api/hed'
 import { getErrorMessage } from '../../lib/api/error'
 
 const abi = disbursementAbiJson as Abi, tokenAbi = tokenAbiJson as Abi
+
+export function HedCampaignFeed() {
+  const campaigns = useQuery({ queryKey: ['hed-public-campaigns'], queryFn: ({ signal }) => listHedPublicCampaigns(signal), retry: false, refetchInterval: 10_000 })
+  if (campaigns.isPending) return <p role="status">Đang tải campaign HED…</p>
+  if (campaigns.isError) return <section className="panel"><p role="alert">{getErrorMessage(campaigns.error)}</p><button className="button button--secondary" onClick={() => void campaigns.refetch()}>Thử lại</button></section>
+  return <><div className="feed-heading"><h1>Campaign giải ngân theo yêu cầu</h1></div><p>Đủ goal trước khi reserve hay trả vendor. Đây là HED, không dùng milestone cấp vốn.</p>
+    {campaigns.data.length === 0 ? <section className="panel"><h2>Chưa có campaign HED</h2><p>Campaign sẽ xuất hiện sau khi đã ghi nhận trên chain và indexer bắt kịp.</p></section>
+      : <ul className="organization-list">{campaigns.data.map(campaign => <li className="panel" key={campaign.campaignId}><h2>Campaign HED #{campaign.campaignId}</h2><p>{campaign.campaign.state} · goal {campaign.campaign.goal} · đã góp {campaign.campaign.contributed}</p><p>Đang reserve {campaign.campaign.reserved} · đã trả vendor {campaign.campaign.grossPaid}</p><a className="button button--secondary" href={`#/hed/campaigns/${campaign.campaignId}`}>Xem campaign</a></li>)}</ul>}</>
+}
 
 export function HedPublicCampaign({ campaignId }: { campaignId: string }) {
   const view = useQuery({ queryKey: ['hed-public-campaign', campaignId], queryFn: ({ signal }) => getHedPublicCampaign(campaignId, signal), retry: false, refetchInterval: 10_000 })

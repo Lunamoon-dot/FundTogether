@@ -1,5 +1,5 @@
 import { Controller, Get, Header, Inject, NotFoundException, Param, Res, ServiceUnavailableException, StreamableFile } from "@nestjs/common";
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { Response } from "express";
 import { Readable } from "node:stream";
@@ -27,6 +27,17 @@ export class HedHealthController {
 export class HedPublicController {
   constructor(@Inject(DRIZZLE_DB) private readonly db: NodePgDatabase<typeof schema>, private readonly indexer: HedIndexerService,
     private readonly storage: EvidenceStorageService, private readonly chain: HedBlockchainService) {}
+  @Get("campaigns")
+  @Header("Cache-Control", "no-store")
+  async campaigns() {
+    const status = await this.indexer.status();
+    if (status.status !== "ready") throw new ServiceUnavailableException("HED indexer is not caught up");
+    const rows = await this.db.select({ snapshot: disbursementCampaignProjection.snapshot }).from(disbursementCampaignProjection).where(
+      eq(disbursementCampaignProjection.streamId, this.indexer.streamKey),
+    ).orderBy(desc(disbursementCampaignProjection.onchainCampaignId));
+    return rows.map(row => row.snapshot);
+  }
+
   @Get("campaigns/:campaignId")
   @Header("Cache-Control", "no-store")
   async campaign(@Param("campaignId") campaignId: string) {
