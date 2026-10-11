@@ -32,7 +32,13 @@ export class HedReviewService {
     const [request] = await this.db.select().from(schema.hedRequestDrafts).where(eq(schema.hedRequestDrafts.id, requestId));
     if (!request) throw new NotFoundException("HED request draft not found");
     if (!request.frozenAt || !request.requestHash) throw new ConflictException("Freeze HED request evidence before recording a review");
-    return this.db.insert(schema.hedRequestReviews).values({ requestDraftId: requestId, content: parsed.data, reviewedBy: userId }).returning();
+    if (!parsed.data.criterionId.startsWith("NEED")) return this.db.insert(schema.hedRequestReviews).values({ requestDraftId: requestId, content: parsed.data, reviewedBy: userId }).returning();
+    const documents = await this.db.select({ id: schema.hedRequestEvidenceDocuments.id }).from(schema.hedRequestEvidenceDocuments)
+      .where(eq(schema.hedRequestEvidenceDocuments.requestDraftId, requestId));
+    const sourceReferences = documents.map(document => document.id).sort();
+    if (!sourceReferences.length) throw new ConflictException("Frozen HED request has no server-owned need evidence");
+    const content = { ...parsed.data, manifestHash: request.requestHash, publicHash: request.requestHash, sourceReferences };
+    return this.db.insert(schema.hedRequestReviews).values({ requestDraftId: requestId, content, reviewedBy: userId }).returning();
   }
 
   async pending(userId: string) {
@@ -81,9 +87,15 @@ export class HedReviewService {
       .where(eq(schema.hedRequestDrafts.id, requestId)).limit(1);
     if (!request?.draft.frozenAt || !request.draft.requestHash || !request.chain.onchainRequestId || !request.campaign.onchainCampaignId)
       throw new ConflictException("HED request is not frozen and mapped on chain");
+    const documents = await this.db.select({ id: schema.hedRequestEvidenceDocuments.id }).from(schema.hedRequestEvidenceDocuments)
+      .where(eq(schema.hedRequestEvidenceDocuments.requestDraftId, requestId));
+    const sourceReferences = documents.map(document => document.id).sort();
+    if (!sourceReferences.length) throw new ConflictException("Frozen HED request has no server-owned need evidence");
     const reviews = await this.db.select().from(schema.hedRequestReviews).where(and(eq(schema.hedRequestReviews.requestDraftId, requestId),
       eq(sql`${schema.hedRequestReviews.content}->>'evidenceVersion'`, String(request.draft.version)), inArray(sql`${schema.hedRequestReviews.content}->>'criterionId'`, needCriteria)));
-    const approved = new Set(reviews.filter(review => review.content.outcome === "MET").map(review => review.content.criterionId));
+    const approved = new Set(reviews.filter(review => review.content.outcome === "MET" && review.content.manifestHash === request.draft.requestHash
+      && review.content.publicHash === request.draft.requestHash && review.content.sourceReferences.length === sourceReferences.length
+      && review.content.sourceReferences.every(id => sourceReferences.includes(id))).map(review => review.content.criterionId));
     if (needCriteria.some(criterion => !approved.has(criterion))) throw new ConflictException("All NEED-01 through NEED-06 reviews must be MET before reserve approval");
     const block = await this.chain.client.getBlock({ blockTag: "latest" });
     const snapshot = await this.chain.snapshot(BigInt(request.campaign.onchainCampaignId), block.number);

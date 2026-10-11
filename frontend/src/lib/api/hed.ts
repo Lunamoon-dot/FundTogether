@@ -86,7 +86,7 @@ export async function listHedReviews(requestId: string, signal?: AbortSignal) {
 export async function recordHedReview(requestId: string, review: HedReviewInput) {
   return (await http.post(`/v1/disbursement/requests/${requestId}/reviews`, review)).data
 }
-export interface HedReviewQueueItem { requestId: string; requestHash: string; onchainCampaignId: string; onchainRequestId: string; content: HedRequestDraftInput }
+export interface HedReviewQueueItem { requestId: string; requestHash: `0x${string}`; onchainCampaignId: string; onchainRequestId: string; content: HedRequestDraftInput }
 export async function listHedPendingReviews(signal?: AbortSignal) {
   return (await http.get<HedReviewQueueItem[]>('/v1/disbursement/reviews/pending', { signal })).data
 }
