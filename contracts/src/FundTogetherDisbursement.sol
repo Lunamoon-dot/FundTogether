@@ -272,10 +272,12 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         T.RequestView storage r = _requests[campaignId][requestId];
         if (msg.sender != r.vendor) revert WrongCaller();
         if (r.state != T.RequestState.APPROVED_RESERVED || block.timestamp >= r.approvedAt + VENDOR_ACK_WINDOW || termsHash == bytes32(0)) revert WrongState();
-        r.termsHash = termsHash;
+        // The vendor's transaction acknowledges this immutable request; do not let a caller
+        // substitute a second off-chain terms commitment after reserve approval.
+        r.termsHash = r.requestHash;
         r.committedAt = block.timestamp;
         r.state = T.RequestState.VENDOR_COMMITTED;
-        emit VendorAcknowledged(campaignId, requestId, msg.sender, termsHash);
+        emit VendorAcknowledged(campaignId, requestId, msg.sender, r.requestHash);
     }
 
     function payDeposit(uint256 campaignId, uint256 requestId) external nonReentrant {

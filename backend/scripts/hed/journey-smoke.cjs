@@ -31,7 +31,7 @@ async function main() {
   await send(0, disbursement.abi, manifest.contractAddress, 'createActivity', [campaignId, activityHash, request]);
   await send(0, disbursement.abi, manifest.contractAddress, 'submitRequest', [campaignId, 0n, requestHash, accounts[3], request, 0n]);
   await send(0, disbursement.abi, manifest.contractAddress, 'approveRequest', [campaignId, 0n, requestHash]);
-  await send(3, disbursement.abi, manifest.contractAddress, 'acknowledgeVendor', [campaignId, 0n, hash('terms')]);
+  await send(3, disbursement.abi, manifest.contractAddress, 'acknowledgeVendor', [campaignId, 0n, requestHash]);
   await send(0, disbursement.abi, manifest.contractAddress, 'candidateDelivery', [campaignId, 0n, request, hash('delivery')]);
   await client.request({ method: 'evm_increaseTime', params: [3 * 24 * 60 * 60] }); await client.request({ method: 'evm_mine' });
   await send(1, disbursement.abi, manifest.contractAddress, 'executeFinal', [campaignId, 0n]);
