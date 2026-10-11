@@ -2816,3 +2816,32 @@ keeps the dated implementation history and its verification evidence.
 - Live backend was restarted with the updated build, health returns 200, one process listens on port 3000 and the indexer is ready at block 22. sadas remains bonded/human-approved but chain DRAFT; abc@gmail.com still needs a verified resolver wallet. Existing organizer spendable balance is 878 MockUSDC.
 - IN_PROGRESS: native MetaMask stability and user-signed browser walkthrough. Standalone extension crashes cannot be certified fixed by application tests. Atomic submission remains tested on the isolated deployment only; active deployment cutover is pending existing escrow recovery/decision.
 - Repeatable workflow, current-state snapshot and limitations: [workflow audit](./workflow-audit-2026-10-05.md).
+
+### 2026-10-10 — DONE public Explore visual refresh
+
+- Improved Workflow B campaign cards, local search and status filters, funding
+  progress, current-step guidance, and campaign detail hierarchy. Technical
+  money movement and indexed transaction history remain available in
+  collapsible sections; existing wallet actions are reused.
+- Clearly labels the local test network and MockUSDC. Search and filters apply
+  only to the campaign list already returned by the API.
+- Navigation stays in the left sidebar. Explore uses a compact campaign heading
+  and list; the large hero artwork/thumbnail was removed. Campaign-card spacing
+  and MockUSDC number formatting remain scoped to the public list.
+- Verification: Workflow B frontend TypeScript and production build passed in
+  the Desktop checkout serving `localhost:5174` after the visual correction.
+  The rendered Explore page with sidebar was visually reviewed in the local
+  in-app browser at 1280×720. Brave account-specific and campaign-flow
+  acceptance remain pending.
+- Profile/list links and representative-wallet rendering covered by regression
+  tests; focused suite 30/30 PASS, lint and Workflow B build PASS.
+- Applied to Desktop runtime and d6be. The separate in-app browser is logged out;
+  authenticated Brave click behavior was not independently reproduced. Existing
+  "Xem hồ sơ" href already targeted the profile; no claim that this anchor was
+  the source of the reported redirect. No representative wallet was assigned.
+
+### 2026-10-10 — REVERTED account access dialog
+
+- A temporary centered-dialog presentation was reverted at the user's request.
+  Account and workspace access remain regular routes inside the left-sidebar
+  layout; sign-in, account roles, and linked-wallet actions are unchanged.
