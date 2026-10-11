@@ -26,11 +26,15 @@ Run from the repository root:
 ```powershell
 wsl.exe -d Ubuntu-24.04 --exec sh -lc 'cd /mnt/c/Users/dell/Desktop/FundTogether/contracts && /home/dell/.foundry/bin/forge test --match-path test/unit/Disbursement/FundingAndReservation.t.sol'
 cd backend; npm.cmd run build; npm.cmd run artifacts:hed
+cd backend; npm.cmd run smoke:hed
 cd ..\frontend; npm.cmd run build
 ```
 
 The HED local chain is intentionally separate. Do not start Anvil manually on
 the HED RPC port and do not use an A/B deployment manifest as an HED manifest.
+`smoke:hed` creates a new local-only campaign on every run and checks receipt
+success, the vendor's balance delta and the final activity state. It never
+resets existing local HED state.
 
 ## Not yet proven
 
