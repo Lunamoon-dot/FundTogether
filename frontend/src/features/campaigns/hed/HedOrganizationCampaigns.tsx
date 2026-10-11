@@ -2,8 +2,8 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import deployment from '../../../lib/web3/deployment-context'
-import { createHedCampaignDraft, freezeHedCampaignDraft, listHedCampaignDrafts } from '../../../lib/api/hed'
-import type { HedCampaignDraft, HedCampaignDraftInput } from '../../../lib/api/hed'
+import { createHedCampaignDraft, createHedRequestDraft, freezeHedCampaignDraft, freezeHedRequestDraft, listHedCampaignDrafts, listHedRequestDrafts, listHedVendorOptions, uploadHedRequestEvidence } from '../../../lib/api/hed'
+import type { HedCampaignDraft, HedCampaignDraftInput, HedRequestDraftInput } from '../../../lib/api/hed'
 import { getErrorMessage } from '../../../lib/api/error'
 import '../advance/advance.css'
 
@@ -30,8 +30,30 @@ function HedCampaignEntry({ value, onFrozen }: { value: HedCampaignDraft; onFroz
   return <li className="panel"><div className="organization-card-heading"><h2>{value.title}</h2><span className="organization-role">{value.frozenAt ? 'Đã chốt' : 'Bản nháp'}</span></div>
     <p className="organization-description">{value.description}</p><p>Mục tiêu: {value.goal} base units MockUSDC · {value.fundingDuration / 86_400} ngày gây quỹ</p>
     {error && <p className="toast toast--error" role="alert">{error}</p>}
-    {value.frozenAt ? <p className="advance-hash">Commitment: {value.commitmentHash}</p> : <button className="button button--primary" disabled={busy} onClick={() => void freeze()}>{busy ? 'Đang chốt…' : 'Chốt commitment'}</button>}
+    {value.frozenAt ? <><p className="advance-hash">Commitment: {value.commitmentHash}</p><HedRequestWorkspace campaignId={value.id} /></> : <button className="button button--primary" disabled={busy} onClick={() => void freeze()}>{busy ? 'Đang chốt…' : 'Chốt commitment'}</button>}
   </li>
+}
+
+function HedRequestWorkspace({ campaignId }: { campaignId: string }) {
+  const cache = useQueryClient(), key = ['hed-requests', campaignId], vendorKey = ['hed-vendors', campaignId]
+  const requests = useQuery({ queryKey: key, queryFn: ({ signal }) => listHedRequestDrafts(campaignId, signal), retry: false })
+  const vendors = useQuery({ queryKey: vendorKey, queryFn: ({ signal }) => listHedVendorOptions(campaignId, signal), retry: false })
+  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [file, setFile] = useState<File | null>(null)
+  const [form, setForm] = useState<HedRequestDraftInput>({ vendorVerificationId: '', activityReference: '', purpose: '', itemLines: [{ description: '', quantity: 1, unitAmount: '' }], amount: '', deposit: '0', expectedDeliveryAt: '', acceptanceCriteria: [''], terms: '', needEvidenceReferences: [] })
+  const ready = vendors.data?.length ? vendors.data : []
+  async function create(event: FormEvent) { event.preventDefault(); if (busy || !file) return; setBusy(true); setError(''); try {
+    const draft = await createHedRequestDraft(campaignId, form); await uploadHedRequestEvidence(campaignId, draft.id, 'QUOTE', file); await cache.invalidateQueries({ queryKey: key }); setFile(null)
+  } catch (cause) { setError(getErrorMessage(cause)) } finally { setBusy(false) } }
+  async function freeze(id: string) { if (busy) return; setBusy(true); setError(''); try { await freezeHedRequestDraft(campaignId, id); await cache.invalidateQueries({ queryKey: key }) } catch (cause) { setError(getErrorMessage(cause)) } finally { setBusy(false) } }
+  return <section className="panel"><h3>Yêu cầu thanh toán</h3><p>Hồ sơ chưa là reserve, vendor acknowledgement hay payout. Upload chỉ lưu evidence private.</p>
+    {error && <p className="toast toast--error" role="alert">{error}</p>}
+    {requests.data?.map(request => <div key={request.id}><p>{request.purpose} · {request.amount} base units · {request.frozenAt ? `Đã chốt ${request.requestHash}` : 'Chưa chốt'}</p>{!request.frozenAt && <button className="button button--secondary" disabled={busy} onClick={() => void freeze(request.id)}>Chốt request đã có evidence</button>}</div>)}
+    {ready.length === 0 ? <p role="status">Chưa có vendor verified khả dụng.</p> : <form className="advance-plan-form" onSubmit={create}><label>Vendor<select required value={form.vendorVerificationId} onChange={e => setForm(v => ({ ...v, vendorVerificationId: e.target.value }))}><option value="">Chọn vendor đã verify</option>{ready.map(v => <option key={v.id} value={v.id}>{v.content.legalName} · {v.vendorWallet}</option>)}</select></label>
+      <label>Activity reference<input required value={form.activityReference} onChange={e => setForm(v => ({ ...v, activityReference: e.target.value }))} /></label><label>Mục đích<textarea required value={form.purpose} onChange={e => setForm(v => ({ ...v, purpose: e.target.value }))} /></label>
+      <label>Line item<input required value={form.itemLines[0].description} onChange={e => setForm(v => ({ ...v, itemLines: [{ ...v.itemLines[0], description: e.target.value }] }))} /></label><label>Đơn giá / amount<input required inputMode="numeric" value={form.amount} onChange={e => setForm(v => ({ ...v, amount: e.target.value, itemLines: [{ ...v.itemLines[0], unitAmount: e.target.value }] }))} /></label><label>Cọc<input required inputMode="numeric" value={form.deposit} onChange={e => setForm(v => ({ ...v, deposit: e.target.value }))} /></label>
+      <label>Hạn giao<input required type="datetime-local" onChange={e => setForm(v => ({ ...v, expectedDeliveryAt: new Date(e.target.value).toISOString() }))} /></label><label>Tiêu chí nghiệm thu<textarea required value={form.acceptanceCriteria[0]} onChange={e => setForm(v => ({ ...v, acceptanceCriteria: [e.target.value] }))} /></label><label>Terms<textarea required value={form.terms} onChange={e => setForm(v => ({ ...v, terms: e.target.value }))} /></label><label>Báo giá hoặc hồ sơ nhu cầu private<input required type="file" accept="application/pdf,image/png,image/jpeg" onChange={e => setFile(e.target.files?.[0] ?? null)} /></label>
+      <button className="button button--primary" disabled={busy || !file} type="submit">{busy ? 'Đang lưu…' : 'Tạo request và upload evidence'}</button></form>}
+  </section>
 }
 
 function HedCampaignWizard({ organizationId, onSaved, onClose }: { organizationId: string; onSaved: () => void; onClose: () => void }) {
