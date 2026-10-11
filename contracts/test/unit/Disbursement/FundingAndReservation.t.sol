@@ -43,6 +43,30 @@ contract HedFundingAndReservationTest is Test {
         assertEq(token.balanceOf(address(disbursement)), 2_000e6);
     }
 
+    function testFuzz_reserveKeepsExactCustodyBeforeAnyPayout(uint96 rawGoal, uint96 rawRequest) public {
+        uint256 goal = bound(uint256(rawGoal), 2e6, 2_000e6);
+        uint256 requestAmount = bound(uint256(rawRequest), 1, goal / 2);
+        token.mint(donor, goal);
+        vm.prank(organizer);
+        uint256 campaignId = disbursement.createCampaign(keccak256("fuzz-campaign"), goal, 1 days);
+        vm.prank(donor);
+        disbursement.donate(campaignId, goal);
+        vm.prank(resolver);
+        disbursement.activateCampaign(campaignId, keccak256("eligibility"));
+        vm.prank(organizer);
+        disbursement.createActivity(campaignId, keccak256("activity"), goal / 2);
+        vm.prank(organizer);
+        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), vendor, requestAmount, 0);
+        vm.prank(resolver);
+        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
+
+        T.CampaignView memory campaign = disbursement.campaign(campaignId);
+        assertEq(campaign.available, goal - requestAmount);
+        assertEq(campaign.reserved, requestAmount);
+        assertEq(campaign.grossPaid, 0);
+        assertEq(token.balanceOf(address(disbursement)), goal);
+    }
+
     function test_backupCanOnlyTakeOverEligibilityAfterPrimaryWindow() public {
         vm.prank(organizer);
         uint256 campaignId = disbursement.createCampaign(keccak256("campaign"), 2_000e6, 1 days);
