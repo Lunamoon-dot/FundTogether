@@ -21,6 +21,7 @@ async function main() {
   const hash = label => keccak256(toHex(`hed-smoke:${label}:${Date.now()}`));
   const goal = 2_000_000_000n, request = 1_000_000_000n;
   const commitment = hash('campaign'), eligibility = hash('eligibility'), activityHash = hash('activity'), requestHash = hash('request');
+  const vendorBalanceBefore = await client.readContract({ address: manifest.tokenAddress, abi: token.abi, functionName: 'balanceOf', args: [accounts[3]] });
   await send(0, token.abi, manifest.tokenAddress, 'mint', [accounts[2], goal]);
   await send(2, token.abi, manifest.tokenAddress, 'approve', [manifest.contractAddress, goal]);
   await send(0, disbursement.abi, manifest.contractAddress, 'createCampaign', [commitment, goal, 86_400n]);
@@ -34,7 +35,7 @@ async function main() {
   await send(0, disbursement.abi, manifest.contractAddress, 'candidateDelivery', [campaignId, 0n, request, hash('delivery')]);
   await client.request({ method: 'evm_increaseTime', params: [3 * 24 * 60 * 60] }); await client.request({ method: 'evm_mine' });
   await send(1, disbursement.abi, manifest.contractAddress, 'executeFinal', [campaignId, 0n]);
-  assert.equal(await client.readContract({ address: manifest.tokenAddress, abi: token.abi, functionName: 'balanceOf', args: [accounts[3]] }), request);
+  assert.equal(await client.readContract({ address: manifest.tokenAddress, abi: token.abi, functionName: 'balanceOf', args: [accounts[3]] }), vendorBalanceBefore + request);
   await send(0, disbursement.abi, manifest.contractAddress, 'candidateOutcome', [campaignId, 0n, hash('outcome')]);
   await client.request({ method: 'evm_increaseTime', params: [3 * 24 * 60 * 60] }); await client.request({ method: 'evm_mine' });
   await send(0, disbursement.abi, manifest.contractAddress, 'verifyOutcome', [campaignId, 0n, hash('outcome-final')]);
