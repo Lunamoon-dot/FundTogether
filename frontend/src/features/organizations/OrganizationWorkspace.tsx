@@ -11,8 +11,9 @@ import { OrganizationsPage } from './OrganizationsPage'
 import { OrganizationProfile } from './OrganizationProfile'
 import { organizationSwitchPath } from './organization-navigation'
 import './OrganizationsPage.css'
-import { isAdvance } from '../../lib/web3/deployment-context'
+import { isAdvance, isHed } from '../../lib/web3/deployment-context'
 import { AdvanceOrganizationCampaigns } from '../campaigns/advance/AdvanceOrganizationCampaigns'
+import { HedOrganizationCampaigns } from '../campaigns/hed/HedOrganizationCampaigns'
 
 const sections = [
   { path: '/campaigns', label: 'Campaign' },
@@ -99,7 +100,8 @@ export function OrganizationWorkspace({ organizationId, section, session, sessio
                 {!organization ? <section className="panel"><h1>Bắt đầu quản lý campaign</h1>
                   <p>Tạo tổ chức để lưu bản nháp và quản lý campaign trong dashboard này.</p>
                   <a className="button button--primary" href="#/organizations">Tạo tổ chức</a>
-                </section> : isAdvance ? <AdvanceOrganizationCampaigns key={`${session.userId}:${organization.id}`} organizationId={organization.id} userId={session.userId} section={activeSection} />
+                </section> : isHed ? <HedOrganizationCampaigns key={`${session.userId}:${organization.id}`} organizationId={organization.id} userId={session.userId} section={activeSection} />
+                  : isAdvance ? <AdvanceOrganizationCampaigns key={`${session.userId}:${organization.id}`} organizationId={organization.id} userId={session.userId} section={activeSection} />
                   : currentSection.path === '/evidence' ? <OrganizationEvidence key={`${session.userId}:${organization.id}`}
                   organizationId={organization.id} userId={session.userId} section={activeSection} />
                   : <OrganizationCampaigns key={`${session.userId}:${organization.id}`}
