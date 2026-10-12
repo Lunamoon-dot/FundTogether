@@ -5,6 +5,15 @@
 > Trạng thái: Định hướng do người dùng yêu cầu lưu và ưu tiên đọc.
 > Phạm vi: mục tiêu, nội dung và kết quả nghiên cứu dự kiến; các quyết định nghiệp vụ còn mở.
 
+> Quyết định mới ngày 2026-10-12: người dùng chỉ đạo bỏ thực thể Vendor trong Web3
+> để tránh phức tạp và sát thực tế đời thực; Organizer trực tiếp nhận tiền giải ngân
+> để chi tiêu. Trọng tâm hệ thống chuyển hẳn sang xoay quanh các luồng xác thực:
+> (1) Xác thực tổ chức, (2) Thẩm định chiến dịch & dự toán, (3) Xác thực chứng từ chi
+> tiêu sau giải ngân, và (4) Xác thực kết quả thiện nguyện. Tạm thời Resolver là bên
+> xác thực chấp nhận giải ngân để kịp thời xây dựng và kiểm chứng hệ thống, đồng thời
+> ghi nhận luồng này có tính xuyên suốt và có thể tiếp tục hoàn thiện cơ chế phân quyền.
+> Xem [đặc tả giải ngân lấy xác thực làm trọng tâm](./verification-first-disbursement-spec.md).
+
 > Quyết định mới ngày 2026-10-11: người dùng chọn chuyển hẳn sản phẩm sang
 > yêu cầu cấp vốn có căn cứ thay cho chia milestone cố định, trên codebase/nhánh
 > hiện tại. Trước mắt lưu checkpoint và lập kế hoạch giữ/sửa/xóa; chưa triển khai

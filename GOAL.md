@@ -1,42 +1,44 @@
-# Goal — Triển khai MVP P1 giải ngân theo yêu cầu
+# Goal — Triển khai cơ chế giải ngân lấy xác thực làm trọng tâm (Verification-Centric)
 
-> Cập nhật: 2026-10-11 · Trạng thái triển khai local: DONE.
+> Cập nhật: 2026-10-12 · Trạng thái: IN_PROGRESS (Chuyển đổi từ HED P1 sang Verification-Centric).
+> Căn cứ: Quyết định người dùng ngày 2026-10-12: bỏ thực thể Vendor Web3, Organizer nhận tiền giải ngân trực tiếp, xoay quanh 4 luồng xác thực (Tổ chức, Dự toán chiến dịch, Chứng từ chi tiêu, và Kết quả thiện nguyện), Resolver tạm thời là bên xác thực chấp thuận giải ngân.
 > File định nghĩa mục tiêu; không tự khởi chạy goal trong ứng dụng.
-> Viết goal không chứng minh tính năng đã triển khai/nghiệm thu, không tự cho phép deploy tiền thật hoặc thay đổi nghĩa vụ cũ.
 
 ## 1. Kết quả cần đạt
 
-Chuyển luồng tạo campaign mới từ milestone cấp vốn cố định sang yêu cầu thanh toán có căn cứ theo thiết kế MVP P1. Hoàn thiện xuyên tầng contract → event/indexer → API/storage → UI:
+Chuyển đổi luồng giải ngân từ cơ chế phụ thuộc Vendor (HED P1) sang **Cơ chế giải ngân lấy xác thực làm trọng tâm** ([đặc tả chi tiết](./docs/verification-first-disbursement-spec.md)). Hoàn thiện xuyên tầng contract → indexer → API → UI:
 
 ```text
-Xác thực tổ chức/vendor → duyệt campaign → gây đủ quỹ
-→ tạo activity → duyệt yêu cầu mua → vendor xác nhận terms
-→ cọc nếu có → xét giao hàng/challenge → thanh toán phần còn lại
-→ thuê vận chuyển nếu cần → xác minh kết quả trao quà
-→ hoàn tất hoặc wind-down → hoàn quỹ còn đủ điều kiện
+Xác thực tổ chức (Admin) 
+  → Thẩm định chiến dịch & dự toán (Resolver) → Đóng băng cam kết on-chain
+  → Gây đủ 100% quỹ 
+  → Tạo yêu cầu giải ngân (Dự toán chi) 
+  → Resolver duyệt dự toán & kích hoạt giải ngân on-chain (tiền về ví Organizer)
+  → Organizer mua sắm & nộp chứng từ chi tiêu (hóa đơn, sao kê, return unused nếu dôi dư)
+  → Resolver nghiệm thu tài chính (Financially Settled)
+  → Organizer trao quà & nộp bằng chứng kết quả (biên bản bàn giao, danh sách ký nhận, ảnh)
+  → Cửa sổ phản biện Donor Challenge (3 ngày) → Resolver nghiệm thu kết quả (Outcome Verified)
+  → Hoàn tất chiến dịch hoặc wind-down/refund quỹ còn lại
 ```
 
-Bàn giao triển khai local có bằng chứng kiểm chứng kỹ thuật. Nghiệm thu Brave/MetaMask và đánh giá hồ sơ bởi người thật theo dõi riêng, chưa làm thì giữ TODO; không dùng kết quả tự động thay nghiệm thu con người.
+Bàn giao triển khai local có bằng chứng kiểm chứng kỹ thuật. Dọn sạch các thành phần phụ thuộc Vendor không còn dùng (vendor wallet, terms ack, cọc vendor, vendor verification).
 
 ## 2. Nguồn và cách sử dụng
 
-1. Đọc [định hướng nghiên cứu](./docs/research-direction.md), AGENTS.md và skills/AGENTSKILLS.md trước.
-2. Dùng [thiết kế MVP](./docs/hed-mvp-design.md) cho phạm vi và phương án HED-MVP-1, gồm 12 OPEN và MVP-13.
-3. Dùng [kế hoạch chuyển đổi](./docs/superpowers/plans/2026-10-11-funding-requests-cleanup.md) để rà giữ/sửa/xóa. Nếu khác hướng tiền mới, ghi rõ delta theo thiết kế MVP.
-4. [Post-MVP](./docs/hed-post-mvp-design.md) nằm ngoài goal. [Kế hoạch request trước](./docs/funding-request-plan.md) là lịch sử lựa chọn; không trộn partial funding/P2 vào P1.
-5. Kiểm source và [progress](./docs/PROJECT_PROGRESS.md) trước kết luận triển khai. [Goal B đã lưu](./docs/goals/workflow-b-completed-2026-10-11.md) chỉ mô tả baseline cũ; không chuyển dấu DONE sang MVP này.
-
-Tỷ lệ/thời hạn trong thiết kế là phương án thử nghiệm local, chưa phải policy production. H0 phải làm rõ mâu thuẫn hoặc quyết định còn thiếu trước khi code phần tiền phụ thuộc; không âm thầm đổi quyền, recipient, cap hoặc công thức refund. Không hỏi lại quyết định người dùng đã chốt; tự giải quyết lựa chọn kỹ thuật nhỏ từ repo.
+1. Đọc [định hướng nghiên cứu](./docs/research-direction.md), [đặc tả giải ngân xác thực](./docs/verification-first-disbursement-spec.md) và AGENTS.md trước.
+2. Dùng [đặc tả giải ngân lấy xác thực làm trọng tâm](./docs/verification-first-disbursement-spec.md) làm căn cứ chuẩn cho các trạng thái, quyền hạn và hạch toán dòng tiền mới.
+3. Kế thừa các nền tảng dùng chung đã kiểm chứng: Auth/SIWE, liên kết ví, xác thực tổ chức (Onboarding), storage private/public, và hạ tầng indexer idempotent.
+4. Kiểm source và [progress](./docs/PROJECT_PROGRESS.md) trước khi kết luận triển khai.
 
 ## 3. Phạm vi
 
-- P1 trả trực tiếp vendor, MockUSDC local; đủ goal trước tạo nghĩa vụ/giải ngân.
-- Một request tài chính và một activity outcome đang mở; hỗ trợ mua rồi vận chuyển tuần tự trong cùng activity.
-- Reserve toàn Q; tối đa một cọc và một final payment chính xác; vendor ký terms trước thực hiện.
-- Kiểm nhu cầu mua, giao hàng và kết quả thiện nguyện riêng; bằng chứng gốc riêng tư, bản công khai được che dữ liệu.
-- Primary/backup resolver, challenge, timeout, partial delivery, recovery, wind-down và refund base/supplement theo thiết kế.
-- Giữ auth, liên kết ví, organization verification và storage dùng chung. ADMIN xác thực tổ chức/vendor; RESOLVER quyết định nghiệp vụ đúng thẩm quyền.
-- Không P2/P3, partial funding, request song song, nhiều installment, fiat, adaptive policy, voting/bond hoặc AI tự xét.
+- Bỏ hoàn toàn thực thể Vendor trong Web3; tiền giải ngân chuyển thẳng vào `campaign.organizerWallet`.
+- Một yêu cầu tài chính chưa đối chiếu tại một thời điểm (`single in-flight unsettled request`).
+- Resolver tạm thời là bên xác thực duyệt giải ngân on-chain và đối chiếu sau chi.
+- Bắt buộc đủ 100% goal trước khi bắt đầu giải ngân.
+- Hai khâu nghiệm thu tách biệt: (1) Nghiệm thu tài chính (hóa đơn, chứng từ) và (2) Nghiệm thu kết quả thiện nguyện (biên bản trao quà).
+- Hỗ trợ hoàn trả tiền thừa (`returnUnused`) từ Organizer về Escrow.
+- Giữ cửa sổ phản biện Donor Challenge (3 ngày), timeout và cơ chế hoàn tiền (Refund) khi chiến dịch dừng/thất bại.
 
 ## 4. Các chặng thực hiện
 

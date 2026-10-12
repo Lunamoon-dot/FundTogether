@@ -3,7 +3,19 @@
 > Updated: 2026-10-10
 > Scope: current repository and local MVP deployment
 
-## Current direction — 2026-10-06
+## Current direction — 2026-10-12
+
+### Verification-Centric Disbursement — 2026-10-12
+
+User decision on 2026-10-12 removes the Web3 Vendor entity (no vendor wallet,
+no vendor terms acknowledgement, no deposit/final split on-chain). Payouts go directly
+to the authenticated Organizer wallet (`campaign.organizerWallet`) for real-world execution.
+The system pivots to a 4-stage verification lifecycle: (1) Organization verification,
+(2) Campaign commitment & budget validation, (3) Post-spend financial evidence
+verification (invoices, receipts, unspent return), and (4) Outcome/impact verification
+(handover records, beneficiary receipts, photos). Resolver acts as the primary verifier
+approving disbursements on-chain and reconciling evidence.
+See [verification spec](./verification-first-disbursement-spec.md).
 
 ### HED-MVP-1 local implementation — 2026-10-11
 

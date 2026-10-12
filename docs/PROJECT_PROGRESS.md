@@ -1,6 +1,12 @@
 # FundTogether Project Progress
 
-> **Updated:** 2026-10-11
+> **Updated:** 2026-10-12
+
+## 2026-10-12 — Verification-Centric disbursement direction and specification
+
+- DONE (Documentation): User decided to eliminate Web3 Vendor entity, disburse directly to Organizer, and structure the system around 4 verification flows (Organization, Campaign & Budget, Post-spend Financial Invoices, and Outcome Handover). Resolver is designated as the primary verifier for approving disbursement in the current build phase.
+- Added `docs/verification-first-disbursement-spec.md`; updated `docs/research-direction.md`, `GOAL.md`, and `docs/PROJECT_OVERVIEW.md`.
+- Code cleanup planning: streamline `FundTogetherDisbursement.sol`, remove vendor controllers/services/schemas in backend, remove vendor UI in frontend.
 
 ## 2026-10-11 — HED-MVP-1 local implementation complete
 
