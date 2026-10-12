@@ -42,8 +42,12 @@ export class RewardCryptoService {
   private readonly encryptionKey: Buffer;
 
   constructor() {
-    const rawKey = process.env.REWARD_PII_ENCRYPTION_KEY || "fundtogether-reward-pii-secret-32b-key!";
-    // Normalize to exact 32-byte key for AES-256-GCM
+    const rawKey = process.env.REWARD_PII_ENCRYPTION_KEY;
+    if (!rawKey || Buffer.from(rawKey, "utf-8").length < 32) {
+      throw new Error(
+        "REWARD_PII_ENCRYPTION_KEY environment variable is required and must be at least 32 bytes for secure AES-256-GCM encryption"
+      );
+    }
     this.encryptionKey = Buffer.alloc(32);
     Buffer.from(rawKey, "utf-8").copy(this.encryptionKey);
   }

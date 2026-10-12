@@ -117,11 +117,21 @@ async function main() {
     const proofHash = hash('printed-samples-proof');
     await send(resolver, rewardArtifact.abi, rewardAddress, 'recordProductionVerified', [campaignId, proofHash]);
 
+    // Attempting premature completion before fulfillment attested must revert!
+    await assertRevert(
+      () => send(creator, rewardArtifact.abi, rewardAddress, 'completeCampaign', [campaignId]),
+      'premature completeCampaign before fulfillment'
+    );
+
+    // Record fulfillment complete (delivery attested by resolver)
+    const deliveryHash = hash('books-delivered-proof');
+    await send(resolver, rewardArtifact.abi, rewardAddress, 'recordFulfillmentComplete', [campaignId, deliveryHash]);
+
     // Complete campaign
     await send(creator, rewardArtifact.abi, rewardAddress, 'completeCampaign', [campaignId]);
 
     const campData = await client.readContract({ address: rewardAddress, abi: rewardArtifact.abi, functionName: 'campaign', args: [campaignId] });
-    assert.equal(campData.state, 3, 'Campaign must be COMPLETED (enum index 3)');
+    assert.equal(campData.state, 4, 'Campaign must be COMPLETED (enum index 4)');
     console.log('✓ Scenario 1 passed');
   }
 
@@ -309,7 +319,7 @@ async function main() {
     const cData = await client.readContract({ address: rewardAddress, abi: rewardArtifact.abi, functionName: 'campaign', args: [cId] });
     assert.equal(cData.refunded, 3_000_000_000n, 'Campaign must record exactly 3,000 USDC refunded to backers');
     assert.equal(cData.basePool - cData.refunded, 0n, 'Campaign refund pool must have exactly 0 tokens unrefunded');
-    assert.equal(cData.state, 4, 'Campaign state must be STOPPED (enum index 4)');
+    assert.equal(cData.state, 5, 'Campaign state must be STOPPED (enum index 5)');
     console.log('✓ Scenario 6 passed');
   }
 

@@ -1,8 +1,36 @@
 # FundTogether Project Progress
 
-> **Updated:** 2026-10-12
+> **Updated:** 2026-10-13
 
-## 2026-10-12 — Reward Crowdfunding Pivot: 10 Critical Gaps Remediated & Fully Verified (VERIFIED_READY)
+## 2026-10-13 — Reward Crowdfunding Pivot: Full Remediation of 7 Reviewer Blockers & 25/25 HTTP Acceptance Verified (VERIFIED_READY)
+
+- STATUS: **VERIFIED_READY**. All 7 reviewer blockers have been completely remediated, hardened, and verified through both a genuine NestJS HTTP Supertest Acceptance Suite and live On-Chain scenario verification:
+  1. **Role Security Enforced (401 & 403 Forbidden)**: Created `RewardAdminGuard` and `RewardResolverGuard` in `backend/src/reward/reward-roles.guard.ts`. Wired to `RewardAdminController` and `RewardResolverController`. Added defense-in-depth role checks against `platformRoles` in `RewardCampaignService` and `RewardFulfillmentService`. Verified that unauthorized users receive HTTP 403 on Admin Creator Review, Resolver Campaign Review, Resolver Dispute Resolution, and Fulfillment Completion.
+  2. **Strict Event Indexer Filtering & Idempotency**: `RewardIndexerService` strictly checks `log.address.toLowerCase() === contractAddress.toLowerCase()` in `processReceipt` and verifies registered contract address in `processEvents`, rejecting foreign unverified contract logs (0 entitlements created). BigInt event args are safely serialized for JSON/jsonb columns. Added unique index `reward_entitlements_tx_log_idx` on `(tx_hash, log_index)` in `reward.schema.ts` and database; `.onConflictDoNothing({ target: [rewardEntitlements.txHash, rewardEntitlements.logIndex] })` guarantees zero duplicate entitlements upon receipt reprocessing.
+  3. **No Hardcoded Secrets & Fail-Fast AES-256-GCM Encryption**: Removed plaintext password fallback in `reward-live-e2e.cjs` and removed all destructive `DELETE FROM` queries against runtime tables. `RewardCryptoService` constructor strictly throws error if `REWARD_PII_ENCRYPTION_KEY` is missing or `< 32 bytes`.
+  4. **Strict On-Chain Registration**: `RewardCampaignService.registerOnchain` disallows registering drafts in `FROZEN` status, strictly requiring `APPROVED` status from Resolver. Verifies on-chain `commitmentHash` and ensures the on-chain creator address matches the linked wallet address in `walletLinks`. Unsets `onchainCampaignId` from any previous stale campaigns to ensure canonical 1-to-1 mapping.
+  5. **Smart Contract State Separation**: Added `FULFILLMENT_COMPLETE` state enum (index 3) and `event FulfillmentComplete` in `FundTogetherReward.sol` and `RewardTypes.sol`. Added `recordFulfillmentComplete(uint256 id, bytes32 reportHash)`. Updated `completeCampaign` to require state `FULFILLMENT_COMPLETE`, reverting prematurely with custom error `WrongState` if invoked prior to fulfillment attestation. Updated database schema constraint `reward_campaign_status_check` to include `FULFILLMENT_COMPLETE`. Added `attestFulfillmentComplete` in `RewardFulfillmentService`.
+  6. **Genuine NestJS HTTP Acceptance Test Suite (`reward-http-acceptance.spec.ts`)**: Implemented full-stack HTTP acceptance testing via Supertest with additive, unique test fixtures (ZERO destructive `DELETE FROM` queries). Verified all 7 priorities:
+     - 401 Unauthorized for unauthenticated requests
+     - 403 Forbidden for unauthorized role access (Admin & Resolver)
+     - Flow V1: Creator verification application & Admin approval
+     - Flow V2: Campaign drafting, commitment freeze & Resolver review
+     - On-Chain Registration: rejection of invalid on-chain ID, verification of matching commitmentHash & creator wallet
+     - Priority 2: Indexer foreign contract log filtering & idempotent pledge processing
+     - Priority 3: Backer shipping details encryption with AES-256-GCM, masked phone/address storage & creator ACL decryption
+     - Priority 5: Gated digital access key unlock only after `recordProductionVerified`
+     - Priority 5: Physical fulfillment batches, backer dispute & resolver resolution to `REFUND_ELIGIBLE`
+     - State Separation: premature `completeCampaign` on contract reverts; resolver attests fulfillment completion $\to$ `FULFILLMENT_COMPLETE` $\to$ creator completes campaign $\to$ `COMPLETED`.
+     - Result: **25/25 TESTS PASS**.
+  7. **Full Backward Compatibility & Regression Safety**:
+     - Foundry Contract Suite: **34/34 PASS** (22 historical HED, 9 Reward with 256 fuzz runs, 3 MockUSDC).
+     - Live Scenario E2E Suite (`reward-scenarios-e2e.cjs`): **6/6 PASS** against live Anvil RPC (port 9548).
+     - Backend Reward Unit Test Suite: **4/4 suites, 17/17 tests PASS**.
+     - Historical Backend HED Test Suite: **9/9 suites, 17/17 tests PASS**.
+     - Full-Stack E2E Suite (`npm run test:reward:e2e`): **6 contract scenarios + 25 HTTP acceptance tests PASS**.
+     - Backend Build (`nest build`): **PASS**.
+     - Frontend Build (`tsc -b && vite build --mode hed`): **PASS**.
+     - Frontend Lint (`oxlint`): **0 warnings, 0 errors** on 45 files.
 
 - STATUS: **VERIFIED_READY**. All 10 architectural gaps identified in the audit have been fully remediated, hardened, and verified with live execution against live Anvil RPC (port 9548) and live PostgreSQL (port 5432):
   1. Anti-spoofing: Entitlement creation verifies on-chain transaction receipt and canonical `RewardPledged` events via `RewardIndexerService.processReceipt(txHash)`. Client parameters are never blindly trusted.

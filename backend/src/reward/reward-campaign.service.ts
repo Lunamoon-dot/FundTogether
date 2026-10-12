@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, ForbiddenException, ConflictException, BadRequestException } from "@nestjs/common";
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { DRIZZLE_DB } from "../database/database.constants";
 import * as schema from "../database/schema";
@@ -62,6 +62,11 @@ export class RewardCampaignService {
    * Flow V1: Admin reviews and verifies Creator profile
    */
   async adminReviewCreator(adminUserId: string, profileId: string, input: AdminReviewCreatorInput) {
+    const [role] = await this.db.select().from(schema.platformRoles).where(eq(schema.platformRoles.userId, adminUserId)).limit(1);
+    if (!role?.roles.includes("ADMIN")) {
+      throw new ForbiddenException("ADMIN platform role required to review creator profiles");
+    }
+
     const [profile] = await this.db.select().from(rewardCreatorProfiles).where(eq(rewardCreatorProfiles.id, profileId));
     if (!profile) throw new NotFoundException("Creator profile not found");
 
@@ -213,6 +218,11 @@ export class RewardCampaignService {
    * Flow V2: Resolver reviews campaign feasibility, budget, and commitments
    */
   async resolverReview(resolverUserId: string, campaignId: string, input: ResolverReviewCampaignInput) {
+    const [role] = await this.db.select().from(schema.platformRoles).where(eq(schema.platformRoles.userId, resolverUserId)).limit(1);
+    if (!role?.roles.includes("RESOLVER")) {
+      throw new ForbiddenException("RESOLVER platform role required to review reward campaigns");
+    }
+
     const [campaign] = await this.db.select().from(rewardCampaigns).where(eq(rewardCampaigns.id, campaignId));
     if (!campaign) throw new NotFoundException("Reward campaign not found");
     if (campaign.status !== "UNDER_REVIEW") throw new BadRequestException("Campaign is not pending review");
@@ -255,12 +265,12 @@ export class RewardCampaignService {
     if (!campaign) throw new NotFoundException("Reward campaign not found");
     if (campaign.creatorUserId !== userId) throw new ForbiddenException("Only creator can register on-chain ID");
 
-    // Must be approved by Resolver or in a publishable state
-    if (!["APPROVED", "FROZEN"].includes(campaign.status)) {
-      throw new BadRequestException("Campaign must be frozen and approved before on-chain registration (Flow V2)");
+    // Must be approved by Resolver (Flow V2)
+    if (campaign.status !== "APPROVED") {
+      throw new BadRequestException("Campaign must be approved by Resolver before on-chain registration (Flow V2)");
     }
 
-    // Optional on-chain verification if RPC available
+    // On-chain verification
     const rpcUrl = process.env.HED_BLOCKCHAIN_RPC_URL;
     const contractAddress = process.env.REWARD_CONTRACT_ADDRESS as `0x${string}` | undefined;
     if (rpcUrl && contractAddress) {
@@ -282,11 +292,22 @@ export class RewardCampaignService {
         if (onchainData.commitmentHash !== campaign.commitmentHash) {
           throw new BadRequestException("On-chain commitmentHash does not match database frozen commitment");
         }
+
+        const userWallets = await this.db.select().from(schema.walletLinks).where(eq(schema.walletLinks.userId, userId));
+        const walletAddresses = userWallets.map(w => w.address.toLowerCase());
+        if (walletAddresses.length > 0 && !walletAddresses.includes(onchainData.creator.toLowerCase())) {
+          throw new BadRequestException("On-chain campaign creator does not match creator's linked wallet");
+        }
       } catch (err: any) {
         if (err instanceof BadRequestException) throw err;
-        // RPC read error in isolated offline unit test
+        throw new BadRequestException(`Failed to verify campaign on-chain: ${err.message}`);
       }
     }
+
+    // Unset onchainCampaignId on any previous stale campaigns to guarantee canonical 1-to-1 mapping
+    await this.db.update(rewardCampaigns)
+      .set({ onchainCampaignId: null })
+      .where(and(eq(rewardCampaigns.onchainCampaignId, onchainCampaignId), ne(rewardCampaigns.id, id)));
 
     const [updated] = await this.db.update(rewardCampaigns).set({
       onchainCampaignId,

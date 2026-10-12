@@ -41,9 +41,15 @@ export const resolverReviewCampaignSchema = z.object({
   decisionReason: z.string().trim().min(10).max(2000),
 });
 
+export const attestFulfillmentCompleteSchema = z.object({
+  fulfillmentReportHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, "Must be a 32-byte hex hash"),
+});
+
 export type RewardTierInput = z.infer<typeof rewardTierInputSchema>;
 export type CreateRewardCampaignDraftInput = z.infer<typeof createRewardCampaignDraftSchema>;
 export type RegisterRewardOnchainInput = z.infer<typeof registerRewardOnchainSchema>;
 export type CreatorVerificationInput = z.infer<typeof creatorVerificationInputSchema>;
 export type AdminReviewCreatorInput = z.infer<typeof adminReviewCreatorSchema>;
 export type ResolverReviewCampaignInput = z.infer<typeof resolverReviewCampaignSchema>;
+export type AttestFulfillmentCompleteInput = z.infer<typeof attestFulfillmentCompleteSchema>;
+

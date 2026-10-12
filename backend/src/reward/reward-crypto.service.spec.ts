@@ -1,10 +1,33 @@
 import { RewardCryptoService } from "./reward-crypto.service";
 
 describe("RewardCryptoService", () => {
+  const validKey = "test_reward_pii_encryption_key_32bytes_safe!!";
   let service: RewardCryptoService;
+  const originalEnv = process.env.REWARD_PII_ENCRYPTION_KEY;
 
   beforeEach(() => {
+    process.env.REWARD_PII_ENCRYPTION_KEY = validKey;
     service = new RewardCryptoService();
+  });
+
+  afterAll(() => {
+    process.env.REWARD_PII_ENCRYPTION_KEY = originalEnv;
+  });
+
+  describe("Constructor key validation", () => {
+    it("fails fast if REWARD_PII_ENCRYPTION_KEY is missing", () => {
+      delete process.env.REWARD_PII_ENCRYPTION_KEY;
+      expect(() => new RewardCryptoService()).toThrow(
+        "REWARD_PII_ENCRYPTION_KEY environment variable is required and must be at least 32 bytes"
+      );
+    });
+
+    it("fails fast if REWARD_PII_ENCRYPTION_KEY is shorter than 32 bytes", () => {
+      process.env.REWARD_PII_ENCRYPTION_KEY = "short_key_16byte";
+      expect(() => new RewardCryptoService()).toThrow(
+        "REWARD_PII_ENCRYPTION_KEY environment variable is required and must be at least 32 bytes"
+      );
+    });
   });
 
   describe("AES-256-GCM Shipping PII Encryption", () => {

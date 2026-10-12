@@ -42,7 +42,7 @@ export const rewardCampaigns = pgTable("reward_campaigns", {
   index("reward_campaign_creator_idx").on(table.creatorUserId),
   index("reward_campaign_status_idx").on(table.status),
   check("reward_campaign_goal_check", sql`${table.goal} > 0`),
-  check("reward_campaign_status_check", sql`${table.status} IN ('DRAFT', 'FROZEN', 'UNDER_REVIEW', 'APPROVED', 'PUBLISHED', 'ACTIVE', 'PRODUCTION_VERIFIED', 'COMPLETED', 'STOPPED')`),
+  check("reward_campaign_status_check", sql`${table.status} IN ('DRAFT', 'FROZEN', 'UNDER_REVIEW', 'APPROVED', 'PUBLISHED', 'ACTIVE', 'PRODUCTION_VERIFIED', 'FULFILLMENT_COMPLETE', 'COMPLETED', 'STOPPED')`),
 ]);
 
 export const rewardReviews = pgTable("reward_reviews", {
@@ -108,6 +108,7 @@ export const rewardEntitlements = pgTable("reward_entitlements", {
   index("reward_entitlement_campaign_idx").on(table.campaignId),
   index("reward_entitlement_backer_idx").on(table.backerUserId),
   index("reward_entitlement_tx_hash_idx").on(table.txHash),
+  uniqueIndex("reward_entitlements_tx_log_idx").on(table.txHash, table.logIndex),
   check("reward_entitlement_status_check", sql`${table.status} IN ('PENDING_FUNDING', 'ACTIVE', 'REDEEM_REQUESTED', 'FULFILLING', 'DELIVERED', 'CONFIRMED', 'DISPUTED', 'REFUND_ELIGIBLE', 'REFUNDED')`),
 ]);
 

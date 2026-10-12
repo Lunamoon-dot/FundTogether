@@ -37,7 +37,10 @@ const chain = defineChain({
   rpcUrls: { default: { http: [rpcUrl] } },
 });
 
-const dbUrl = process.env.DATABASE_URL || 'postgresql://postgres:huytp231@localhost:5432/postgres';
+const dbUrl = process.env.DATABASE_URL;
+if (!dbUrl) {
+  throw new Error("DATABASE_URL environment variable is required to run live e2e integration");
+}
 
 async function main() {
   console.log('========================================================================');
@@ -49,20 +52,6 @@ async function main() {
   const pool = new Pool({ connectionString: dbUrl });
   const db = drizzle(pool, { schema });
   console.log('[Setup] Connected to live PostgreSQL database.');
-
-  // Clean reward tables for isolated test run
-  await pool.query(`
-    DELETE FROM reward_batch_entitlements;
-    DELETE FROM reward_disputes;
-    DELETE FROM reward_entitlements;
-    DELETE FROM reward_fulfillment_batches;
-    DELETE FROM reward_reviews;
-    DELETE FROM reward_tiers;
-    DELETE FROM reward_campaigns;
-    DELETE FROM reward_creator_profiles;
-    DELETE FROM wallet_links WHERE chain_id = '31339';
-  `);
-  console.log('[Setup] Cleared reward test tables for fresh isolated test execution.');
 
   // 2. Connect to Anvil RPC
   const client = createPublicClient({ chain, transport: http(rpcUrl), pollingInterval: 100 });

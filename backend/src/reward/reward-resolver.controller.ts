@@ -1,13 +1,14 @@
 import { BadRequestException, Body, Controller, Param, ParseUUIDPipe, Post, Req, UseGuards } from "@nestjs/common";
 import type { Request } from "express";
 import { AuthGuard } from "../modules/auth/auth.guard";
+import { RewardResolverGuard } from "./reward-roles.guard";
 import { RewardCampaignService } from "./reward-campaign.service";
 import { RewardFulfillmentService } from "./reward-fulfillment.service";
-import { resolverReviewCampaignSchema } from "./reward-campaign.schema";
+import { resolverReviewCampaignSchema, attestFulfillmentCompleteSchema } from "./reward-campaign.schema";
 import { resolveRewardDisputeSchema } from "./reward-pledge.schema";
 
 @Controller("v1/reward/resolver")
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, RewardResolverGuard)
 export class RewardResolverController {
   constructor(
     private readonly campaigns: RewardCampaignService,
@@ -39,4 +40,18 @@ export class RewardResolverController {
     }
     return this.fulfillment.resolveDispute(req.account!.userId, id, parsed.data);
   }
+
+  @Post("campaigns/:id/fulfillment-complete")
+  attestFulfillmentComplete(
+    @Param("id", new ParseUUIDPipe()) id: string,
+    @Body() body: unknown,
+    @Req() req: Request,
+  ) {
+    const parsed = attestFulfillmentCompleteSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException({ message: "Invalid fulfillment complete payload", issues: parsed.error.issues });
+    }
+    return this.fulfillment.attestFulfillmentComplete(req.account!.userId, id, parsed.data.fulfillmentReportHash);
+  }
 }
+

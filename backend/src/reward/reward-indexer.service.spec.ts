@@ -66,6 +66,10 @@ describe("RewardIndexerService Unit Tests", () => {
       insert: jest.fn().mockImplementation((table: any) => ({
         values: jest.fn().mockImplementation((val: any) => ({
           returning: jest.fn().mockReturnValue([val]),
+          onConflictDoNothing: jest.fn().mockReturnValue({
+            returning: jest.fn().mockReturnValue([val]),
+          }),
+          onConflictDoUpdate: jest.fn().mockResolvedValue([val]),
         })),
       })),
       update: jest.fn().mockImplementation((table: any) => ({
@@ -99,10 +103,9 @@ describe("RewardIndexerService Unit Tests", () => {
       from: jest.fn().mockImplementation(() => ({
         where: jest.fn().mockImplementation(() => {
           selectCall++;
-          if (selectCall === 1) return []; // no duplicate
-          if (selectCall === 2) return [fakeCampaigns[0]]; // campaign found
-          if (selectCall === 3) return [fakeTiers[0]]; // digital tier
-          if (selectCall === 4) return [{ userId: fakeUsers[0].id, address: fakeUsers[0].walletAddress }]; // backer walletLink
+          if (selectCall === 1) return [fakeCampaigns[0]]; // campaign found
+          if (selectCall === 2) return [fakeTiers[0]]; // digital tier
+          if (selectCall === 3) return [{ userId: fakeUsers[0].id, address: fakeUsers[0].walletAddress }]; // backer walletLink
           return [];
         }),
       })),
@@ -126,9 +129,17 @@ describe("RewardIndexerService Unit Tests", () => {
     let insertedValues: any = null;
     mockDb.insert.mockImplementation(() => ({
       values: jest.fn().mockImplementation((val: any) => {
-        insertedValues = val;
-        fakeEntitlements.push({ ...val, id: "entitlement-uuid-1" });
-        return { returning: jest.fn().mockReturnValue([val]) };
+        if (val && (val.backerWallet || val.tierId)) {
+          insertedValues = val;
+          fakeEntitlements.push({ ...val, id: "entitlement-uuid-1" });
+        }
+        return {
+          returning: jest.fn().mockReturnValue([val]),
+          onConflictDoNothing: jest.fn().mockReturnValue({
+            returning: jest.fn().mockReturnValue([val]),
+          }),
+          onConflictDoUpdate: jest.fn().mockResolvedValue([val]),
+        };
       }),
     }));
 

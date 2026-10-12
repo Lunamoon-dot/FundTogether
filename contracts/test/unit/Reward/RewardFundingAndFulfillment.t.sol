@@ -152,7 +152,21 @@ contract RewardFundingAndFulfillmentTest is Test {
         assertEq(uint8(c.state), uint8(T.CampaignState.PRODUCTION_VERIFIED));
         assertEq(c.productionReportHash, proofOfPrint);
 
-        // 8. Campaign completed
+        // 8. Attempting to complete campaign prematurely (before fulfillment verified) must revert!
+        vm.prank(creator);
+        vm.expectRevert(FundTogetherReward.WrongState.selector);
+        rewardEscrow.completeCampaign(id);
+
+        // 9. Resolver verifies physical delivery & fulfillment completion
+        bytes32 proofOfFulfillment = keccak256("proof-of-all-books-shipped-and-delivered");
+        vm.prank(resolver);
+        rewardEscrow.recordFulfillmentComplete(id, proofOfFulfillment);
+
+        c = rewardEscrow.campaign(id);
+        assertEq(uint8(c.state), uint8(T.CampaignState.FULFILLMENT_COMPLETE));
+        assertEq(c.fulfillmentReportHash, proofOfFulfillment);
+
+        // 10. Now campaign can be finalized/completed
         vm.prank(creator);
         rewardEscrow.completeCampaign(id);
         assertEq(uint8(rewardEscrow.campaign(id).state), uint8(T.CampaignState.COMPLETED));

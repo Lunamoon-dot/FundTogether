@@ -1,7 +1,7 @@
 pragma solidity 0.8.24;
 
 library RewardTypes {
-    enum CampaignState { FUNDING, ACTIVE, PRODUCTION_VERIFIED, COMPLETED, STOPPED }
+    enum CampaignState { FUNDING, ACTIVE, PRODUCTION_VERIFIED, FULFILLMENT_COMPLETE, COMPLETED, STOPPED }
     enum RequestState { SUBMITTED, APPROVED_DISBURSED, EXPENDITURE_CANDIDATE, FINANCIALLY_SETTLED, CANCELLED }
 
     struct TierView {
@@ -28,6 +28,7 @@ library RewardTypes {
         uint256 refunded;
         bool refundSnapshotted;
         bytes32 productionReportHash;
+        bytes32 fulfillmentReportHash;
     }
 
     struct RequestView {

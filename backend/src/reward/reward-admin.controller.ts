@@ -1,11 +1,12 @@
-import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Post, Req, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Param, ParseUUIDPipe, Post, Req, UseGuards } from "@nestjs/common";
 import type { Request } from "express";
 import { AuthGuard } from "../modules/auth/auth.guard";
+import { RewardAdminGuard } from "./reward-roles.guard";
 import { RewardCampaignService } from "./reward-campaign.service";
 import { adminReviewCreatorSchema } from "./reward-campaign.schema";
 
 @Controller("v1/reward/admin")
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, RewardAdminGuard)
 export class RewardAdminController {
   constructor(private readonly campaigns: RewardCampaignService) {}
 

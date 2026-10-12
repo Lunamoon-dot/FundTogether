@@ -89,6 +89,11 @@ export class RewardFulfillmentService {
    * Flow V4: Resolver resolution of backer dispute
    */
   async resolveDispute(resolverUserId: string, disputeId: string, input: ResolveRewardDisputeInput) {
+    const [role] = await this.db.select().from(schema.platformRoles).where(eq(schema.platformRoles.userId, resolverUserId)).limit(1);
+    if (!role?.roles.includes("RESOLVER")) {
+      throw new ForbiddenException("RESOLVER platform role required to resolve reward disputes");
+    }
+
     const [dispute] = await this.db.select().from(rewardDisputes).where(eq(rewardDisputes.id, disputeId));
     if (!dispute) throw new NotFoundException("Dispute not found");
     if (dispute.status !== "OPEN") throw new ConflictException("Dispute has already been resolved");
@@ -134,5 +139,29 @@ export class RewardFulfillmentService {
         inArray(rewardEntitlements.status, ["ACTIVE", "REDEEM_REQUESTED", "FULFILLING"])
       )
     );
+  }
+
+  /**
+   * Flow V4: Resolver attests that physical fulfillment / reward delivery is complete.
+   * Gated: Requires PRODUCTION_VERIFIED status!
+   */
+  async attestFulfillmentComplete(resolverUserId: string, campaignId: string, fulfillmentReportHash: string) {
+    const [role] = await this.db.select().from(schema.platformRoles).where(eq(schema.platformRoles.userId, resolverUserId)).limit(1);
+    if (!role?.roles.includes("RESOLVER")) {
+      throw new ForbiddenException("RESOLVER platform role required to attest fulfillment completion");
+    }
+
+    const [campaign] = await this.db.select().from(rewardCampaigns).where(eq(rewardCampaigns.id, campaignId));
+    if (!campaign) throw new NotFoundException("Reward campaign not found");
+    if (campaign.status !== "PRODUCTION_VERIFIED") {
+      throw new ConflictException("Campaign must be in PRODUCTION_VERIFIED status to attest fulfillment complete");
+    }
+
+    const [updated] = await this.db.update(rewardCampaigns).set({
+      status: "FULFILLMENT_COMPLETE",
+      updatedAt: new Date(),
+    }).where(eq(rewardCampaigns.id, campaignId)).returning();
+
+    return updated;
   }
 }

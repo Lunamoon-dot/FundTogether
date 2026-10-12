@@ -63,6 +63,7 @@ contract FundTogetherReward is ReentrancyGuard {
     event DisputeCaseUpheld(uint256 indexed campaignId, uint256 indexed requestId, bytes32 decisionHash, uint256 challengeEnd);
     event DisputeCaseTakenOver(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
     event ProductionVerified(uint256 indexed campaignId, bytes32 reportHash);
+    event FulfillmentComplete(uint256 indexed campaignId, bytes32 fulfillmentReportHash);
     event CampaignCompleted(uint256 indexed campaignId);
     event WindDownStarted(uint256 indexed campaignId, uint256 basePool);
     event RefundClaimed(uint256 indexed campaignId, address indexed backer, uint256 baseAmount, uint256 supplementAmount);
@@ -333,17 +334,28 @@ contract FundTogetherReward is ReentrancyGuard {
         emit ProductionVerified(campaignId, reportHash);
     }
 
+    function recordFulfillmentComplete(uint256 campaignId, bytes32 fulfillmentReportHash) external {
+        T.CampaignView storage c = _campaign(campaignId);
+        if (msg.sender != resolver) revert WrongCaller();
+        if (c.state != T.CampaignState.PRODUCTION_VERIFIED || hasOpenRequest[campaignId] || fulfillmentReportHash == bytes32(0)) {
+            revert WrongState();
+        }
+        c.state = T.CampaignState.FULFILLMENT_COMPLETE;
+        c.fulfillmentReportHash = fulfillmentReportHash;
+        emit FulfillmentComplete(campaignId, fulfillmentReportHash);
+    }
+
     function completeCampaign(uint256 campaignId) external {
         T.CampaignView storage c = _campaign(campaignId);
         if (msg.sender != c.creator && msg.sender != resolver) revert WrongCaller();
-        if (c.state != T.CampaignState.PRODUCTION_VERIFIED) revert WrongState();
+        if (c.state != T.CampaignState.FULFILLMENT_COMPLETE) revert WrongState();
         c.state = T.CampaignState.COMPLETED;
         emit CampaignCompleted(campaignId);
     }
 
     function startWindDown(uint256 id) external {
         T.CampaignView storage c = _campaign(id);
-        if ((c.state != T.CampaignState.ACTIVE && c.state != T.CampaignState.PRODUCTION_VERIFIED)
+        if ((c.state != T.CampaignState.ACTIVE && c.state != T.CampaignState.PRODUCTION_VERIFIED && c.state != T.CampaignState.FULFILLMENT_COMPLETE)
             || hasOpenRequest[id] || block.timestamp < c.executionEnd) {
             revert WrongState();
         }

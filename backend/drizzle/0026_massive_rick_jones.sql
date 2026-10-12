@@ -31,7 +31,7 @@ CREATE TABLE "reward_campaigns" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "reward_campaign_goal_check" CHECK ("reward_campaigns"."goal" > 0),
-	CONSTRAINT "reward_campaign_status_check" CHECK ("reward_campaigns"."status" IN ('DRAFT', 'FROZEN', 'UNDER_REVIEW', 'APPROVED', 'PUBLISHED', 'ACTIVE', 'PRODUCTION_VERIFIED', 'COMPLETED', 'STOPPED'))
+	CONSTRAINT "reward_campaign_status_check" CHECK ("reward_campaigns"."status" IN ('DRAFT', 'FROZEN', 'UNDER_REVIEW', 'APPROVED', 'PUBLISHED', 'ACTIVE', 'PRODUCTION_VERIFIED', 'FULFILLMENT_COMPLETE', 'COMPLETED', 'STOPPED'))
 );
 --> statement-breakpoint
 CREATE TABLE "reward_reviews" (
@@ -158,6 +158,7 @@ CREATE UNIQUE INDEX "reward_tier_campaign_index_idx" ON "reward_tiers" USING btr
 CREATE INDEX "reward_entitlement_campaign_idx" ON "reward_entitlements" USING btree ("campaign_id");--> statement-breakpoint
 CREATE INDEX "reward_entitlement_backer_idx" ON "reward_entitlements" USING btree ("backer_user_id");--> statement-breakpoint
 CREATE INDEX "reward_entitlement_tx_hash_idx" ON "reward_entitlements" USING btree ("tx_hash");--> statement-breakpoint
+CREATE UNIQUE INDEX "reward_entitlements_tx_log_idx" ON "reward_entitlements" USING btree ("tx_hash","log_index");--> statement-breakpoint
 CREATE UNIQUE INDEX "reward_batch_campaign_idx" ON "reward_fulfillment_batches" USING btree ("campaign_id","batch_number");--> statement-breakpoint
 CREATE UNIQUE INDEX "reward_batch_entitlement_unique_idx" ON "reward_batch_entitlements" USING btree ("batch_id","entitlement_id");--> statement-breakpoint
 CREATE INDEX "reward_dispute_entitlement_idx" ON "reward_disputes" USING btree ("entitlement_id");

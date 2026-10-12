@@ -33,6 +33,7 @@ function artifacts(root) {
     'finalizeExpenditure(uint256,uint256)',
     'returnFunds(uint256,uint256,uint256)',
     'recordProductionVerified(uint256,bytes32)',
+    'recordFulfillmentComplete(uint256,bytes32)',
     'completeCampaign(uint256)',
     'startWindDown(uint256)',
     'claimRefund(uint256)',
