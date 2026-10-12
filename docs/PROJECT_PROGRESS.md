@@ -2,11 +2,23 @@
 
 > **Updated:** 2026-10-12
 
-## 2026-10-12 — Verification-Centric disbursement direction and specification
+## 2026-10-12 — Verification-Centric disbursement direction and implementation complete
 
-- DONE (Documentation): User decided to eliminate Web3 Vendor entity, disburse directly to Organizer, and structure the system around 4 verification flows (Organization, Campaign & Budget, Post-spend Financial Invoices, and Outcome Handover). Resolver is designated as the primary verifier for approving disbursement in the current build phase.
+- DONE (Documentation): User decided to eliminate Web3 Vendor entity, disburse directly to Organizer, and structure the system around 4 verification flows (Organization, Campaign & Budget, Post-spend Financial Invoices, and Outcome Handover). Resolver is designated as the primary verifier for approving disbursement in the current build phase. Extensible architecture preserved for future vendor re-integration.
 - Added `docs/verification-first-disbursement-spec.md`; updated `docs/research-direction.md`, `GOAL.md`, and `docs/PROJECT_OVERVIEW.md`.
-- Code cleanup planning: streamline `FundTogetherDisbursement.sol`, remove vendor controllers/services/schemas in backend, remove vendor UI in frontend.
+- DONE (Smart Contracts):
+  - Streamlined `FundTogetherDisbursement.sol` and `DisbursementTypes.sol`.
+  - Implemented direct disbursement via `approveAndDisburse`, post-spend candidate invoices via `candidateExpenditure`, and settlement via `finalizeExpenditure` / `returnFunds`.
+  - Evidence: `HedFundingAndReservationTest` in WSL Ubuntu-24.04: 20/20 unit/fuzz tests PASS (total 23/23 contract tests PASS, including 256-run custody fuzzing).
+- DONE (Backend):
+  - Generated deterministic artifacts, ABI, and policy (`artifact-contract.test.cjs`: 4/4 PASS).
+  - Made vendor entity optional/nullable in draft schemas, Drizzle database schema, and review services.
+  - Verified backend build (`nest build`: PASS) and test suite (`test:hed`: 8/8 suites, 13/13 tests PASS).
+  - Updated smoke harness `journey-smoke.cjs` to reflect direct disbursement and expenditure settlement.
+- DONE (Frontend):
+  - Removed `/vendor` route from `App.tsx`.
+  - Updated `HedOrganizationCampaigns.tsx` and `HedPublicCampaign.tsx` to align with the 4 verification stages, direct disbursement, and post-spend expenditure challenges/settlement.
+  - Verified frontend build (`tsc -b && vite build`: PASS) and lint (`oxlint`: 0 errors, 0 warnings).
 
 ## 2026-10-11 — HED-MVP-1 local implementation complete
 

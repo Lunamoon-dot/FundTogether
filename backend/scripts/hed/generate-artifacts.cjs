@@ -4,9 +4,11 @@ const { keccak256, toFunctionSignature, toHex } = require('viem');
 
 const bytes = value => JSON.stringify(value, null, 2) + '\n';
 const hashJson = value => keccak256(toHex(bytes(value)));
-const policy = Object.freeze({ MAX_DEPOSIT_BPS: 2_000, MAX_CAMPAIGN_DEPOSIT_BPS: 1_000,
-  PRIMARY_REVIEW_WINDOW: 259_200, VENDOR_ACK_WINDOW: 259_200, DEPOSIT_WINDOW: 259_200,
-  EXECUTION_HORIZON: 15_552_000, CHALLENGE_WINDOW: 259_200 });
+const policy = Object.freeze({
+  PRIMARY_REVIEW_WINDOW: 259_200,
+  CHALLENGE_WINDOW: 259_200,
+  EXECUTION_HORIZON: 15_552_000,
+});
 
 function validateManifest(manifest) {
   const fail = () => { throw new Error('HED manifest identity/configuration invalid'); };
@@ -62,14 +64,11 @@ function artifacts(root) {
   const expected = [
     'createCampaign(bytes32,uint256,uint256)', 'donate(uint256,uint256)', 'activateCampaign(uint256,bytes32)', 'takeOverEligibility(uint256,bytes32)',
     'finalizeFundingFailure(uint256)', 'claimRefund(uint256)', 'startWindDown(uint256)', 'createActivity(uint256,bytes32,uint256)',
-    'submitRequest(uint256,uint256,bytes32,address,uint256,uint256)', 'approveRequest(uint256,uint256,bytes32)',
-    'takeOverRequestApproval(uint256,uint256,bytes32)',
-    'acknowledgeVendor(uint256,uint256,bytes32)', 'payDeposit(uint256,uint256)',
-    'candidateDelivery(uint256,uint256,uint256,bytes32)', 'openDeliveryCase(uint256,uint256,bytes32)',
-    'upholdDeliveryCase(uint256,uint256,bytes32)', 'takeOverDeliveryCase(uint256,uint256,bytes32)', 'executeFinal(uint256,uint256)',
-    'releaseResidual(uint256,uint256,bytes32)', 'returnFunds(uint256,uint256,uint256)',
-    'cancelUncommittedRequest(uint256,uint256,bytes32)', 'expireUncommittedRequest(uint256,uint256,bytes32)',
-    'expireUnpaidDeposit(uint256,uint256,bytes32)', 'candidateOutcome(uint256,uint256,bytes32)',
+    'submitRequest(uint256,uint256,bytes32,address,uint256)', 'approveAndDisburse(uint256,uint256,bytes32)',
+    'takeOverRequestApproval(uint256,uint256,bytes32)', 'cancelRequest(uint256,uint256,bytes32)',
+    'candidateExpenditure(uint256,uint256,uint256,bytes32)', 'openExpenditureCase(uint256,uint256,bytes32)',
+    'upholdExpenditureCase(uint256,uint256,bytes32)', 'takeOverExpenditureCase(uint256,uint256,bytes32)', 'finalizeExpenditure(uint256,uint256)',
+    'returnFunds(uint256,uint256,uint256)', 'candidateOutcome(uint256,uint256,bytes32)',
     'verifyOutcome(uint256,uint256,bytes32)', 'openOutcomeCase(uint256,uint256,bytes32)',
     'upholdOutcomeCase(uint256,uint256,bytes32)', 'takeOverOutcomeCase(uint256,uint256,bytes32)', 'campaign(uint256)', 'request(uint256,uint256)', 'activity(uint256,uint256)',
   ];

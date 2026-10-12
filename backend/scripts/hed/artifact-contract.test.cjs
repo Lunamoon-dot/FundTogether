@@ -38,7 +38,7 @@ test('HED artifacts export deterministically with the required escrow functions'
   assert.deepEqual(one, two);
   assert.ok(one.runtimeBytes > 0 && one.runtimeBytes <= 24576);
   const names = new Set(one.disbursement.abi.filter(item => item.type === 'function').map(item => item.name));
-  for (const name of ['donate', 'approveRequest', 'acknowledgeVendor', 'openDeliveryCase', 'claimRefund']) {
+  for (const name of ['donate', 'approveAndDisburse', 'candidateExpenditure', 'openExpenditureCase', 'claimRefund']) {
     assert.ok(names.has(name), `missing ${name}`);
   }
   const out = fs.mkdtempSync(path.join(os.tmpdir(), 'ft-hed-export-'));

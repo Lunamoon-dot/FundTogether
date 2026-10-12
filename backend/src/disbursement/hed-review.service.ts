@@ -123,7 +123,10 @@ export class HedReviewService {
     const block = await this.chain.client.getBlock({ blockTag: "latest" });
     const snapshots = new Map<string, Awaited<ReturnType<HedBlockchainService["snapshot"]>>>();
     for (const row of rows) if (!snapshots.has(row.campaign.onchainCampaignId!)) snapshots.set(row.campaign.onchainCampaignId!, await this.chain.snapshot(BigInt(row.campaign.onchainCampaignId!), block.number));
-    return rows.filter(row => snapshots.get(row.campaign.onchainCampaignId!)?.requests[Number(row.chain.onchainRequestId!)]?.state === "VENDOR_COMMITTED")
+    return rows.filter(row => {
+      const state = snapshots.get(row.campaign.onchainCampaignId!)?.requests[Number(row.chain.onchainRequestId!)]?.state;
+      return state === "APPROVED_DISBURSED";
+    })
       .map(row => ({ packageId: row.evidence.id, requestId: row.request.id, onchainCampaignId: row.campaign.onchainCampaignId,
         onchainRequestId: row.chain.onchainRequestId, requestHash: row.request.requestHash, content: row.evidence.content }));
   }
@@ -149,8 +152,9 @@ export class HedReviewService {
     const block = await this.chain.client.getBlock({ blockTag: "latest" });
     const snapshot = await this.chain.snapshot(BigInt(request.campaign.onchainCampaignId), block.number);
     const onchain = snapshot.requests[Number(request.chain.onchainRequestId)];
-    if (!onchain || onchain.state !== "VENDOR_COMMITTED" || onchain.requestHash.toLowerCase() !== request.draft.requestHash.toLowerCase()
-      || onchain.vendor.toLowerCase() !== request.chain.vendorWallet.toLowerCase() || BigInt(evidence.content.acceptedValue) > BigInt(onchain.approvedAmount))
+    if (!onchain || onchain.state !== "APPROVED_DISBURSED"
+      || onchain.requestHash.toLowerCase() !== request.draft.requestHash.toLowerCase()
+      || BigInt(evidence.content.acceptedValue) > BigInt(onchain.approvedAmount))
       throw new ConflictException("HED delivery no longer matches the committed on-chain request");
     return { onchainCampaignId: request.campaign.onchainCampaignId, onchainRequestId: request.chain.onchainRequestId,
       acceptedValue: evidence.content.acceptedValue, reportHash: evidence.content.publicHash, checkpoint: snapshot.checkpoint };

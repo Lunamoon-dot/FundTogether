@@ -12,7 +12,6 @@ contract HedFundingAndReservationTest is Test {
     address private resolver = makeAddr("resolver");
     address private backupResolver = makeAddr("backup-resolver");
     address private donor = makeAddr("donor");
-    address private vendor = makeAddr("vendor");
 
     function setUp() public {
         token = new MockUSDC();
@@ -22,7 +21,7 @@ contract HedFundingAndReservationTest is Test {
         token.approve(address(disbursement), type(uint256).max);
     }
 
-    function test_fullFundingReservesWholeRequestAmountBeforeAnyVendorPayout() public {
+    function test_fullFundingDisbursesExactAmountToOrganizerUponResolverApproval() public {
         vm.prank(organizer);
         uint256 campaignId = disbursement.createCampaign(keccak256("campaign"), 2_000e6, 1 days);
         vm.prank(donor);
@@ -32,18 +31,19 @@ contract HedFundingAndReservationTest is Test {
         vm.prank(organizer);
         disbursement.createActivity(campaignId, keccak256("activity"), 1_000e6);
         vm.prank(organizer);
-        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), vendor, 1_000e6, 200e6);
+        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), organizer, 1_000e6);
         vm.prank(resolver);
-        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
+        disbursement.approveAndDisburse(campaignId, requestId, keccak256("request"));
         T.CampaignView memory campaign = disbursement.campaign(campaignId);
         T.RequestView memory request = disbursement.request(campaignId, requestId);
         assertEq(campaign.available, 1_000e6);
-        assertEq(campaign.reserved, 1_000e6);
-        assertEq(request.grossPaid, 0);
-        assertEq(token.balanceOf(address(disbursement)), 2_000e6);
+        assertEq(campaign.grossPaid, 1_000e6);
+        assertEq(request.grossPaid, 1_000e6);
+        assertEq(token.balanceOf(organizer), 1_000e6);
+        assertEq(token.balanceOf(address(disbursement)), 1_000e6);
     }
 
-    function testFuzz_reserveKeepsExactCustodyBeforeAnyPayout(uint96 rawGoal, uint96 rawRequest) public {
+    function testFuzz_disbursementKeepsExactCustody(uint96 rawGoal, uint96 rawRequest) public {
         uint256 goal = bound(uint256(rawGoal), 2e6, 2_000e6);
         uint256 requestAmount = bound(uint256(rawRequest), 1, goal / 2);
         token.mint(donor, goal);
@@ -56,15 +56,15 @@ contract HedFundingAndReservationTest is Test {
         vm.prank(organizer);
         disbursement.createActivity(campaignId, keccak256("activity"), goal / 2);
         vm.prank(organizer);
-        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), vendor, requestAmount, 0);
+        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), organizer, requestAmount);
         vm.prank(resolver);
-        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
+        disbursement.approveAndDisburse(campaignId, requestId, keccak256("request"));
 
         T.CampaignView memory campaign = disbursement.campaign(campaignId);
         assertEq(campaign.available, goal - requestAmount);
-        assertEq(campaign.reserved, requestAmount);
-        assertEq(campaign.grossPaid, 0);
-        assertEq(token.balanceOf(address(disbursement)), goal);
+        assertEq(campaign.grossPaid, requestAmount);
+        assertEq(token.balanceOf(organizer), requestAmount);
+        assertEq(token.balanceOf(address(disbursement)), goal - requestAmount);
     }
 
     function test_backupCanOnlyTakeOverEligibilityAfterPrimaryWindow() public {
@@ -92,39 +92,38 @@ contract HedFundingAndReservationTest is Test {
     function test_backupRequestTakeoverIsScopedAndBlocksLatePrimaryApproval() public {
         uint256 campaignId = _activeCampaign();
         vm.prank(organizer);
-        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), vendor, 500e6, 0);
+        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), organizer, 500e6);
         vm.expectRevert(FundTogetherDisbursement.WrongCaller.selector);
         vm.prank(backupResolver);
-        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
+        disbursement.approveAndDisburse(campaignId, requestId, keccak256("request"));
         vm.warp(block.timestamp + 3 days);
         vm.prank(backupResolver);
         disbursement.takeOverRequestApproval(campaignId, requestId, keccak256("takeover"));
         vm.expectRevert(FundTogetherDisbursement.WrongCaller.selector);
         vm.prank(resolver);
-        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
+        disbursement.approveAndDisburse(campaignId, requestId, keccak256("request"));
         vm.prank(backupResolver);
-        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
+        disbursement.approveAndDisburse(campaignId, requestId, keccak256("request"));
+        assertEq(token.balanceOf(organizer), 500e6);
     }
 
-    function test_backupDeliveryTakeoverCannotRunBeforeWindowOrAlongsidePrimary() public {
+    function test_backupExpenditureTakeoverCannotRunBeforeWindowOrAlongsidePrimary() public {
         uint256 campaignId = _activeCampaign();
         vm.prank(organizer);
-        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), vendor, 500e6, 0);
+        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), organizer, 500e6);
         vm.prank(resolver);
-        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
-        vm.prank(vendor);
-        disbursement.acknowledgeVendor(campaignId, requestId, keccak256("terms"));
+        disbursement.approveAndDisburse(campaignId, requestId, keccak256("request"));
         vm.expectRevert(FundTogetherDisbursement.WrongState.selector);
         vm.prank(backupResolver);
-        disbursement.takeOverDeliveryReview(campaignId, requestId, keccak256("takeover"));
+        disbursement.takeOverExpenditureReview(campaignId, requestId, keccak256("takeover"));
         vm.warp(block.timestamp + 3 days);
         vm.prank(backupResolver);
-        disbursement.takeOverDeliveryReview(campaignId, requestId, keccak256("takeover"));
+        disbursement.takeOverExpenditureReview(campaignId, requestId, keccak256("takeover"));
         vm.expectRevert(FundTogetherDisbursement.WrongCaller.selector);
         vm.prank(resolver);
-        disbursement.candidateDelivery(campaignId, requestId, 500e6, keccak256("delivery"));
+        disbursement.candidateExpenditure(campaignId, requestId, 500e6, keccak256("expenditure"));
         vm.prank(backupResolver);
-        disbursement.candidateDelivery(campaignId, requestId, 500e6, keccak256("delivery"));
+        disbursement.candidateExpenditure(campaignId, requestId, 500e6, keccak256("expenditure"));
     }
 
     function test_backupOutcomeTakeoverIsBoundToTheOpenActivity() public {
@@ -139,66 +138,44 @@ contract HedFundingAndReservationTest is Test {
         disbursement.candidateOutcome(campaignId, 0, keccak256("outcome"));
     }
 
-    function test_candidateDeliveryPersistsTheSelectedReportHash() public {
+    function test_candidateExpenditurePersistsTheSelectedReportHash() public {
         uint256 campaignId = _activeCampaign();
         vm.prank(organizer);
-        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), vendor, 500e6, 0);
+        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), organizer, 500e6);
         vm.prank(resolver);
-        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
-        vm.prank(vendor);
-        disbursement.acknowledgeVendor(campaignId, requestId, keccak256("terms"));
-        bytes32 reportHash = keccak256("delivery-report");
+        disbursement.approveAndDisburse(campaignId, requestId, keccak256("request"));
+        bytes32 reportHash = keccak256("expenditure-report");
         vm.prank(resolver);
-        disbursement.candidateDelivery(campaignId, requestId, 500e6, reportHash);
-        assertEq(disbursement.request(campaignId, requestId).deliveryReportHash, reportHash);
+        disbursement.candidateExpenditure(campaignId, requestId, 500e6, reportHash);
+        assertEq(disbursement.request(campaignId, requestId).expenditureReportHash, reportHash);
     }
 
-    function test_backupCanUpholdStuckDeliveryCaseOnlyAfterItsReviewWindow() public {
+    function test_backupCanUpholdStuckExpenditureCaseOnlyAfterItsReviewWindow() public {
         uint256 campaignId = _activeCampaign();
         vm.prank(organizer);
-        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), vendor, 500e6, 0);
+        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), organizer, 500e6);
         vm.prank(resolver);
-        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
-        vm.prank(vendor);
-        disbursement.acknowledgeVendor(campaignId, requestId, keccak256("terms"));
+        disbursement.approveAndDisburse(campaignId, requestId, keccak256("request"));
         vm.prank(resolver);
-        disbursement.candidateDelivery(campaignId, requestId, 500e6, keccak256("delivery"));
+        disbursement.candidateExpenditure(campaignId, requestId, 500e6, keccak256("expenditure"));
         vm.prank(donor);
-        disbursement.openDeliveryCase(campaignId, requestId, keccak256("case"));
+        disbursement.openExpenditureCase(campaignId, requestId, keccak256("case"));
         vm.warp(block.timestamp + 3 days);
         vm.prank(backupResolver);
-        disbursement.takeOverDeliveryCase(campaignId, requestId, keccak256("takeover"));
+        disbursement.takeOverExpenditureCase(campaignId, requestId, keccak256("takeover"));
         vm.expectRevert(FundTogetherDisbursement.WrongCaller.selector);
         vm.prank(resolver);
-        disbursement.upholdDeliveryCase(campaignId, requestId, keccak256("decision"));
+        disbursement.upholdExpenditureCase(campaignId, requestId, keccak256("decision"));
         vm.prank(backupResolver);
-        disbursement.upholdDeliveryCase(campaignId, requestId, keccak256("decision"));
-    }
-
-    function test_vendorAcknowledgementLocksRecipientAndPaysOnlyExactDeposit() public {
-        uint256 campaignId = _activeCampaign();
-        vm.prank(organizer);
-        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), vendor, 1_000e6, 200e6);
-        vm.prank(resolver);
-        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
-        vm.prank(vendor);
-        disbursement.acknowledgeVendor(campaignId, requestId, keccak256("terms"));
-        disbursement.payDeposit(campaignId, requestId);
-        T.CampaignView memory campaign = disbursement.campaign(campaignId);
-        T.RequestView memory request = disbursement.request(campaignId, requestId);
-        assertEq(token.balanceOf(vendor), 200e6);
-        assertEq(campaign.reserved, 800e6);
-        assertEq(campaign.grossPaid, 200e6);
-        assertEq(request.grossPaid, 200e6);
-        assertEq(request.termsHash, keccak256("request"));
+        disbursement.upholdExpenditureCase(campaignId, requestId, keccak256("decision"));
     }
 
     function test_secondRequestCannotBypassTheSingleOpenFinancialSlot() public {
         uint256 campaignId = _activeCampaign();
         vm.startPrank(organizer);
-        disbursement.submitRequest(campaignId, 0, keccak256("first"), vendor, 1_000e6, 0);
+        disbursement.submitRequest(campaignId, 0, keccak256("first"), organizer, 1_000e6);
         vm.expectRevert(FundTogetherDisbursement.WrongState.selector);
-        disbursement.submitRequest(campaignId, 0, keccak256("second"), vendor, 500e6, 0);
+        disbursement.submitRequest(campaignId, 0, keccak256("second"), organizer, 500e6);
         vm.stopPrank();
     }
 
@@ -207,15 +184,13 @@ contract HedFundingAndReservationTest is Test {
         uint256 first = _settleRequest(campaignId, 800e6, keccak256("purchase"));
         assertEq(uint256(disbursement.request(campaignId, first).state), uint256(T.RequestState.FINANCIALLY_SETTLED));
         vm.prank(organizer);
-        uint256 second = disbursement.submitRequest(campaignId, 0, keccak256("transport"), vendor, 200e6, 0);
+        uint256 second = disbursement.submitRequest(campaignId, 0, keccak256("transport"), organizer, 200e6);
         vm.prank(resolver);
-        disbursement.approveRequest(campaignId, second, keccak256("transport"));
-        vm.prank(vendor);
-        disbursement.acknowledgeVendor(campaignId, second, keccak256("terms-transport"));
+        disbursement.approveAndDisburse(campaignId, second, keccak256("transport"));
         vm.prank(resolver);
-        disbursement.candidateDelivery(campaignId, second, 200e6, keccak256("transport-delivery"));
+        disbursement.candidateExpenditure(campaignId, second, 200e6, keccak256("transport-expenditure"));
         vm.warp(block.timestamp + 3 days);
-        disbursement.executeFinal(campaignId, second);
+        disbursement.finalizeExpenditure(campaignId, second);
         vm.expectRevert(FundTogetherDisbursement.WrongState.selector);
         vm.prank(organizer);
         disbursement.createActivity(campaignId, keccak256("next"), 1_000e6);
@@ -254,121 +229,41 @@ contract HedFundingAndReservationTest is Test {
         disbursement.verifyOutcome(campaignId, 0, keccak256("outcome"));
     }
 
-    function test_approvalRejectsDepositAboveRequestOrCampaignPolicyCap() public {
+    function test_donorCaseOpenedDuringChallengeBlocksFinalSettlement() public {
         uint256 campaignId = _activeCampaign();
         vm.prank(organizer);
-        uint256 overRequestCap = disbursement.submitRequest(campaignId, 0, keccak256("request-cap"), vendor, 1_000e6, 201e6);
-        vm.expectRevert(FundTogetherDisbursement.InvalidInput.selector);
+        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), organizer, 1_000e6);
         vm.prank(resolver);
-        disbursement.approveRequest(campaignId, overRequestCap, keccak256("request-cap"));
-
-        uint256 otherCampaignId = _activeCampaign();
-        vm.prank(organizer);
-        uint256 overCampaignCap = disbursement.submitRequest(otherCampaignId, 0, keccak256("campaign-cap"), vendor, 900e6, 201e6);
-        vm.expectRevert(FundTogetherDisbursement.InvalidInput.selector);
+        disbursement.approveAndDisburse(campaignId, requestId, keccak256("request"));
         vm.prank(resolver);
-        disbursement.approveRequest(otherCampaignId, overCampaignCap, keccak256("campaign-cap"));
-    }
-
-    function test_partialFinalPaymentKeepsSlotUntilResidualIsResolved() public {
-        uint256 campaignId = _activeCampaign();
-        vm.prank(organizer);
-        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), vendor, 1_000e6, 200e6);
-        vm.prank(resolver);
-        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
-        vm.prank(vendor);
-        disbursement.acknowledgeVendor(campaignId, requestId, keccak256("terms"));
-        disbursement.payDeposit(campaignId, requestId);
-        vm.prank(resolver);
-        disbursement.candidateDelivery(campaignId, requestId, 700e6, keccak256("delivery"));
-        vm.expectRevert(FundTogetherDisbursement.WrongState.selector);
-        disbursement.executeFinal(campaignId, requestId);
-        vm.warp(block.timestamp + 3 days);
-        disbursement.executeFinal(campaignId, requestId);
-        T.CampaignView memory campaign = disbursement.campaign(campaignId);
-        assertEq(token.balanceOf(vendor), 700e6);
-        assertEq(campaign.reserved, 300e6);
-        assertTrue(disbursement.hasOpenRequest(campaignId));
-    }
-
-    function test_resolverCanReleasePartialResidualOnlyAfterFinalDecision() public {
-        uint256 campaignId = _activeCampaign();
-        vm.prank(organizer);
-        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), vendor, 1_000e6, 200e6);
-        vm.prank(resolver);
-        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
-        vm.prank(vendor);
-        disbursement.acknowledgeVendor(campaignId, requestId, keccak256("terms"));
-        disbursement.payDeposit(campaignId, requestId);
-        vm.prank(resolver);
-        disbursement.candidateDelivery(campaignId, requestId, 700e6, keccak256("delivery"));
-        vm.warp(block.timestamp + 3 days);
-        disbursement.executeFinal(campaignId, requestId);
-        vm.prank(resolver);
-        disbursement.releaseResidual(campaignId, requestId, keccak256("partial-close"));
-        T.CampaignView memory campaign = disbursement.campaign(campaignId);
-        assertEq(campaign.available, 1_300e6);
-        assertEq(campaign.reserved, 0);
-        assertFalse(disbursement.hasOpenRequest(campaignId));
-    }
-
-    function test_donorCaseOpenedDuringChallengeBlocksFinalPayment() public {
-        uint256 campaignId = _activeCampaign();
-        vm.prank(organizer);
-        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), vendor, 1_000e6, 0);
-        vm.prank(resolver);
-        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
-        vm.prank(vendor);
-        disbursement.acknowledgeVendor(campaignId, requestId, keccak256("terms"));
-        vm.prank(resolver);
-        disbursement.candidateDelivery(campaignId, requestId, 1_000e6, keccak256("delivery"));
+        disbursement.candidateExpenditure(campaignId, requestId, 1_000e6, keccak256("expenditure"));
         vm.prank(donor);
-        disbursement.openDeliveryCase(campaignId, requestId, keccak256("conflict"));
+        disbursement.openExpenditureCase(campaignId, requestId, keccak256("conflict"));
         vm.warp(block.timestamp + 3 days);
         vm.expectRevert(FundTogetherDisbursement.WrongState.selector);
-        disbursement.executeFinal(campaignId, requestId);
+        disbursement.finalizeExpenditure(campaignId, requestId);
     }
 
-    function test_openDeliveryCaseAlsoBlocksResidualRelease() public {
+    function test_resolverUpholdReopensChallengeBeforeFinalSettlement() public {
         uint256 campaignId = _activeCampaign();
         vm.prank(organizer);
-        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), vendor, 1_000e6, 0);
+        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), organizer, 1_000e6);
         vm.prank(resolver);
-        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
-        vm.prank(vendor);
-        disbursement.acknowledgeVendor(campaignId, requestId, keccak256("terms"));
+        disbursement.approveAndDisburse(campaignId, requestId, keccak256("request"));
         vm.prank(resolver);
-        disbursement.candidateDelivery(campaignId, requestId, 700e6, keccak256("delivery"));
+        disbursement.candidateExpenditure(campaignId, requestId, 1_000e6, keccak256("expenditure"));
         vm.prank(donor);
-        disbursement.openDeliveryCase(campaignId, requestId, keccak256("conflict"));
-        vm.warp(block.timestamp + 3 days);
-        vm.expectRevert(FundTogetherDisbursement.WrongState.selector);
+        disbursement.openExpenditureCase(campaignId, requestId, keccak256("conflict"));
         vm.prank(resolver);
-        disbursement.releaseResidual(campaignId, requestId, keccak256("partial-close"));
-    }
-
-    function test_resolverUpholdReopensChallengeBeforeFinalPayment() public {
-        uint256 campaignId = _activeCampaign();
-        vm.prank(organizer);
-        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), vendor, 1_000e6, 0);
-        vm.prank(resolver);
-        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
-        vm.prank(vendor);
-        disbursement.acknowledgeVendor(campaignId, requestId, keccak256("terms"));
-        vm.prank(resolver);
-        disbursement.candidateDelivery(campaignId, requestId, 1_000e6, keccak256("delivery"));
-        vm.prank(donor);
-        disbursement.openDeliveryCase(campaignId, requestId, keccak256("conflict"));
-        vm.prank(resolver);
-        disbursement.upholdDeliveryCase(campaignId, requestId, keccak256("decision"));
+        disbursement.upholdExpenditureCase(campaignId, requestId, keccak256("decision"));
         vm.expectRevert(FundTogetherDisbursement.WrongState.selector);
         vm.prank(donor);
-        disbursement.openDeliveryCase(campaignId, requestId, keccak256("replay"));
+        disbursement.openExpenditureCase(campaignId, requestId, keccak256("replay"));
         vm.expectRevert(FundTogetherDisbursement.WrongState.selector);
-        disbursement.executeFinal(campaignId, requestId);
+        disbursement.finalizeExpenditure(campaignId, requestId);
         vm.warp(block.timestamp + 3 days);
-        disbursement.executeFinal(campaignId, requestId);
-        assertEq(token.balanceOf(vendor), 1_000e6);
+        disbursement.finalizeExpenditure(campaignId, requestId);
+        assertEq(uint256(disbursement.request(campaignId, requestId).state), uint256(T.RequestState.FINANCIALLY_SETTLED));
     }
 
     function test_failedFundingSnapshotsCustodyForDonorRefund() public {
@@ -397,14 +292,14 @@ contract HedFundingAndReservationTest is Test {
         assertEq(token.balanceOf(donor), before + 2_000e6);
     }
 
-    function test_lateVendorReturnAfterWindDownBecomesClaimableSupplementWithoutReopeningCampaign() public {
+    function test_lateOrganizerReturnAfterWindDownBecomesClaimableSupplementWithoutReopeningCampaign() public {
         uint256 campaignId = _activeCampaign();
         uint256 requestId = _settleRequest(campaignId, 1_000e6, keccak256("purchase"));
         vm.warp(block.timestamp + 180 days);
         disbursement.startWindDown(campaignId);
-        vm.prank(vendor);
+        vm.prank(organizer);
         token.approve(address(disbursement), 200e6);
-        vm.prank(vendor);
+        vm.prank(organizer);
         disbursement.returnFunds(campaignId, requestId, 200e6);
         T.CampaignView memory beforeClaim = disbursement.campaign(campaignId);
         assertEq(beforeClaim.basePool, 1_000e6);
@@ -416,105 +311,63 @@ contract HedFundingAndReservationTest is Test {
         assertEq(uint256(disbursement.campaign(campaignId).state), uint256(T.CampaignState.STOPPED));
     }
 
-    function test_vendorReturnRequiresActualTokenInflowAndCannotExceedGrossPaid() public {
+    function test_organizerReturnRequiresActualTokenInflowAndCannotExceedGrossPaid() public {
         uint256 campaignId = _activeCampaign();
         vm.prank(organizer);
-        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), vendor, 1_000e6, 200e6);
+        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), organizer, 1_000e6);
         vm.prank(resolver);
-        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
-        vm.prank(vendor);
-        disbursement.acknowledgeVendor(campaignId, requestId, keccak256("terms"));
-        disbursement.payDeposit(campaignId, requestId);
-        vm.prank(vendor);
+        disbursement.approveAndDisburse(campaignId, requestId, keccak256("request"));
+        vm.prank(organizer);
         token.approve(address(disbursement), 100e6);
-        vm.prank(vendor);
+        vm.prank(organizer);
         disbursement.returnFunds(campaignId, requestId, 100e6);
         T.RequestView memory request = disbursement.request(campaignId, requestId);
-        assertEq(request.grossPaid, 200e6);
+        assertEq(request.grossPaid, 1_000e6);
         assertEq(request.returned, 100e6);
         vm.expectRevert(FundTogetherDisbursement.InvalidInput.selector);
-        vm.prank(vendor);
-        disbursement.returnFunds(campaignId, requestId, 101e6);
+        vm.prank(organizer);
+        disbursement.returnFunds(campaignId, requestId, 901e6);
     }
 
-    function test_returnAfterCandidateInvalidatesDeliveryDecisionAndUsesNetPaidForReplacementFinal() public {
+    function test_returnAfterCandidateInvalidatesExpenditureDecision() public {
         uint256 campaignId = _activeCampaign();
         vm.prank(organizer);
-        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), vendor, 1_000e6, 200e6);
+        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), organizer, 1_000e6);
         vm.prank(resolver);
-        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
-        vm.prank(vendor);
-        disbursement.acknowledgeVendor(campaignId, requestId, keccak256("terms"));
-        disbursement.payDeposit(campaignId, requestId);
+        disbursement.approveAndDisburse(campaignId, requestId, keccak256("request"));
         vm.prank(resolver);
-        disbursement.candidateDelivery(campaignId, requestId, 700e6, keccak256("delivery-one"));
-        vm.prank(vendor);
+        disbursement.candidateExpenditure(campaignId, requestId, 700e6, keccak256("expenditure-one"));
+        vm.prank(organizer);
         token.approve(address(disbursement), 100e6);
-        vm.prank(vendor);
+        vm.prank(organizer);
         disbursement.returnFunds(campaignId, requestId, 100e6);
         vm.warp(block.timestamp + 3 days);
         vm.expectRevert(FundTogetherDisbursement.WrongState.selector);
-        disbursement.executeFinal(campaignId, requestId);
+        disbursement.finalizeExpenditure(campaignId, requestId);
         vm.prank(resolver);
-        disbursement.candidateDelivery(campaignId, requestId, 700e6, keccak256("delivery-two"));
+        disbursement.candidateExpenditure(campaignId, requestId, 700e6, keccak256("expenditure-two"));
         vm.warp(block.timestamp + 3 days);
-        disbursement.executeFinal(campaignId, requestId);
-        assertEq(token.balanceOf(vendor), 700e6);
+        disbursement.finalizeExpenditure(campaignId, requestId);
+        assertEq(uint256(disbursement.request(campaignId, requestId).state), uint256(T.RequestState.FINANCIALLY_SETTLED));
     }
 
-    function test_organizerCanCancelOnlyAnUncommittedReservedRequest() public {
+    function test_organizerCanCancelSubmittedRequest() public {
         uint256 campaignId = _activeCampaign();
         vm.prank(organizer);
-        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), vendor, 1_000e6, 0);
-        vm.prank(resolver);
-        disbursement.approveRequest(campaignId, requestId, keccak256("request"));
+        uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), organizer, 1_000e6);
         vm.prank(organizer);
-        disbursement.cancelUncommittedRequest(campaignId, requestId, keccak256("cancel"));
-        T.CampaignView memory campaign = disbursement.campaign(campaignId);
-        assertEq(campaign.available, 2_000e6);
-        assertEq(campaign.reserved, 0);
+        disbursement.cancelRequest(campaignId, requestId, keccak256("cancel"));
         assertFalse(disbursement.hasOpenRequest(campaignId));
+        assertEq(uint256(disbursement.request(campaignId, requestId).state), uint256(T.RequestState.CANCELLED));
     }
 
-    function test_expiredAcknowledgementAndUnpaidDepositReleaseReserveWithoutReopeningGrossCap() public {
+    function test_requestAmountCannotExceedActivityCeiling() public {
         uint256 campaignId = _activeCampaign();
         vm.prank(organizer);
-        uint256 pending = disbursement.submitRequest(campaignId, 0, keccak256("pending"), vendor, 200e6, 0);
-        vm.prank(resolver);
-        disbursement.approveRequest(campaignId, pending, keccak256("pending"));
-        vm.warp(block.timestamp + 3 days);
-        disbursement.expireUncommittedRequest(campaignId, pending, keccak256("ack-timeout"));
-        assertFalse(disbursement.hasOpenRequest(campaignId));
-        assertEq(disbursement.campaign(campaignId).available, 2_000e6);
-
-        vm.prank(organizer);
-        uint256 committed = disbursement.submitRequest(campaignId, 0, keccak256("committed"), vendor, 800e6, 160e6);
-        vm.prank(resolver);
-        disbursement.approveRequest(campaignId, committed, keccak256("committed"));
-        vm.prank(vendor);
-        disbursement.acknowledgeVendor(campaignId, committed, keccak256("terms"));
-        vm.warp(block.timestamp + 3 days);
-        disbursement.expireUnpaidDeposit(campaignId, committed, keccak256("deposit-timeout"));
-        vm.prank(organizer);
-        uint256 overCap = disbursement.submitRequest(campaignId, 0, keccak256("over-cap"), vendor, 300e6, 0);
+        uint256 overCap = disbursement.submitRequest(campaignId, 0, keccak256("over-cap"), organizer, 1_001e6);
         vm.expectRevert(FundTogetherDisbursement.InvalidInput.selector);
         vm.prank(resolver);
-        disbursement.approveRequest(campaignId, overCap, keccak256("over-cap"));
-    }
-
-    function test_cancelDoesNotReopenActivityGrossApprovalCeiling() public {
-        uint256 campaignId = _activeCampaign();
-        vm.prank(organizer);
-        uint256 first = disbursement.submitRequest(campaignId, 0, keccak256("first"), vendor, 800e6, 0);
-        vm.prank(resolver);
-        disbursement.approveRequest(campaignId, first, keccak256("first"));
-        vm.prank(organizer);
-        disbursement.cancelUncommittedRequest(campaignId, first, keccak256("cancel"));
-        vm.prank(organizer);
-        uint256 second = disbursement.submitRequest(campaignId, 0, keccak256("second"), vendor, 300e6, 0);
-        vm.expectRevert(FundTogetherDisbursement.InvalidInput.selector);
-        vm.prank(resolver);
-        disbursement.approveRequest(campaignId, second, keccak256("second"));
+        disbursement.approveAndDisburse(campaignId, overCap, keccak256("over-cap"));
     }
 
     function _activeCampaign() private returns (uint256 campaignId) {
@@ -530,14 +383,12 @@ contract HedFundingAndReservationTest is Test {
 
     function _settleRequest(uint256 campaignId, uint256 amount, bytes32 requestHash) private returns (uint256 requestId) {
         vm.prank(organizer);
-        requestId = disbursement.submitRequest(campaignId, 0, requestHash, vendor, amount, 0);
+        requestId = disbursement.submitRequest(campaignId, 0, requestHash, organizer, amount);
         vm.prank(resolver);
-        disbursement.approveRequest(campaignId, requestId, requestHash);
-        vm.prank(vendor);
-        disbursement.acknowledgeVendor(campaignId, requestId, keccak256("terms"));
+        disbursement.approveAndDisburse(campaignId, requestId, requestHash);
         vm.prank(resolver);
-        disbursement.candidateDelivery(campaignId, requestId, amount, keccak256("delivery"));
+        disbursement.candidateExpenditure(campaignId, requestId, amount, keccak256("expenditure"));
         vm.warp(block.timestamp + 3 days);
-        disbursement.executeFinal(campaignId, requestId);
+        disbursement.finalizeExpenditure(campaignId, requestId);
     }
 }

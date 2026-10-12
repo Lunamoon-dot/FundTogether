@@ -9,11 +9,8 @@ import { DisbursementTypes as T } from "./disbursement/DisbursementTypes.sol";
 contract FundTogetherDisbursement is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    uint256 public constant MAX_DEPOSIT_BPS = 2_000;
-    uint256 public constant MAX_CAMPAIGN_DEPOSIT_BPS = 1_000;
     uint256 public constant PRIMARY_REVIEW_WINDOW = 3 days;
-    uint256 public constant VENDOR_ACK_WINDOW = 3 days;
-    uint256 public constant DEPOSIT_WINDOW = 3 days;
+    uint256 public constant CHALLENGE_WINDOW = 3 days;
     uint256 public constant EXECUTION_HORIZON = 180 days;
 
     error InvalidInput();
@@ -36,13 +33,13 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     mapping(uint256 => bool) public hasOpenRequest;
     mapping(uint256 => bool) public eligibilityTakenOver;
     mapping(uint256 => mapping(uint256 => bool)) public requestApprovalTakenOver;
-    mapping(uint256 => mapping(uint256 => bool)) public deliveryReviewTakenOver;
+    mapping(uint256 => mapping(uint256 => bool)) public expenditureReviewTakenOver;
     mapping(uint256 => mapping(uint256 => bool)) public outcomeReviewTakenOver;
     mapping(uint256 => bool) public hasOpenActivity;
-    mapping(uint256 => mapping(uint256 => bool)) public deliveryCaseOpen;
-    mapping(uint256 => mapping(uint256 => bool)) public deliveryCaseUsed;
-    mapping(uint256 => mapping(uint256 => uint256)) public deliveryCaseOpenedAt;
-    mapping(uint256 => mapping(uint256 => bool)) public deliveryCaseTakenOver;
+    mapping(uint256 => mapping(uint256 => bool)) public expenditureCaseOpen;
+    mapping(uint256 => mapping(uint256 => bool)) public expenditureCaseUsed;
+    mapping(uint256 => mapping(uint256 => uint256)) public expenditureCaseOpenedAt;
+    mapping(uint256 => mapping(uint256 => bool)) public expenditureCaseTakenOver;
     mapping(uint256 => mapping(uint256 => bool)) public outcomeCaseOpen;
     mapping(uint256 => mapping(uint256 => bool)) public outcomeCaseUsed;
     mapping(uint256 => mapping(uint256 => uint256)) public outcomeCaseOpenedAt;
@@ -55,32 +52,28 @@ contract FundTogetherDisbursement is ReentrancyGuard {
     event Donated(uint256 indexed campaignId, address indexed donor, uint256 amount, uint256 contributed);
     event CampaignActivated(uint256 indexed campaignId, bytes32 eligibilityHash);
     event EligibilityTakenOver(uint256 indexed campaignId, bytes32 reasonHash);
-    event RequestSubmitted(uint256 indexed campaignId, uint256 indexed requestId, bytes32 requestHash, uint256 amount, uint256 deposit);
+    event RequestSubmitted(uint256 indexed campaignId, uint256 indexed requestId, bytes32 requestHash, address indexed recipient, uint256 amount);
+    event RequestCancelled(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
     event ActivityCreated(uint256 indexed campaignId, uint256 indexed activityId, bytes32 commitmentHash, uint256 ceiling);
     event OutcomeCandidate(uint256 indexed campaignId, uint256 indexed activityId, bytes32 reportHash, uint256 challengeEnd);
     event OutcomeVerified(uint256 indexed campaignId, uint256 indexed activityId, bytes32 reportHash);
     event OutcomeCaseOpened(uint256 indexed campaignId, uint256 indexed activityId, address indexed donor, bytes32 reasonHash);
     event OutcomeCaseUpheld(uint256 indexed campaignId, uint256 indexed activityId, bytes32 decisionHash, uint256 challengeEnd);
-    event RequestReserved(uint256 indexed campaignId, uint256 indexed requestId, uint256 amount, uint256 available, uint256 reserved);
+    event RequestApprovedAndDisbursed(uint256 indexed campaignId, uint256 indexed requestId, address indexed recipient, uint256 amount, uint256 available);
     event RequestApprovalTakenOver(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
-    event DeliveryReviewTakenOver(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
+    event ExpenditureReviewTakenOver(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
     event OutcomeReviewTakenOver(uint256 indexed campaignId, uint256 indexed activityId, bytes32 reasonHash);
-    event VendorAcknowledged(uint256 indexed campaignId, uint256 indexed requestId, address indexed vendor, bytes32 termsHash);
-    event DepositPaid(uint256 indexed campaignId, uint256 indexed requestId, address indexed vendor, uint256 amount);
-    event DeliveryCandidate(uint256 indexed campaignId, uint256 indexed requestId, uint256 acceptedValue, bytes32 reportHash);
-    event FinalPaid(uint256 indexed campaignId, uint256 indexed requestId, address indexed vendor, uint256 amount);
-    event ResidualReleased(uint256 indexed campaignId, uint256 indexed requestId, uint256 amount, bytes32 reasonHash);
-    event DeliveryCaseOpened(uint256 indexed campaignId, uint256 indexed requestId, address indexed donor, bytes32 reasonHash);
-    event DeliveryCaseUpheld(uint256 indexed campaignId, uint256 indexed requestId, bytes32 decisionHash, uint256 challengeEnd);
-    event DeliveryCaseTakenOver(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
+    event ExpenditureCandidate(uint256 indexed campaignId, uint256 indexed requestId, uint256 acceptedExpenditure, bytes32 reportHash);
+    event ExpenditureSettled(uint256 indexed campaignId, uint256 indexed requestId, uint256 acceptedExpenditure);
+    event ExpenditureCaseOpened(uint256 indexed campaignId, uint256 indexed requestId, address indexed donor, bytes32 reasonHash);
+    event ExpenditureCaseUpheld(uint256 indexed campaignId, uint256 indexed requestId, bytes32 decisionHash, uint256 challengeEnd);
+    event ExpenditureCaseTakenOver(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
     event OutcomeCaseTakenOver(uint256 indexed campaignId, uint256 indexed activityId, bytes32 reasonHash);
     event FundingFailed(uint256 indexed campaignId, uint256 basePool);
     event WindDownStarted(uint256 indexed campaignId, uint256 basePool);
     event RefundClaimed(uint256 indexed campaignId, address indexed donor, uint256 baseAmount, uint256 supplementAmount);
-    event FundsReturned(uint256 indexed campaignId, uint256 indexed requestId, address indexed vendor, uint256 amount);
-    event DeliveryAuthorizationInvalidated(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
-    event UncommittedRequestCancelled(uint256 indexed campaignId, uint256 indexed requestId, uint256 amount, bytes32 reasonHash);
-    event RequestExpired(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
+    event FundsReturned(uint256 indexed campaignId, uint256 indexed requestId, address indexed sender, uint256 amount);
+    event ExpenditureAuthorizationInvalidated(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
 
     constructor(address token, address resolver_, address backupResolver_, bytes32 policyHash_) {
         if (token == address(0) || resolver_ == address(0) || backupResolver_ == address(0) || resolver_ == backupResolver_ || policyHash_ == bytes32(0)) revert InvalidInput();
@@ -198,63 +191,63 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         T.CampaignView storage c = _campaign(campaignId);
         if (requestId >= requestCount[campaignId]) revert InvalidReference();
         T.RequestView storage r = _requests[campaignId][requestId];
-        if (msg.sender != r.vendor) revert WrongCaller();
+        if (msg.sender != r.recipient) revert WrongCaller();
         if (amount == 0 || amount > r.grossPaid - r.returned) revert InvalidInput();
-        if (r.state == T.RequestState.DELIVERY_CANDIDATE && deliveryCaseOpen[campaignId][requestId]) revert WrongState();
+        if (r.state == T.RequestState.EXPENDITURE_CANDIDATE && expenditureCaseOpen[campaignId][requestId]) revert WrongState();
         r.returned += amount;
         if (c.refundSnapshotted) c.supplementPool += amount;
         else c.available += amount;
         emit FundsReturned(campaignId, requestId, msg.sender, amount);
-        if (r.state == T.RequestState.DELIVERY_CANDIDATE) {
-            r.acceptedDeliveryValue = 0;
+        if (r.state == T.RequestState.EXPENDITURE_CANDIDATE) {
+            r.acceptedExpenditure = 0;
             r.challengeEnd = 0;
-            r.state = T.RequestState.VENDOR_COMMITTED;
-            emit DeliveryAuthorizationInvalidated(campaignId, requestId, keccak256("RETURN_AFTER_CANDIDATE"));
+            r.state = T.RequestState.APPROVED_DISBURSED;
+            emit ExpenditureAuthorizationInvalidated(campaignId, requestId, keccak256("RETURN_AFTER_CANDIDATE"));
         }
         _receiveExact(msg.sender, amount);
     }
 
-    function cancelUncommittedRequest(uint256 campaignId, uint256 requestId, bytes32 reasonHash) external {
+    function cancelRequest(uint256 campaignId, uint256 requestId, bytes32 reasonHash) external {
         T.CampaignView storage c = _campaign(campaignId);
         if (msg.sender != c.organizer) revert WrongCaller();
         if (requestId >= requestCount[campaignId]) revert InvalidReference();
         T.RequestView storage r = _requests[campaignId][requestId];
-        if (r.state != T.RequestState.APPROVED_RESERVED || reasonHash == bytes32(0)) revert WrongState();
-        c.reserved -= r.approvedAmount;
-        c.available += r.approvedAmount;
+        if (r.state != T.RequestState.SUBMITTED || reasonHash == bytes32(0)) revert WrongState();
         r.state = T.RequestState.CANCELLED;
         hasOpenRequest[campaignId] = false;
-        emit UncommittedRequestCancelled(campaignId, requestId, r.approvedAmount, reasonHash);
+        emit RequestCancelled(campaignId, requestId, reasonHash);
     }
 
-    function submitRequest(uint256 campaignId, uint256 activityId, bytes32 requestHash, address vendor, uint256 amount, uint256 deposit) external returns (uint256 requestId) {
+    function submitRequest(uint256 campaignId, uint256 activityId, bytes32 requestHash, address recipient, uint256 amount) external returns (uint256 requestId) {
         T.CampaignView storage c = _campaign(campaignId);
         if (msg.sender != c.organizer) revert WrongCaller();
-        if (c.state != T.CampaignState.ACTIVE || requestHash == bytes32(0) || vendor == address(0) || amount == 0 || deposit > amount) revert InvalidInput();
+        if (recipient == address(0) || recipient != c.organizer) revert InvalidInput();
+        if (c.state != T.CampaignState.ACTIVE || requestHash == bytes32(0) || amount == 0) revert InvalidInput();
         if (hasOpenRequest[campaignId]) revert WrongState();
         if (activityId >= activityCount[campaignId]) revert InvalidReference();
         if (_activities[campaignId][activityId].state != T.ActivityState.OPEN) revert WrongState();
         requestId = requestCount[campaignId]++;
         hasOpenRequest[campaignId] = true;
-        _requests[campaignId][requestId] = T.RequestView(activityId, requestHash, vendor, bytes32(0), amount, deposit, 0, 0, 0, bytes32(0), 0, 0, 0, block.timestamp, T.RequestState.SUBMITTED);
-        emit RequestSubmitted(campaignId, requestId, requestHash, amount, deposit);
+        _requests[campaignId][requestId] = T.RequestView(activityId, requestHash, recipient, bytes32(0), amount, 0, 0, 0, bytes32(0), 0, 0, block.timestamp, T.RequestState.SUBMITTED);
+        emit RequestSubmitted(campaignId, requestId, requestHash, recipient, amount);
     }
 
-    function approveRequest(uint256 campaignId, uint256 requestId, bytes32 expectedRequestHash) external {
+    function approveAndDisburse(uint256 campaignId, uint256 requestId, bytes32 expectedRequestHash) external nonReentrant {
         T.CampaignView storage c = _campaign(campaignId);
         if (c.state != T.CampaignState.ACTIVE || requestId >= requestCount[campaignId]) revert WrongState();
         T.RequestView storage r = _requests[campaignId][requestId];
         if ((msg.sender != resolver || requestApprovalTakenOver[campaignId][requestId])
             && (msg.sender != backupResolver || !requestApprovalTakenOver[campaignId][requestId])) revert WrongCaller();
         T.ActivityView storage a = _activities[campaignId][r.activityId];
-        if (r.state != T.RequestState.SUBMITTED || r.requestHash != expectedRequestHash || r.approvedAmount > c.available || r.approvedAmount > a.ceiling - a.approved
-            || r.depositAmount > r.approvedAmount * MAX_DEPOSIT_BPS / 10_000 || r.depositAmount > c.goal * MAX_CAMPAIGN_DEPOSIT_BPS / 10_000) revert InvalidInput();
+        if (r.state != T.RequestState.SUBMITTED || r.requestHash != expectedRequestHash || r.approvedAmount > c.available || r.approvedAmount > a.ceiling - a.approved) revert InvalidInput();
         c.available -= r.approvedAmount;
-        c.reserved += r.approvedAmount;
+        c.grossPaid += r.approvedAmount;
         a.approved += r.approvedAmount;
+        r.grossPaid = r.approvedAmount;
         r.approvedAt = block.timestamp;
-        r.state = T.RequestState.APPROVED_RESERVED;
-        emit RequestReserved(campaignId, requestId, r.approvedAmount, c.available, c.reserved);
+        r.state = T.RequestState.APPROVED_DISBURSED;
+        emit RequestApprovedAndDisbursed(campaignId, requestId, r.recipient, r.approvedAmount, c.available);
+        _sendExact(r.recipient, r.approvedAmount);
     }
 
     function takeOverRequestApproval(uint256 campaignId, uint256 requestId, bytes32 reasonHash) external {
@@ -267,144 +260,67 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         emit RequestApprovalTakenOver(campaignId, requestId, reasonHash);
     }
 
-    function acknowledgeVendor(uint256 campaignId, uint256 requestId, bytes32 termsHash) external {
+    function candidateExpenditure(uint256 campaignId, uint256 requestId, uint256 acceptedSpent, bytes32 reportHash) external {
         if (requestId >= requestCount[campaignId]) revert InvalidReference();
         T.RequestView storage r = _requests[campaignId][requestId];
-        if (msg.sender != r.vendor) revert WrongCaller();
-        if (r.state != T.RequestState.APPROVED_RESERVED || block.timestamp >= r.approvedAt + VENDOR_ACK_WINDOW || termsHash == bytes32(0)) revert WrongState();
-        // The vendor's transaction acknowledges this immutable request; do not let a caller
-        // substitute a second off-chain terms commitment after reserve approval.
-        r.termsHash = r.requestHash;
-        r.committedAt = block.timestamp;
-        r.state = T.RequestState.VENDOR_COMMITTED;
-        emit VendorAcknowledged(campaignId, requestId, msg.sender, r.requestHash);
+        if ((msg.sender != resolver || expenditureReviewTakenOver[campaignId][requestId])
+            && (msg.sender != backupResolver || !expenditureReviewTakenOver[campaignId][requestId])) revert WrongCaller();
+        if (r.state != T.RequestState.APPROVED_DISBURSED || acceptedSpent > r.approvedAmount || reportHash == bytes32(0)) revert InvalidInput();
+        r.acceptedExpenditure = acceptedSpent;
+        r.expenditureReportHash = reportHash;
+        r.challengeEnd = block.timestamp + CHALLENGE_WINDOW;
+        r.state = T.RequestState.EXPENDITURE_CANDIDATE;
+        emit ExpenditureCandidate(campaignId, requestId, acceptedSpent, reportHash);
     }
 
-    function payDeposit(uint256 campaignId, uint256 requestId) external nonReentrant {
-        T.CampaignView storage c = _campaign(campaignId);
-        if (requestId >= requestCount[campaignId]) revert InvalidReference();
-        T.RequestView storage r = _requests[campaignId][requestId];
-        if (c.state != T.CampaignState.ACTIVE || r.state != T.RequestState.VENDOR_COMMITTED || block.timestamp >= r.committedAt + DEPOSIT_WINDOW || r.grossPaid != 0 || r.depositAmount == 0) revert WrongState();
-        c.reserved -= r.depositAmount;
-        c.grossPaid += r.depositAmount;
-        r.grossPaid = r.depositAmount;
-        emit DepositPaid(campaignId, requestId, r.vendor, r.depositAmount);
-        _sendExact(r.vendor, r.depositAmount);
-    }
-
-    function candidateDelivery(uint256 campaignId, uint256 requestId, uint256 acceptedValue, bytes32 reportHash) external {
-        if (requestId >= requestCount[campaignId]) revert InvalidReference();
-        T.RequestView storage r = _requests[campaignId][requestId];
-        if ((msg.sender != resolver || deliveryReviewTakenOver[campaignId][requestId])
-            && (msg.sender != backupResolver || !deliveryReviewTakenOver[campaignId][requestId])) revert WrongCaller();
-        if (r.state != T.RequestState.VENDOR_COMMITTED || acceptedValue > r.approvedAmount || reportHash == bytes32(0)) revert InvalidInput();
-        r.acceptedDeliveryValue = acceptedValue;
-        r.deliveryReportHash = reportHash;
-        r.challengeEnd = block.timestamp + 3 days;
-        r.state = T.RequestState.DELIVERY_CANDIDATE;
-        emit DeliveryCandidate(campaignId, requestId, acceptedValue, reportHash);
-    }
-
-    function takeOverDeliveryReview(uint256 campaignId, uint256 requestId, bytes32 reasonHash) external {
+    function takeOverExpenditureReview(uint256 campaignId, uint256 requestId, bytes32 reasonHash) external {
         _campaign(campaignId);
         if (msg.sender != backupResolver || requestId >= requestCount[campaignId]) revert WrongCaller();
         T.RequestView storage r = _requests[campaignId][requestId];
-        if (r.state != T.RequestState.VENDOR_COMMITTED || deliveryReviewTakenOver[campaignId][requestId]
-            || block.timestamp < r.committedAt + PRIMARY_REVIEW_WINDOW || reasonHash == bytes32(0)) revert WrongState();
-        deliveryReviewTakenOver[campaignId][requestId] = true;
-        emit DeliveryReviewTakenOver(campaignId, requestId, reasonHash);
+        if (r.state != T.RequestState.APPROVED_DISBURSED || expenditureReviewTakenOver[campaignId][requestId]
+            || block.timestamp < r.approvedAt + PRIMARY_REVIEW_WINDOW || reasonHash == bytes32(0)) revert WrongState();
+        expenditureReviewTakenOver[campaignId][requestId] = true;
+        emit ExpenditureReviewTakenOver(campaignId, requestId, reasonHash);
     }
 
-    function executeFinal(uint256 campaignId, uint256 requestId) external nonReentrant {
-        T.CampaignView storage c = _campaign(campaignId);
+    function finalizeExpenditure(uint256 campaignId, uint256 requestId) external {
         if (requestId >= requestCount[campaignId]) revert InvalidReference();
         T.RequestView storage r = _requests[campaignId][requestId];
-        if (r.state != T.RequestState.DELIVERY_CANDIDATE || block.timestamp < r.challengeEnd || deliveryCaseOpen[campaignId][requestId]) revert WrongState();
-        uint256 netPaid = r.grossPaid - r.returned;
-        uint256 due = r.acceptedDeliveryValue > netPaid ? r.acceptedDeliveryValue - netPaid : 0;
-        uint256 payout = due < c.reserved ? due : c.reserved;
-        if (payout != 0) {
-            c.reserved -= payout;
-            c.grossPaid += payout;
-            r.grossPaid += payout;
-        }
-        if (c.reserved == 0) {
-            r.state = T.RequestState.FINANCIALLY_SETTLED;
-            hasOpenRequest[campaignId] = false;
-        }
-        emit FinalPaid(campaignId, requestId, r.vendor, payout);
-        if (payout != 0) _sendExact(r.vendor, payout);
-    }
-
-    function openDeliveryCase(uint256 campaignId, uint256 requestId, bytes32 reasonHash) external {
-        if (requestId >= requestCount[campaignId]) revert InvalidReference();
-        T.RequestView storage r = _requests[campaignId][requestId];
-        if (r.state != T.RequestState.DELIVERY_CANDIDATE || block.timestamp >= r.challengeEnd || contributions[campaignId][msg.sender] == 0 || reasonHash == bytes32(0)
-            || deliveryCaseOpen[campaignId][requestId] || deliveryCaseUsed[campaignId][requestId]) revert WrongState();
-        deliveryCaseOpen[campaignId][requestId] = true;
-        deliveryCaseUsed[campaignId][requestId] = true;
-        deliveryCaseOpenedAt[campaignId][requestId] = block.timestamp;
-        emit DeliveryCaseOpened(campaignId, requestId, msg.sender, reasonHash);
-    }
-
-    function upholdDeliveryCase(uint256 campaignId, uint256 requestId, bytes32 decisionHash) external {
-        if (requestId >= requestCount[campaignId]) revert InvalidReference();
-        T.RequestView storage r = _requests[campaignId][requestId];
-        if ((msg.sender != resolver || deliveryCaseTakenOver[campaignId][requestId])
-            && (msg.sender != backupResolver || !deliveryCaseTakenOver[campaignId][requestId])) revert WrongCaller();
-        if (r.state != T.RequestState.DELIVERY_CANDIDATE || !deliveryCaseOpen[campaignId][requestId] || decisionHash == bytes32(0)) revert WrongState();
-        deliveryCaseOpen[campaignId][requestId] = false;
-        r.challengeEnd = block.timestamp + 3 days;
-        emit DeliveryCaseUpheld(campaignId, requestId, decisionHash, r.challengeEnd);
-    }
-
-    function takeOverDeliveryCase(uint256 campaignId, uint256 requestId, bytes32 reasonHash) external {
-        _campaign(campaignId);
-        if (msg.sender != backupResolver || requestId >= requestCount[campaignId]) revert WrongCaller();
-        if (!deliveryCaseOpen[campaignId][requestId] || deliveryCaseTakenOver[campaignId][requestId]
-            || block.timestamp < deliveryCaseOpenedAt[campaignId][requestId] + PRIMARY_REVIEW_WINDOW || reasonHash == bytes32(0)) revert WrongState();
-        deliveryCaseTakenOver[campaignId][requestId] = true;
-        emit DeliveryCaseTakenOver(campaignId, requestId, reasonHash);
-    }
-
-    function releaseResidual(uint256 campaignId, uint256 requestId, bytes32 reasonHash) external {
-        T.CampaignView storage c = _campaign(campaignId);
-        if (msg.sender != resolver) revert WrongCaller();
-        if (requestId >= requestCount[campaignId]) revert InvalidReference();
-        T.RequestView storage r = _requests[campaignId][requestId];
-        if (r.state != T.RequestState.DELIVERY_CANDIDATE || deliveryCaseOpen[campaignId][requestId] || reasonHash == bytes32(0)) revert WrongState();
-        uint256 residual = r.approvedAmount - r.grossPaid;
-        if (residual == 0 || residual > c.reserved) revert WrongState();
-        c.reserved -= residual;
-        c.available += residual;
+        if (r.state != T.RequestState.EXPENDITURE_CANDIDATE || block.timestamp < r.challengeEnd || expenditureCaseOpen[campaignId][requestId]) revert WrongState();
         r.state = T.RequestState.FINANCIALLY_SETTLED;
         hasOpenRequest[campaignId] = false;
-        emit ResidualReleased(campaignId, requestId, residual, reasonHash);
+        emit ExpenditureSettled(campaignId, requestId, r.acceptedExpenditure);
     }
 
-    function expireUncommittedRequest(uint256 campaignId, uint256 requestId, bytes32 reasonHash) external {
-        T.CampaignView storage c = _campaign(campaignId);
+    function openExpenditureCase(uint256 campaignId, uint256 requestId, bytes32 reasonHash) external {
         if (requestId >= requestCount[campaignId]) revert InvalidReference();
         T.RequestView storage r = _requests[campaignId][requestId];
-        if (r.state != T.RequestState.APPROVED_RESERVED || block.timestamp < r.approvedAt + VENDOR_ACK_WINDOW || reasonHash == bytes32(0)) revert WrongState();
-        c.reserved -= r.approvedAmount;
-        c.available += r.approvedAmount;
-        r.state = T.RequestState.CANCELLED;
-        hasOpenRequest[campaignId] = false;
-        emit RequestExpired(campaignId, requestId, reasonHash);
+        if (r.state != T.RequestState.EXPENDITURE_CANDIDATE || block.timestamp >= r.challengeEnd || contributions[campaignId][msg.sender] == 0 || reasonHash == bytes32(0)
+            || expenditureCaseOpen[campaignId][requestId] || expenditureCaseUsed[campaignId][requestId]) revert WrongState();
+        expenditureCaseOpen[campaignId][requestId] = true;
+        expenditureCaseUsed[campaignId][requestId] = true;
+        expenditureCaseOpenedAt[campaignId][requestId] = block.timestamp;
+        emit ExpenditureCaseOpened(campaignId, requestId, msg.sender, reasonHash);
     }
 
-    function expireUnpaidDeposit(uint256 campaignId, uint256 requestId, bytes32 reasonHash) external {
-        T.CampaignView storage c = _campaign(campaignId);
+    function upholdExpenditureCase(uint256 campaignId, uint256 requestId, bytes32 decisionHash) external {
         if (requestId >= requestCount[campaignId]) revert InvalidReference();
         T.RequestView storage r = _requests[campaignId][requestId];
-        if (r.state != T.RequestState.VENDOR_COMMITTED || r.depositAmount == 0 || r.grossPaid != 0
-            || block.timestamp < r.committedAt + DEPOSIT_WINDOW || reasonHash == bytes32(0)) revert WrongState();
-        c.reserved -= r.approvedAmount;
-        c.available += r.approvedAmount;
-        r.state = T.RequestState.CANCELLED;
-        hasOpenRequest[campaignId] = false;
-        emit RequestExpired(campaignId, requestId, reasonHash);
+        if ((msg.sender != resolver || expenditureCaseTakenOver[campaignId][requestId])
+            && (msg.sender != backupResolver || !expenditureCaseTakenOver[campaignId][requestId])) revert WrongCaller();
+        if (r.state != T.RequestState.EXPENDITURE_CANDIDATE || !expenditureCaseOpen[campaignId][requestId] || decisionHash == bytes32(0)) revert WrongState();
+        expenditureCaseOpen[campaignId][requestId] = false;
+        r.challengeEnd = block.timestamp + CHALLENGE_WINDOW;
+        emit ExpenditureCaseUpheld(campaignId, requestId, decisionHash, r.challengeEnd);
+    }
+
+    function takeOverExpenditureCase(uint256 campaignId, uint256 requestId, bytes32 reasonHash) external {
+        _campaign(campaignId);
+        if (msg.sender != backupResolver || requestId >= requestCount[campaignId]) revert WrongCaller();
+        if (!expenditureCaseOpen[campaignId][requestId] || expenditureCaseTakenOver[campaignId][requestId]
+            || block.timestamp < expenditureCaseOpenedAt[campaignId][requestId] + PRIMARY_REVIEW_WINDOW || reasonHash == bytes32(0)) revert WrongState();
+        expenditureCaseTakenOver[campaignId][requestId] = true;
+        emit ExpenditureCaseTakenOver(campaignId, requestId, reasonHash);
     }
 
     function candidateOutcome(uint256 campaignId, uint256 activityId, bytes32 reportHash) external {
@@ -415,7 +331,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
             && (msg.sender != backupResolver || !outcomeReviewTakenOver[campaignId][activityId])) revert WrongCaller();
         if (c.state != T.CampaignState.ACTIVE || a.state != T.ActivityState.OPEN) revert WrongState();
         a.outcomeReportHash = reportHash;
-        a.challengeEnd = block.timestamp + 3 days;
+        a.challengeEnd = block.timestamp + CHALLENGE_WINDOW;
         a.state = T.ActivityState.OUTCOME_CANDIDATE;
         emit OutcomeCandidate(campaignId, activityId, reportHash, a.challengeEnd);
     }
@@ -459,7 +375,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
             && (msg.sender != backupResolver || !outcomeCaseTakenOver[campaignId][activityId])) revert WrongCaller();
         if (a.state != T.ActivityState.OUTCOME_CANDIDATE || !outcomeCaseOpen[campaignId][activityId] || decisionHash == bytes32(0)) revert WrongState();
         outcomeCaseOpen[campaignId][activityId] = false;
-        a.challengeEnd = block.timestamp + 3 days;
+        a.challengeEnd = block.timestamp + CHALLENGE_WINDOW;
         emit OutcomeCaseUpheld(campaignId, activityId, decisionHash, a.challengeEnd);
     }
 

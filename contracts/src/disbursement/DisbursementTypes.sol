@@ -2,7 +2,7 @@ pragma solidity 0.8.24;
 
 library DisbursementTypes {
     enum CampaignState { FUNDING, ACTIVE, WIND_DOWN, COMPLETED, STOPPED }
-    enum RequestState { DRAFT, SUBMITTED, APPROVED_RESERVED, VENDOR_COMMITTED, DELIVERY_CANDIDATE, FINANCIALLY_SETTLED, CANCELLED }
+    enum RequestState { DRAFT, SUBMITTED, APPROVED_DISBURSED, EXPENDITURE_CANDIDATE, FINANCIALLY_SETTLED, CANCELLED }
     enum ActivityState { OPEN, OUTCOME_CANDIDATE, VERIFIED, CANCELLED_NO_SPEND, FAILED }
 
     struct CampaignView {
@@ -27,17 +27,15 @@ library DisbursementTypes {
     struct RequestView {
         uint256 activityId;
         bytes32 requestHash;
-        address vendor;
+        address recipient;
         bytes32 termsHash;
         uint256 approvedAmount;
-        uint256 depositAmount;
         uint256 grossPaid;
         uint256 returned;
-        uint256 acceptedDeliveryValue;
-        bytes32 deliveryReportHash;
+        uint256 acceptedExpenditure;
+        bytes32 expenditureReportHash;
         uint256 challengeEnd;
         uint256 approvedAt;
-        uint256 committedAt;
         uint256 submittedAt;
         RequestState state;
     }

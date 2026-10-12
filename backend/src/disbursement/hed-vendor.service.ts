@@ -21,6 +21,6 @@ export class HedVendorService {
     const block = await this.chain.client.getBlock({ blockTag: "latest" });
     const snapshots = new Map<string, Awaited<ReturnType<HedBlockchainService["snapshot"]>>>();
     for (const row of rows) if (!snapshots.has(row.onchainCampaignId!)) snapshots.set(row.onchainCampaignId!, await this.chain.snapshot(BigInt(row.onchainCampaignId!), block.number));
-    return rows.filter(row => snapshots.get(row.onchainCampaignId!)?.requests[Number(row.onchainRequestId!)]?.state === "APPROVED_RESERVED");
+    return rows.filter(row => snapshots.get(row.onchainCampaignId!)?.requests[Number(row.onchainRequestId!)]?.state === "APPROVED_DISBURSED");
   }
 }

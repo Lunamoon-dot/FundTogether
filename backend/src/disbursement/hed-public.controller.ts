@@ -67,7 +67,7 @@ export class HedPublicController {
     if (content.kind === "DELIVERY") {
       const [request] = await this.db.select().from(schema.disbursementRequests).where(eq(schema.disbursementRequests.requestDraftId, content.requestDraftId)).limit(1);
       const onchain = request?.onchainRequestId === null || request?.onchainRequestId === undefined ? undefined : snapshot.requests[Number(request.onchainRequestId)];
-      if (!onchain || (onchain.state !== "DELIVERY_CANDIDATE" && onchain.state !== "FINANCIALLY_SETTLED") || onchain.deliveryReportHash !== content.publicHash) throw new NotFoundException("HED public evidence not available");
+      if (!onchain || (onchain.state !== "EXPENDITURE_CANDIDATE" && onchain.state !== "FINANCIALLY_SETTLED") || onchain.expenditureReportHash !== content.publicHash) throw new NotFoundException("HED public evidence not available");
     } else {
       const [activity] = await this.db.select().from(schema.hedActivities).where(eq(schema.hedActivities.id, content.activityId)).limit(1);
       const state = activity?.onchainActivityId === null || activity?.onchainActivityId === undefined ? undefined : snapshot.activities[Number(activity.onchainActivityId)]?.state;

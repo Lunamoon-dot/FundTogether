@@ -1,6 +1,6 @@
 import { http } from './http'
 
-export interface HedPublicSnapshot { campaignId: string; checkpoint: { blockNumber: string; blockHash: string; chainTimestamp: string }; campaign: { goal: string; contributed: string; available: string; reserved: string; grossPaid: string; refundSnapshotted: boolean; basePool: string; supplementPool: string; state: string }; activities: { commitmentHash: `0x${string}`; outcomeReportHash: `0x${string}`; ceiling: string; approved: string; createdAt: string; challengeEnd: string; state: string }[]; requests: { requestHash: `0x${string}`; approvedAmount: string; depositAmount: string; grossPaid: string; acceptedDeliveryValue: string; deliveryReportHash: `0x${string}`; challengeEnd: string; state: string }[] }
+export interface HedPublicSnapshot { campaignId: string; checkpoint: { blockNumber: string; blockHash: string; chainTimestamp: string }; campaign: { goal: string; contributed: string; available: string; reserved: string; grossPaid: string; refundSnapshotted: boolean; basePool: string; supplementPool: string; state: string }; activities: { commitmentHash: `0x${string}`; outcomeReportHash: `0x${string}`; ceiling: string; approved: string; createdAt: string; challengeEnd: string; state: string }[]; requests: { requestHash: `0x${string}`; recipient?: string; amount?: string; approvedAmount: string; depositAmount?: string; grossPaid?: string; acceptedExpenditure?: string; expenditureReportHash?: `0x${string}`; challengeEnd: string; state: string }[] }
 export async function getHedPublicCampaign(campaignId: string, signal?: AbortSignal) {
   return (await http.get<HedPublicSnapshot>(`/v1/disbursement/public/campaigns/${campaignId}`, { signal })).data
 }
@@ -53,8 +53,8 @@ export async function registerHedOnchainActivity(campaignId: string, activityId:
   return (await http.post<HedActivityDraft>(`/v1/disbursement/campaigns/${campaignId}/activities/${activityId}/onchain`, { onchainActivityId })).data
 }
 
-export interface HedRequestDraftInput { vendorVerificationId: string; activityId: string; purpose: string;
-  itemLines: { description: string; quantity: number; unitAmount: string }[]; amount: string; deposit: string;
+export interface HedRequestDraftInput { vendorVerificationId?: string; activityId: string; purpose: string;
+  itemLines: { description: string; quantity: number; unitAmount: string }[]; amount: string; deposit?: string;
   expectedDeliveryAt: string; acceptanceCriteria: string[]; terms: string; needEvidenceReferences: string[] }
 export interface HedRequestDraft extends HedRequestDraftInput { id: string; version: number; requestHash: string | null; frozenAt: string | null; onchainRequestId: string | null }
 
