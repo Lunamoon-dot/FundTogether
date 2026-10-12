@@ -32,7 +32,7 @@ async function main() {
     }
     throw new Error('HED indexer projection did not catch up to the verified journey');
   };
-  const goal = 3_000_000_000n, purchase = 1_000_000_000n, transport = 500_000_000n;
+  const goal = 4_000_000_000n, purchase = 1_000_000_000n, transport = 500_000_000n;
   const commitment = hash('campaign'), eligibility = hash('eligibility'), activityHash = hash('activity'), purchaseHash = hash('purchase-request'), transportHash = hash('transport-request');
   const recipient = accounts[0];
   const balanceBefore = await client.readContract({ address: manifest.tokenAddress, abi: token.abi, functionName: 'balanceOf', args: [recipient] });
@@ -44,7 +44,7 @@ async function main() {
   await send(0, disbursement.abi, manifest.contractAddress, 'activateCampaign', [campaignId, eligibility]);
   await send(0, disbursement.abi, manifest.contractAddress, 'createActivity', [campaignId, activityHash, purchase + transport]);
   await send(0, disbursement.abi, manifest.contractAddress, 'submitRequest', [campaignId, 0n, purchaseHash, recipient, purchase]);
-  await send(0, disbursement.abi, manifest.contractAddress, 'approveAndDisburse', [campaignId, 0n, purchaseHash, purchase]);
+  await send(0, disbursement.abi, manifest.contractAddress, 'approveAndDisburse', [campaignId, 0n, purchaseHash]);
   assert.equal(await client.readContract({ address: manifest.tokenAddress, abi: token.abi, functionName: 'balanceOf', args: [recipient] }), balanceBefore + purchase);
   const expenditureReportHash = hash('expenditure');
   await send(0, disbursement.abi, manifest.contractAddress, 'candidateExpenditure', [campaignId, 0n, purchase, expenditureReportHash]);
@@ -53,7 +53,7 @@ async function main() {
   await client.request({ method: 'evm_increaseTime', params: [3 * 24 * 60 * 60] }); await client.request({ method: 'evm_mine' });
   await send(1, disbursement.abi, manifest.contractAddress, 'finalizeExpenditure', [campaignId, 0n]);
   await send(0, disbursement.abi, manifest.contractAddress, 'submitRequest', [campaignId, 0n, transportHash, recipient, transport]);
-  await send(0, disbursement.abi, manifest.contractAddress, 'approveAndDisburse', [campaignId, 1n, transportHash, transport]);
+  await send(0, disbursement.abi, manifest.contractAddress, 'approveAndDisburse', [campaignId, 1n, transportHash]);
   assert.equal(await client.readContract({ address: manifest.tokenAddress, abi: token.abi, functionName: 'balanceOf', args: [recipient] }), balanceBefore + purchase + transport);
   const transportReportHash = hash('transport-expenditure');
   await send(0, disbursement.abi, manifest.contractAddress, 'candidateExpenditure', [campaignId, 1n, transport, transportReportHash]);

@@ -27,6 +27,15 @@ export function HedOrganizationCampaigns({ organizationId, userId, section }: { 
   return <>
     <div className="feed-heading"><h1>Campaign · giải ngân theo yêu cầu</h1>{verified ? <a className="button button--primary" href={`#${base}/new`}>Tạo campaign HED</a> : <a className="button button--secondary" href={`#/organizations/${organizationId}`}>Xác minh tổ chức trước</a>}</div>
     <p>Đủ goal trước khi giải ngân · Tổ chức nhận trực tiếp · 4 giai đoạn xác thực · chain {deployment.chainId}. Chốt hồ sơ chưa gửi transaction.</p>
+    <div className="panel" style={{ background: '#f8fafc', borderLeft: '4px solid #6366f1', margin: '1rem 0' }}>
+      <h3 style={{ margin: '0 0 0.5rem 0' }}>Chuỗi 4 luồng xác thực (Verification-Centric Architecture)</h3>
+      <ol style={{ paddingLeft: '1.2rem', margin: 0 }}>
+        <li><strong>Flow 1 - Organization Verification:</strong> Admin duyệt danh tính & tư cách pháp nhân tổ chức thiện nguyện.</li>
+        <li><strong>Flow 2 - Campaign & Budget Verification:</strong> Resolver kích hoạt campaign & duyệt từng Funding Request (Hard Cap 25% Goal) giải ngân trực tiếp về ví tổ chức.</li>
+        <li><strong>Flow 3 - Expenditure Verification:</strong> Tổ chức nộp chứng từ chi tiêu (Hóa đơn VAT/Biên nhận); Resolver đối chiếu; mở 3 ngày challenge trước khi quyết toán.</li>
+        <li><strong>Flow 4 - Charitable Outcome Verification:</strong> Tổ chức nộp bằng chứng kết quả trao tặng (che PII); Resolver nghiệm thu; mở 3 ngày challenge kiểm soát Outcome Exposure (trần 50% Goal).</li>
+      </ol>
+    </div>
     {!organizations.isPending && !verified && <p className="toast toast--error">Tổ chức chưa được ADMIN xác minh nên chưa thể tạo hoặc publish campaign HED.</p>}
     {list.isPending ? <p role="status">Đang tải campaign…</p> : list.isError ? <section className="panel"><p role="alert">{getErrorMessage(list.error)}</p><button className="button button--secondary" onClick={() => void list.refetch()}>Thử lại</button></section>
       : list.data.length === 0 ? <section className="panel"><h2>Chưa có campaign HED</h2><p>Tạo hồ sơ purpose, scope và outcome trước khi chốt commitment.</p></section>
@@ -54,18 +63,25 @@ function HedCampaignEntry({ value, onFrozen }: { value: HedCampaignDraft; onFroz
   return <li className="panel"><div className="organization-card-heading"><h2>{value.title}</h2><span className="organization-role">{value.frozenAt ? 'Đã chốt' : 'Bản nháp'}</span></div>
     <p className="organization-description">{value.description}</p><p>Mục tiêu: {value.goal} base units MockUSDC · {value.fundingDuration / 86_400} ngày gây quỹ</p>
     {error && <p className="toast toast--error" role="alert">{error}</p>}
-    {value.frozenAt ? <><p className="hed-hash">Commitment: {value.commitmentHash}</p>{value.onchainCampaignId ? <><p>Campaign HED on-chain: {value.onchainCampaignId}</p><a className="button button--secondary" href={`#/hed/campaigns/${value.onchainCampaignId}`}>Mở trang công khai HED</a>{state.data === 1 ? <><HedActivityWorkspace campaignId={value.id} onchainCampaignId={value.onchainCampaignId} /><HedRequestWorkspace campaignId={value.id} onchainCampaignId={value.onchainCampaignId} /></> : <p className="muted">Request chỉ mở sau khi resolver kích hoạt campaign trên chain.</p>}</> : <button className="button button--primary" disabled={busy || !account.address} onClick={() => void publish()}>{busy ? 'Đang xử lý…' : 'Tạo campaign trên HED chain'}</button>}</> : <button className="button button--primary" disabled={busy} onClick={() => void freeze()}>{busy ? 'Đang chốt…' : 'Chốt commitment'}</button>}
+    {value.frozenAt ? <><p className="hed-hash">Commitment: {value.commitmentHash}</p>{value.onchainCampaignId ? <><p>Campaign HED on-chain: {value.onchainCampaignId}</p><a className="button button--secondary" href={`#/hed/campaigns/${value.onchainCampaignId}`}>Mở trang công khai HED</a>{state.data === 1 ? <><HedActivityWorkspace campaignId={value.id} onchainCampaignId={value.onchainCampaignId} goal={value.goal} /><HedRequestWorkspace campaignId={value.id} onchainCampaignId={value.onchainCampaignId} goal={value.goal} /></> : <p className="muted">Request chỉ mở sau khi resolver kích hoạt campaign trên chain.</p>}</> : <button className="button button--primary" disabled={busy || !account.address} onClick={() => void publish()}>{busy ? 'Đang xử lý…' : 'Tạo campaign trên HED chain'}</button>}</> : <button className="button button--primary" disabled={busy} onClick={() => void freeze()}>{busy ? 'Đang chốt…' : 'Chốt commitment'}</button>}
   </li>
 }
 
-function HedActivityWorkspace({ campaignId, onchainCampaignId }: { campaignId: string; onchainCampaignId: string }) {
+function HedActivityWorkspace({ campaignId, onchainCampaignId, goal }: { campaignId: string; onchainCampaignId: string; goal: string }) {
   const cache = useQueryClient(), key = ['hed-activities', campaignId]
   const activities = useQuery({ queryKey: key, queryFn: ({ signal }) => listHedActivities(campaignId, signal), retry: false })
   const account = useAccount(), client = usePublicClient({ chainId: deployment.chainId })
   const { data: wallet } = useWalletClient({ account: account.address, connector: account.connector })
   const [busy, setBusy] = useState(false), [error, setError] = useState('')
   const [form, setForm] = useState<HedActivityInput>({ title: '', beneficiaryScope: '', targetQuantity: 1, outcomeCriteria: [''], ceiling: '', deliveryDeadline: '', outcomeDeadline: '' })
-  async function create(event: FormEvent) { event.preventDefault(); if (busy) return; setBusy(true); setError(''); try { await createHedActivity(campaignId, form); await cache.invalidateQueries({ queryKey: key }) } catch (cause) { setError(getErrorMessage(cause)) } finally { setBusy(false) } }
+  const maxCeiling = BigInt(goal || '0') / 2n
+  async function create(event: FormEvent) {
+    event.preventDefault(); if (busy) return; setError('')
+    const ceilingVal = BigInt(form.ceiling || '0')
+    if (ceilingVal <= 0n) { setError('Trần chi phải lớn hơn 0.'); return }
+    if (ceilingVal > maxCeiling) { setError(`Trần chi hoạt động vượt quá giới hạn Outcome Exposure 50% Goal (tối đa ${maxCeiling.toString()} base units).`); return }
+    setBusy(true); try { await createHedActivity(campaignId, form); await cache.invalidateQueries({ queryKey: key }) } catch (cause) { setError(getErrorMessage(cause)) } finally { setBusy(false) }
+  }
   async function freeze(id: string) { if (busy) return; setBusy(true); setError(''); try { await freezeHedActivity(campaignId, id); await cache.invalidateQueries({ queryKey: key }) } catch (cause) { setError(getErrorMessage(cause)) } finally { setBusy(false) } }
   async function publish(activity: { id: string; commitmentHash: string | null; ceiling: string }) { if (busy || !activity.commitmentHash || !account.address || !client || !wallet) return; setBusy(true); setError(''); try {
     if (account.chainId !== deployment.chainId) throw new Error(`Chuyển ví sang mạng HED ${deployment.chainId} trước khi publish.`)
@@ -76,10 +92,14 @@ function HedActivityWorkspace({ campaignId, onchainCampaignId }: { campaignId: s
     if (!event || event.args.campaignId !== BigInt(onchainCampaignId) || event.args.commitmentHash.toLowerCase() !== activity.commitmentHash.toLowerCase() || event.args.ceiling !== BigInt(activity.ceiling)) throw new Error('Receipt không chứa ActivityCreated đúng campaign, commitment và ceiling.')
     await registerHedOnchainActivity(campaignId, activity.id, String(event.args.activityId)); await cache.invalidateQueries({ queryKey: key })
   } catch (cause) { setError(getErrorMessage(cause)) } finally { setBusy(false) } }
-  return <section className="panel"><h3>Activity outcome</h3><p>Activity khóa scope, target, deadline và trần chi; đây không phải milestone giải ngân.</p>
+  return <section className="panel"><h3>Activity outcome (Flow 4)</h3><p>Activity khóa scope, target, deadline và trần chi; đây không phải milestone giải ngân.</p>
+    <div className="panel" style={{ background: '#f8fafc', borderLeft: '4px solid #3b82f6', margin: '0.75rem 0' }}>
+      <p style={{ margin: 0 }}><strong>Kiểm soát rủi ro Outcome Exposure (Trần 50% Goal = {maxCeiling.toString()} base units):</strong></p>
+      <p className="muted" style={{ margin: '0.25rem 0 0 0' }}>Smart contract giới hạn mỗi Activity không quá 50% mục tiêu quỹ và chỉ cho phép 1 Activity mở trên chain tại một thời điểm. Cần hoàn tất nghiệm thu kết quả (Outcome Package) trước khi tạo Activity tiếp theo.</p>
+    </div>
     {error && <p className="toast toast--error" role="alert">{error}</p>}
     {activities.data?.map(activity => <div key={activity.id}><p>{activity.title} · ceiling {activity.ceiling} · {activity.onchainActivityId === null ? activity.frozenAt ? 'Đã chốt, chưa publish' : 'Bản nháp' : `chain #${activity.onchainActivityId}`}</p>{!activity.frozenAt ? <button className="button button--secondary" disabled={busy} onClick={() => void freeze(activity.id)}>Chốt activity</button> : activity.onchainActivityId === null ? <button className="button button--secondary" disabled={busy || !account.address} onClick={() => void publish(activity)}>Tạo activity trên chain</button> : <HedOutcomeEvidence campaignId={campaignId} activityId={activity.id} targetQuantity={activity.targetQuantity} />}</div>)}
-    <form className="hed-plan-form" onSubmit={create}><label>Tên activity<input required value={form.title} onChange={e => setForm(v => ({ ...v, title: e.target.value }))} /></label><label>Nhóm thụ hưởng<textarea required value={form.beneficiaryScope} onChange={e => setForm(v => ({ ...v, beneficiaryScope: e.target.value }))} /></label><label>Số lượng mục tiêu<input required type="number" min={1} value={form.targetQuantity} onChange={e => setForm(v => ({ ...v, targetQuantity: Number(e.target.value) }))} /></label><label>Ceiling (base units MockUSDC)<input required inputMode="numeric" value={form.ceiling} onChange={e => setForm(v => ({ ...v, ceiling: e.target.value }))} /></label><label>Tiêu chí outcome<textarea required value={form.outcomeCriteria[0]} onChange={e => setForm(v => ({ ...v, outcomeCriteria: [e.target.value] }))} /></label><label>Hạn giao<input required type="datetime-local" onChange={e => setForm(v => ({ ...v, deliveryDeadline: new Date(e.target.value).toISOString() }))} /></label><label>Hạn outcome<input required type="datetime-local" onChange={e => setForm(v => ({ ...v, outcomeDeadline: new Date(e.target.value).toISOString() }))} /></label><button className="button button--secondary" disabled={busy} type="submit">Tạo activity</button></form>
+    <form className="hed-plan-form" onSubmit={create}><label>Tên activity<input required value={form.title} onChange={e => setForm(v => ({ ...v, title: e.target.value }))} /></label><label>Nhóm thụ hưởng<textarea required value={form.beneficiaryScope} onChange={e => setForm(v => ({ ...v, beneficiaryScope: e.target.value }))} /></label><label>Số lượng mục tiêu<input required type="number" min={1} value={form.targetQuantity} onChange={e => setForm(v => ({ ...v, targetQuantity: Number(e.target.value) }))} /></label><label>Ceiling (base units MockUSDC · tối đa 50% Goal: {maxCeiling.toString()})<input required inputMode="numeric" value={form.ceiling} onChange={e => setForm(v => ({ ...v, ceiling: e.target.value }))} /></label><label>Tiêu chí outcome<textarea required value={form.outcomeCriteria[0]} onChange={e => setForm(v => ({ ...v, outcomeCriteria: [e.target.value] }))} /></label><label>Hạn giao<input required type="datetime-local" onChange={e => setForm(v => ({ ...v, deliveryDeadline: new Date(e.target.value).toISOString() }))} /></label><label>Hạn outcome<input required type="datetime-local" onChange={e => setForm(v => ({ ...v, outcomeDeadline: new Date(e.target.value).toISOString() }))} /></label><button className="button button--secondary" disabled={busy} type="submit">Tạo activity</button></form>
   </section>
 }
 
@@ -89,7 +109,7 @@ function HedOutcomeEvidence({ campaignId, activityId, targetQuantity }: { campai
   return <form className="hed-plan-form" onSubmit={submit}><p>Outcome package không xác nhận delivery/payment; bản public phải được che PII và server tự khóa hash của file đó.</p>{error && <p className="toast toast--error" role="alert">{error}</p>}{saved && <p className="toast toast--success" role="status">{saved}</p>}<label>Bằng chứng outcome private<input required type="file" accept="application/pdf,image/png,image/jpeg" onChange={event => setFile(event.target.files?.[0] ?? null)} /></label><label>Bản outcome public đã che PII<input required type="file" accept="application/pdf,image/png,image/jpeg" onChange={event => setPublicFile(event.target.files?.[0] ?? null)} /></label><label>Số lượng đã trao<input required type="number" min={0} value={quantity} onChange={event => setQuantity(event.target.value)} /></label><button className="button button--secondary" disabled={busy || !file || !publicFile} type="submit">{busy ? 'Đang khóa outcome…' : 'Nộp outcome package'}</button></form>
 }
 
-function HedRequestWorkspace({ campaignId, onchainCampaignId }: { campaignId: string; onchainCampaignId: string }) {
+function HedRequestWorkspace({ campaignId, onchainCampaignId, goal }: { campaignId: string; onchainCampaignId: string; goal: string }) {
   const cache = useQueryClient(), key = ['hed-requests', campaignId], activityKey = ['hed-activities', campaignId]
   const requests = useQuery({ queryKey: key, queryFn: ({ signal }) => listHedRequestDrafts(campaignId, signal), retry: false })
   const activities = useQuery({ queryKey: activityKey, queryFn: ({ signal }) => listHedActivities(campaignId, signal), retry: false })
@@ -97,9 +117,16 @@ function HedRequestWorkspace({ campaignId, onchainCampaignId }: { campaignId: st
   const { data: wallet } = useWalletClient({ account: account.address, connector: account.connector })
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [file, setFile] = useState<File | null>(null)
   const [form, setForm] = useState<HedRequestDraftInput>({ activityId: '', purpose: '', itemLines: [{ description: '', quantity: 1, unitAmount: '' }], amount: '', deposit: '0', expectedDeliveryAt: '', acceptanceCriteria: [''], terms: '', needEvidenceReferences: [] })
-  async function create(event: FormEvent) { event.preventDefault(); if (busy || !file) return; setBusy(true); setError(''); try {
-    const draft = await createHedRequestDraft(campaignId, form); await uploadHedRequestEvidence(campaignId, draft.id, 'QUOTE', file); await cache.invalidateQueries({ queryKey: key }); setFile(null)
-  } catch (cause) { setError(getErrorMessage(cause)) } finally { setBusy(false) } }
+  const maxRequestAmount = BigInt(goal || '0') / 4n
+  async function create(event: FormEvent) {
+    event.preventDefault(); if (busy || !file) return; setError('')
+    const amountVal = BigInt(form.amount || '0')
+    if (amountVal <= 0n) { setError('Số tiền giải ngân phải lớn hơn 0.'); return }
+    if (amountVal > maxRequestAmount) { setError(`Số tiền đề nghị giải ngân vượt quá 25% Request Hard Cap (tối đa ${maxRequestAmount.toString()} base units).`); return }
+    setBusy(true); try {
+      const draft = await createHedRequestDraft(campaignId, form); await uploadHedRequestEvidence(campaignId, draft.id, 'QUOTE', file); await cache.invalidateQueries({ queryKey: key }); setFile(null)
+    } catch (cause) { setError(getErrorMessage(cause)) } finally { setBusy(false) }
+  }
   async function freeze(id: string) { if (busy) return; setBusy(true); setError(''); try { await freezeHedRequestDraft(campaignId, id); await cache.invalidateQueries({ queryKey: key }) } catch (cause) { setError(getErrorMessage(cause)) } finally { setBusy(false) } }
   async function publish(request: HedRequestDraftInput & { id: string; requestHash: string | null; onchainRequestId: string | null }) { if (busy || !request.requestHash || !account.address || !client || !wallet) return; setBusy(true); setError(''); try {
     const activity = activities.data?.find(value => value.id === request.activityId)
@@ -112,12 +139,16 @@ function HedRequestWorkspace({ campaignId, onchainCampaignId }: { campaignId: st
     if (!event || event.args.requestHash.toLowerCase() !== request.requestHash.toLowerCase() || event.args.amount !== BigInt(request.amount)) throw new Error('Receipt không chứa RequestSubmitted đúng hash và amount.')
     await registerHedOnchainRequest(campaignId, request.id, String(event.args.requestId)); await cache.invalidateQueries({ queryKey: key })
   } catch (cause) { setError(getErrorMessage(cause)) } finally { setBusy(false) } }
-  return <section className="panel"><h3>Yêu cầu giải ngân</h3><p>Đề xuất dự toán đợt chi. Tiền giải ngân được chuyển trực tiếp vào ví tổ chức khi Resolver phê duyệt; tổ chức sau đó nộp chứng từ/hóa đơn thực chi.</p>
+  return <section className="panel"><h3>Yêu cầu giải ngân (Flow 2 & 3)</h3><p>Đề xuất dự toán đợt chi. Tiền giải ngân được chuyển trực tiếp vào ví tổ chức khi Resolver phê duyệt; tổ chức sau đó nộp chứng từ/hóa đơn thực chi.</p>
+    <div className="panel" style={{ background: '#f8fafc', borderLeft: '4px solid #10b981', margin: '0.75rem 0' }}>
+      <p style={{ margin: 0 }}><strong>Kiểm soát rủi ro Financial Exposure (25% Request Hard Cap = {maxRequestAmount.toString()} base units):</strong></p>
+      <p className="muted" style={{ margin: '0.25rem 0 0 0' }}>Mỗi Funding Request tối đa 25% Goal. Tiền giải ngân chuyển trực tiếp vào ví tổ chức khi Resolver duyệt (Flow 2). Đợt trước phải hoàn tất đối chiếu chi tiêu (Financially Settled - Flow 3) trước khi mở request tiếp theo.</p>
+    </div>
     {error && <p className="toast toast--error" role="alert">{error}</p>}
     {requests.data?.map(request => <HedRequestEntry key={request.id} request={request} campaignMetadataId={campaignId} campaignId={onchainCampaignId} onFreeze={() => void freeze(request.id)} onPublish={() => void publish(request)} busy={busy} walletReady={Boolean(account.address)} />)}
     {!activities.data?.some(activity => activity.onchainActivityId !== null) ? <p role="status">Tạo, chốt và publish activity trước khi lập request.</p> : <form className="hed-plan-form" onSubmit={create}>
       <label>Activity đã khóa<select required value={form.activityId} onChange={e => setForm(v => ({ ...v, activityId: e.target.value }))}><option value="">Chọn activity đã publish</option>{activities.data.filter(activity => activity.onchainActivityId !== null).map(activity => <option key={activity.id} value={activity.id}>{activity.title} · chain #{activity.onchainActivityId}</option>)}</select></label><label>Mục đích chi<textarea required value={form.purpose} onChange={e => setForm(v => ({ ...v, purpose: e.target.value }))} /></label>
-      <label>Hạng mục chi (Line item)<input required value={form.itemLines[0].description} onChange={e => setForm(v => ({ ...v, itemLines: [{ ...v.itemLines[0], description: e.target.value }] }))} /></label><label>Số tiền đề nghị giải ngân (base units MockUSDC)<input required inputMode="numeric" value={form.amount} onChange={e => setForm(v => ({ ...v, amount: e.target.value, itemLines: [{ ...v.itemLines[0], unitAmount: e.target.value }] }))} /></label>
+      <label>Hạng mục chi (Line item)<input required value={form.itemLines[0].description} onChange={e => setForm(v => ({ ...v, itemLines: [{ ...v.itemLines[0], description: e.target.value }] }))} /></label><label>Số tiền đề nghị giải ngân (base units MockUSDC · tối đa 25% Goal: {maxRequestAmount.toString()})<input required inputMode="numeric" value={form.amount} onChange={e => setForm(v => ({ ...v, amount: e.target.value, itemLines: [{ ...v.itemLines[0], unitAmount: e.target.value }] }))} /></label>
       <label>Dự kiến hoàn thành chi tiêu<input required type="datetime-local" onChange={e => setForm(v => ({ ...v, expectedDeliveryAt: new Date(e.target.value).toISOString() }))} /></label><label>Tiêu chí nghiệm thu/chứng từ dự kiến<textarea required value={form.acceptanceCriteria[0]} onChange={e => setForm(v => ({ ...v, acceptanceCriteria: [e.target.value] }))} /></label><label>Ghi chú/Điều khoản<textarea required value={form.terms} onChange={e => setForm(v => ({ ...v, terms: e.target.value }))} /></label><label>Báo giá hoặc hồ sơ dự toán private<input required type="file" accept="application/pdf,image/png,image/jpeg" onChange={e => setFile(e.target.files?.[0] ?? null)} /></label>
       <button className="button button--primary" disabled={busy || !file} type="submit">{busy ? 'Đang lưu…' : 'Tạo request và upload dự toán'}</button></form>}
   </section>

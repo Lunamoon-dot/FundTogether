@@ -2,6 +2,27 @@
 
 > **Updated:** 2026-10-12
 
+## 2026-10-12 — Verification-First integration plan complete: Dual-exposure limits (25% Request Cap & 50% Outcome Exposure Cap) verified
+
+- DONE (Specification & Planning):
+  - Created `docs/verification-integration-plan.md` executing the 5-step integration plan for Verification-Centric MVP.
+  - Hardened `docs/verification-first-disbursement-spec.md` with mathematical risk formulas for Financial Exposure ($\le 25\%$) and Outcome Exposure ($\le 50\%$), evidence taxonomy (VAT, non-VAT, local procurement, cash relief), PII redaction rules, Resolver backup mechanisms, and fiat off-ramp caveats.
+- DONE (Smart Contracts):
+  - In `FundTogetherDisbursement.sol`: enforced 25% Request Hard Cap (`amount <= goal / 4`) on `submitRequest`. Combined with `ceiling <= goal / 2` on `createActivity` and `hasOpenActivity` mutex, this mathematically bounds unverified disbursements at 50% of campaign goal.
+  - In `contracts/test/unit/Disbursement/FundingAndReservation.t.sol`: added explicit regression tests:
+    - `test_revertWhenRequestExceeds25PercentHardCap`
+    - `test_revertWhenDisbursementExceedsOutcomeExposureBeforeOutcomeVerification`
+    - `test_outcomeVerificationUnlocksSubsequentDisbursements`
+  - Evidence: `forge test` in WSL Ubuntu-24.04: 25/25 tests PASS (0 failures, including 256-run custody fuzzing).
+- DONE (Backend):
+  - Deterministic artifacts regenerated via `generate-artifacts.cjs` (`artifact-contract.test.cjs`: 4/4 PASS).
+  - Verified backend build (`nest build`: PASS) and test suite (`npm run test:hed`: 8/8 suites, 13/13 tests PASS).
+  - Journey smoke test fixture `journey-smoke.cjs` updated to 4B goal with 3-arg `approveAndDisburse`.
+- DONE (Frontend):
+  - In `HedOrganizationCampaigns.tsx`: added 4-stage Verification Overview panel, enforced 25% Request Cap and 50% Outcome Exposure Cap validations and explanatory risk banners.
+  - In `HedReviewPage.tsx`: transitioned contract calls and event listeners to `approveAndDisburse` (`RequestApprovedAndDisbursed`) and `candidateExpenditure` (`ExpenditureCandidate`), reflecting Flow 2 (Budget Verification) and Flow 3 (Expenditure Verification).
+  - Verified frontend build (`tsc -b && vite build`: PASS) and lint (`oxlint`: 0 errors, 0 warnings).
+
 ## 2026-10-12 — Verification-Centric disbursement direction and implementation complete
 
 - DONE (Documentation): User decided to eliminate Web3 Vendor entity, disburse directly to Organizer, and structure the system around 4 verification flows (Organization, Campaign & Budget, Post-spend Financial Invoices, and Outcome Handover). Resolver is designated as the primary verifier for approving disbursement in the current build phase. Extensible architecture preserved for future vendor re-integration.

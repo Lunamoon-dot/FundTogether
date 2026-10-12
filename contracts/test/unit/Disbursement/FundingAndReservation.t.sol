@@ -16,36 +16,36 @@ contract HedFundingAndReservationTest is Test {
     function setUp() public {
         token = new MockUSDC();
         disbursement = new FundTogetherDisbursement(address(token), resolver, backupResolver, keccak256("hed-mvp-1"));
-        token.mint(donor, 4_000e6);
+        token.mint(donor, 8_000e6);
         vm.prank(donor);
         token.approve(address(disbursement), type(uint256).max);
     }
 
     function test_fullFundingDisbursesExactAmountToOrganizerUponResolverApproval() public {
         vm.prank(organizer);
-        uint256 campaignId = disbursement.createCampaign(keccak256("campaign"), 2_000e6, 1 days);
+        uint256 campaignId = disbursement.createCampaign(keccak256("campaign"), 4_000e6, 1 days);
         vm.prank(donor);
-        disbursement.donate(campaignId, 2_000e6);
+        disbursement.donate(campaignId, 4_000e6);
         vm.prank(resolver);
         disbursement.activateCampaign(campaignId, keccak256("eligibility"));
         vm.prank(organizer);
-        disbursement.createActivity(campaignId, keccak256("activity"), 1_000e6);
+        disbursement.createActivity(campaignId, keccak256("activity"), 2_000e6);
         vm.prank(organizer);
         uint256 requestId = disbursement.submitRequest(campaignId, 0, keccak256("request"), organizer, 1_000e6);
         vm.prank(resolver);
         disbursement.approveAndDisburse(campaignId, requestId, keccak256("request"));
         T.CampaignView memory campaign = disbursement.campaign(campaignId);
         T.RequestView memory request = disbursement.request(campaignId, requestId);
-        assertEq(campaign.available, 1_000e6);
+        assertEq(campaign.available, 3_000e6);
         assertEq(campaign.grossPaid, 1_000e6);
         assertEq(request.grossPaid, 1_000e6);
         assertEq(token.balanceOf(organizer), 1_000e6);
-        assertEq(token.balanceOf(address(disbursement)), 1_000e6);
+        assertEq(token.balanceOf(address(disbursement)), 3_000e6);
     }
 
     function testFuzz_disbursementKeepsExactCustody(uint96 rawGoal, uint96 rawRequest) public {
-        uint256 goal = bound(uint256(rawGoal), 2e6, 2_000e6);
-        uint256 requestAmount = bound(uint256(rawRequest), 1, goal / 2);
+        uint256 goal = bound(uint256(rawGoal), 4e6, 4_000e6);
+        uint256 requestAmount = bound(uint256(rawRequest), 1, goal / 4);
         token.mint(donor, goal);
         vm.prank(organizer);
         uint256 campaignId = disbursement.createCampaign(keccak256("fuzz-campaign"), goal, 1 days);
@@ -285,11 +285,11 @@ contract HedFundingAndReservationTest is Test {
         disbursement.startWindDown(campaignId);
         T.CampaignView memory campaign = disbursement.campaign(campaignId);
         assertEq(uint256(campaign.state), uint256(T.CampaignState.STOPPED));
-        assertEq(campaign.basePool, 2_000e6);
+        assertEq(campaign.basePool, 4_000e6);
         uint256 before = token.balanceOf(donor);
         vm.prank(donor);
         disbursement.claimRefund(campaignId);
-        assertEq(token.balanceOf(donor), before + 2_000e6);
+        assertEq(token.balanceOf(donor), before + 4_000e6);
     }
 
     function test_lateOrganizerReturnAfterWindDownBecomesClaimableSupplementWithoutReopeningCampaign() public {
@@ -302,12 +302,12 @@ contract HedFundingAndReservationTest is Test {
         vm.prank(organizer);
         disbursement.returnFunds(campaignId, requestId, 200e6);
         T.CampaignView memory beforeClaim = disbursement.campaign(campaignId);
-        assertEq(beforeClaim.basePool, 1_000e6);
+        assertEq(beforeClaim.basePool, 3_000e6);
         assertEq(beforeClaim.supplementPool, 200e6);
         uint256 before = token.balanceOf(donor);
         vm.prank(donor);
         disbursement.claimRefund(campaignId);
-        assertEq(token.balanceOf(donor), before + 1_200e6);
+        assertEq(token.balanceOf(donor), before + 3_200e6);
         assertEq(uint256(disbursement.campaign(campaignId).state), uint256(T.CampaignState.STOPPED));
     }
 
@@ -361,24 +361,61 @@ contract HedFundingAndReservationTest is Test {
         assertEq(uint256(disbursement.request(campaignId, requestId).state), uint256(T.RequestState.CANCELLED));
     }
 
-    function test_requestAmountCannotExceedActivityCeiling() public {
+    function test_revertWhenRequestExceeds25PercentHardCap() public {
         uint256 campaignId = _activeCampaign();
+        vm.expectRevert(FundTogetherDisbursement.InvalidInput.selector);
         vm.prank(organizer);
-        uint256 overCap = disbursement.submitRequest(campaignId, 0, keccak256("over-cap"), organizer, 1_001e6);
+        disbursement.submitRequest(campaignId, 0, keccak256("over-cap"), organizer, 1_001e6);
+    }
+
+    function test_revertWhenDisbursementExceedsOutcomeExposureBeforeOutcomeVerification() public {
+        uint256 campaignId = _activeCampaign();
+        _settleRequest(campaignId, 1_000e6, keccak256("req-1"));
+        _settleRequest(campaignId, 1_000e6, keccak256("req-2"));
+
+        vm.expectRevert(FundTogetherDisbursement.WrongState.selector);
+        vm.prank(organizer);
+        disbursement.createActivity(campaignId, keccak256("activity-2"), 1_000e6);
+
+        vm.prank(organizer);
+        uint256 req3 = disbursement.submitRequest(campaignId, 0, keccak256("req-3"), organizer, 500e6);
         vm.expectRevert(FundTogetherDisbursement.InvalidInput.selector);
         vm.prank(resolver);
-        disbursement.approveAndDisburse(campaignId, overCap, keccak256("over-cap"));
+        disbursement.approveAndDisburse(campaignId, req3, keccak256("req-3"));
+    }
+
+    function test_outcomeVerificationUnlocksSubsequentDisbursements() public {
+        uint256 campaignId = _activeCampaign();
+        _settleRequest(campaignId, 1_000e6, keccak256("req-1"));
+        _settleRequest(campaignId, 1_000e6, keccak256("req-2"));
+
+        vm.prank(resolver);
+        disbursement.candidateOutcome(campaignId, 0, keccak256("outcome-0"));
+        vm.warp(block.timestamp + 3 days);
+        vm.prank(resolver);
+        disbursement.verifyOutcome(campaignId, 0, keccak256("outcome-0"));
+        assertEq(uint256(disbursement.activity(campaignId, 0).state), uint256(T.ActivityState.VERIFIED));
+
+        vm.prank(organizer);
+        uint256 act1 = disbursement.createActivity(campaignId, keccak256("activity-1"), 2_000e6);
+        assertEq(act1, 1);
+
+        vm.prank(organizer);
+        uint256 req3 = disbursement.submitRequest(campaignId, 1, keccak256("req-3"), organizer, 1_000e6);
+        vm.prank(resolver);
+        disbursement.approveAndDisburse(campaignId, req3, keccak256("req-3"));
+        assertEq(disbursement.request(campaignId, req3).grossPaid, 1_000e6);
     }
 
     function _activeCampaign() private returns (uint256 campaignId) {
         vm.prank(organizer);
-        campaignId = disbursement.createCampaign(keccak256("campaign"), 2_000e6, 1 days);
+        campaignId = disbursement.createCampaign(keccak256("campaign"), 4_000e6, 1 days);
         vm.prank(donor);
-        disbursement.donate(campaignId, 2_000e6);
+        disbursement.donate(campaignId, 4_000e6);
         vm.prank(resolver);
         disbursement.activateCampaign(campaignId, keccak256("eligibility"));
         vm.prank(organizer);
-        disbursement.createActivity(campaignId, keccak256("activity"), 1_000e6);
+        disbursement.createActivity(campaignId, keccak256("activity"), 2_000e6);
     }
 
     function _settleRequest(uint256 campaignId, uint256 amount, bytes32 requestHash) private returns (uint256 requestId) {

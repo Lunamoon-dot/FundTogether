@@ -222,7 +222,7 @@ contract FundTogetherDisbursement is ReentrancyGuard {
         T.CampaignView storage c = _campaign(campaignId);
         if (msg.sender != c.organizer) revert WrongCaller();
         if (recipient == address(0) || recipient != c.organizer) revert InvalidInput();
-        if (c.state != T.CampaignState.ACTIVE || requestHash == bytes32(0) || amount == 0) revert InvalidInput();
+        if (c.state != T.CampaignState.ACTIVE || requestHash == bytes32(0) || amount == 0 || amount > c.goal / 4) revert InvalidInput();
         if (hasOpenRequest[campaignId]) revert WrongState();
         if (activityId >= activityCount[campaignId]) revert InvalidReference();
         if (_activities[campaignId][activityId].state != T.ActivityState.OPEN) revert WrongState();
