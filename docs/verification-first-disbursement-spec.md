@@ -56,25 +56,29 @@ Hệ thống vận hành xoay quanh 4 mắt xích xác thực độc lập nhưn
 * **Người duyệt:** RESOLVER.
 * **Đóng băng on-chain:** Toàn bộ nội dung cam kết được băm SHA-256 (`commitmentHash`) và lưu vào smart contract khi chiến dịch được duyệt. Không ai có thể âm thầm sửa đổi mục đích sau khi đã mở gây quỹ.
 
-### 3.3. Chặng 3: Xác thực Chứng từ Chi tiêu (Post-Disbursement Financial Verification)
+#### 3.3. Chặng 3: Xác thực Chứng từ Chi tiêu (Post-Disbursement Financial Verification)
 * **Mục tiêu:** Kiểm tra từng đồng tiền giải ngân có thực sự được chi đúng danh mục dự toán hay bị chiếm dụng.
+* **Nguyên tắc phân loại chứng từ (Evidence Taxonomy):** Không bắt buộc cứng nhắc mọi khoản chi từ thiện đều phải có hóa đơn VAT điện tử, mà phân loại theo thực tế hoạt động:
+  * *Hàng hóa quy mô lớn (đại lý/doanh nghiệp):* Hóa đơn điện tử VAT (kèm mã tra cứu) + Ủy nhiệm chi/Sao kê ngân hàng khớp số tiền và bên thụ hưởng.
+  * *Nông sản/Hàng hóa mua lẻ tại địa phương:* Bảng kê thu mua hàng hóa dịch vụ không có hóa đơn (Mẫu 01/TNDN) + Ảnh chụp cân hàng/biên nhận viết tay + Sao kê rút tiền mặt/chuyển khoản cho tiểu thương.
+  * *Vận chuyển, bốc xếp, lưu kho:* Phiếu thu/Hợp đồng vận chuyển + Ảnh biển số xe chở hàng + Sao kê chuyển khoản nhà xe.
+  * *Cứu trợ tiền mặt trực tiếp:* Danh sách ký nhận của từng hộ dân (có xác nhận chính quyền địa phương) + Video/ảnh phát tiền có gắn thời gian GPS.
+* **Nguyên tắc bảo vệ dữ liệu nhạy cảm (PII Redaction):**
+  * Hồ sơ gốc đầy đủ thông tin (CCCD, số tài khoản, số điện thoại) lưu tại kho lưu trữ bảo mật riêng tư (Private Storage).
+  * Hồ sơ công khai đưa mã băm lên on-chain (Public Hash) bắt buộc phải che/làm mờ thông tin định danh cá nhân nhạy cảm để bảo vệ người thụ hưởng và người bán.
 * **Quy trình 3 bước:**
-  1. **Tạo Request & Nhận tiền:** Organizer tạo `FundingRequest` gồm các dòng chi phí (line items) $\rightarrow$ Resolver thẩm định dự toán $\rightarrow$ Resolver kích hoạt lệnh giải ngân on-chain $\rightarrow$ Smart contract chuyển 100% số tiền của Request đó về ví `organizerWallet`.
-  2. **Chi tiêu & Nộp chứng từ:** Organizer rút tiền/chuyển khoản để mua sắm ngoài đời $\rightarrow$ Nộp **Hồ sơ chứng từ tài chính** gồm:
-     * Hóa đơn VAT điện tử (kèm mã tra cứu hóa đơn) hoặc hóa đơn bán lẻ/phiếu thu hợp lệ.
-     * Sao kê/ủy nhiệm chi ngân hàng khớp số tiền và người nhận trên hóa đơn.
-     * Bảng kê hàng hóa thực tế đã nhận.
-     * Nếu chi tiêu ít hơn số tiền đã nhận: Nộp lệnh hoàn trả tiền dôi dư vào Escrow (`returnUnused`).
-  3. **Thẩm định & Quyết toán:** Resolver kiểm tra hóa đơn (tra cứu mã số thuế, kiểm tra trùng lặp) $\rightarrow$ Nếu hợp lệ: Đánh dấu `FINANCIALLY_SETTLED`.
-* **Quy tắc an toàn sống còn:** **Chỉ khi Request hiện tại đã `FINANCIALLY_SETTLED`, Organizer mới được phép tạo hoặc nhận tiền cho Request tiếp theo.**
+  1. **Tạo Request & Nhận tiền:** Organizer tạo `FundingRequest` gồm các dòng chi phí ($\le 25\%$ Goal) $\rightarrow$ Resolver thẩm định dự toán $\rightarrow$ Resolver kích hoạt lệnh giải ngân on-chain $\rightarrow$ Smart contract chuyển 100% số tiền của Request đó về ví `organizerWallet`.
+  2. **Chi tiêu & Nộp chứng từ:** Organizer rút tiền/chuyển khoản để mua sắm ngoài đời $\rightarrow$ Nộp **Hồ sơ chứng từ tài chính** theo danh mục quy định ở trên. Nếu chi tiêu ít hơn số tiền đã nhận ($V_{\text{actual}} < Q_{\text{disbursed}}$), nộp kèm giao dịch hoàn tiền thừa vào Escrow (`returnFunds`).
+  3. **Thẩm định & Quyết toán:** Resolver kiểm tra tính hợp lệ và đối chiếu số tiền $\rightarrow$ Đạt yêu cầu thì mở cửa sổ 3 ngày phản biện $\rightarrow$ Nếu không có tranh chấp thì chuyển trạng thái thành `FINANCIALLY_SETTLED`.
+* **Quy tắc an toàn sống còn:** **Chỉ khi Request hiện tại đã `FINANCIALLY_SETTLED`, Organizer mới được phép tạo hoặc nhận tiền cho Request tiếp theo (Single In-Flight Constraint).**
 
 ### 3.4. Chặng 4: Xác thực Kết quả Thiện nguyện (Outcome / Impact Verification)
-* **Mục tiêu:** Tách bạch việc "đã mua hàng" với việc "hàng đã đến tay người nghèo".
+* **Mục tiêu:** Tách bạch việc "đã mua hàng" với việc "hàng đã đến tay người thụ hưởng". Xác minh chi tiêu không đồng nghĩa xác minh kết quả.
 * **Hồ sơ nộp sau khi trao quà:**
   * Biên bản bàn giao/tiếp nhận quà có chữ ký, họ tên và con dấu xác nhận của chính quyền cơ sở (UBND xã, Mặt trận Tổ quốc, Hội chữ thập đỏ hoặc Ban giám hiệu trường học).
   * Danh sách ký nhận của các hộ dân/người thụ hưởng.
   * Ảnh/video buổi trao quà (có siêu dữ liệu ngày giờ, tọa độ GPS).
-* **Thẩm định:** Resolver đối chiếu số lượng quà thực trao với KPI đã cam kết ở Chặng 2 $\rightarrow$ Đạt thì chuyển Activity thành `VERIFIED`.
+* **Thẩm định:** Resolver đối chiếu số lượng quà thực trao với KPI đã cam kết ở Chặng 2 $\rightarrow$ Đạt thì chuyển Activity thành `OUTCOME_CANDIDATE` (mở 3 ngày challenge) $\rightarrow$ Hết thời hạn mà không có khiếu nại thì chuyển Activity thành `VERIFIED`.
 
 ---
 
@@ -94,44 +98,58 @@ DRAFT → SUBMITTED
           ├─ NEEDS_INFO (yêu cầu sửa/bổ sung dự toán)
           └─ APPROVED_DISBURSED (tiền chuyển vào ví Organizer)
                ↓ Organizer đi mua sắm và nộp chứng từ
-             EXPENDITURE_SUBMITTED 
-               ├─ NEEDS_INFO (bổ sung hóa đơn/sao kê)
+             EXPENDITURE_CANDIDATE (mở 3 ngày Donor challenge)
+               ├─ CHALLENGED (Donor khiếu nại) → DISPUTED (Resolver/Backup xử lý)
                └─ FINANCIALLY_SETTLED (đối chiếu tài chính thành công)
-                    ↓ (hoặc phát hiện gian lận)
-                  DISPUTED → WIND_DOWN / STOPPED
 ```
 
 ### 4.3. Trạng thái Hoạt động / Kết quả (Activity Outcome Lifecycle)
 ```text
-OPEN → OUTCOME_SUBMITTED → PENDING_CHALLENGE (mở 3 ngày cho Donor xem)
-         ├─ CHALLENGED (Donor khiếu nại) → DISPUTED
-         └─ VERIFIED (kết quả thiện nguyện được công nhận)
+OPEN → OUTCOME_CANDIDATE (mở 3 ngày Donor challenge)
+         ├─ CHALLENGED (Donor khiếu nại) → DISPUTED (Resolver/Backup xử lý)
+         └─ VERIFIED (kết quả thiện nguyện được công nhận hoàn tất)
 ```
 
 ---
 
 ## 5. Các Quy tắc Tài chính & Bất biến Escrow (Financial Invariants)
 
-1. **Bảo toàn số dư Escrow:**
+1. **Bảo toàn số dư Escrow (Custody Conservation):**
    $$\text{TotalContributions} + \text{ActualReturns} = \text{GrossDisbursed} + \text{RefundsPaid} + \text{EscrowCustody}$$
-2. **Hạn mức mỗi đợt (Request Cap):**
-   Mỗi yêu cầu giải ngân không vượt quá trần quy định (khuyến nghị $\le 25\%$ tổng ngân sách chiến dịch $C$).
-3. **Cơ chế một khoản mở duy nhất (Single In-Flight Unsettled Request):**
-   Tại một thời điểm, toàn bộ chiến dịch chỉ được có tối đa 1 khoản tiền đã giải ngân nhưng chưa đối chiếu chứng từ.
-4. **Cơ chế hoàn trả tiền thừa (`returnUnused`):**
-   Nếu số tiền thực tế mua sắm $V_{\text{actual}} < Q_{\text{disbursed}}$, Organizer phải gọi hàm `returnUnused` chuyển khoản chênh lệch $(Q - V)$ về hợp đồng thông minh. Số tiền này tự động cộng lại vào `AvailableBalance`.
-5. **Cửa sổ phản biện (Donor Challenge Window):**
-   Khi Resolver đưa ra kết luận chấp thuận chứng từ hoặc kết quả, hệ thống mở một cửa sổ công khai (3 ngày). Trong thời gian này, bất kỳ Donor nào có đóng góp $> 0$ đều có quyền nộp bằng chứng khiếu nại để chặn bước tiếp theo nếu có dấu hiệu gian lận.
+2. **Hạn mức mỗi đợt (Request Hard Cap $\le 25\%$):**
+   Mỗi yêu cầu giải ngân không vượt quá trần quy định: $\text{amount} \le 25\% \times \text{Goal}$.
+3. **Phơi nhiễm tài chính đợt chi (Financial Exposure Cap $\le 25\%$):**
+   Tại một thời điểm, toàn bộ chiến dịch chỉ được có tối đa 1 khoản tiền đã giải ngân nhưng chưa đối chiếu chứng từ (Single in-flight unsettled request).
+4. **Phơi nhiễm kết quả thiện nguyện (Outcome Exposure Cap $\le 50\%$):**
+   $$\text{Outcome Exposure} = \sum_{\text{Activity chưa VERIFIED}} \text{approvedFunds} \le 50\% \times \text{Goal}$$
+   Không được phép giải ngân tiếp khi tổng chi tiêu tích lũy chưa có kết quả trao quà đạt $50\%$ ngân sách chiến dịch. Muốn mở tiếp hạn mức, Organizer bắt buộc phải hoàn thành và được nghiệm thu ít nhất một hoạt động thiện nguyện (`activity.state == VERIFIED`).
+5. **Cơ chế hoàn trả tiền thừa (`returnFunds`):**
+   Nếu số tiền thực tế mua sắm $V_{\text{actual}} < Q_{\text{disbursed}}$, Organizer gọi hàm `returnFunds` nộp lại token thừa vào hợp đồng. Số tiền này tự động cộng lại vào `availablePool` (hoặc `supplementPool` nếu chiến dịch đã wind-down).
+6. **Cửa sổ phản biện (Donor Challenge Window = 3 ngày):**
+   Khi Resolver chấp thuận chứng từ chi tiêu hoặc kết quả thiện nguyện, hệ thống mở thời hạn 3 ngày on-chain. Donor đã góp quỹ có quyền nộp hash lý do để đóng băng tiến trình nếu có dấu hiệu gian lận.
 
 ---
 
-## 6. Kế hoạch Dọn dẹp Mã nguồn (Code Cleanup Scope)
+## 6. Quản trị Rủi ro Resolver & Ranh giới Chuyển đổi Fiat
+
+### 6.1. Giám sát và Giải quyết Khiếu nại Resolver
+* **Minh bạch căn cứ:** Mọi quyết định phê duyệt của Resolver phải ghi nhận Rubric ID, lý do giải trình, hash chứng từ, nhãn thời gian và danh tính người duyệt.
+* **Cơ chế Backup Resolver:** Tránh để Primary Resolver là bên phán quyết duy nhất khi bị Donor khiếu nại. Nếu Primary Resolver quá hạn thẩm định (`PRIMARY_REVIEW_WINDOW`) hoặc có tranh chấp, Backup Resolver được quyền tiếp quản để đưa ra quyết định độc lập.
+
+### 6.2. Ranh giới Thế giới thực & Off-ramp Fiat (Luận cứ NCKH)
+* **Giới hạn Blockchain:** Smart contract chỉ giám sát dòng tiền token trên chuỗi (từ Escrow sang ví Organizer). Việc chuyển đổi USDC sang VNĐ và chi tiêu qua ngân hàng thương mại là giao dịch ngoài chuỗi.
+* **Tính chất của bằng chứng:** Hóa đơn và sao kê ngân hàng là căn cứ đối chiếu pháp lý ngoài chuỗi (Audit Trail), không phải bằng chứng tự sinh từ thuật toán blockchain.
+* **Giới hạn thu hồi quỹ:** Hợp đồng chỉ thu hồi được token khi Organizer nộp lại vào Escrow; hệ thống không thể tự trích tiền từ tài khoản ngân hàng của Organizer. Điểm này cần tuyên bố minh bạch trong tài liệu nghiên cứu và giao diện người dùng.
+
+---
+
+## 7. Kế hoạch Dọn dẹp Mã nguồn (Code Cleanup Scope)
 
 1. **Smart Contracts (`contracts/`):**
    * Trong `FundTogetherDisbursement.sol`:
      * Bỏ tham số `vendor`, bỏ hàm `acknowledgeVendor`, bỏ trạng thái `VENDOR_COMMITTED`.
      * Cập nhật hàm `disburse`: Chuyển tiền thẳng tới `campaign.organizerWallet`.
-     * Tinh gọn thành 2 bước nghiệm thu: `settleExpenditure` (chứng từ chi) và `verifyOutcome` (kết quả trao quà).
+     * Tinh gọn thành 2 bước nghiệm thu: `candidateExpenditure` / `finalizeExpenditure` (chứng từ chi) và `candidateOutcome` / `verifyOutcome` (kết quả trao quà).
      * Bỏ chia tách cọc/final; giải ngân đúng số tiền được phê duyệt của Request.
 2. **Backend (`backend/`):**
    * Xóa các controller/service không còn dùng: `HedVendorVerificationController`, `HedVendorController`, `HedCampaignVendorController`.
