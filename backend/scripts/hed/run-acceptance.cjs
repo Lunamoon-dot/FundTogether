@@ -19,6 +19,7 @@ run(process.execPath, [npmCli, 'run', 'build'], backend);
 run(process.execPath, [npmCli, 'run', 'test:hed'], backend);
 run(process.execPath, [npmCli, '--prefix', 'frontend', 'run', 'build'], root);
 run(process.execPath, [npmCli, 'run', 'smoke:hed'], backend);
+run(process.execPath, [npmCli, 'run', 'smoke:hed:scenarios'], backend);
 run(process.execPath, [npmCli, 'run', 'smoke:hed:reorg'], backend);
 run(process.execPath, ['scripts/hed/acceptance-report.test.cjs'], backend);
 console.log(JSON.stringify({ protocol: 'HED-MVP-1', status: 'local_acceptance_passed', host: os.hostname() }));

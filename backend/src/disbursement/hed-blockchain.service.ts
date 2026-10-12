@@ -4,7 +4,7 @@ import type { Abi } from "viem";
 import generatedAbi = require("../blockchain/generated/hed/fund-together-disbursement.abi.json");
 import tokenAbi = require("../blockchain/generated/hed/mock-usdc.abi.json");
 import { HED_ACTIVITY_STATES, HED_CAMPAIGN_STATES, HED_DEPLOYMENT, HED_REQUEST_STATES } from "./hed.types";
-import type { HedCampaignSnapshot, HedCampaignView, HedDeployment, HedRequestView, HedActivityView } from "./hed.types";
+import type { HedCampaignSnapshot, HedCampaignView, HedDeployment, HedRequestView, HedActivityView, HedRiskProjection } from "./hed.types";
 import { backendRoot } from "../backend-root";
 import { resolve } from "node:path";
 
@@ -15,6 +15,65 @@ function label<T extends string>(labels: readonly T[], index: unknown): T {
   const value = labels[Number(index)];
   if (value === undefined) throw new Error("Unknown HED state");
   return value;
+}
+
+export function computeHedRiskProjection(
+  campaign: HedCampaignView,
+  activities: readonly HedActivityView[],
+  requests: readonly HedRequestView[],
+): HedRiskProjection {
+  const goal = BigInt(campaign.goal || 0);
+  const maxRequestCap = goal > 0n ? (goal / 4n).toString() : "0";
+  const financialExposureLimit = maxRequestCap;
+  const outcomeExposureLimit = goal > 0n ? (goal / 2n).toString() : "0";
+
+  let financialExposureBigInt = 0n;
+  let hasOpenRequest = false;
+  for (const r of requests) {
+    if (r.state === "SUBMITTED" || r.state === "APPROVED_DISBURSED" || r.state === "EXPENDITURE_CANDIDATE") {
+      hasOpenRequest = true;
+    }
+    if (r.state === "APPROVED_DISBURSED" || r.state === "EXPENDITURE_CANDIDATE") {
+      const gross = BigInt(r.grossPaid || 0);
+      const ret = BigInt(r.returned || 0);
+      financialExposureBigInt += gross > ret ? gross - ret : 0n;
+    }
+  }
+
+  let outcomeExposureBigInt = 0n;
+  let hasOpenActivity = false;
+  for (const a of activities) {
+    if (a.state === "OPEN" || a.state === "OUTCOME_CANDIDATE") {
+      hasOpenActivity = true;
+      outcomeExposureBigInt += BigInt(a.approved || 0);
+    }
+  }
+
+  const financialLimitBigInt = BigInt(financialExposureLimit);
+  const outcomeLimitBigInt = BigInt(outcomeExposureLimit);
+
+  const financialExposureRatioBps = financialLimitBigInt > 0n
+    ? Math.min(10000, Number((financialExposureBigInt * 10000n) / financialLimitBigInt))
+    : 0;
+
+  const outcomeExposureRatioBps = outcomeLimitBigInt > 0n
+    ? Math.min(10000, Number((outcomeExposureBigInt * 10000n) / outcomeLimitBigInt))
+    : 0;
+
+  const canCreateRequest = campaign.state === "ACTIVE" && !hasOpenRequest && hasOpenActivity;
+
+  return {
+    maxRequestCap,
+    financialExposure: financialExposureBigInt.toString(),
+    financialExposureLimit,
+    financialExposureRatioBps,
+    outcomeExposure: outcomeExposureBigInt.toString(),
+    outcomeExposureLimit,
+    outcomeExposureRatioBps,
+    hasOpenRequest,
+    hasOpenActivity,
+    canCreateRequest,
+  };
 }
 
 @Injectable()
@@ -68,8 +127,9 @@ export class HedBlockchainService implements OnModuleInit {
       await this.verifyDeployment();
       const after = await this.client.getBlock({ blockNumber });
       if (!before.hash || before.hash !== after.hash) throw new Error("HED checkpoint orphaned");
+      const riskProjection = computeHedRiskProjection(campaign, activities, requests);
       return { context: this.context, checkpoint: { blockNumber: blockNumber.toString(), blockHash: before.hash,
-        chainTimestamp: before.timestamp.toString() }, campaignId: id.toString(), campaign, activities, requests };
+        chainTimestamp: before.timestamp.toString() }, campaignId: id.toString(), campaign, activities, requests, riskProjection };
     } catch { throw new ServiceUnavailableException("HED canonical snapshot unavailable"); }
   }
 }

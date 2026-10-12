@@ -41,7 +41,19 @@ export interface HedRequestView {
   expenditureReportHash: Hex; deliveryReportHash?: Hex;
   challengeEnd: string; state: typeof HED_REQUEST_STATES[number];
 }
+export interface HedRiskProjection {
+  maxRequestCap: string;
+  financialExposure: string;
+  financialExposureLimit: string;
+  financialExposureRatioBps: number;
+  outcomeExposure: string;
+  outcomeExposureLimit: string;
+  outcomeExposureRatioBps: number;
+  hasOpenRequest: boolean;
+  hasOpenActivity: boolean;
+  canCreateRequest: boolean;
+}
 export interface HedCampaignSnapshot {
   context: HedContext; checkpoint: HedCheckpoint; campaignId: string; campaign: HedCampaignView;
-  activities: HedActivityView[]; requests: HedRequestView[];
+  activities: HedActivityView[]; requests: HedRequestView[]; riskProjection: HedRiskProjection;
 }

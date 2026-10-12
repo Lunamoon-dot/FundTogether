@@ -12,7 +12,7 @@ async function main() {
   const { disbursement, token } = artifacts(root), client = createPublicClient({ chain, transport: http(manifest.rpcUrl) });
   await verifyDeployment(client, manifest, disbursement.abi, token.abi);
   const accounts = await client.request({ method: 'eth_accounts' });
-  assert.ok(accounts.length >= 4, 'local HED Anvil needs primary, backup, donor and vendor accounts');
+  assert.ok(accounts.length >= 4, 'local HED Anvil needs primary, backup, donor and organizer accounts');
   const wallet = index => createWalletClient({ account: accounts[index], chain, transport: http(manifest.rpcUrl) });
   const send = async (index, abi, address, functionName, args) => {
     const hash = await wallet(index).writeContract({ abi, address, functionName, args });
@@ -71,6 +71,10 @@ async function main() {
   assert.equal(indexed.activities[0].outcomeReportHash, outcomeReportHash);
   assert.equal(indexed.requests[0].expenditureReportHash, expenditureReportHash);
   assert.equal(indexed.requests[1].expenditureReportHash, transportReportHash);
-  console.log(JSON.stringify({ campaignId: campaignId.toString(), purchasePaid: purchase.toString(), transportPaid: transport.toString(), outcomeState: 'VERIFIED', indexedBlock: indexed.checkpoint.blockNumber }));
+  assert.ok(indexed.riskProjection, 'indexed snapshot must include riskProjection');
+  assert.equal(indexed.riskProjection.financialExposure, '0');
+  assert.equal(indexed.riskProjection.outcomeExposure, '0');
+  assert.equal(indexed.riskProjection.maxRequestCap, '1000000000');
+  console.log(JSON.stringify({ campaignId: campaignId.toString(), purchasePaid: purchase.toString(), transportPaid: transport.toString(), outcomeState: 'VERIFIED', indexedBlock: indexed.checkpoint.blockNumber, riskProjection: indexed.riskProjection }));
 }
 main().catch(error => { console.error(error.stack || error.message); process.exitCode = 1; });

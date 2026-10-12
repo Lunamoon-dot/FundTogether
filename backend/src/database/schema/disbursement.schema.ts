@@ -7,7 +7,7 @@ import type { HedCampaignSnapshot } from "../../disbursement/hed.types";
 import type { HedCampaignDraftInput } from "../../disbursement/hed-campaign-draft.schema";
 import type { HedRequestDraftInput } from "../../disbursement/hed-request-draft.schema";
 import type { HedActivityInput } from "../../disbursement/hed-activity.schema";
-import type { HedVendorVerificationInput } from "../../disbursement/hed-vendor-verification.schema";
+type HedVendorVerificationInput = Record<string, unknown>;
 import type { HedReviewInput } from "../../disbursement/hed-review.schema";
 import type { HedEvidencePackage } from "../../disbursement/hed-evidence-package.schema";
 

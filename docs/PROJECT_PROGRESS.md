@@ -2,7 +2,37 @@
 
 > **Updated:** 2026-10-12
 
-## 2026-10-12 — Verification-First integration plan complete: Dual-exposure limits (25% Request Cap & 50% Outcome Exposure Cap) verified
+## 2026-10-12 — Vendor runtime purge, dual-exposure risk projections, and 6-scenario E2E test suite complete
+
+- DONE (Runtime Vendor Clean-up):
+  - Completely purged dead Vendor entities from runtime without destroying historical database tables:
+    - Removed backend vendor controllers, services, and schemas (`HedCampaignVendorController`, `HedVendorController`, `HedVendorService`, `HedVendorVerificationController`, `HedVendorVerificationService`, `HedVendorVerificationSchema`).
+    - Removed frontend vendor components (`HedVendorRequests.tsx`, `HedVendorVerification.tsx`), routes (`#/vendor`), and navigation menus (`Vendor HED · ADMIN`).
+    - Purged `vendorVerificationId` and vendor options from `HedRequestDraftInput`, `HedRequestDraftService`, and API layer.
+    - Cleaned vendor comments and strings across test fixtures (`journey-smoke.cjs`).
+- DONE (Dual-Exposure Risk Projection & Interactive Risk Meter):
+  - Added `HedRiskProjection` data contract (`maxRequestCap`, `financialExposure`, `financialExposureLimit`, `financialExposureRatioBps`, `outcomeExposure`, `outcomeExposureLimit`, `outcomeExposureRatioBps`, `hasOpenRequest`, `hasOpenActivity`, `canCreateRequest`) to backend types and frontend API types.
+  - Implemented `computeHedRiskProjection` in `HedBlockchainService.snapshot()` and indexed campaign projections in `disbursementCampaignProjection`.
+  - Added unit test suite `backend/src/disbursement/hed-risk-projection.spec.ts` (4/4 tests PASS). Total backend HED tests: 9 suites, 17 tests PASS.
+  - Added interactive visual **Risk Meter** in `frontend/src/features/explore/HedPublicCampaign.tsx` rendering progress bars and real-time limits for Financial Exposure ($\le 25\%$) and Outcome Exposure ($\le 50\%$).
+- DONE (Automated 6-Scenario E2E Acceptance Suite):
+  - Implemented `backend/scripts/hed/scenarios-e2e.cjs` (`npm run smoke:hed:scenarios`):
+    - Scenario 1 (Happy Path): 25% Purchase $\to$ Settle $\to$ 12.5% Transport $\to$ Settle $\to$ Outcome Verify.
+    - Scenario 2 (25% Request Cap): `amount > goal / 4` reverts with `InvalidInput`.
+    - Scenario 3 (50% Outcome Exposure): `ceiling > goal / 2` reverts with `InvalidInput`; 2nd activity before 1st verified reverts with `WrongState`.
+    - Scenario 4 (Surplus Return): `returnFunds` replenishes Escrow available custody.
+    - Scenario 5 (Donor Dispute): `openExpenditureCase` blocks settlement until resolver decision and challenge window elapses.
+    - Scenario 6 (Wind-Down & Refund): after execution horizon, unspent funds snapshotted and donor claims proportional refund.
+  - Integrated `smoke:hed:scenarios` into `backend/scripts/hed/run-acceptance.cjs`.
+- VERIFIED TEST METRICS:
+  - Smart Contract Suite: `forge test --match-contract HedFundingAndReservationTest`: 22/22 PASS (including 256-run custody fuzzing).
+  - Artifact & RPC Suite: `artifact-contract.test.cjs` + `local-rpc-endpoint.test.cjs`: 5/5 PASS.
+  - Backend HED Suite: `npm run test:hed`: 9/9 suites, 17/17 tests PASS.
+  - Backend Build: `nest build`: PASS.
+  - Frontend Build: `tsc -b && vite build`: PASS.
+  - Frontend Lint: `oxlint`: 0 errors, 0 warnings on 39 files.
+
+## 2026-10-12 — Verification-First integration plan: Dual-exposure limits (25% Request Cap & 50% Outcome Exposure Cap) verified
 
 - DONE (Specification & Planning):
   - Created `docs/verification-integration-plan.md` executing the 5-step integration plan for Verification-Centric MVP.
@@ -13,9 +43,9 @@
     - `test_revertWhenRequestExceeds25PercentHardCap`
     - `test_revertWhenDisbursementExceedsOutcomeExposureBeforeOutcomeVerification`
     - `test_outcomeVerificationUnlocksSubsequentDisbursements`
-  - Evidence: `forge test` in WSL Ubuntu-24.04: 25/25 tests PASS (0 failures, including 256-run custody fuzzing).
+  - Evidence: `HedFundingAndReservationTest` in WSL Ubuntu-24.04: 22/22 tests PASS (0 failures, including 256-run custody fuzzing).
 - DONE (Backend):
-  - Deterministic artifacts regenerated via `generate-artifacts.cjs` (`artifact-contract.test.cjs`: 4/4 PASS).
+  - Deterministic artifacts regenerated via `generate-artifacts.cjs` (`artifact-contract.test.cjs` + `local-rpc-endpoint.test.cjs`: 5/5 PASS).
   - Verified backend build (`nest build`: PASS) and test suite (`npm run test:hed`: 8/8 suites, 13/13 tests PASS).
   - Journey smoke test fixture `journey-smoke.cjs` updated to 4B goal with 3-arg `approveAndDisburse`.
 - DONE (Frontend):

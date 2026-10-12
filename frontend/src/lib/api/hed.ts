@@ -1,6 +1,26 @@
 import { http } from './http'
 
-export interface HedPublicSnapshot { campaignId: string; checkpoint: { blockNumber: string; blockHash: string; chainTimestamp: string }; campaign: { goal: string; contributed: string; available: string; reserved: string; grossPaid: string; refundSnapshotted: boolean; basePool: string; supplementPool: string; state: string }; activities: { commitmentHash: `0x${string}`; outcomeReportHash: `0x${string}`; ceiling: string; approved: string; createdAt: string; challengeEnd: string; state: string }[]; requests: { requestHash: `0x${string}`; recipient?: string; amount?: string; approvedAmount: string; depositAmount?: string; grossPaid?: string; acceptedExpenditure?: string; expenditureReportHash?: `0x${string}`; challengeEnd: string; state: string }[] }
+export interface HedRiskProjection {
+  maxRequestCap: string
+  financialExposure: string
+  financialExposureLimit: string
+  financialExposureRatioBps: number
+  outcomeExposure: string
+  outcomeExposureLimit: string
+  outcomeExposureRatioBps: number
+  hasOpenRequest: boolean
+  hasOpenActivity: boolean
+  canCreateRequest: boolean
+}
+
+export interface HedPublicSnapshot {
+  campaignId: string
+  checkpoint: { blockNumber: string; blockHash: string; chainTimestamp: string }
+  campaign: { goal: string; contributed: string; available: string; reserved: string; grossPaid: string; refundSnapshotted: boolean; basePool: string; supplementPool: string; state: string }
+  activities: { commitmentHash: `0x${string}`; outcomeReportHash: `0x${string}`; ceiling: string; approved: string; createdAt: string; challengeEnd: string; state: string }[]
+  requests: { requestHash: `0x${string}`; recipient?: string; amount?: string; approvedAmount: string; depositAmount?: string; grossPaid?: string; acceptedExpenditure?: string; expenditureReportHash?: `0x${string}`; challengeEnd: string; state: string }[]
+  riskProjection?: HedRiskProjection
+}
 export async function getHedPublicCampaign(campaignId: string, signal?: AbortSignal) {
   return (await http.get<HedPublicSnapshot>(`/v1/disbursement/public/campaigns/${campaignId}`, { signal })).data
 }
@@ -29,15 +49,6 @@ export async function registerHedOnchainCampaign(id: string, onchainCampaignId: 
   return (await http.post<{ campaignId: string; onchainCampaignId: string }>(`/v1/disbursement/campaigns/${id}/onchain`, { onchainCampaignId })).data
 }
 
-export interface HedVendorOption { id: string; vendorWallet: string; content: { legalName: string; categories: string[] }; validUntil: string }
-export interface HedVendorVerificationInput { vendorWallet: `0x${string}`; legalName: string; contact: string; categories: string[]; relatedPartyDeclaration: false; validUntil: string }
-export interface HedVendorVerification { id: string; vendorWallet: `0x${string}`; content: HedVendorVerificationInput; status: string; reportHash: `0x${string}`; validUntil: string; createdAt: string }
-export async function listHedVendorVerifications(signal?: AbortSignal) {
-  return (await http.get<HedVendorVerification[]>('/v1/disbursement/vendors', { signal })).data
-}
-export async function verifyHedVendor(value: HedVendorVerificationInput) {
-  return (await http.post<HedVendorVerification>('/v1/disbursement/vendors/verify', value)).data
-}
 export interface HedActivityInput { title: string; beneficiaryScope: string; targetQuantity: number; outcomeCriteria: string[]; ceiling: string; deliveryDeadline: string; outcomeDeadline: string }
 export interface HedActivityDraft extends HedActivityInput { id: string; commitmentHash: string | null; frozenAt: string | null; onchainActivityId: string | null }
 export async function listHedActivities(campaignId: string, signal?: AbortSignal) {
@@ -53,14 +64,11 @@ export async function registerHedOnchainActivity(campaignId: string, activityId:
   return (await http.post<HedActivityDraft>(`/v1/disbursement/campaigns/${campaignId}/activities/${activityId}/onchain`, { onchainActivityId })).data
 }
 
-export interface HedRequestDraftInput { vendorVerificationId?: string; activityId: string; purpose: string;
+export interface HedRequestDraftInput { activityId: string; purpose: string;
   itemLines: { description: string; quantity: number; unitAmount: string }[]; amount: string; deposit?: string;
   expectedDeliveryAt: string; acceptanceCriteria: string[]; terms: string; needEvidenceReferences: string[] }
 export interface HedRequestDraft extends HedRequestDraftInput { id: string; version: number; requestHash: string | null; frozenAt: string | null; onchainRequestId: string | null }
 
-export async function listHedVendorOptions(campaignId: string, signal?: AbortSignal) {
-  return (await http.get<HedVendorOption[]>(`/v1/disbursement/campaigns/${campaignId}/vendors`, { signal })).data
-}
 export async function listHedRequestDrafts(campaignId: string, signal?: AbortSignal) {
   return (await http.get<HedRequestDraft[]>(`/v1/disbursement/campaigns/${campaignId}/requests`, { signal })).data
 }
@@ -134,8 +142,4 @@ export async function createHedDeliveryPackage(campaignId: string, value: HedDel
 }
 export async function createHedOutcomePackage(campaignId: string, value: HedOutcomePackageInput) {
   return (await http.post<{ id: string }>(`/v1/disbursement/campaigns/${campaignId}/evidence`, value)).data
-}
-export interface HedVendorRequest { requestId: string; requestHash: `0x${string}`; vendorWallet: `0x${string}`; onchainCampaignId: string; onchainRequestId: string; content: HedRequestDraftInput }
-export async function listHedVendorRequests(signal?: AbortSignal) {
-  return (await http.get<HedVendorRequest[]>('/v1/disbursement/vendor/requests', { signal })).data
 }

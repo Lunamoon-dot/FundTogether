@@ -5,7 +5,6 @@ const tokenAmount = z.string().regex(/^[1-9][0-9]*$/);
 const nonNegativeAmount = z.string().regex(/^(0|[1-9][0-9]*)$/);
 
 export const hedRequestDraftSchema = z.object({
-  vendorVerificationId: z.string().uuid().optional(),
   recipientWallet: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
   activityId: z.string().uuid(),
   purpose: z.string().trim().min(10).max(2_000),

@@ -12,19 +12,14 @@ import type { HedDeployment } from "./hed.types";
 import { HedHealthController, HedPublicController } from "./hed-public.controller";
 import { HedCampaignDraftController } from "./hed-campaign-draft.controller";
 import { HedCampaignDraftService } from "./hed-campaign-draft.service";
-import { HedCampaignVendorController } from "./hed-campaign-vendor.controller";
 import { HedRequestDraftController } from "./hed-request-draft.controller";
 import { HedRequestDraftService } from "./hed-request-draft.service";
-import { HedVendorVerificationController } from "./hed-vendor-verification.controller";
-import { HedVendorVerificationService } from "./hed-vendor-verification.service";
 import { HedReviewController } from "./hed-review.controller";
 import { HedOutcomeReviewController } from "./hed-outcome-review.controller";
 import { HedReviewService } from "./hed-review.service";
 import { HedActivityController } from "./hed-activity.controller";
 import { HedActivityService } from "./hed-activity.service";
 import { HedReviewQueueController } from "./hed-review-queue.controller";
-import { HedVendorController } from "./hed-vendor.controller";
-import { HedVendorService } from "./hed-vendor.service";
 import { HedEvidencePackageController } from "./hed-evidence-package.controller";
 import { HedEvidencePackageService } from "./hed-evidence-package.service";
 import { HedOrganizationVerificationController } from "./hed-organization-verification.controller";
@@ -32,7 +27,7 @@ import { HedOrganizationVerificationService } from "./hed-organization-verificat
 
 @Module({
   imports: [AuthModule, DatabaseModule, EvidenceStorageModule],
-  controllers: [HedHealthController, HedPublicController, HedCampaignDraftController, HedActivityController, HedCampaignVendorController, HedRequestDraftController, HedVendorVerificationController, HedReviewController, HedOutcomeReviewController, HedReviewQueueController, HedVendorController, HedEvidencePackageController, HedOrganizationVerificationController],
+  controllers: [HedHealthController, HedPublicController, HedCampaignDraftController, HedActivityController, HedRequestDraftController, HedReviewController, HedOutcomeReviewController, HedReviewQueueController, HedEvidencePackageController, HedOrganizationVerificationController],
   providers: [{
     provide: HED_DEPLOYMENT,
     useFactory: (): HedDeployment => {
@@ -42,7 +37,7 @@ import { HedOrganizationVerificationService } from "./hed-organization-verificat
       if (manifest.rpcUrl !== process.env.HED_BLOCKCHAIN_RPC_URL) throw new Error("HED manifest/RPC configuration mismatch");
       return Object.freeze(manifest);
     },
-  }, HedBlockchainService, HedIndexerService, HedCampaignDraftService, HedActivityService, HedRequestDraftService, HedVendorVerificationService, HedOrganizationVerificationService, HedReviewService, HedVendorService, HedEvidencePackageService],
+  }, HedBlockchainService, HedIndexerService, HedCampaignDraftService, HedActivityService, HedRequestDraftService, HedOrganizationVerificationService, HedReviewService, HedEvidencePackageService],
   exports: [HedBlockchainService, HedIndexerService, HED_DEPLOYMENT],
 })
 export class HedModule {}

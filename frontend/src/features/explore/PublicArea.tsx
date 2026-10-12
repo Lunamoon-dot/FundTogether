@@ -26,8 +26,8 @@ export function PublicArea({
   const organizations = path === '/organizations' || Boolean(organizationProfile)
   const detail = /^\/campaigns\/([^/]+)$/.exec(path)
   const staff = session?.roles.some(role => role === 'ADMIN' || role === 'RESOLVER') ?? false
-  const internalHref = session?.roles.includes('RESOLVER') ? '#/internal/requests' : '#/internal/vendors'
-  const internalLabel = session?.roles.includes('RESOLVER') ? 'Yêu cầu HED · RESOLVER' : 'Vendor HED · ADMIN'
+  const internalHref = session?.roles.includes('RESOLVER') ? '#/internal/requests' : '#/internal/organizations'
+  const internalLabel = session?.roles.includes('RESOLVER') ? 'Yêu cầu HED · RESOLVER' : 'Tổ chức · ADMIN'
 
   return (
     <div className="public-area">
@@ -39,7 +39,6 @@ export function PublicArea({
           <a href="#/" aria-current={feed ? 'page' : undefined}>Khám phá</a>
           {session && <a href="#/organizations" aria-current={organizations ? 'page' : undefined}>Tổ chức của tôi</a>}
           {session && <a href="#/workspace" aria-current={path === '/workspace' ? 'page' : undefined}>Quản lý gây quỹ</a>}
-          {session && <a href="#/vendor">Vendor HED</a>}
           {staff && <a href={internalHref}>{internalLabel}</a>}
         </nav>
         <div className="public-sidebar-account">
