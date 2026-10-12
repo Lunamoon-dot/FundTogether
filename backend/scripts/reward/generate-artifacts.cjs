@@ -1,0 +1,75 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const { keccak256, toFunctionSignature, toHex } = require('viem');
+
+const bytes = value => JSON.stringify(value, null, 2) + '\n';
+const hashJson = value => keccak256(toHex(bytes(value)));
+const policy = Object.freeze({
+  PRIMARY_REVIEW_WINDOW: 259_200,
+  CHALLENGE_WINDOW: 259_200,
+  EXECUTION_HORIZON: 15_552_000,
+  MAX_PRINT_DEPOSIT_BPS: 5000,
+});
+
+function artifacts(root) {
+  const read = name => JSON.parse(fs.readFileSync(path.join(root, 'contracts/out', `${name}.sol`, `${name}.json`), 'utf8'));
+  const reward = read('FundTogetherReward');
+  const token = read('MockUSDC');
+  for (const artifact of [reward, token]) {
+    for (const field of ['bytecode', 'deployedBytecode']) {
+      if (!/^0x(?:[a-fA-F0-9]{2})+$/.test(artifact[field]?.object || '')) throw new Error('Reward artifact missing bytecode');
+    }
+    if (!Array.isArray(artifact.abi)) throw new Error('Reward artifact missing ABI');
+  }
+  const signatures = reward.abi.filter(item => item.type === 'function').map(toFunctionSignature);
+  const expected = [
+    'createCampaign(bytes32,uint256,uint256,(uint256,uint256,uint256,bool)[])',
+    'pledge(uint256,uint256,uint256)',
+    'activateCampaign(uint256,bytes32)',
+    'finalizeFundingFailure(uint256)',
+    'submitDisbursementRequest(uint256,bytes32,address,uint256)',
+    'approveAndDisburse(uint256,uint256,bytes32)',
+    'candidateExpenditure(uint256,uint256,uint256,bytes32)',
+    'finalizeExpenditure(uint256,uint256)',
+    'returnFunds(uint256,uint256,uint256)',
+    'recordProductionVerified(uint256,bytes32)',
+    'completeCampaign(uint256)',
+    'startWindDown(uint256)',
+    'claimRefund(uint256)',
+    'openDisputeCase(uint256,uint256,bytes32)',
+    'upholdDisputeCase(uint256,uint256,bytes32)',
+    'campaign(uint256)',
+    'tier(uint256,uint256)',
+    'request(uint256,uint256)',
+  ];
+  for (const signature of expected) {
+    if (!signatures.includes(signature)) throw new Error(`Reward ABI drift: ${signature}`);
+  }
+  const runtimeBytes = (reward.deployedBytecode.object.length - 2) / 2;
+  if (runtimeBytes > 24576) throw new Error('Reward runtime exceeds EVM limit');
+  return { reward, token, runtimeBytes };
+}
+
+function atomicWrite(file, value) {
+  const content = JSON.stringify(value, null, 2) + '\n';
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  if (fs.existsSync(file) && fs.readFileSync(file, 'utf8') === content) return;
+  const pending = `${file}.${process.pid}.pending`;
+  fs.writeFileSync(pending, content, { flag: 'wx' });
+  fs.renameSync(pending, file);
+}
+
+function generate(root = path.resolve(__dirname, '../../..'), out = path.join(root, 'backend/src/blockchain/generated/reward')) {
+  const result = artifacts(root);
+  atomicWrite(path.join(out, 'fund-together-reward.abi.json'), result.reward.abi);
+  atomicWrite(path.join(out, 'mock-usdc.abi.json'), result.token.abi);
+  atomicWrite(path.join(out, 'reward-policy.json'), policy);
+  return { ...result, policyHash: hashJson(policy) };
+}
+
+if (require.main === module) {
+  const result = generate();
+  console.log(JSON.stringify({ runtimeBytes: result.runtimeBytes, policyHash: result.policyHash }, null, 2));
+}
+
+module.exports = { generate, artifacts, policy, hashJson };

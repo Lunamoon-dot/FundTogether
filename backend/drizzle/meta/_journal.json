@@ -183,6 +183,13 @@
       "when": 1791725377702,
       "tag": "0025_sharp_kitty_pryde",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791819554383,
+      "tag": "0026_massive_rick_jones",
+      "breakpoints": true
     }
   ]
 }

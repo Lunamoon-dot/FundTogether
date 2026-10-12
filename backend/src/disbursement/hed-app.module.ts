@@ -4,11 +4,12 @@ import { LoggerModule } from "nestjs-pino";
 import { configuration } from "../config/env.config";
 import { HedModule } from "./hed.module";
 import { OrganizationsModule } from "../modules/organizations/organizations.module";
+import { RewardModule } from "../reward/reward.module";
 
 @Module({ imports: [
   ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true, load: [configuration] }),
   LoggerModule.forRoot({ pinoHttp: { level: process.env.LOG_LEVEL ?? "info",
     redact: ["req.headers.cookie", "req.headers.authorization", "res.headers[\"set-cookie\"]", "req.body.password"] } }),
-  HedModule, OrganizationsModule,
+  HedModule, OrganizationsModule, RewardModule,
 ] })
 export class HedAppModule {}

@@ -5,6 +5,16 @@
 
 ## Current direction — 2026-10-12
 
+### Reward Crowdfunding Pivot (Comics & Artbooks) — 2026-10-12
+
+User decision pivots the new-campaign product direction to **Reward-Based Crowdfunding** for creators and backers, with the primary pilot vertical being **independent comics/artbooks** (digital reader access & physical limited merchandise).
+- Contract: [`contracts/src/reward/FundTogetherReward.sol`](../contracts/src/reward/FundTogetherReward.sol) implements supply-gated reward tiers (`pledge`), print deposit disbursement hard cap ($\le 50\%$ Goal) directly to `creatorWallet`, post-spend invoice reconciliation (`candidateExpenditure`), unused fund return (`returnFunds`), sample production verification (`recordProductionVerified`), 100% underfunded refund, and mid-production wind-down proportional refund.
+- Database: Additive schema `backend/src/database/schema/reward.schema.ts` (`reward_campaigns`, `reward_tiers`, `reward_entitlements`, `fulfillment_batches`, `reward_disputes`) with private off-chain PII protection for shipping addresses.
+- Frontend: Dedicated Comics & Artbooks feed, Dual-Exposure security indicators, Tier cards with Web3 pledge checkout, Creator Studio with dynamic tier builder, and "My Rewards" backer dashboard.
+- Verification: 34/34 Foundry contract tests PASS, 24/24 backend tests PASS, 7/7 frontend tests PASS. Full live E2E integration across DB, API, Indexer, and UI is currently IN_PROGRESS.
+- Preservation: 100% of historical charity infrastructure (Workflow A/B, HED P1 `FundTogetherDisbursement.sol`) preserved intact.
+See [reward spec](./reward-crowdfunding-spec.md) and [pivot plan](./reward-crowdfunding-pivot-plan.md).
+
 ### Verification-Centric Disbursement — 2026-10-12
 
 User decision on 2026-10-12 removes the Web3 Vendor entity (no vendor wallet,

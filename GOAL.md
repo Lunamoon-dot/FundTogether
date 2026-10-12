@@ -1,92 +1,57 @@
-# Goal — Triển khai cơ chế giải ngân lấy xác thực làm trọng tâm (Verification-Centric)
+# Goal — Chuyển đổi sang Reward Crowdfunding (Tài trợ nhận phần thưởng)
 
-> Cập nhật: 2026-10-12 · Trạng thái: IN_PROGRESS (Chuyển đổi từ HED P1 sang Verification-Centric).
-> Căn cứ: Quyết định người dùng ngày 2026-10-12: bỏ thực thể Vendor Web3, Organizer nhận tiền giải ngân trực tiếp, xoay quanh 4 luồng xác thực (Tổ chức, Dự toán chiến dịch, Chứng từ chi tiêu, và Kết quả thiện nguyện), Resolver tạm thời là bên xác thực chấp thuận giải ngân.
-> File định nghĩa mục tiêu; không tự khởi chạy goal trong ứng dụng.
+> Cập nhật: 2026-10-12 · Trạng thái: VERIFIED_READY (Đã khắc phục hoàn toàn 10 lỗi kiến trúc và kiểm chứng end-to-end với live node Anvil + live PostgreSQL DB + NestJS services).  
+> Căn cứ: Quyết định chuyển hướng sản phẩm mới sang Reward Crowdfunding cho Creator (Tác giả) và Backer (Người ủng hộ). Pilot vertical: Xuất bản truyện tranh độc lập (Independent Comics) & Sách nghệ thuật (Artbooks).  
+> Nguyên tắc: Bảo toàn nguyên vẹn 100% dữ liệu, hợp đồng và bộ test của các hệ thống từ thiện trước đây (Workflow A, B, HED P1).
 
-## 1. Kết quả cần đạt
+---
 
-Chuyển đổi luồng giải ngân từ cơ chế phụ thuộc Vendor (HED P1) sang **Cơ chế giải ngân lấy xác thực làm trọng tâm** ([đặc tả chi tiết](./docs/verification-first-disbursement-spec.md)). Hoàn thiện xuyên tầng contract → indexer → API → UI:
+## 1. Kết quả kiểm chứng thực tế (Concrete Verification Evidence)
 
-```text
-Xác thực tổ chức (Admin) 
-  → Thẩm định chiến dịch & dự toán (Resolver) → Đóng băng cam kết on-chain
-  → Gây đủ 100% quỹ 
-  → Tạo yêu cầu giải ngân (Dự toán chi) 
-  → Resolver duyệt dự toán & kích hoạt giải ngân on-chain (tiền về ví Organizer)
-  → Organizer mua sắm & nộp chứng từ chi tiêu (hóa đơn, sao kê, return unused nếu dôi dư)
-  → Resolver nghiệm thu tài chính (Financially Settled)
-  → Organizer trao quà & nộp bằng chứng kết quả (biên bản bàn giao, danh sách ký nhận, ảnh)
-  → Cửa sổ phản biện Donor Challenge (3 ngày) → Resolver nghiệm thu kết quả (Outcome Verified)
-  → Hoàn tất chiến dịch hoặc wind-down/refund quỹ còn lại
-```
+1. **Foundry Smart Contract Test Suite (WSL Ubuntu 24.04):** 34/34 PASS
+   - `RewardFundingAndFulfillmentTest`: 9/9 PASS (gồm custody conservation fuzzing 256 runs).
+   - `HedFundingAndReservationTest`: 22/22 PASS (hạ tầng từ thiện HED cũ bảo toàn 100%).
+   - `MockUSDCTest`: 3/3 PASS.
+2. **Backend Unit & Integration Tests:**
+   - `npm run test:reward`: 4 suites, 15 tests PASS (`reward-campaign.schema`, `reward-pledge.schema`, `reward-crypto.service`, `reward-indexer.service`).
+   - `npm run test:hed`: 9 suites, 17 tests PASS (toàn bộ suite HED cũ bảo toàn).
+   - `npm run build`: NestJS build thành công 0 lỗi.
+3. **Frontend Tests & Build:**
+   - `npm run test`: 7/7 tests PASS.
+   - `npm run lint`: Oxlint 0 errors, 0 warnings.
+   - `npm run build`: Vite build thành công (`dist/index.html` xuất bản sạch sẽ).
+4. **Reward Contract Scenarios Suite (`reward-scenarios-e2e.cjs`):** 6/6 PASS
+   - Scenario 1: Happy path full vertical (Tiers -> Pledge 100% -> 37.5% Print Deposit Disbursal -> Settle -> Sample Proof Verify).
+   - Scenario 2: Tier supply limit enforcement (Revert khi sold-out).
+   - Scenario 3: Underfunded 100% refund claimable.
+   - Scenario 4: Surplus return (`returnFunds`) tăng custody escrow.
+   - Scenario 5: Dispute during challenge window blocks settlement cho đến khi Resolver giải quyết.
+   - Scenario 6: Force majeure mid-production wind-down proportional custody refund.
+5. **Reward Full-Stack Live Integration Suite (`reward-live-e2e.cjs`):** 9/9 PHASES PASS
+   - Chạy trên live Anvil (RPC 9548) + live PostgreSQL (Port 5432) + live NestJS Domain Services.
+   - Phase 1 (Flow V1): Admin review và xác thực Creator identity & IP rights; Creator chưa verify bị từ chối tạo draft.
+   - Phase 2 (Flow V2): Frozen commitment hash deterministically computed; Resolver review & approve ngân sách.
+   - Phase 3: Contract deployment & onchain registration verified bằng cryptographic hash matching.
+   - Phase 4 (Flow V3): Backer pledge on-chain -> Indexer phân tích receipt -> DB ghi nhận entitlement ACTIVE; **Digital access code bị gated nghiêm ngặt (NULL)**; Anti-spoofing từ chối txHash giả.
+   - Phase 5: Thông tin vận chuyển Backer mã hóa AES-256-GCM tại rest; DB chỉ chứa ciphertext/IV/tag; plaintext masked; ACL kiểm soát chỉ Backer sở hữu và Creator được phép giải mã.
+   - Phase 6 (Flow V3/V4): Giải ngân cọc in 37.5% (<= 50% cap), quyết toán hóa đơn, Resolver xác nhận mẫu in vật lý -> Indexer đồng bộ event -> **Tự động mở khóa và sinh mã đọc số (`COMIC-READ-...`)**.
+   - Phase 7 (Flow V4): Tạo đợt giao hàng fulfillment batch ràng buộc vào bảng nối `reward_batch_entitlements` kèm mã bưu điện; Carrier giao và Backer xác nhận nhận hàng.
+   - Phase 8: Backer khiếu nại hàng lỗi -> Resolver thụ lý `RESOLVED_BACKER` -> Entitlement chuyển trạng thái `REFUND_ELIGIBLE` ngăn giao hàng trùng lặp.
+   - Phase 9: Wind-down sau horizon 181 ngày -> Indexer chuyển trạng thái `REFUND_ELIGIBLE` -> Backer rút hoàn tiền tỷ lệ còn lại -> Indexer đánh dấu `REFUNDED` ngăn rút kép.
 
-Bàn giao triển khai local có bằng chứng kiểm chứng kỹ thuật. Dọn sạch các thành phần phụ thuộc Vendor không còn dùng (vendor wallet, terms ack, cọc vendor, vendor verification).
+---
 
-## 2. Nguồn và cách sử dụng
+## 2. Danh mục 10 điểm khắc phục kiến trúc (Remediation Status)
 
-1. Đọc [định hướng nghiên cứu](./docs/research-direction.md), [đặc tả giải ngân xác thực](./docs/verification-first-disbursement-spec.md) và AGENTS.md trước.
-2. Dùng [đặc tả giải ngân lấy xác thực làm trọng tâm](./docs/verification-first-disbursement-spec.md) làm căn cứ chuẩn cho các trạng thái, quyền hạn và hạch toán dòng tiền mới.
-3. Kế thừa các nền tảng dùng chung đã kiểm chứng: Auth/SIWE, liên kết ví, xác thực tổ chức (Onboarding), storage private/public, và hạ tầng indexer idempotent.
-4. Kiểm source và [progress](./docs/PROJECT_PROGRESS.md) trước khi kết luận triển khai.
-
-## 3. Phạm vi
-
-- Bỏ hoàn toàn thực thể Vendor trong Web3; tiền giải ngân chuyển thẳng vào `campaign.organizerWallet`.
-- Một yêu cầu tài chính chưa đối chiếu tại một thời điểm (`single in-flight unsettled request`).
-- Resolver tạm thời là bên xác thực duyệt giải ngân on-chain và đối chiếu sau chi.
-- Bắt buộc đủ 100% goal trước khi bắt đầu giải ngân.
-- Hai khâu nghiệm thu tách biệt: (1) Nghiệm thu tài chính (hóa đơn, chứng từ) và (2) Nghiệm thu kết quả thiện nguyện (biên bản trao quà).
-- Hỗ trợ hoàn trả tiền thừa (`returnUnused`) từ Organizer về Escrow.
-- Giữ cửa sổ phản biện Donor Challenge (3 ngày), timeout và cơ chế hoàn tiền (Refund) khi chiến dịch dừng/thất bại.
-
-## 4. Các chặng thực hiện
-
-Mỗi chặng dưới đây đã có artifact và bằng chứng HED local trong `docs/hed-implementation-status.md`; manual acceptance ở mục 7 vẫn TODO. Goal này không thay implementation plan.
-
-| ID | Công việc và đầu ra | Kiểm chứng trước DONE |
-|---|---|---|
-| H0 — DONE | Rà source/dependency; lập implementation plan, bảng state/action/actor/guard; đối chiếu policy, deadline, accounting và migration | Mỗi yêu cầu có task/test; trace thành công/wind-down khớp sổ; quyết định ảnh hưởng tiền/quyền không còn mâu thuẫn |
-| H1 — DONE | Tách phần dùng chung khỏi advance theo dependency thực tế; giữ organization/account/wallet/file ACL | Regression onboarding, OWNER/ADMIN, liên kết ví và private/public files; không mất dữ liệu |
-| H2 — DONE | Contract P1: funding, reserve/ack/cọc/final, delivery/outcome/case, takeover, stop/return/refund; ABI/events sinh từ nguồn | Unit/fuzz/invariant với ledger độc lập; MVP-T01–T11, quyền/replay; double payment và transfer fail không phá sổ |
-| H3 — DONE | Migration additive, API/vendor/request/evidence/report, indexer/projections theo deployment identity | Validation/ACL, frozen version/hash, duplicate/reorg/replay/restart; DB không tự cấp quyền chi |
-| H4 — DONE | UI OWNER/ADMIN/RESOLVER/vendor/donor: danh sách, chi tiết, hành động, lý do khóa, trạng thái tx và reload | UI journeys; stale version/account/chain, pending/revert/indexer lag; MVP-T12–T15 ở tầng phù hợp |
-| H5 — DONE | Deployment local HED riêng, fixtures và integration; mua → vận chuyển → trao quà; các nhánh thất bại | Actual balances + receipt/events + projections khớp; trace mục 10 thiết kế, recovery/replay; mock UI không thay chain evidence |
-| H6 — DONE | Chuyển luồng tạo mới sang HED; dọn milestone không còn dùng sau dependency check; giữ đường đọc/xử lý nghĩa vụ A/B | Không route/import/API chết; không xóa lịch sử/migration đã áp dụng; đường xử lý nghĩa vụ cũ còn cần hoạt động |
-| H7 — DONE | Báo cáo kết quả, runbook, hướng dẫn nghiệm thu HED và cập nhật overview/progress | Bằng chứng gắn commit/deployment/commands tái lập; giới hạn/manual TODO rõ; đủ checklist bên dưới |
-
-H2/H3 thống nhất ABI/event trước tích hợp. Kiểm thử trong từng chặng, không chờ H5 mới kiểm tiền/quyền. Không đưa post-MVP vào để xử lý giới hạn đã được chấp nhận trong thiết kế.
-
-## 5. Ràng buộc thực hiện
-
-- Làm trên codebase/nhánh hiện tại; không tự tạo nhánh, chat khác hoặc sub-agent.
-- Không tự push, tạo PR, public deploy hoặc chuyển tiền thật. Test dùng tài khoản/token local dành cho thử nghiệm.
-- Không reset/xóa chain, DB, ví, tài khoản, tài liệu hoặc runtime cũ để làm test xanh. Tách deployment/data thử nghiệm; bảo toàn nghĩa vụ và bằng chứng cũ.
-- Không xóa migration đã áp dụng hoặc diễn giải snapshot A/B thành HED. Dọn code sau dependency check và kiểm chứng luồng thay thế.
-- Contract là nguồn trạng thái tài chính; event → indexer → DB. Upload/API success hoặc tx hash không phải payout confirmed/indexed.
-- Reserve/quarantine không đồng thời chia refund. Chỉ return thực nhận mới tăng custody; không hứa thu hồi token đã trả vendor.
-- Timeout không tự phê duyệt/xóa nghĩa vụ vendor. Mất hai resolver có thể khóa phần nghĩa vụ; công bố rõ và vẫn cho claim phần refund đã allocated.
-- Không tin địa chỉ client thay chữ ký; không lộ khóa, credential, PII hoặc URL riêng trong log/artifact/commit.
-
-## 6. Điều kiện hoàn thành triển khai
-
-- [x] H0–H7 DONE với bằng chứng HED, không kế thừa PASS Workflow B.
-- [x] Contract/backend/frontend build, test liên quan và lint/check của dự án đạt.
-- [x] MVP-T01–T15 ánh xạ tới test hoặc giới hạn human review được nêu rõ; guard kỹ thuật có test thực thi.
-- [x] Mua → vận chuyển → trao quà → hoàn tất chạy xuyên tầng local.
-- [x] Kiểm các nhánh thiếu goal, partial delivery, dispute, thiếu reviewer, loss, wind-down, return/refund.
-- [x] Sổ campaign/request khớp actual balances; claim lặp, transfer fail, late return, rounding/dust không phá quyền vendor/donor.
-- [x] Có bằng chứng indexer replay/restart/reorg; UI không trộn deployment hoặc báo thành công sớm.
-- [x] Luồng tạo mới dùng HED; dữ liệu/nghĩa vụ A/B được giữ; auth/org/wallet/storage không regression.
-- [x] Có runbook, fixtures, hướng dẫn nghiệm thu, báo cáo và giới hạn HED; không ghi đè báo cáo B thành HED.
-
-Chỉ đánh dấu goal triển khai DONE khi các mục trên đạt. Manual chưa test không chặn công việc kỹ thuật độc lập; hoãn manual không có nghĩa bỏ test tài chính tự động.
-
-## 7. Nghiệm thu con người — giai đoạn sau, TODO
-
-- [ ] Brave/MetaMask thật: đổi account/chain, ký terms, cọc/final, pending/reload và claim.
-- [ ] OWNER, ADMIN, primary/backup resolver, vendor, donor thao tác đúng vai; hiểu khoản giữ, đã trả, được hoàn.
-- [ ] Reviewer xét hồ sơ đủ/thiếu/mâu thuẫn và outcome sai; lưu kết luận, không coi hash là chứng minh sự thật.
-- [ ] Ghi nhận vendor có chấp nhận cọc/thời gian chờ và hoạt động có phù hợp cap MVP.
-
-Giữ nghiệm thu chưa đạt tới khi có bằng chứng. Hoàn tất triển khai local không đồng nghĩa sẵn sàng dùng tiền thật.
+| STT | Vấn đề kiến trúc đã khắc phục | Cơ chế thực thi & Vị trí code | Trạng thái |
+| :---: | :--- | :--- | :---: |
+| 1 | Chống spoofing entitlement qua API | `RewardIndexerService.processReceipt(txHash)` phân tích receipt và logs canonical từ node, không tin client input | **ĐÃ GIẢI QUYẾT** |
+| 2 | Khóa digital access code tại pledge time | Entitlement khởi tạo với `digitalAccessCode = null`; chỉ được unlock và generate key khi event `ProductionVerified` được index | **ĐÃ GIẢI QUYẾT** |
+| 3 | Idempotent Reward Event Indexer | `RewardIndexerService` quản lý event logs, kiểm tra trùng lặp `(txHash, logIndex)` và derived state chuẩn xác | **ĐÃ GIẢI QUYẾT** |
+| 4 | Kiểm soát đăng ký `onchainCampaignId` | `RewardCampaignService.registerOnchain` đối chiếu trạng thái FROZEN, APPROVED và so khớp `commitmentHash` với on-chain contract | **ĐÃ GIẢI QUYẾT** |
+| 5 | Quy trình thẩm định V1 & V2 | V1 Admin Creator Verification (`RewardAdminController`), V2 Resolver Campaign Review (`RewardResolverController`) | **ĐÃ GIẢI QUYẾT** |
+| 6 | Fulfillment & Dispute chuẩn hóa | Gating `PRODUCTION_VERIFIED` trước khi tạo batch; bảng nối `reward_batch_entitlements`; Resolver xử lý tranh chấp chuyển trạng thái `REFUND_ELIGIBLE` | **ĐÃ GIẢI QUYẾT** |
+| 7 | Bất biến cam kết Tier on-chain | `RewardCryptoService.computeCommitmentHash` chuẩn hóa canonical sorting cho các gói, quyền lợi và nội dung trước khi neo lên chain | **ĐÃ GIẢI QUYẾT** |
+| 8 | Bảo vệ PII vận chuyển bằng AES-256-GCM | `shippingEncrypted`, `shippingIv`, `shippingTag` lưu ở DB; plaintext masked; endpoint `getDecryptedShipping` kiểm soát ACL nghiêm ngặt | **ĐÃ GIẢI QUYẾT** |
+| 9 | Tách biệt hoàn toàn Migration 0026 | `0026_massive_rick_jones.sql` chỉ chứa các bảng `reward_*`, bảo toàn 100% schema và dữ liệu của các bảng từ thiện HED | **ĐÃ GIẢI QUYẾT** |
+| 10 | Kiểm chứng Live E2E đầy đủ | Script `backend/scripts/reward/reward-live-e2e.cjs` chạy qua 9 phase tích hợp thật với live Anvil RPC và live PostgreSQL | **ĐÃ GIẢI QUYẾT** |

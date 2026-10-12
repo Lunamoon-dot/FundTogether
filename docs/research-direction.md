@@ -5,6 +5,15 @@
 > Trạng thái: Định hướng do người dùng yêu cầu lưu và ưu tiên đọc.
 > Phạm vi: mục tiêu, nội dung và kết quả nghiên cứu dự kiến; các quyết định nghiệp vụ còn mở.
 
+> Quyết định mới ngày 2026-10-12 (Pivot sang Reward Crowdfunding): Thử nghiệm hướng
+> sản phẩm mới cho Creator và Backer với Pilot Vertical: Xuất bản truyện tranh độc lập (Independent Comics)
+> & Sách nghệ thuật (Artbooks). Hợp đồng `FundTogetherReward.sol` thực thi phân bổ theo gói (Tiers),
+> giải ngân cọc in ấn tối đa 50% Goal trực tiếp về ví Creator, đối chiếu hóa đơn VAT/phiếu thu, nghiệm thu
+> mẫu in độc lập trước khi mở quyền đọc số và giao hàng, cùng cơ chế hoàn tiền 100% khi không đạt goal
+> hoặc hoàn tiền theo tỷ lệ còn lại nếu dừng giữa chừng. Toàn bộ hạ tầng và nghĩa vụ từ thiện trước đây
+> (Workflow A, B, HED P1) được bảo toàn nguyên vẹn 100%. Xem [đặc tả chuyển đổi](./reward-crowdfunding-spec.md)
+> và [kế hoạch thực hiện](./reward-crowdfunding-pivot-plan.md).
+
 > Quyết định mới ngày 2026-10-12: người dùng chỉ đạo bỏ thực thể Vendor trong Web3
 > để tránh phức tạp và sát thực tế đời thực; Organizer trực tiếp nhận tiền giải ngân
 > để chi tiêu. Trọng tâm hệ thống chuyển hẳn sang xoay quanh các luồng xác thực:

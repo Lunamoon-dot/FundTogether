@@ -13,3 +13,4 @@ export * from './milestone-workflow.schema';
 export * from './advance.schema';
 export * from './organization-verification-requests.schema';
 export * from './disbursement.schema';
+export * from './reward.schema';

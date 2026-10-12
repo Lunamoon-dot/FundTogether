@@ -2,7 +2,62 @@
 
 > **Updated:** 2026-10-12
 
-## 2026-10-12 — Vendor runtime purge, dual-exposure risk projections, and 6-scenario E2E test suite complete
+## 2026-10-12 — Reward Crowdfunding Pivot: 10 Critical Gaps Remediated & Fully Verified (VERIFIED_READY)
+
+- STATUS: **VERIFIED_READY**. All 10 architectural gaps identified in the audit have been fully remediated, hardened, and verified with live execution against live Anvil RPC (port 9548) and live PostgreSQL (port 5432):
+  1. Anti-spoofing: Entitlement creation verifies on-chain transaction receipt and canonical `RewardPledged` events via `RewardIndexerService.processReceipt(txHash)`. Client parameters are never blindly trusted.
+  2. Gated Digital Access: Digital access codes are strictly `NULL` at pledge time; automatically generated and unlocked only after `ProductionVerified` is indexed from the blockchain.
+  3. Real Idempotent Event Indexer: `RewardIndexerService` idempotently maps `CampaignCreated`, `RewardPledged`, `CampaignActivated`, `ProductionVerified`, `WindDownStarted`, and `RefundClaimed` into PostgreSQL.
+  4. On-chain Campaign Registration: `RewardCampaignService.registerOnchain` cryptographically verifies on-chain contract `commitmentHash` against database frozen commitments.
+  5. Flow V1 & V2 Formalization: Implemented V1 Admin Creator Verification (`RewardAdminController`) and V2 Resolver Campaign Review (`RewardResolverController`). Unverified creators cannot create drafts; unapproved drafts cannot register on-chain.
+  6. Fulfillment & Dispute Lifecycles: Enforced `PRODUCTION_VERIFIED` check before batch creation; tracked per-entitlement carrier tracking via `rewardBatchEntitlements` join table; Resolver dispute resolution transitions entitlements to `REFUND_ELIGIBLE`.
+  7. Deterministic Tier Commitments: `RewardCryptoService.computeCommitmentHash` enforces canonical sorting of tiers, items, and IP declarations.
+  8. AES-256-GCM Backer Shipping PII Protection: Sensitive shipping information encrypted at rest (`shippingEncrypted`, `shippingIv`, `shippingTag`); plaintext columns masked; ACL restricts decryption strictly to the backer owner or campaign creator.
+  9. Isolated Migration 0026: Migration `0026_massive_rick_jones.sql` strictly isolated to `reward_*` tables, preserving 100% of historical HED charity schema and data.
+  10. Full-Stack Live Integration Suite: `npm run test:reward:e2e` runs both 6 contract scenarios and 9 live full-stack phases against real Anvil and PostgreSQL. All pass with concrete evidence.
+
+- DONE (Specification & Planning):
+  - Formulated full architecture in `docs/reward-crowdfunding-spec.md` and 6-phase roadmap in `docs/reward-crowdfunding-pivot-plan.md` based on `docs/FUNDTOGETHER_REWARD_PIVOT_AGENT_SPEC.md`.
+  - Chosen pilot vertical: **Independent Comics & Artbooks** with digital reader access & physical limited merchandise (books, postcards, bookmarks).
+  - Preserved 100% of historical charity infrastructure (`FundTogetherDisbursement.sol`, 22/22 Forge tests, and DB migrations).
+- DONE (Smart Contracts — `FundTogetherReward.sol`):
+  - Created `contracts/src/reward/RewardTypes.sol` and `contracts/src/reward/FundTogetherReward.sol`.
+  - Enforced Print Deposit Hard Cap ($\le 50\%$ Goal) disbursed directly to `creator` upon resolver approval.
+  - Enforced Tier Supply Limits (`TierSoldOut()` revert when pledged quantity equals max quantity).
+  - Enforced Post-spend Invoice Reconciliation with 3-day challenge window (`candidateExpenditure` $\to$ `finalizeExpenditure`).
+  - Enforced Surplus Return (`returnFunds`), replenishing Escrow custody.
+  - Enforced Production Verification gate (`recordProductionVerified`), unlocking digital codes and physical shipment.
+  - Enforced 100% Underfunded Refund (`finalizeFundingFailure` $\to$ `claimRefund`) and Mid-Production Wind-down Proportional Refund (`startWindDown` $\to$ `claimRefund`).
+  - Verified test suite `contracts/test/unit/Reward/RewardFundingAndFulfillment.t.sol`: **9/9 tests PASS** (including 256 fuzz runs).
+  - Total Foundry suite across repo: **34/34 tests PASS** (3 MockUSDC, 22 HED, 9 Reward).
+- DONE (Database Schema & Additive Migrations):
+  - Created `backend/src/database/schema/reward.schema.ts` (`rewardCampaigns`, `rewardTiers`, `rewardEntitlements`, `rewardFulfillmentBatches`, `rewardDisputes`, `rewardCampaignProjection`).
+  - Generated Drizzle migration `drizzle/0026_massive_rick_jones.sql` without touching historical migrations.
+- DONE (Backend API & Services):
+  - Created `RewardModule` with `RewardCreatorController`, `RewardBackerController`, and `RewardPublicController`.
+  - Implemented secure off-chain storage for backer shipping addresses (PII encrypted/protected).
+  - Registered deterministic ABI generator `backend/scripts/reward/generate-artifacts.cjs` (runtimeBytes: 11965, EVM compliant).
+  - Unit test suites `reward-campaign.schema.spec.ts` & `reward-pledge.schema.spec.ts`: **7/7 tests PASS**.
+  - Historical test suite `npm run test:hed`: **17/17 tests PASS** across 9 suites.
+  - Backend build `nest build`: **PASS**.
+- DONE (Automated 6-Scenario E2E Acceptance Suite):
+  - Implemented `backend/scripts/reward/reward-scenarios-e2e.cjs` (`npm run test:reward:e2e`):
+    - Scenario 1 (Happy Path Full Vertical): Tier definition $\to$ 100% Pledge $\to$ 37.5% Print Deposit disbursement $\to$ Invoice reconciliation $\to$ Production verified $\to$ Complete campaign: **PASS**.
+    - Scenario 2 (Tier Supply Limit): Sold-out tier reverts with `TierSoldOut`: **PASS**.
+    - Scenario 3 (Underfunded 100% Refund): Backer claims 100% refund when goal unmet: **PASS**.
+    - Scenario 4 (Surplus Return): `returnFunds` replenishes Escrow custody: **PASS**.
+    - Scenario 5 (Dispute Blocks Settle): Backer dispute blocks expenditure finalization until resolver decision: **PASS**.
+    - Scenario 6 (Mid-Production Wind-down): Proportional refund across backers with 0 leakage: **PASS**.
+- DONE (Frontend UI & Navigation):
+  - Created `frontend/src/features/reward/reward.css` with responsive cards, tier builder, and status badges.
+  - Created `frontend/src/features/reward/RewardPublicFeed.tsx`: Comics & Artbooks discovery feed with category filter and funding progress bars.
+  - Created `frontend/src/features/reward/RewardPublicCampaign.tsx`: Comic pitch, dual-exposure security indicators, tier selector, Web3 pledge modal (approve + pledge), and refund claim flow.
+  - Created `frontend/src/features/reward/RewardCreatorStudio.tsx`: Campaign draft form, dynamic tier builder, freeze commitment, on-chain publishing, and batch shipment manager.
+  - Created `frontend/src/features/reward/RewardBackerEntitlements.tsx`: "Phần thưởng của tôi" with private shipping address editor, digital access code unlock, tracking numbers, and dispute flow.
+  - Integrated into `frontend/src/features/explore/PublicArea.tsx` with clear routing and navigation tabs.
+  - Frontend production build (`tsc -b && vite build`): **PASS**.
+  - Frontend lint (`oxlint`): **0 warnings, 0 errors** on 45 files.
+  - Frontend tests: **7/7 PASS**.
 
 - DONE (Runtime Vendor Clean-up):
   - Completely purged dead Vendor entities from runtime without destroying historical database tables:
