@@ -69,7 +69,8 @@ Flow 4: Reward Fulfillment Verification (Backer + Resolver)
 - **Tiến trình:**
   1. **Digital Tiers:** Khi smart contract ghi nhận `PRODUCTION_VERIFIED`, quyền truy cập tệp số (PDF/EPUB) được tự động kích hoạt cho Backer.
   2. **Physical Tiers:** Creator nộp danh sách mã vận đơn theo đợt (Fulfillment Batches); Backer cập nhật địa chỉ giao hàng riêng tư (PII protected).
-  3. Khi nhận hàng, Backer bấm xác nhận đã nhận (`CONFIRMED`). Nếu quá hạn cam kết hoặc hàng hư hỏng, Backer mở khiếu nại (`openDispute`).
+  3. Khi nhận hàng, Backer bấm xác nhận đã nhận (`CONFIRMED`). Nếu quá hạn cam kết hoặc hàng hư hỏng, Backer mở khiếu nại (`openDispute`) để Resolver phân xử (`RESOLVED_BACKER` $\to$ `REFUND_ELIGIBLE` hoặc `RESOLVED_CREATOR` / `DISMISSED` $\to$ `CONFIRMED`).
+  4. **Điều kiện hoàn tất Fulfillment (`FULFILLMENT_COMPLETE`):** Resolver chỉ được xác nhận hoàn tất giao hàng (`attestFulfillmentComplete` kết hợp biên lai on-chain `recordFulfillmentComplete`) khi chiến dịch đang ở trạng thái `PRODUCTION_VERIFIED` **và toàn bộ 100% physical entitlements (`isDigital = false`) đã ở trạng thái `CONFIRMED` hoặc đã được giải quyết khiếu nại/hoàn tiền (`REFUND_ELIGIBLE` / `REFUNDED`)**. Sau khi đạt `FULFILLMENT_COMPLETE`, Creator hoặc Resolver mới được phép đóng chiến dịch (`completeCampaign` $\to$ `COMPLETED`).
 
 ---
 
@@ -124,28 +125,45 @@ $$
 
 ### 4.1. Campaign Lifecycle
 ```text
-DRAFT ──► IN_REVIEW ──► APPROVED ──► FUNDING
-                                       │
-                ┌──────────────────────┴──────────────────────┐
-                ▼                                             ▼
-        FUNDING_FAILED (Refund 100%)                       ACTIVE
-                                                              │
-                                            ┌─────────────────┴─────────────────┐
-                                            ▼                                   ▼
-                                        COMPLETED                       STOPPED (Wind-Down Refund)
+DRAFT ──► FROZEN ──► UNDER_REVIEW ──► APPROVED ──► PUBLISHED (On-Chain FUNDING)
+                                                      │
+                        ┌─────────────────────────────┴─────────────────────────────┐
+                        ▼                                                           ▼
+                STOPPED (Funding Failed)                                          ACTIVE
+                                                                                    │
+                                                    ┌───────────────────────────────┴───────────────────────────────┐
+                                                    ▼                                                               ▼
+                                          PRODUCTION_VERIFIED                                             STOPPED (Wind-Down)
+                                                    │
+                                                    ▼
+                                          FULFILLMENT_COMPLETE
+                                                    │
+                                                    ▼
+                                                COMPLETED
 ```
 
 ### 4.2. Reward Entitlement Lifecycle
 ```text
-PENDING_FUNDING ──► ACTIVE ──► REDEEM_REQUESTED ──► FULFILLING ──► DELIVERED ──► CONFIRMED
-                        │                                                   │
-                        ▼                                                   ▼
-                REFUND_ELIGIBLE                                         DISPUTED
+ACTIVE ──► REDEEM_REQUESTED ──► FULFILLING ──► DELIVERED ──► CONFIRMED
+  │                                                │
+  ▼                                                ▼
+REFUND_ELIGIBLE ──► REFUNDED                   DISPUTED ──► CONFIRMED / REFUND_ELIGIBLE
 ```
 
 ---
 
 ## 5. Bảo vệ Dữ liệu Riêng tư (Privacy & PII Protection)
 - Địa chỉ nhận hàng, số điện thoại, tên thật của Backer **tuyệt đối không lưu on-chain**.
-- Dữ liệu vận chuyển được mã hóa lưu trữ ở Backend/S3 riêng tư, chỉ Creator và Backer sở hữu Entitlement mới có quyền truy cập.
+- Dữ liệu vận chuyển được mã hóa AES-256-GCM lưu trữ ở Backend, chỉ Creator và Backer sở hữu Entitlement mới có quyền truy cập.
 - Trên Blockchain chỉ lưu trữ mã băm xác thực lô hàng (`batchManifestHash`) và mã băm cam kết (`commitmentHash`).
+
+---
+
+## 6. Đồng bộ Chuỗi chuẩn tắc & Xử lý Reorg (Canonical Indexing & Reorg Reconciliation)
+- Mọi trạng thái tài chính và quyền nhận thưởng (`reward_campaigns`, `reward_tiers`, `reward_entitlements`, `reward_campaign_projection`) bắt nguồn từ chuỗi chuẩn tắc: `chain → canonical event → projection`.
+- Checkpoint trên `indexer_streams` luôn lưu cặp `(last_block, last_block_hash)` của cùng một khối đích đã xác thực.
+- Khi phát hiện reorg (sai lệch `block_hash` tại `last_block` hoặc tại bất kỳ khối nào của sự kiện `canonical = true` trong `chain_events`):
+  1. Đánh dấu toàn bộ sự kiện cũ của stream là `canonical = false` và xóa `reward_campaign_projection` của stream.
+  2. Quét lại toàn bộ log chuẩn tắc từ khối `0` đến `headBlock`, khôi phục `canonical = true` cho các sự kiện còn nằm trên nhánh chính.
+  3. Thu hồi mọi entitlement mồ côi (`RewardPledged` thuộc giao dịch bị reorg), tính lại `pledged_quantity` của từng Tier, thu hồi `digital_access_code` nếu `ProductionVerified` không còn trên nhánh chính, và đồng bộ lại trạng thái chiến dịch cùng `reward_campaign_projection` khớp tuyệt đối với trạng thái hợp đồng trên nhánh chuẩn tắc.
+

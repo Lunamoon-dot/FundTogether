@@ -9,6 +9,7 @@ import {
   rewardDisputes,
   rewardEntitlements,
   rewardFulfillmentBatches,
+  rewardTiers,
 } from "../database/schema";
 import type { CreateFulfillmentBatchInput, ResolveRewardDisputeInput } from "./reward-pledge.schema";
 import { RewardIndexerService } from "./reward-indexer.service";
@@ -162,7 +163,8 @@ export class RewardFulfillmentService {
   /**
    * Flow V4: Resolver attests on-chain (`recordFulfillmentComplete`) that physical fulfillment / reward delivery
    * is complete, and Backend verifies + indexes the canonical `FulfillmentComplete` event from `txHash`.
-   * Gated: Requires PRODUCTION_VERIFIED status and valid on-chain receipt!
+   * Gated: Requires PRODUCTION_VERIFIED status, all physical entitlements CONFIRMED or resolved via dispute/refund,
+   * and valid on-chain receipt!
    */
   async attestFulfillmentComplete(
     resolverUserId: string,
@@ -184,6 +186,28 @@ export class RewardFulfillmentService {
       throw new BadRequestException("Campaign is not registered on-chain");
     }
 
+    // Ensure all physical entitlements are CONFIRMED or resolved (REFUND_ELIGIBLE / REFUNDED) with 0 OPEN disputes
+    const physicalEntitlements = await this.db
+      .select({
+        id: rewardEntitlements.id,
+        status: rewardEntitlements.status,
+      })
+      .from(rewardEntitlements)
+      .innerJoin(rewardTiers, eq(rewardEntitlements.tierId, rewardTiers.id))
+      .where(and(
+        eq(rewardEntitlements.campaignId, campaignId),
+        eq(rewardTiers.isDigital, false)
+      ));
+
+    const unresolvedPhysical = physicalEntitlements.filter(
+      e => !["CONFIRMED", "REFUND_ELIGIBLE", "REFUNDED"].includes(e.status)
+    );
+    if (unresolvedPhysical.length > 0) {
+      throw new ConflictException(
+        `Cannot attest fulfillment completion: ${unresolvedPhysical.length} physical entitlement(s) have not been CONFIRMED or resolved via dispute/refund`
+      );
+    }
+
     try {
       await this.indexerService.processReceipt(txHash as `0x${string}`);
     } catch (err: any) {
@@ -200,7 +224,7 @@ export class RewardFulfillmentService {
           functionName: "campaign",
           args: [BigInt(campaign.onchainCampaignId)],
         });
-        const onchainReportHash = onchainData.fulfillmentReportHash ?? onchainData[13];
+        const onchainReportHash = onchainData.fulfillmentReportHash ?? onchainData[16];
         if (onchainReportHash && onchainReportHash.toLowerCase() !== fulfillmentReportHash.toLowerCase()) {
           throw new BadRequestException("On-chain fulfillmentReportHash does not match submitted fulfillmentReportHash");
         }
