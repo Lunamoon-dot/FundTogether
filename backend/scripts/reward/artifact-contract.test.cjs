@@ -28,7 +28,7 @@ test('Reward artifacts reject incomplete Foundry output and export deterministic
 
 test('Reward manifest rejects a wrong protocol, endpoint, or deployment identity', () => {
   validateManifest(manifest());
-  for (const delta of [{ protocolKind: 'HED' }, { chainId: 31338 }, { rpcUrl: 'http://127.0.0.1:9547' },
+  for (const delta of [{ protocolKind: 'INVALID' }, { chainId: 31338 }, { rpcUrl: 'http://127.0.0.1:9547' },
     { contractAddress: address(0) }, { backupResolver: address(3) }, { deploymentBlockNumber: '0' }, { tokenDecimals: 18 }]) {
     assert.throws(() => validateManifest({ ...manifest(), ...delta }), /Reward manifest/);
   }

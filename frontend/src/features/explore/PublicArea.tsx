@@ -2,7 +2,6 @@ import { AccountAccess } from '../auth/AccountAccess';
 import type { AccountSession } from '../../lib/api/auth';
 import { OrganizationsPage } from '../organizations/OrganizationsPage';
 import { OrganizationProfile } from '../organizations/OrganizationProfile';
-import { HedCampaignFeed, HedPublicCampaign } from './HedPublicCampaign';
 import { RewardPublicFeed } from '../reward/RewardPublicFeed';
 import { RewardPublicCampaign } from '../reward/RewardPublicCampaign';
 import { RewardCreatorStudio } from '../reward/RewardCreatorStudio';
@@ -30,16 +29,11 @@ export function PublicArea({
   const isRewardCreator = path === '/reward/creator';
   const isRewardMyRewards = path === '/reward/my-rewards';
   const isRewardResolver = path === '/reward/resolver';
-  const isHedFeed = path === '/hed';
 
   const account = path === '/account' || path === '/workspace';
   const organizationProfile = /^\/organizations\/([^/]+)$/.exec(path);
   const organizations = path === '/organizations' || Boolean(organizationProfile);
-  const hedDetail = /^\/campaigns\/([^/]+)$/.exec(path) || /^\/hed\/campaigns\/(\d+)$/.exec(path);
-
   const staff = session?.roles.some(role => role === 'ADMIN' || role === 'RESOLVER') ?? false;
-  const internalHref = session?.roles.includes('RESOLVER') ? '#/internal/requests' : '#/internal/organizations';
-  const internalLabel = session?.roles.includes('RESOLVER') ? 'Yêu cầu HED · RESOLVER' : 'Tổ chức · ADMIN';
 
   return (
     <div className="public-area">
@@ -66,9 +60,6 @@ export function PublicArea({
               Thẩm định Reward (V1–V4)
             </a>
           )}
-          <a href="#/hed" aria-current={isHedFeed ? 'page' : undefined}>
-            Gây quỹ HED (Lịch sử)
-          </a>
           {session && (
             <a href="#/organizations" aria-current={organizations ? 'page' : undefined}>
               Tổ chức của tôi
@@ -79,7 +70,6 @@ export function PublicArea({
               Quản lý gây quỹ
             </a>
           )}
-          {staff && <a href={internalHref}>{internalLabel}</a>}
         </nav>
         <div className="public-sidebar-account">
           <span className="network-pill">Mạng thử nghiệm · MockUSDC</span>
@@ -104,10 +94,6 @@ export function PublicArea({
         {isRewardMyRewards && <RewardBackerEntitlements />}
         {isRewardResolver && <RewardResolverConsole />}
 
-        {/* Historical HED Charity Views */}
-        {isHedFeed && <HedCampaignFeed />}
-        {hedDetail && <HedPublicCampaign key={hedDetail[1]} campaignId={hedDetail[1]} />}
-
         {/* Account / Workspace View */}
         {account && (
           <div className="public-account-page">
@@ -128,7 +114,6 @@ export function PublicArea({
                       <a className="button button--secondary" href="#/reward/my-rewards">Xem phần thưởng đã ủng hộ</a>
                       {staff && <a className="button button--secondary" href="#/reward/resolver">Thẩm định Reward (V1–V4)</a>}
                       <a className="button button--secondary" href="#/workspace">Mở quản lý gây quỹ</a>
-                      {staff && <a className="button button--secondary" href={internalHref}>{internalLabel}</a>}
                     </div>
                   </section>
                 )}
@@ -153,7 +138,7 @@ export function PublicArea({
           </section>
         ))}
 
-        {!isRewardFeed && !rewardDetail && !isRewardCreator && !isRewardMyRewards && !isRewardResolver && !isHedFeed && !account && !hedDetail && !organizations && (
+        {!isRewardFeed && !rewardDetail && !isRewardCreator && !isRewardMyRewards && !isRewardResolver && !account && !organizations && (
           <section className="panel public-empty">
             <h1>Không tìm thấy trang</h1>
             <a className="button button--secondary" href="#/">

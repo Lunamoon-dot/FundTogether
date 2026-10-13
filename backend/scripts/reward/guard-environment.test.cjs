@@ -25,7 +25,7 @@ test('accepts the isolated Reward environment', () => {
 });
 
 for (const [field, value] of [
-  ['REWARD_PROTOCOL', 'HED'],
+  ['REWARD_PROTOCOL', 'INVALID'],
   ['DATABASE_URL', 'postgresql://test:fixture@127.0.0.1:5435/fundtogether_hed'],
   ['REWARD_RPC_URL', 'http://127.0.0.1:9547'],
   ['S3_ENDPOINT', 'http://localhost:9200'],
