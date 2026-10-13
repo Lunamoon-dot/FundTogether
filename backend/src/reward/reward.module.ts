@@ -9,6 +9,7 @@ import { RewardCreatorController } from "./reward-creator.controller";
 import { RewardBackerController } from "./reward-backer.controller";
 import { RewardResolverController } from "./reward-resolver.controller";
 import { RewardAdminController } from "./reward-admin.controller";
+import { RewardHealthController } from "./reward-health.controller";
 import { DatabaseModule } from "../database/database.module";
 import { AuthModule } from "../modules/auth/auth.module";
 
@@ -20,6 +21,7 @@ import { AuthModule } from "../modules/auth/auth.module";
     RewardBackerController,
     RewardResolverController,
     RewardAdminController,
+    RewardHealthController,
   ],
   providers: [
     RewardCryptoService,

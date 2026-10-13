@@ -34,7 +34,7 @@ const { RewardPledgeService } = require('../../dist/src/reward/reward-pledge.ser
 const { RewardFulfillmentService } = require('../../dist/src/reward/reward-fulfillment.service');
 
 const root = path.resolve(__dirname, '../../..');
-const rpcUrl = process.env.HED_BLOCKCHAIN_RPC_URL || 'http://127.0.0.1:9548';
+const rpcUrl = process.env.REWARD_RPC_URL || 'http://127.0.0.1:9548';
 const chain = defineChain({
   id: 31339,
   name: 'FundTogether Local',

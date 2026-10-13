@@ -39,7 +39,7 @@ export class RewardIndexerService implements OnModuleInit, OnModuleDestroy {
   private runningPromise: Promise<SyncRewardResult> | null = null;
 
   constructor(@Inject(DRIZZLE_DB) private readonly db: NodePgDatabase<typeof schema>) {
-    this.rpcUrl = process.env.REWARD_RPC_URL || process.env.HED_BLOCKCHAIN_RPC_URL || "http://127.0.0.1:9548";
+    this.rpcUrl = process.env.REWARD_RPC_URL || "http://127.0.0.1:9548";
     this.chainId = Number(process.env.CHAIN_ID) || 31339;
     const chain = defineChain({
       id: this.chainId,
@@ -105,7 +105,7 @@ export class RewardIndexerService implements OnModuleInit, OnModuleDestroy {
   }
 
   getRpcUrl(): string | undefined {
-    const url = this.rpcUrl || process.env.REWARD_RPC_URL || process.env.HED_BLOCKCHAIN_RPC_URL;
+    const url = this.rpcUrl || process.env.REWARD_RPC_URL;
     return url && url.trim().length > 0 ? url.trim() : undefined;
   }
 

@@ -280,7 +280,7 @@ export class RewardCampaignService {
       throw new BadRequestException("Campaign must be approved by Resolver before on-chain registration (Flow V2)");
     }
 
-    const envRpc = process.env.REWARD_RPC_URL ?? process.env.HED_BLOCKCHAIN_RPC_URL;
+    const envRpc = process.env.REWARD_RPC_URL;
     const rpcUrl = envRpc !== undefined
       ? envRpc.trim()
       : this.indexerService.getRpcUrl();

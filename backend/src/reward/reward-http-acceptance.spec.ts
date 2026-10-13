@@ -10,7 +10,7 @@ import { and, eq } from "drizzle-orm";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env"), quiet: true } as any);
 process.env.REWARD_PII_ENCRYPTION_KEY = "test_reward_pii_encryption_key_32bytes_safe!!";
-process.env.HED_BLOCKCHAIN_RPC_URL = process.env.REWARD_RPC_URL || process.env.HED_BLOCKCHAIN_RPC_URL || "http://127.0.0.1:9548";
+process.env.REWARD_RPC_URL = process.env.REWARD_RPC_URL || "http://127.0.0.1:9548";
 process.env.NODE_ENV = "test";
 
 const testOrigin = "http://127.0.0.1:5173";
@@ -98,7 +98,7 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
   let indexerService: RewardIndexerService;
   let cryptoService: RewardCryptoService;
 
-  const rpcUrl = process.env.HED_BLOCKCHAIN_RPC_URL!;
+  const rpcUrl = process.env.REWARD_RPC_URL!;
   const chain = defineChain({
     id: 31339,
     name: "FundTogether Local",
