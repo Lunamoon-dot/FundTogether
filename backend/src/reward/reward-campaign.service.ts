@@ -337,26 +337,37 @@ export class RewardCampaignService {
       throw new BadRequestException(`Failed to verify campaign on-chain: ${err.message}`);
     }
 
-    // Unset onchainCampaignId on any previous stale campaigns to guarantee canonical 1-to-1 mapping
-    await this.db.update(rewardCampaigns)
-      .set({ onchainCampaignId: null })
-      .where(and(eq(rewardCampaigns.onchainCampaignId, onchainCampaignId), ne(rewardCampaigns.id, id)));
+    // Bind the requested metadata record before receipt synchronization so a
+    // repeated commitmentHash cannot make CampaignCreated select an old draft.
+    await this.db.transaction(async tx => {
+      await tx.update(rewardCampaigns)
+        .set({ onchainCampaignId: null })
+        .where(and(eq(rewardCampaigns.onchainCampaignId, onchainCampaignId), ne(rewardCampaigns.id, id)));
+      await tx.update(rewardCampaigns)
+        .set({ onchainCampaignId, updatedAt: new Date() })
+        .where(eq(rewardCampaigns.id, id));
+    });
 
-    if (txHash) {
-      try {
-        await this.indexerService.processReceipt(txHash as `0x${string}`);
-      } catch (err: any) {
-        throw new BadRequestException(`Failed to index CampaignCreated receipt: ${err.message}`);
-      }
+    if (!txHash) {
+      await this.db.update(rewardCampaigns)
+        .set({ onchainCampaignId: null, updatedAt: new Date() })
+        .where(eq(rewardCampaigns.id, id));
+      throw new BadRequestException("CampaignCreated transaction receipt is required for on-chain registration");
     }
 
-    const [updated] = await this.db.update(rewardCampaigns).set({
-      onchainCampaignId,
-      status: "PUBLISHED",
-      updatedAt: new Date(),
-    }).where(eq(rewardCampaigns.id, id)).returning();
-
-    return updated;
+    try {
+      await this.indexerService.processReceipt(txHash as `0x${string}`);
+      const [updated] = await this.db.select().from(rewardCampaigns).where(eq(rewardCampaigns.id, id));
+      if (!updated || updated.status !== "PUBLISHED") {
+        throw new Error("Receipt did not contain a CampaignCreated event for this campaign");
+      }
+      return updated;
+    } catch (err: any) {
+      await this.db.update(rewardCampaigns)
+        .set({ onchainCampaignId: null, status: "APPROVED", updatedAt: new Date() })
+        .where(eq(rewardCampaigns.id, id));
+      throw new BadRequestException(`Failed to index CampaignCreated receipt: ${err.message}`);
+    }
   }
 
   /**

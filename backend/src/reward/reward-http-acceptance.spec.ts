@@ -444,6 +444,21 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
     it("registers valid on-chain campaign with matching commitmentHash, linked creator wallet, and txHash receipt", async () => {
       const [camp] = await db.select().from(schema.rewardCampaigns).where(eq(schema.rewardCampaigns.id, campaignId));
 
+      // An earlier draft can legitimately have the same frozen commitment. The
+      // receipt must still be projected onto the campaign selected by this request.
+      await db.insert(schema.rewardCampaigns).values({
+        creatorUserId,
+        title: `Archived duplicate ${randomBytes(4).toString("hex")}`,
+        pitch: camp.pitch,
+        story: camp.story,
+        category: camp.category,
+        commitmentHash: camp.commitmentHash,
+        goal: camp.goal,
+        fundingDuration: camp.fundingDuration,
+        policyHash: camp.policyHash,
+        status: "APPROVED",
+      });
+
       const onchainTiers = [
         { price: 50_000_000n, maxQuantity: 500n, pledgedQuantity: 0n, isDigital: true },
         { price: 100_000_000n, maxQuantity: 200n, pledgedQuantity: 0n, isDigital: false },
@@ -474,6 +489,14 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
       expect(res.status).toBe(201);
       expect(res.body.status).toBe("PUBLISHED");
       expect(res.body.onchainCampaignId).toBe(onchainCampaignId.toString());
+
+      const streamId = `REWARD:31339:${rewardAddress.toLowerCase()}`;
+      const [projection] = await db.select().from(schema.rewardCampaignProjection)
+        .where(and(
+          eq(schema.rewardCampaignProjection.streamId, streamId),
+          eq(schema.rewardCampaignProjection.onchainCampaignId, onchainCampaignId.toString())
+        ));
+      expect(projection.campaignMetadataId).toBe(campaignId);
     });
   });
 

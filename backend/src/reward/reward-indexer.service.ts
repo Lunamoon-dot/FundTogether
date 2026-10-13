@@ -459,8 +459,15 @@ export class RewardIndexerService implements OnModuleInit, OnModuleDestroy {
           const { campaignId, commitmentHash } = event.args;
           const onchainId = campaignId.toString();
 
-          const [existing] = await this.db.select().from(rewardCampaigns)
-            .where(eq(rewardCampaigns.commitmentHash, commitmentHash));
+          // registerOnchain binds the requested metadata record before its
+          // receipt is synchronized. Prefer that unambiguous mapping over a
+          // potentially duplicated content commitment.
+          let [existing] = await this.db.select().from(rewardCampaigns)
+            .where(eq(rewardCampaigns.onchainCampaignId, onchainId));
+          if (!existing) {
+            [existing] = await this.db.select().from(rewardCampaigns)
+              .where(eq(rewardCampaigns.commitmentHash, commitmentHash));
+          }
 
           if (existing) {
             await this.db.update(rewardCampaigns).set({
