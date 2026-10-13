@@ -43,7 +43,7 @@ function Stop-RewardSupervisor {
 $ready = $false
 for ($attempt = 0; $attempt -lt 30; $attempt++) {
     if ($process.HasExited) { throw 'Reward supervisor exited; inspect logs. Saved state preserved.' }
-    & node $probe $env:REWARD_RPC_URL 2>$null | Out-Null
+    & node $probe $env:REWARD_RPC_URL --quiet | Out-Null
     if ($LASTEXITCODE -eq 0) { $ready = $true; break }
     Start-Sleep -Seconds 1
 }

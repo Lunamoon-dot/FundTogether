@@ -13,6 +13,25 @@ snapshots = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(snapshots)
 
 
+def prepare_state(active, backup, manifest):
+    active.parent.mkdir(parents=True, exist_ok=True)
+    backup.parent.mkdir(parents=True, exist_ok=True)
+    pending = active.with_suffix('.json.pending')
+    if not active.exists():
+        if backup.exists():
+            snapshots.promote_snapshot(backup, active)
+        elif pending.exists():
+            snapshots.promote_snapshot(pending, active)
+    if active.exists():
+        result = snapshots.inspect_state(active)
+        if not backup.exists():
+            snapshots.promote_snapshot(active, backup)
+        return result
+    if manifest.exists() or backup.with_suffix('.json.previous').exists():
+        raise ValueError('Reward saved chain missing; refusing empty replacement')
+    return None
+
+
 def run(active, backup, manifest, pid_file):
     root = Path(__file__).resolve().parents[3]
     expected = Path.home() / '.local/state/fundtogether/reward/anvil/state.json'
@@ -25,14 +44,10 @@ def run(active, backup, manifest, pid_file):
     backup.parent.mkdir(parents=True, exist_ok=True)
     lock = active.with_suffix('.json.lock').open('w')
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    if not active.exists() and backup.exists():
-        snapshots.inspect_state(backup)
-        snapshots.promote_snapshot(backup, active)
-    if active.exists():
-        snapshots.inspect_state(active)
-    elif manifest.exists() or backup.with_suffix('.json.previous').exists():
-        raise ValueError('Reward saved chain missing; refusing empty replacement')
+    prepare_state(active, backup, manifest)
     pending = active.with_suffix('.json.pending')
+    before = pending.stat() if pending.exists() else None
+    attempted = (before.st_mtime_ns, before.st_size) if before else None
     args = [str(Path.home() / '.foundry/bin/anvil'), '--host', '0.0.0.0', '--port', '9548', '--chain-id', '31339',
             '--dump-state', str(pending), '--state-interval', '30', '--preserve-historical-states', '--quiet']
     if active.exists():
@@ -47,8 +62,22 @@ def run(active, backup, manifest, pid_file):
     signal.signal(signal.SIGINT, stop)
     signal.signal(signal.SIGTERM, stop)
     try:
+        observed = None
         while process.poll() is None:
             time.sleep(2)
+            if not pending.exists():
+                continue
+            stat = pending.stat()
+            signature = (stat.st_mtime_ns, stat.st_size)
+            if signature == observed and signature != attempted:
+                attempted = signature
+                try:
+                    saved = snapshots.promote_snapshot(pending, active)
+                    snapshots.promote_snapshot(active, backup)
+                    print(f"Validated Reward snapshot: block {saved['best_block_number']}", flush=True)
+                except (ValueError, OSError) as error:
+                    print(f'Reward snapshot not promoted; last good state retained: {error}', file=sys.stderr, flush=True)
+            observed = signature
         if process.wait() == 0:
             snapshots.promote_snapshot(pending, active)
             snapshots.promote_snapshot(active, backup)

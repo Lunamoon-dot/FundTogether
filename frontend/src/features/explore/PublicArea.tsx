@@ -7,6 +7,7 @@ import { RewardPublicCampaign } from '../reward/RewardPublicCampaign';
 import { RewardCreatorStudio } from '../reward/RewardCreatorStudio';
 import { RewardBackerEntitlements } from '../reward/RewardBackerEntitlements';
 import { RewardResolverConsole } from '../reward/RewardResolverConsole';
+import { RewardAdminConsole } from '../reward/RewardAdminConsole';
 import { EditionsCampaign, EditionsFeed, EditionsLibrary } from '../reward/EditionsCampaign';
 import './PublicArea.css';
 
@@ -27,8 +28,11 @@ export function PublicArea({
 }: PublicAreaProps) {
   const isRewardFeed = path === '/' || path === '/reward';
   const rewardDetail = /^\/reward\/campaigns\/([^/]+)$/.exec(path);
-  const isRewardCreator = path === '/reward/creator';
+  const isRewardCreatorStudio = path === '/reward/creator';
+  const isRewardCreatorDraft = path === '/reward/creator/draft' || path === '/reward/creator/new';
+  const isRewardCreator = isRewardCreatorStudio || isRewardCreatorDraft;
   const isRewardMyRewards = path === '/reward/my-rewards';
+  const isAdmin = path === '/admin' || path === '/reward/admin';
   const isRewardResolver = path === '/reward/resolver';
   const edition = /^\/reward\/editions\/([^/]+)(?:\/(creator|resolver))?$/.exec(path);
   const history = path === '/reward/history';
@@ -37,7 +41,8 @@ export function PublicArea({
   const account = path === '/account' || path === '/workspace';
   const organizationProfile = /^\/organizations\/([^/]+)$/.exec(path);
   const organizations = path === '/organizations' || Boolean(organizationProfile);
-  const staff = session?.roles.some(role => role === 'ADMIN' || role === 'RESOLVER') ?? false;
+  const hasAdminRole = session?.roles.includes('ADMIN') ?? false;
+  const hasResolverRole = session?.roles.includes('RESOLVER') ?? false;
 
   return (
     <div className="public-area">
@@ -59,19 +64,14 @@ export function PublicArea({
               Creator Studio
             </a>
           )}
-          {staff && (
+          {session && hasAdminRole && (
+            <a href="#/admin" aria-current={isAdmin ? 'page' : undefined}>
+              🛡️ Quản trị Admin
+            </a>
+          )}
+          {session && hasResolverRole && (
             <a href="#/reward/resolver" aria-current={isRewardResolver ? 'page' : undefined}>
-              Thẩm định Reward (V1–V4)
-            </a>
-          )}
-          {session && (
-            <a href="#/organizations" aria-current={organizations ? 'page' : undefined}>
-              Tổ chức của tôi
-            </a>
-          )}
-          {session && (
-            <a href="#/workspace" aria-current={path === '/workspace' ? 'page' : undefined}>
-              Quản lý gây quỹ
+              ⚖️ Thẩm định Resolver
             </a>
           )}
         </nav>
@@ -97,37 +97,27 @@ export function PublicArea({
         {edition && <EditionsCampaign key={`${edition[1]}:${session?.userId ?? 'public'}:${edition[2] ?? 'public'}`} id={edition[1]} session={session} mode={(edition[2] as 'creator' | 'resolver') || 'public'} />}
         {historicalRewards && session && <RewardBackerEntitlements key={session.userId} />}
         {rewardDetail && <RewardPublicCampaign key={rewardDetail[1]} campaignId={rewardDetail[1]} />}
-        {isRewardCreator && session && <RewardCreatorStudio key={session.userId} userId={session.userId} />}
+        {isRewardCreator && session && <RewardCreatorStudio key={session.userId} userId={session.userId} path={path} />}
         {isRewardMyRewards && (session ? <EditionsLibrary key={session.userId} userId={session.userId} /> : <p>Đăng nhập để xem thư viện PDF của bạn.</p>)}
-        {isRewardResolver && session && staff && <RewardResolverConsole key={session.userId} userId={session.userId} />}
-        {(isRewardCreator || isRewardResolver) && !session && <p>Đăng nhập để mở hồ sơ riêng tư. <a href="#/account">Đăng nhập</a></p>}
-        {isRewardResolver && session && !staff && <p>Tài khoản cần quyền ADMIN hoặc RESOLVER.</p>}
+        {isAdmin && session && hasAdminRole && <RewardAdminConsole key={session.userId} userId={session.userId} />}
+        {isAdmin && !session && <p>Đăng nhập để vào trang quản trị. <a href="#/account">Đăng nhập</a></p>}
+        {isAdmin && session && !hasAdminRole && <p className="review-notice review-notice--blocked">Tài khoản cần có quyền ADMIN để truy cập trang này.</p>}
+        {isRewardResolver && session && hasResolverRole && <RewardResolverConsole key={session.userId} userId={session.userId} />}
+        {isRewardResolver && !session && <p>Đăng nhập để vào trang thẩm định. <a href="#/account">Đăng nhập</a></p>}
+        {isRewardResolver && session && !hasResolverRole && <p className="review-notice review-notice--blocked">Tài khoản cần có quyền RESOLVER để truy cập trang này.</p>}
+        {isRewardCreator && !session && <p>Đăng nhập để mở Creator Studio. <a href="#/account">Đăng nhập</a></p>}
 
         {/* Account / Workspace View */}
         {account && (
           <div className="public-account-page">
             <div className="feed-heading">
-              <h1>{path === '/workspace' ? 'Đăng nhập để mở workspace' : 'Tài khoản'}</h1>
+              <h1>Tài khoản</h1>
             </div>
             {error && <p className="toast toast--error" role="alert">{error}</p>}
             {sessionLoading ? (
               <p role="status" className="muted">Đang kiểm tra phiên đăng nhập…</p>
             ) : (
-              <>
-                {session && (
-                  <section className="panel">
-                    <h2>Tài khoản FundTogether</h2>
-                    <p className="public-wallet-address">{session.email ?? 'Tài khoản đã liên kết ví'}</p>
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      <a className="button button--primary" href="#/reward/creator">Mở Creator Studio</a>
-                      <a className="button button--secondary" href="#/reward/my-rewards">Xem phần thưởng đã ủng hộ</a>
-                      {staff && <a className="button button--secondary" href="#/reward/resolver">Thẩm định Reward (V1–V4)</a>}
-                      <a className="button button--secondary" href="#/workspace">Mở quản lý gây quỹ</a>
-                    </div>
-                  </section>
-                )}
-                <AccountAccess session={session} onSession={onSession} />
-              </>
+              <AccountAccess session={session} onSession={onSession} />
             )}
           </div>
         )}
@@ -147,7 +137,7 @@ export function PublicArea({
           </section>
         ))}
 
-        {!isRewardFeed && !rewardDetail && !edition && !history && !historicalRewards && !isRewardCreator && !isRewardMyRewards && !isRewardResolver && !account && !organizations && (
+        {!isRewardFeed && !rewardDetail && !edition && !history && !historicalRewards && !isRewardCreator && !isRewardMyRewards && !isAdmin && !isRewardResolver && !account && !organizations && (
           <section className="panel public-empty">
             <h1>Không tìm thấy trang</h1>
             <a className="button button--secondary" href="#/">

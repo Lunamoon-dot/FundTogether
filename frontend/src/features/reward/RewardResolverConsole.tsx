@@ -3,8 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { keccak256, toHex } from 'viem';
 import {
-  listAdminCreatorProfiles,
-  reviewAdminCreatorProfile,
   listResolverRewardCampaigns,
   reviewResolverRewardCampaign,
   activateResolverRewardCampaign,
@@ -13,7 +11,7 @@ import {
   resolveResolverRewardDispute,
   syncRewardReceipt,
 } from '../../lib/api/reward';
-import type { RewardCampaign, RewardCreatorProfile, RewardDispute } from '../../lib/api/reward';
+import type { RewardCampaign, RewardDispute } from '../../lib/api/reward';
 import { getErrorMessage } from '../../lib/api/error';
 import { EditionsResolverReview } from './EditionsReview';
 import { EditionsCommunity } from './EditionsCampaign';
@@ -28,12 +26,6 @@ export function RewardResolverConsole({ userId }: { userId: string }) {
   const account = useAccount();
   const client = usePublicClient({ chainId: activeChain.id });
   const { data: wallet } = useWalletClient({ account: account.address, connector: account.connector });
-
-  const { data: profiles, refetch: refetchProfiles } = useQuery({
-    queryKey: ['reward-admin-creators', userId],
-    queryFn: ({ signal }) => listAdminCreatorProfiles(signal),
-    retry: false,
-  });
 
   const { data: campaigns, refetch: refetchCampaigns } = useQuery({
     queryKey: ['reward-resolver-campaigns', userId],
@@ -50,24 +42,6 @@ export function RewardResolverConsole({ userId }: { userId: string }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-
-  async function handleReviewCreator(profile: RewardCreatorProfile, outcome: 'VERIFIED' | 'REJECTED') {
-    setBusy(true);
-    setNotice('');
-    setErrorMsg('');
-    try {
-      await reviewAdminCreatorProfile(profile.id, {
-        outcome,
-        rejectionReason: outcome === 'REJECTED' ? 'Hồ sơ chưa đủ minh chứng bản quyền tác giả.' : undefined,
-      });
-      setNotice(`Đã cập nhật trạng thái hồ sơ tác giả "${profile.displayName}" sang ${outcome}.`);
-      void refetchProfiles();
-    } catch (err) {
-      setErrorMsg(getErrorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function handleReviewCampaign(
     c: RewardCampaign,
@@ -324,46 +298,15 @@ export function RewardResolverConsole({ userId }: { userId: string }) {
   return (
     <div className="reward-container">
       <header className="reward-hero">
-        <span className="reward-badge-category">Quản trị & Thẩm định · Admin / Resolver Console</span>
-        <h1 className="reward-hero-title">Trung Tâm Thẩm Định & Nghiệm Thu On-Chain (V1 – V4)</h1>
+        <span className="reward-badge-category">⚖️ Thẩm quyền Hợp đồng · Resolver Console</span>
+        <h1 className="reward-hero-title">Trung Tâm Thẩm Định & Nghiệm Thu On-Chain (V2 – V4)</h1>
         <p className="reward-hero-pitch">
-          Duyệt hồ sơ tác giả và cam kết PDF Editions. Các thao tác hợp đồng bên dưới áp dụng cho campaign đã tồn tại.
+          Thẩm định cam kết ấn phẩm Editions, ký kích hoạt chiến dịch và nghiệm thu bằng chứng sản xuất / PDF trên smart contract.
         </p>
       </header>
 
       {errorMsg && <p className="toast toast--error" role="alert">{errorMsg}</p>}
       {notice && <p className="toast toast--success" role="status">{notice}</p>}
-
-      {/* Flow V1: Creator Verification Queue */}
-      <section className="panel">
-        <h2>Flow V1: Duyệt Hồ Sơ Tác Giả ({profiles?.length ?? 0})</h2>
-        {(profiles || []).length === 0 ? (
-          <p className="muted">Chưa có hồ sơ tác giả nào hoặc tài khoản hiện tại không có quyền ADMIN.</p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
-            {profiles!.map(p => (
-              <div key={p.id} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                <div>
-                  <strong>{p.displayName}</strong>{' '}
-                  <span className="reward-status-pill status-active" style={{ fontSize: '11px' }}>{p.status}</span>
-                  <p style={{ margin: '4px 0', fontSize: '13px', color: '#475569' }}>{p.bio}</p>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>Cam kết IP: {p.ipDeclaration}</p>
-                </div>
-                {p.status === 'PENDING' && (
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button className="button button--primary" disabled={busy} onClick={() => void handleReviewCreator(p, 'VERIFIED')}>
-                      Phê duyệt (VERIFIED)
-                    </button>
-                    <button className="button button--secondary" disabled={busy} onClick={() => void handleReviewCreator(p, 'REJECTED')}>
-                      Từ chối
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
 
       {/* Flow V2 - V4: Resolver Campaign Lifecycle Queue */}
       <section className="panel">

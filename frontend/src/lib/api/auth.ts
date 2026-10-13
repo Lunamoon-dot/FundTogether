@@ -61,6 +61,7 @@ export async function linkWallet(message: string, signature: string) {
   return data
 }
 
+
 export async function logout() {
   await http.post('/auth/logout')
 }

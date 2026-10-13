@@ -19,9 +19,6 @@ function saveBlob(blob: Blob, name: string) {
 export function EditionsFeed() {
   const query = useQuery({ queryKey: ['reward-editions-public'], queryFn: ({ signal }) => editionsApi.list(signal) });
   return <div className="reward-container">
-    <header className="reward-hero"><span className="reward-badge-category">FundTogether Editions</span><h1>Truyện tranh & Artbook độc lập</h1>
-      <p>Mỗi campaign là một PDF và một gói standard. Cùng kiểm tra cam kết tác phẩm trước khi ủng hộ.</p>
-      <a className="button button--primary" href="#/reward/creator">Tạo bản thảo PDF</a></header>
     <section className="panel"><h2>Pilot local · MockUSDC</h2><p>Không ứng tiền. Creator chỉ nhận tiền sau PDF được Resolver duyệt, hết 7 ngày challenge và không còn tranh chấp mở. Community góp ý; Resolver ra quyết định.</p>
       <p>Không đạt mục tiêu, hủy trước payout hoặc hết thời hạn theo policy sẽ mở hoàn tiền. Sau payout không có hoàn tiền tự động. Không cam kết lưu trữ vĩnh viễn hay DRM.</p></section>
     {query.isPending && <p role="status">Đang tải Editions…</p>}{query.error && <p role="alert">{getErrorMessage(query.error)}</p>}
