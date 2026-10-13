@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { guardEnvironment } = require('./guard-environment.cjs');
+const { assertRewardManifest } = require('./runtime-identity.cjs');
 
 function readEnvironment(file) {
   const values = {};
@@ -20,11 +21,7 @@ function loadRewardRuntime(root) {
     path.join(root, '.local', 'reward', 'generated', 'deployment.local.json'),
     'utf8',
   ));
-  if (manifest.protocolKind !== 'REWARD' || manifest.chainId !== 31339
-    || manifest.rpcUrl !== environment.REWARD_RPC_URL
-    || !/^0x(?!0{40}$)[0-9a-f]{40}$/i.test(manifest.contractAddress || '')) {
-    throw new Error('Reward deployment manifest identity invalid');
-  }
+  assertRewardManifest(manifest, environment.REWARD_RPC_URL);
   return {
     ...environment,
     REWARD_RPC_URL: manifest.rpcUrl,

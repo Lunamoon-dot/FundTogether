@@ -6,16 +6,16 @@ $environmentFile = Join-Path $projectRoot '.local\reward\backend.env'
 $compose = Join-Path $projectRoot 'infra\reward\compose.yaml'
 $runtime = Join-Path $projectRoot '.local\reward\runtime'
 $manifestFile = Join-Path $projectRoot '.local\reward\generated\deployment.local.json'
+$identity = Join-Path $PSScriptRoot 'runtime-identity.cjs'
+$webIdentityFile = Join-Path $runtime 'web-identity.json'
 $apiProcess = $null
 $webProcess = $null
 
 function Get-RewardHealth {
     param($Manifest)
     $health = Invoke-RestMethod -Uri 'http://127.0.0.1:3002/health' -UseBasicParsing -TimeoutSec 2
-    $matchesManifest = $health.status -eq 'ok' -and $health.protocolKind -eq 'REWARD' -and ([int]$health.chainId) -eq 31339 -and $health.contractAddress -and $health.contractAddress.ToLowerInvariant() -eq $Manifest.contractAddress.ToLowerInvariant()
-    if (-not $matchesManifest) {
-        throw 'Reward API health identity does not match the current deployment manifest.'
-    }
+    & node $identity health $manifestFile ($health | ConvertTo-Json -Compress)
+    if ($LASTEXITCODE -ne 0) { throw 'Reward API health identity does not match the current deployment manifest.' }
     return $health
 }
 
@@ -73,10 +73,19 @@ try {
     }
 
     $webListener = Get-NetTCPConnection -LocalPort 5175 -State Listen -ErrorAction SilentlyContinue
-    if ($webListener) { throw 'Port 5175 is already occupied; the launcher did not stop the unowned listener.' }
-    $webProcess = Start-Process -FilePath 'npm.cmd' -ArgumentList @('run', 'dev:reward', '--', '--host', '127.0.0.1', '--port', '5175', '--strictPort') -WorkingDirectory (Join-Path $projectRoot 'frontend') -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $runtime 'web.log') -RedirectStandardError (Join-Path $runtime 'web-error.log')
+    if ($webListener) {
+        & node $identity web $manifestFile $webIdentityFile $webListener[0].OwningProcess
+        if ($LASTEXITCODE -ne 0) { throw 'Port 5175 is occupied by an unowned or stale listener; it was not stopped.' }
+        Write-Output 'Reused verified Reward web listener.'
+        return
+    }
+    $vite = Join-Path $projectRoot 'frontend\node_modules\vite\bin\vite.js'
+    $webProcess = Start-Process -FilePath 'node.exe' -ArgumentList @($vite, '--mode', 'reward', '--host', '127.0.0.1', '--port', '5175', '--strictPort') -WorkingDirectory (Join-Path $projectRoot 'frontend') -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $runtime 'web.log') -RedirectStandardError (Join-Path $runtime 'web-error.log')
     Set-Content -LiteralPath (Join-Path $runtime 'web-pid.txt') -Value $webProcess.Id
     Wait-RewardWeb
+    $webListener = Get-NetTCPConnection -LocalPort 5175 -State Listen -ErrorAction Stop
+    if ($webListener[0].OwningProcess -ne $webProcess.Id) { throw 'Reward web listener ownership did not match the process started by this launcher.' }
+    @{ protocolKind = 'REWARD'; contractAddress = $manifest.contractAddress; pid = $webProcess.Id } | ConvertTo-Json -Compress | Set-Content -LiteralPath $webIdentityFile
     Write-Output "Reward services ready: API 3002, web 5175, contract $($manifest.contractAddress)"
 } catch {
     foreach ($process in @($webProcess, $apiProcess)) {
