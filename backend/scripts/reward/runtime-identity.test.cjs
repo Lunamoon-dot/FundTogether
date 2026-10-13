@@ -49,10 +49,14 @@ test('rejects an API health response for another contract', () => {
 });
 
 test('reuses only a web listener owned by the current Reward manifest', () => {
+  const startedAt = '2026-10-13T12:00:00.000Z';
   assert.equal(isOwnedRewardWeb(manifest, {
-    protocolKind: 'REWARD', contractAddress: manifest.contractAddress, pid: 4242,
-  }, 4242), true);
+    protocolKind: 'REWARD', contractAddress: manifest.contractAddress, pid: 4242, startedAt,
+  }, 4242, startedAt), true);
   assert.equal(isOwnedRewardWeb(manifest, {
-    protocolKind: 'REWARD', contractAddress: '0x2222222222222222222222222222222222222222', pid: 4242,
-  }, 4242), false);
+    protocolKind: 'REWARD', contractAddress: '0x2222222222222222222222222222222222222222', pid: 4242, startedAt,
+  }, 4242, startedAt), false);
+  assert.equal(isOwnedRewardWeb(manifest, {
+    protocolKind: 'REWARD', contractAddress: manifest.contractAddress, pid: 4242, startedAt,
+  }, 4242, '2026-10-13T12:01:00.000Z'), false);
 });

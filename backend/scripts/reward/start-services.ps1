@@ -74,7 +74,9 @@ try {
 
     $webListener = Get-NetTCPConnection -LocalPort 5175 -State Listen -ErrorAction SilentlyContinue
     if ($webListener) {
-        & node $identity web $manifestFile $webIdentityFile $webListener[0].OwningProcess
+        $webOwner = Get-Process -Id $webListener[0].OwningProcess -ErrorAction Stop
+        $webStartedAt = $webOwner.StartTime.ToUniversalTime().ToString('o')
+        & node $identity web $manifestFile $webIdentityFile $webListener[0].OwningProcess $webStartedAt
         if ($LASTEXITCODE -ne 0) { throw 'Port 5175 is occupied by an unowned or stale listener; it was not stopped.' }
         Write-Output 'Reused verified Reward web listener.'
         return
@@ -85,7 +87,7 @@ try {
     Wait-RewardWeb
     $webListener = Get-NetTCPConnection -LocalPort 5175 -State Listen -ErrorAction Stop
     if ($webListener[0].OwningProcess -ne $webProcess.Id) { throw 'Reward web listener ownership did not match the process started by this launcher.' }
-    @{ protocolKind = 'REWARD'; contractAddress = $manifest.contractAddress; pid = $webProcess.Id } | ConvertTo-Json -Compress | Set-Content -LiteralPath $webIdentityFile
+    @{ protocolKind = 'REWARD'; contractAddress = $manifest.contractAddress; pid = $webProcess.Id; startedAt = $webProcess.StartTime.ToUniversalTime().ToString('o') } | ConvertTo-Json -Compress | Set-Content -LiteralPath $webIdentityFile
     Write-Output "Reward services ready: API 3002, web 5175, contract $($manifest.contractAddress)"
 } catch {
     foreach ($process in @($webProcess, $apiProcess)) {
