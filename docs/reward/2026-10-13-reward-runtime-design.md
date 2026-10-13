@@ -1,13 +1,14 @@
 # Reward Runtime Local Design
 
 > Ngày: 2026-10-13  
-> Trạng thái: Đã duyệt hướng thiết kế, chờ review đặc tả trước khi lập implementation plan.
+> Trạng thái: Đã duyệt Reward-only và loại bỏ HED source/runtime; chờ review đặc tả sửa đổi trước khi lập implementation plan.
 
 ## Mục tiêu
 
 Reward Crowdfunding là runtime local duy nhất được hỗ trợ để phát triển và demo.
-HED không còn khởi động cùng ứng dụng, nhưng source, tài liệu, Docker volumes và
-snapshot `.local/hed/` được giữ nguyên như dữ liệu lịch sử.
+HED bị loại khỏi source, runtime, test command và tài liệu đang dùng. Chỉ giữ
+`.local/hed/` và Docker volume HED hiện có như archive local không bị Reward đọc,
+khởi động, migrate, reset hoặc xóa.
 
 ## Vấn đề hiện tại
 
@@ -30,7 +31,7 @@ Tạo runtime Reward độc lập trong `.local/reward/`. Reward sử dụng cá
 | MinIO API / console | `9202` / `9203` |
 | Local root | `.local/reward/` |
 
-Runtime HED sẽ không dùng các port này. Dữ liệu HED cũ không bị xóa, reset,
+Không còn runtime HED trong repository. Dữ liệu HED cũ không bị xóa, reset,
 migrate hoặc sử dụng để chạy Reward.
 
 ## Thành phần
@@ -57,7 +58,7 @@ migrate hoặc sử dụng để chạy Reward.
 
 - Tạo entry point/module Reward chỉ import `RewardModule`, `AuthModule`,
   `OrganizationsModule`, database và storage cần cho Reward.
-- Không import `HedModule` hoặc route HED vào runtime Reward.
+- Không import module, route, schema hoặc migration chỉ phục vụ HED.
 - API health trả `protocolKind: REWARD` cùng chain/deployment identity để launcher
   phát hiện đúng listener ở `3002`.
 - Chạy migrations database Reward trước khi start API.
@@ -88,9 +89,9 @@ Launcher không tự xóa data, volume, manifest, snapshot hay process không s�
 
 ## Không thuộc phạm vi
 
-- Xóa source, docs, migrations, contracts hoặc `.local/hed/` của HED.
-- Chạy đồng thời runtime HED và Reward.
+- Xóa `.local/hed/`, Docker volume HED hoặc state/snapshot HED hiện có.
 - Migration/bảo toàn campaign HED sang database Reward.
+- Chạy đồng thời runtime HED và Reward.
 - Thay đổi financial rules, contract Reward hay workflow Reward.
 - Deploy public chain, fiat, hoặc production hosting.
 
@@ -100,5 +101,22 @@ Launcher không tự xóa data, volume, manifest, snapshot hay process không s�
 2. Health API/manifest/frontend cùng nhận diện `REWARD`, chain `31339` và đúng
    contract deployment.
 3. Listener hoặc manifest không khớp fail closed, không bị kill/reset tự động.
-4. HED volumes và `.local/hed/` không thay đổi bởi launcher Reward.
-5. Backend build, frontend build, Foundry tests và reward E2E vẫn pass.
+4. Không còn import, route, script, compose, test command, biến runtime hoặc tài liệu
+   active nào tham chiếu HED; shared auth, wallet và organization vẫn hoạt động.
+5. HED volumes và `.local/hed/` không thay đổi bởi launcher Reward.
+6. Backend build, frontend build, Foundry tests và reward E2E vẫn pass.
+
+## Loại bỏ HED
+
+Xóa khỏi repository những phần chỉ phục vụ HED:
+
+- `HedModule`, `hed-main`, controllers, services, schemas và tests HED.
+- Contract `FundTogetherDisbursement` cùng HED-only contract tests/artifacts.
+- Scripts, compose, environment template và launcher HED.
+- HED UI, routes, deployment alias, API naming và tài liệu active.
+- HED migrations chỉ tạo bảng HED, khi không được Reward/shared schema sử dụng.
+
+Không xóa bảng hoặc code dùng chung nếu Reward cần: user, session/auth, wallet link,
+organization, PostgreSQL provider, object storage primitives, audit primitives và
+chain event primitives. Quyết định xóa file chỉ được thực hiện sau khi search chứng
+minh không còn Reward/shared import.
