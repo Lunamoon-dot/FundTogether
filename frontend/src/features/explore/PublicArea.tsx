@@ -1,16 +1,21 @@
-import { AccountAccess } from '../auth/AccountAccess'
-import type { AccountSession } from '../../lib/api/auth'
-import { OrganizationsPage } from '../organizations/OrganizationsPage'
-import { OrganizationProfile } from '../organizations/OrganizationProfile'
-import { HedCampaignFeed, HedPublicCampaign } from './HedPublicCampaign'
-import './PublicArea.css'
+import { AccountAccess } from '../auth/AccountAccess';
+import type { AccountSession } from '../../lib/api/auth';
+import { OrganizationsPage } from '../organizations/OrganizationsPage';
+import { OrganizationProfile } from '../organizations/OrganizationProfile';
+import { RewardPublicFeed } from '../reward/RewardPublicFeed';
+import { RewardPublicCampaign } from '../reward/RewardPublicCampaign';
+import { RewardCreatorStudio } from '../reward/RewardCreatorStudio';
+import { RewardBackerEntitlements } from '../reward/RewardBackerEntitlements';
+import { RewardResolverConsole } from '../reward/RewardResolverConsole';
+import { EditionsCampaign, EditionsFeed, EditionsLibrary } from '../reward/EditionsCampaign';
+import './PublicArea.css';
 
 interface PublicAreaProps {
-  path: string
-  session: AccountSession | null
-  sessionLoading: boolean
-  error: string
-  onSession: (session: AccountSession | null) => void
+  path: string;
+  session: AccountSession | null;
+  sessionLoading: boolean;
+  error: string;
+  onSession: (session: AccountSession | null) => void;
 }
 
 export function PublicArea({
@@ -20,14 +25,19 @@ export function PublicArea({
   error,
   onSession,
 }: PublicAreaProps) {
-  const feed = path === '/'
-  const account = path === '/account' || path === '/workspace'
-  const organizationProfile = /^\/organizations\/([^/]+)$/.exec(path)
-  const organizations = path === '/organizations' || Boolean(organizationProfile)
-  const detail = /^\/campaigns\/([^/]+)$/.exec(path)
-  const staff = session?.roles.some(role => role === 'ADMIN' || role === 'RESOLVER') ?? false
-  const internalHref = session?.roles.includes('RESOLVER') ? '#/internal/requests' : '#/internal/vendors'
-  const internalLabel = session?.roles.includes('RESOLVER') ? 'Yêu cầu HED · RESOLVER' : 'Vendor HED · ADMIN'
+  const isRewardFeed = path === '/' || path === '/reward';
+  const rewardDetail = /^\/reward\/campaigns\/([^/]+)$/.exec(path);
+  const isRewardCreator = path === '/reward/creator';
+  const isRewardMyRewards = path === '/reward/my-rewards';
+  const isRewardResolver = path === '/reward/resolver';
+  const edition = /^\/reward\/editions\/([^/]+)(?:\/(creator|resolver))?$/.exec(path);
+  const history = path === '/reward/history';
+  const historicalRewards = path === '/reward/history/my-rewards';
+
+  const account = path === '/account' || path === '/workspace';
+  const organizationProfile = /^\/organizations\/([^/]+)$/.exec(path);
+  const organizations = path === '/organizations' || Boolean(organizationProfile);
+  const staff = session?.roles.some(role => role === 'ADMIN' || role === 'RESOLVER') ?? false;
 
   return (
     <div className="public-area">
@@ -36,11 +46,34 @@ export function PublicArea({
           <span className="brand-mark">F</span><span>FundTogether</span>
         </a>
         <nav className="public-nav" aria-label="Điều hướng người dùng">
-          <a href="#/" aria-current={feed ? 'page' : undefined}>Khám phá</a>
-          {session && <a href="#/organizations" aria-current={organizations ? 'page' : undefined}>Tổ chức của tôi</a>}
-          {session && <a href="#/workspace" aria-current={path === '/workspace' ? 'page' : undefined}>Quản lý gây quỹ</a>}
-          {session && <a href="#/vendor">Vendor HED</a>}
-          {staff && <a href={internalHref}>{internalLabel}</a>}
+          <a href="#/reward" aria-current={isRewardFeed ? 'page' : undefined}>
+            Truyện tranh & Artbook
+          </a>
+          {session && (
+            <a href="#/reward/my-rewards" aria-current={isRewardMyRewards ? 'page' : undefined}>
+              Phần thưởng của tôi
+            </a>
+          )}
+          {session && (
+            <a href="#/reward/creator" aria-current={isRewardCreator ? 'page' : undefined}>
+              Creator Studio
+            </a>
+          )}
+          {staff && (
+            <a href="#/reward/resolver" aria-current={isRewardResolver ? 'page' : undefined}>
+              Thẩm định Reward (V1–V4)
+            </a>
+          )}
+          {session && (
+            <a href="#/organizations" aria-current={organizations ? 'page' : undefined}>
+              Tổ chức của tôi
+            </a>
+          )}
+          {session && (
+            <a href="#/workspace" aria-current={path === '/workspace' ? 'page' : undefined}>
+              Quản lý gây quỹ
+            </a>
+          )}
         </nav>
         <div className="public-sidebar-account">
           <span className="network-pill">Mạng thử nghiệm · MockUSDC</span>
@@ -57,10 +90,20 @@ export function PublicArea({
             {organizationProfile ? '← Tổ chức của tôi' : '← Về khu vực người dùng'}
           </a>
         )}
-        {feed && <HedCampaignFeed />}
 
-        {detail && <HedPublicCampaign key={detail[1]} campaignId={detail[1]} />}
+        {/* Reward Crowdfunding Views */}
+        {isRewardFeed && <EditionsFeed />}
+        {history && <RewardPublicFeed />}
+        {edition && <EditionsCampaign key={`${edition[1]}:${session?.userId ?? 'public'}:${edition[2] ?? 'public'}`} id={edition[1]} session={session} mode={(edition[2] as 'creator' | 'resolver') || 'public'} />}
+        {historicalRewards && session && <RewardBackerEntitlements key={session.userId} />}
+        {rewardDetail && <RewardPublicCampaign key={rewardDetail[1]} campaignId={rewardDetail[1]} />}
+        {isRewardCreator && session && <RewardCreatorStudio key={session.userId} userId={session.userId} />}
+        {isRewardMyRewards && (session ? <EditionsLibrary key={session.userId} userId={session.userId} /> : <p>Đăng nhập để xem thư viện PDF của bạn.</p>)}
+        {isRewardResolver && session && staff && <RewardResolverConsole key={session.userId} userId={session.userId} />}
+        {(isRewardCreator || isRewardResolver) && !session && <p>Đăng nhập để mở hồ sơ riêng tư. <a href="#/account">Đăng nhập</a></p>}
+        {isRewardResolver && session && !staff && <p>Tài khoản cần quyền ADMIN hoặc RESOLVER.</p>}
 
+        {/* Account / Workspace View */}
         {account && (
           <div className="public-account-page">
             <div className="feed-heading">
@@ -75,8 +118,12 @@ export function PublicArea({
                   <section className="panel">
                     <h2>Tài khoản FundTogether</h2>
                     <p className="public-wallet-address">{session.email ?? 'Tài khoản đã liên kết ví'}</p>
-                    <a className="button button--secondary" href="#/workspace">Mở quản lý gây quỹ</a>
-                    {staff && <a className="button button--secondary" href={internalHref}>{internalLabel}</a>}
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <a className="button button--primary" href="#/reward/creator">Mở Creator Studio</a>
+                      <a className="button button--secondary" href="#/reward/my-rewards">Xem phần thưởng đã ủng hộ</a>
+                      {staff && <a className="button button--secondary" href="#/reward/resolver">Thẩm định Reward (V1–V4)</a>}
+                      <a className="button button--secondary" href="#/workspace">Mở quản lý gây quỹ</a>
+                    </div>
                   </section>
                 )}
                 <AccountAccess session={session} onSession={onSession} />
@@ -100,16 +147,17 @@ export function PublicArea({
           </section>
         ))}
 
-        {!feed && !account && !detail && !organizations && (
+        {!isRewardFeed && !rewardDetail && !edition && !history && !historicalRewards && !isRewardCreator && !isRewardMyRewards && !isRewardResolver && !account && !organizations && (
           <section className="panel public-empty">
             <h1>Không tìm thấy trang</h1>
             <a className="button button--secondary" href="#/">
-              Về feed
+              Về trang chủ
             </a>
           </section>
         )}
       </main>
       <footer className="public-footer"><span>FundTogether</span><span>Môi trường phát triển · Mạng thử nghiệm</span></footer>
     </div>
-  )
+  );
 }
+

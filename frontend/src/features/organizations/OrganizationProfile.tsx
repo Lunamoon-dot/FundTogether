@@ -3,7 +3,6 @@ import { listOrganizations } from '../../lib/api/organizations'
 import { getErrorMessage } from '../../lib/api/error'
 import { OrganizationWallet } from './OrganizationWallet'
 import { organizationVerificationLabel } from './organization-verification'
-import { HedOrganizationVerification } from './HedOrganizationVerification'
 
 export function OrganizationProfile({ organizationId, userId }: { organizationId: string; userId: string }) {
   const organizations = useQuery({
@@ -28,7 +27,6 @@ export function OrganizationProfile({ organizationId, userId }: { organizationId
           <span>Tạo ngày {new Intl.DateTimeFormat('vi-VN').format(new Date(organization.createdAt))}</span></div>
       </section>
       <OrganizationWallet key={`${userId}:${organization.id}`} organization={organization} userId={userId} />
-      <HedOrganizationVerification organization={organization} />
     </div>
   )
 }

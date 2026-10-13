@@ -1,1 +1,1 @@
-import "./disbursement/hed-main";
+import "./reward/reward-main";

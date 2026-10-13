@@ -4,10 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --mode hed",
-    "dev:hed": "vite --mode hed",
-    "build": "tsc -b && vite build --mode hed",
-    "test": "node --test scripts/hed-context.test.mjs scripts/hed-cutover.test.mjs",
+    "dev": "vite --mode reward",
+    "dev:reward": "vite --mode reward",
+    "build": "tsc -b && vite build --mode reward",
+    "test": "node --test scripts/*.test.mjs",
     "lint": "oxlint",
     "preview": "vite preview"
   },

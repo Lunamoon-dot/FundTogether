@@ -5,7 +5,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { and, eq, gt, isNull, lt, ne, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, lt, ne } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { createHash, randomBytes } from "node:crypto";
 import * as argon2 from "argon2";
@@ -19,8 +19,7 @@ import {
   users,
   walletLinks,
   organizations,
-  advanceCampaignPlans,
-  campaignSubmissions,
+  rewardCampaigns,
 } from "../../database/schema";
 
 export const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -171,11 +170,9 @@ export class AuthService {
       const [organization] = await tx.select({ id: organizations.id }).from(organizations)
         .where(eq(organizations.representativeWalletLinkId, wallet.id)).limit(1);
       if (organization) throw new ConflictException("Không thể gỡ ví đại diện tổ chức. Ví này đang ràng buộc quyền quản lý campaign.");
-      const [advancePlan] = await tx.select({ id: advanceCampaignPlans.campaignMetadataId }).from(advanceCampaignPlans)
-        .where(and(eq(advanceCampaignPlans.chainId, chainId), eq(advanceCampaignPlans.organizerWallet, wallet.address))).limit(1);
-      const [submission] = await tx.select({ id: campaignSubmissions.campaignMetadataId }).from(campaignSubmissions)
-        .where(sql`lower(${campaignSubmissions.plan}->>'organizer') = ${wallet.address} AND ${campaignSubmissions.plan}->>'chainId' = ${String(chainId)}`).limit(1);
-      if (advancePlan || submission) throw new ConflictException("Không thể gỡ ví đã gắn với kế hoạch campaign được chốt.");
+      const [edition] = await tx.select({ id: rewardCampaigns.id }).from(rewardCampaigns)
+        .where(eq(rewardCampaigns.payoutWalletLinkId, wallet.id)).limit(1);
+      if (edition) throw new ConflictException("Ví này đang gắn với cam kết Editions đã khóa; không thể gỡ liên kết.");
       await tx.delete(walletLinks).where(and(eq(walletLinks.id, wallet.id), eq(walletLinks.userId, userId)));
       // Old authenticated sessions must not retain access after wallet removal.
       await tx.delete(authSessions).where(and(eq(authSessions.userId, userId), ne(authSessions.tokenHash, hashToken(token))));
