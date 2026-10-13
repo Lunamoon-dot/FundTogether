@@ -14,9 +14,8 @@ import type {
   ClaimRewardRefundInput,
   NotifyRewardPledgeInput,
   OpenRewardDisputeInput,
-  UpdateShippingAddressInput,
+  ResolveRewardDisputeInput,
 } from "./reward-pledge.schema";
-import { RewardCryptoService } from "./reward-crypto.service";
 import { RewardIndexerService } from "./reward-indexer.service";
 
 
@@ -24,7 +23,6 @@ import { RewardIndexerService } from "./reward-indexer.service";
 export class RewardPledgeService {
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: NodePgDatabase<typeof schema>,
-    private readonly cryptoService: RewardCryptoService,
     private readonly indexerService: RewardIndexerService
   ) {}
 
@@ -53,96 +51,64 @@ export class RewardPledgeService {
     return { entitlement, tier, campaign };
   }
 
-  /**
-   * Secure Shipping PII Update: AES-256-GCM encrypted off-chain storage
-   */
-  async updateShipping(userId: string, entitlementId: string, input: UpdateShippingAddressInput) {
-    const [entitlement] = await this.db.select().from(rewardEntitlements).where(eq(rewardEntitlements.id, entitlementId));
-    if (!entitlement) throw new NotFoundException("Reward entitlement not found");
-    if (entitlement.backerUserId !== userId) throw new ForbiddenException("Only entitlement owner can update shipping info");
-
-    // Encrypt sensitive PII using AES-256-GCM
-    const encryptedResult = this.cryptoService.encryptShipping({
-      fullName: input.fullName,
-      address: input.address,
-      phone: input.phone,
-    });
-
-    const [updated] = await this.db.update(rewardEntitlements).set({
-      shippingEncrypted: encryptedResult.encrypted,
-      shippingIv: encryptedResult.iv,
-      shippingTag: encryptedResult.tag,
-      shippingUpdatedAt: new Date(),
-      // Mask plaintext columns for security
-      shippingFullName: "*** Protected ***",
-      shippingAddress: "*** Encrypted (AES-256-GCM) ***",
-      shippingPhone: "*** Protected ***",
-      status: entitlement.status === "ACTIVE" ? "REDEEM_REQUESTED" : entitlement.status,
-      updatedAt: new Date(),
-    }).where(eq(rewardEntitlements.id, entitlementId)).returning();
-
-    return updated;
-  }
-
-  /**
-   * Controlled ACL PII Decryption: accessible ONLY by backer or campaign creator
-   */
-  async getDecryptedShipping(requesterUserId: string, entitlementId: string) {
-    const [entitlement] = await this.db.select().from(rewardEntitlements).where(eq(rewardEntitlements.id, entitlementId));
-    if (!entitlement) throw new NotFoundException("Reward entitlement not found");
-
-    const [campaign] = await this.db.select().from(rewardCampaigns).where(eq(rewardCampaigns.id, entitlement.campaignId));
-    if (!campaign) throw new NotFoundException("Campaign not found");
-
-    const isBacker = entitlement.backerUserId === requesterUserId;
-    const isCreator = campaign.creatorUserId === requesterUserId;
-
-    if (!isBacker && !isCreator) {
-      throw new ForbiddenException("Access denied: Shipping PII is strictly protected by ACL");
-    }
-
-    if (!entitlement.shippingEncrypted || !entitlement.shippingIv || !entitlement.shippingTag) {
-      return null;
-    }
-
-    return this.cryptoService.decryptShipping(
-      entitlement.shippingEncrypted,
-      entitlement.shippingIv,
-      entitlement.shippingTag
-    );
-  }
-
   async listMyEntitlements(userId: string) {
     const entitlements = await this.db.select().from(rewardEntitlements).where(eq(rewardEntitlements.backerUserId, userId));
     return Promise.all(entitlements.map(async e => {
       const [tier] = await this.db.select().from(rewardTiers).where(eq(rewardTiers.id, e.tierId));
       const [campaign] = await this.db.select().from(rewardCampaigns).where(eq(rewardCampaigns.id, e.campaignId));
+      const projections = await this.db.select().from(schema.rewardCampaignProjection)
+        .where(eq(schema.rewardCampaignProjection.campaignMetadataId, e.campaignId));
+      const projection = projections.length === 1 ? projections[0] : null;
       return {
         ...e,
         tier,
         campaignTitle: campaign?.title || "Unknown Campaign",
         campaignStatus: campaign?.status || "UNKNOWN",
-        onchainCampaignId: campaign?.onchainCampaignId?.toString() || null,
+        onchainCampaignId: projection?.onchainCampaignId || null,
+        contractAddress: projection?.streamId.match(/^REWARD:31339:(0x[0-9a-fA-F]{40})$/)?.[1] || null,
       };
     }));
   }
 
-  async confirmDelivery(userId: string, entitlementId: string) {
-    const [entitlement] = await this.db.select().from(rewardEntitlements).where(eq(rewardEntitlements.id, entitlementId));
-    if (!entitlement) throw new NotFoundException("Reward entitlement not found");
-    if (entitlement.backerUserId !== userId) throw new ForbiddenException("Only backer can confirm delivery");
-    if (entitlement.status !== "DELIVERED" && entitlement.status !== "FULFILLING") {
-      throw new ConflictException("Entitlement must be in delivery before confirming receipt");
+  async resolveDispute(resolverUserId: string, disputeId: string, input: ResolveRewardDisputeInput) {
+    const [role] = await this.db.select().from(schema.platformRoles).where(eq(schema.platformRoles.userId, resolverUserId)).limit(1);
+    if (!role?.roles.includes("RESOLVER")) {
+      throw new ForbiddenException("RESOLVER platform role required to resolve reward disputes");
     }
 
-    const [updated] = await this.db.update(rewardEntitlements).set({
-      status: "CONFIRMED",
-      confirmedAt: new Date(),
-      updatedAt: new Date(),
-    }).where(eq(rewardEntitlements.id, entitlementId)).returning();
+    const [dispute] = await this.db.select().from(rewardDisputes).where(eq(rewardDisputes.id, disputeId));
+    if (!dispute) throw new NotFoundException("Dispute not found");
+    if (dispute.status !== "OPEN") throw new ConflictException("Dispute has already been resolved");
 
-    return updated;
+    return this.db.transaction(async tx => {
+      const [updatedDispute] = await tx.update(rewardDisputes).set({
+        status: input.outcome,
+        resolutionNote: input.resolutionNote,
+        resolvedBy: resolverUserId,
+        resolvedAt: new Date(),
+      }).where(eq(rewardDisputes.id, disputeId)).returning();
+
+      // Historical off-chain decision only: this does not create an on-chain refund right.
+      let nextEntitlementStatus = "DELIVERED";
+      if (input.outcome === "RESOLVED_BACKER") {
+        nextEntitlementStatus = "REFUND_ELIGIBLE";
+      } else if (input.outcome === "RESOLVED_CREATOR" || input.outcome === "DISMISSED") {
+        nextEntitlementStatus = "CONFIRMED";
+      }
+
+      await tx.update(rewardEntitlements).set({
+        status: nextEntitlementStatus,
+        updatedAt: new Date(),
+      }).where(eq(rewardEntitlements.id, dispute.entitlementId));
+
+      return updatedDispute;
+    });
   }
+
+  async listDisputesForResolver() {
+    return this.db.select().from(rewardDisputes);
+  }
+
 
   async openDispute(userId: string, entitlementId: string, input: OpenRewardDisputeInput) {
     const [entitlement] = await this.db.select().from(rewardEntitlements).where(eq(rewardEntitlements.id, entitlementId));

@@ -13,7 +13,7 @@ const chain = defineChain({
   rpcUrls: { default: { http: [rpcUrl] } },
 });
 
-async function main() {
+async function runScenarios() {
   console.log('=== Starting Reward Crowdfunding 6-Scenario Acceptance Suite ===');
   const { reward: rewardArtifact, token: tokenArtifact } = artifacts(root);
   const policyHash = hashJson(policy);
@@ -324,6 +324,18 @@ async function main() {
   }
 
   console.log('\n=== All 6 Reward Crowdfunding E2E Scenarios Passed Successfully ===');
+}
+
+async function main() {
+  const client = createPublicClient({ chain, transport: http(rpcUrl), pollingInterval: 100 });
+  assert.equal(await client.getChainId(), 31339, 'Reward chain 31339 required');
+  assert.match(await client.request({ method: 'web3_clientVersion' }), /anvil/i, 'Local Anvil required');
+  const snapshot = await client.request({ method: 'evm_snapshot' });
+  try {
+    await runScenarios();
+  } finally {
+    assert.equal(await client.request({ method: 'evm_revert', params: [snapshot] }), true, 'Reward E2E must restore the shared local chain');
+  }
 }
 
 if (require.main === module) {

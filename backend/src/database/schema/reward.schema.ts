@@ -1,8 +1,11 @@
 import { pgTable, uuid, varchar, text, integer, numeric, timestamp, boolean, jsonb, primaryKey, index, uniqueIndex, check } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import { users } from "./users.schema";
+import { users, walletLinks } from "./users.schema";
 import { organizations } from "./organizations.schema";
 import { indexerStreams } from "./indexer.schema";
+import type { CreateRewardCampaignDraftInput } from "../../reward/reward-campaign.schema";
+import type { EditionsPreparation } from "../../reward/reward-editions.schema";
+import type { EditionsSnapshot } from "../../reward/reward-editions-commitment";
 
 export const rewardCreatorProfiles = pgTable("reward_creator_profiles", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -32,7 +35,12 @@ export const rewardCampaigns = pgTable("reward_campaigns", {
   commitmentHash: varchar("commitment_hash", { length: 66 }),
   goal: numeric("goal", { precision: 78, scale: 0 }).notNull(),
   fundingDuration: integer("funding_duration").notNull().default(2592000), // 30 days
-  policyHash: varchar("policy_hash", { length: 66 }).notNull(),
+  policyHash: varchar("policy_hash", { length: 66 }),
+  draftConfig: jsonb("draft_config").$type<CreateRewardCampaignDraftInput>(),
+  reviewPreparation: jsonb("review_preparation").$type<EditionsPreparation>(),
+  frozenSnapshot: jsonb("frozen_snapshot").$type<EditionsSnapshot>(),
+  revision: integer("revision").notNull().default(0),
+  payoutWalletLinkId: uuid("payout_wallet_link_id").references(() => walletLinks.id),
   onchainCampaignId: numeric("onchain_campaign_id", { precision: 78, scale: 0 }),
   status: varchar("status", { length: 32 }).notNull().default("DRAFT"),
   frozenAt: timestamp("frozen_at", { withTimezone: true }),
@@ -42,6 +50,8 @@ export const rewardCampaigns = pgTable("reward_campaigns", {
   index("reward_campaign_creator_idx").on(table.creatorUserId),
   index("reward_campaign_status_idx").on(table.status),
   check("reward_campaign_goal_check", sql`${table.goal} > 0`),
+  check("reward_campaign_revision_check", sql`${table.revision} >= 0`),
+  check("reward_campaign_policy_check", sql`${table.policyHash} IS NOT NULL OR (${table.draftConfig} IS NOT NULL AND ${table.category} = 'COMICS_ARTBOOK')`),
   check("reward_campaign_status_check", sql`${table.status} IN ('DRAFT', 'FROZEN', 'UNDER_REVIEW', 'APPROVED', 'PUBLISHED', 'ACTIVE', 'PRODUCTION_VERIFIED', 'FULFILLMENT_COMPLETE', 'COMPLETED', 'STOPPED')`),
 ]);
 
@@ -52,10 +62,28 @@ export const rewardReviews = pgTable("reward_reviews", {
   outcome: varchar("outcome", { length: 32 }).notNull(),
   decisionReason: text("decision_reason").notNull(),
   commitmentHash: varchar("commitment_hash", { length: 66 }).notNull(),
+  frozenSnapshot: jsonb("frozen_snapshot").$type<EditionsSnapshot>(),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }).defaultNow().notNull(),
 }, table => [
   index("reward_review_campaign_idx").on(table.campaignId),
   check("reward_review_outcome_check", sql`${table.outcome} IN ('APPROVED', 'CHANGES_REQUESTED', 'REJECTED')`),
+]);
+
+export const rewardEditionsSamples = pgTable("reward_editions_samples", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  campaignId: uuid("campaign_id").notNull().references(() => rewardCampaigns.id),
+  ownerUserId: uuid("owner_user_id").notNull().references(() => users.id),
+  objectId: uuid("object_id").notNull().unique(),
+  sha256: varchar("sha256", { length: 66 }).notNull(),
+  mediaType: varchar("media_type", { length: 50 }).notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  purpose: varchar("purpose", { length: 32 }).notNull().default("SAMPLE_PAGE"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, table => [
+  index("reward_editions_sample_campaign_idx").on(table.campaignId),
+  check("reward_editions_sample_media_check", sql`${table.mediaType} IN ('application/pdf', 'image/png', 'image/jpeg')`),
+  check("reward_editions_sample_size_check", sql`${table.sizeBytes} > 0 AND ${table.sizeBytes} <= 10485760`),
+  check("reward_editions_sample_purpose_check", sql`${table.purpose} = 'SAMPLE_PAGE'`),
 ]);
 
 export const rewardTiers = pgTable("reward_tiers", {
@@ -90,18 +118,6 @@ export const rewardEntitlements = pgTable("reward_entitlements", {
   logIndex: integer("log_index"),
   status: varchar("status", { length: 32 }).notNull().default("PENDING_FUNDING"),
   digitalAccessCode: varchar("digital_access_code", { length: 100 }),
-  // Encrypted PII shipping details (AES-256-GCM)
-  shippingEncrypted: text("shipping_encrypted"),
-  shippingIv: varchar("shipping_iv", { length: 64 }),
-  shippingTag: varchar("shipping_tag", { length: 64 }),
-  shippingUpdatedAt: timestamp("shipping_updated_at", { withTimezone: true }),
-  // Plaintext convenience fields for backwards compatibility
-  shippingFullName: varchar("shipping_full_name", { length: 150 }),
-  shippingAddress: text("shipping_address"),
-  shippingPhone: varchar("shipping_phone", { length: 50 }),
-  carrierTrackingCode: varchar("carrier_tracking_code", { length: 100 }),
-  deliveredAt: timestamp("delivered_at", { withTimezone: true }),
-  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, table => [
@@ -110,30 +126,6 @@ export const rewardEntitlements = pgTable("reward_entitlements", {
   index("reward_entitlement_tx_hash_idx").on(table.txHash),
   uniqueIndex("reward_entitlements_tx_log_idx").on(table.txHash, table.logIndex),
   check("reward_entitlement_status_check", sql`${table.status} IN ('PENDING_FUNDING', 'ACTIVE', 'REDEEM_REQUESTED', 'FULFILLING', 'DELIVERED', 'CONFIRMED', 'DISPUTED', 'REFUND_ELIGIBLE', 'REFUNDED')`),
-]);
-
-export const rewardFulfillmentBatches = pgTable("reward_fulfillment_batches", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  campaignId: uuid("campaign_id").notNull().references(() => rewardCampaigns.id),
-  batchNumber: integer("batch_number").notNull(),
-  title: varchar("title", { length: 150 }).notNull(),
-  carrier: varchar("carrier", { length: 100 }).notNull(),
-  manifestHash: varchar("manifest_hash", { length: 66 }).notNull(),
-  shippedItemCount: integer("shipped_item_count").notNull(),
-  shippedAt: timestamp("shipped_at", { withTimezone: true }).defaultNow().notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-}, table => [
-  uniqueIndex("reward_batch_campaign_idx").on(table.campaignId, table.batchNumber),
-]);
-
-export const rewardBatchEntitlements = pgTable("reward_batch_entitlements", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  batchId: uuid("batch_id").notNull().references(() => rewardFulfillmentBatches.id),
-  entitlementId: uuid("entitlement_id").notNull().references(() => rewardEntitlements.id),
-  carrierTrackingCode: varchar("carrier_tracking_code", { length: 100 }).notNull(),
-  shippedAt: timestamp("shipped_at", { withTimezone: true }).defaultNow().notNull(),
-}, table => [
-  uniqueIndex("reward_batch_entitlement_unique_idx").on(table.batchId, table.entitlementId),
 ]);
 
 export const rewardDisputes = pgTable("reward_disputes", {

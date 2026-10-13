@@ -14,7 +14,7 @@ $webProcess = $null
 function Get-RewardHealth {
     param($Manifest)
     $health = Invoke-RestMethod -Uri 'http://127.0.0.1:3002/health' -UseBasicParsing -TimeoutSec 2
-    & node $identity health $manifestFile ($health | ConvertTo-Json -Compress)
+    & node $identity health $manifestFile $health.status $health.protocolKind $health.chainId $health.contractAddress
     if ($LASTEXITCODE -ne 0) { throw 'Reward API health identity does not match the current deployment manifest.' }
     return $health
 }

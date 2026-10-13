@@ -2,23 +2,19 @@ import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Post,
 import type { Request } from "express";
 import { AuthGuard } from "../modules/auth/auth.guard";
 import { RewardCampaignService } from "./reward-campaign.service";
-import { RewardFulfillmentService } from "./reward-fulfillment.service";
-import { RewardPledgeService } from "./reward-pledge.service";
 import {
   createRewardCampaignDraftSchema,
   registerRewardOnchainSchema,
   creatorVerificationInputSchema,
   completeRewardCampaignSchema,
+  assertEmptyRewardBody,
 } from "./reward-campaign.schema";
-import { createFulfillmentBatchSchema } from "./reward-pledge.schema";
 
 @Controller("v1/reward/creator")
 @UseGuards(AuthGuard)
 export class RewardCreatorController {
   constructor(
     private readonly campaigns: RewardCampaignService,
-    private readonly fulfillment: RewardFulfillmentService,
-    private readonly pledgeService: RewardPledgeService,
   ) {}
 
   @Post("profile")
@@ -50,17 +46,19 @@ export class RewardCreatorController {
   }
 
   @Get("campaigns/:id")
-  getCampaign(@Param("id", new ParseUUIDPipe()) id: string) {
-    return this.campaigns.getById(id);
+  getCampaign(@Param("id", new ParseUUIDPipe()) id: string, @Req() req: Request) {
+    return this.campaigns.getById(id, req.account!.userId);
   }
 
   @Post("campaigns/:id/freeze")
-  freeze(@Param("id", new ParseUUIDPipe()) id: string, @Req() req: Request) {
+  freeze(@Param("id", new ParseUUIDPipe()) id: string, @Req() req: Request, @Body() body: unknown) {
+    assertEmptyRewardBody(body);
     return this.campaigns.freeze(id, req.account!.userId);
   }
 
   @Post("campaigns/:id/submit-review")
-  submitForReview(@Param("id", new ParseUUIDPipe()) id: string, @Req() req: Request) {
+  submitForReview(@Param("id", new ParseUUIDPipe()) id: string, @Req() req: Request, @Body() body: unknown) {
+    assertEmptyRewardBody(body);
     return this.campaigns.submitForReview(id, req.account!.userId);
   }
 
@@ -87,33 +85,4 @@ export class RewardCreatorController {
     return this.campaigns.completeCampaignOnchain(req.account!.userId, id, parsed.data.txHash);
   }
 
-  @Post("campaigns/:id/batches")
-  createBatch(@Param("id", new ParseUUIDPipe()) id: string, @Body() body: unknown, @Req() req: Request) {
-    const parsed = createFulfillmentBatchSchema.safeParse(body);
-    if (!parsed.success) {
-      throw new BadRequestException({ message: "Invalid fulfillment batch payload", issues: parsed.error.issues });
-    }
-    return this.fulfillment.createBatch(req.account!.userId, id, parsed.data);
-  }
-
-  @Get("campaigns/:id/batches")
-  listBatches(@Param("id", new ParseUUIDPipe()) id: string) {
-    return this.fulfillment.listBatches(id);
-  }
-
-  @Get("campaigns/:id/entitlements")
-  listEntitlementsToFulfill(@Param("id", new ParseUUIDPipe()) id: string, @Req() req: Request) {
-    return this.fulfillment.listEntitlementsToFulfill(req.account!.userId, id);
-  }
-
-  @Post("entitlements/:id/delivered")
-  markDelivered(@Param("id", new ParseUUIDPipe()) id: string, @Req() req: Request) {
-    return this.fulfillment.markDelivered(req.account!.userId, id);
-  }
-
-  @Get("entitlements/:id/shipping")
-  getDecryptedShipping(@Param("id", new ParseUUIDPipe()) id: string, @Req() req: Request) {
-    return this.pledgeService.getDecryptedShipping(req.account!.userId, id);
-  }
 }
-

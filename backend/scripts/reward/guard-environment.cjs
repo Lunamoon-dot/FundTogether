@@ -21,7 +21,6 @@ function guardEnvironment(env) {
   } catch { fail('database'); }
   localUrl(env.REWARD_RPC_URL, 'REWARD_RPC_URL', '9548');
   localUrl(env.S3_ENDPOINT, 'S3_ENDPOINT', '9202');
-  if (!env.REWARD_PII_ENCRYPTION_KEY || Buffer.byteLength(env.REWARD_PII_ENCRYPTION_KEY) < 32) fail('REWARD_PII_ENCRYPTION_KEY');
   return { protocolKind: 'REWARD', databaseName: 'fundtogether_reward' };
 }
 

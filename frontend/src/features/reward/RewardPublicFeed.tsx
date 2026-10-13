@@ -40,14 +40,14 @@ export function RewardPublicFeed() {
   return (
     <div className="reward-container">
       <header className="reward-hero">
-        <span className="reward-badge-category">Gây quỹ Đổi Quà · Reward Crowdfunding</span>
-        <h1 className="reward-hero-title">Khám phá Truyện tranh & Sách nghệ thuật Độc lập</h1>
+        <span className="reward-badge-category">Reward · Hồ sơ lịch sử</span>
+        <h1 className="reward-hero-title">Campaign Reward đã tồn tại</h1>
         <p className="reward-hero-pitch">
-          Ủng hộ các tác giả truyện tranh và họa sĩ xuất bản tác phẩm độc lập. Nhận ấn phẩm giới hạn, quà tặng độc quyền và mã đọc kỹ thuật số với cơ chế bảo vệ kép (Dual-Exposure).
+          Khu vực hỗ trợ campaign và quyền lợi từ hợp đồng Reward cũ. Các quy tắc dưới đây thuộc phiên bản lịch sử; Editions mới dùng một PDF và chính sách escrow riêng.
         </p>
         <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
-          <a className="button button--primary" href="#/reward/creator">Tạo dự án truyện tranh</a>
-          <a className="button button--secondary" style={{ color: '#fff', borderColor: '#475569' }} href="#/reward/my-rewards">Phần thưởng của tôi</a>
+          <a className="button button--primary" href="#/reward">Về FundTogether Editions</a>
+          <a className="button button--secondary" style={{ color: '#fff', borderColor: '#475569' }} href="#/reward/history/my-rewards">Quyền lợi lịch sử của tôi</a>
         </div>
       </header>
 
@@ -88,9 +88,9 @@ export function RewardPublicFeed() {
       {filtered.length === 0 ? (
         <section className="panel" style={{ textAlign: 'center', padding: '40px 20px' }}>
           <h2>Chưa có dự án nào trong mục này</h2>
-          <p className="muted">Hãy trở thành tác giả đầu tiên khởi tạo chiến dịch gây quỹ độc lập!</p>
-          <a className="button button--primary" href="#/reward/creator" style={{ marginTop: '12px' }}>
-            Khởi tạo chiến dịch mới
+          <p className="muted">Không có hồ sơ lịch sử trong mục này.</p>
+          <a className="button button--primary" href="#/reward" style={{ marginTop: '12px' }}>
+            Về Editions
           </a>
         </section>
       ) : (

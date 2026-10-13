@@ -2,8 +2,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Client } = require('pg');
 const { guardEnvironment } = require('./guard-environment.cjs');
+const net = require('node:net');
 
-const migrationId = '0000_reward_baseline';
+const migrationIds = ['0000_reward_baseline', '0001_reward_editions_drafts', '0002_reward_editions_review', '0003_reward_editions_chain', '0004_reward_editions_delivery', '0005_reward_physical_retirement'];
 
 function readEnvironment(file) {
   const values = {};
@@ -26,10 +27,6 @@ async function migrateRewardDatabase(root, options = {}) {
     throw new Error(`Reward migration must target ${expectedDatabaseName}`);
   }
 
-  const sql = fs.readFileSync(
-    path.join(root, 'backend', 'drizzle', 'reward', '0000_reward_baseline.sql'),
-    'utf8',
-  );
   const client = new Client({ connectionString: databaseUrl });
   await client.connect();
   try {
@@ -40,13 +37,24 @@ async function migrateRewardDatabase(root, options = {}) {
         applied_at timestamp with time zone DEFAULT now() NOT NULL
       )
     `);
-    const { rowCount } = await client.query(
-      'SELECT 1 FROM reward_schema_migrations WHERE id = $1',
-      [migrationId],
-    );
-    if (!rowCount) {
-      await client.query(sql);
-      await client.query('INSERT INTO reward_schema_migrations (id) VALUES ($1)', [migrationId]);
+    for (const migrationId of migrationIds) {
+      const { rowCount } = await client.query(
+        'SELECT 1 FROM reward_schema_migrations WHERE id = $1', [migrationId],
+      );
+      if (!rowCount) {
+        if (migrationId === '0005_reward_physical_retirement' && target.pathname === `/${databaseName}`) {
+          // Old running processes still select shipping columns. Do not break them with DDL.
+          await new Promise((resolve, reject) => {
+            const socket = net.createConnection({ host: '127.0.0.1', port: Number(environment.PORT) });
+            socket.once('connect', () => { socket.destroy(); reject(new Error('Stop the existing Reward API before applying physical retirement migration 0005')); });
+            socket.once('error', error => { socket.destroy(); error.code === 'ECONNREFUSED' ? resolve() : reject(error); });
+            socket.setTimeout(2000, () => { socket.destroy(); reject(new Error('Cannot verify API is stopped before retirement')); });
+          });
+        }
+        const sql = fs.readFileSync(path.join(root, 'backend', 'drizzle', 'reward', `${migrationId}.sql`), 'utf8');
+        await client.query(sql);
+        await client.query('INSERT INTO reward_schema_migrations (id) VALUES ($1)', [migrationId]);
+      }
     }
     await client.query('COMMIT');
   } catch (error) {

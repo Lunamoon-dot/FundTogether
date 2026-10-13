@@ -16,7 +16,6 @@ const valid = {
   S3_BUCKET: 'fundtogether-reward-private',
   S3_ACCESS_KEY_ID: 'reward-test',
   S3_SECRET_ACCESS_KEY: 'storage-secret',
-  REWARD_PII_ENCRYPTION_KEY: 'test_reward_pii_encryption_key_32bytes_safe!!',
   REWARD_INDEXER_POLL_ENABLED: 'true',
 };
 
@@ -29,7 +28,6 @@ for (const [field, value] of [
   ['DATABASE_URL', 'postgresql://test:fixture@127.0.0.1:5435/fundtogether_hed'],
   ['REWARD_RPC_URL', 'http://127.0.0.1:9547'],
   ['S3_ENDPOINT', 'http://localhost:9200'],
-  ['REWARD_PII_ENCRYPTION_KEY', 'short'],
 ]) {
   test(`rejects invalid ${field}`, () => {
     assert.throws(() => guardEnvironment({ ...valid, [field]: value }));

@@ -7,7 +7,7 @@
     "dev": "vite --mode reward",
     "dev:reward": "vite --mode reward",
     "build": "tsc -b && vite build --mode reward",
-    "test": "node --test scripts/reward-context.test.mjs",
+    "test": "node --test scripts/*.test.mjs",
     "lint": "oxlint",
     "preview": "vite preview"
   },

@@ -1,7 +1,7 @@
 # ADR 001: Reward Crowdfunding Financial Invariants & Verification Flows
 
 > Ngày quyết định: 2026-10-12  
-> Trạng thái: APPROVED FOR IMPLEMENTATION  
+> Trạng thái: SUPERSEDED FOR NEW REWARD CAMPAIGNS by `docs/reward/FUNDTOGETHER_CAMPAIGN_CONFIG_MVP.md` (2026-10-13). Retained as the historical physical-fulfilment baseline; it does not authorise new physical reward work.
 > Tham chiếu: `docs/FUNDTOGETHER_REWARD_PIVOT_AGENT_SPEC.md`, `contracts/src/reward/FundTogetherReward.sol`
 
 ---

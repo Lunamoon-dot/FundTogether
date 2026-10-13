@@ -347,32 +347,6 @@
   color: #15803d;
 }
 
-.reward-shipping-form {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  background: #f8fafc;
-  padding: 14px;
-  border-radius: 6px;
-}
-
-.reward-shipping-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #334155;
-}
-
-.reward-shipping-form input,
-.reward-shipping-form textarea {
-  padding: 8px 10px;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-  font-size: 13.5px;
-}
-
 /* Creator Studio */
 .reward-studio-tiers-builder {
   background: #f8fafc;

@@ -4,3 +4,4 @@ export * from './organizations.schema';
 export * from './platform-roles.schema';
 export * from './indexer.schema';
 export * from './reward.schema';
+export * from './editions.schema';

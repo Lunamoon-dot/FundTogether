@@ -17,6 +17,8 @@ import type {
   AdminReviewCreatorInput,
   ResolverReviewCampaignInput,
 } from "./reward-campaign.schema";
+import { createRewardCampaignDraftSchema } from "./reward-campaign.schema";
+import { isEditionsCampaign, requireLegacyRewardCampaign } from "./reward-editions.policy";
 import { RewardCryptoService } from "./reward-crypto.service";
 import { RewardIndexerService } from "./reward-indexer.service";
 import rewardAbiJson = require("../blockchain/generated/reward/fund-together-reward.abi.json");
@@ -78,6 +80,7 @@ export class RewardCampaignService {
 
     const [profile] = await this.db.select().from(rewardCreatorProfiles).where(eq(rewardCreatorProfiles.id, profileId));
     if (!profile) throw new NotFoundException("Creator profile not found");
+    if (profile.userId === adminUserId) throw new ForbiddenException("Creator cannot verify their own profile");
 
     const [updated] = await this.db.update(rewardCreatorProfiles).set({
       status: input.outcome,
@@ -99,69 +102,27 @@ export class RewardCampaignService {
    * Create campaign draft - requires verified Creator profile
    */
   async createDraft(userId: string, input: CreateRewardCampaignDraftInput) {
+    const parsed = createRewardCampaignDraftSchema.safeParse(input);
+    if (!parsed.success) {
+      throw new BadRequestException({ message: "Invalid Editions draft", issues: parsed.error.issues });
+    }
     const [profile] = await this.db.select().from(rewardCreatorProfiles).where(eq(rewardCreatorProfiles.userId, userId));
     if (!profile || profile.status !== "VERIFIED") {
       throw new ForbiddenException("Creator must be verified by Admin before creating a campaign draft (Flow V1)");
     }
-
-    return this.db.transaction(async tx => {
-      const [campaign] = await tx.insert(rewardCampaigns).values({
-        creatorUserId: userId,
-        title: input.title,
-        pitch: input.pitch,
-        story: input.story,
-        category: input.category,
-        goal: input.goal,
-        fundingDuration: input.fundingDuration,
-        policyHash: input.policyHash,
-        status: "DRAFT",
-      }).returning();
-
-      const createdTiers = [];
-      for (let i = 0; i < input.tiers.length; i++) {
-        const t = input.tiers[i];
-        const [tier] = await tx.insert(rewardTiers).values({
-          campaignId: campaign.id,
-          tierIndex: i,
-          title: t.title,
-          description: t.description,
-          price: t.price,
-          maxQuantity: t.maxQuantity,
-          pledgedQuantity: 0,
-          isDigital: t.isDigital,
-          rewardItems: t.rewardItems,
-          estimatedDeliveryAt: t.estimatedDeliveryAt ? new Date(t.estimatedDeliveryAt) : null,
-        }).returning();
-        createdTiers.push(tier);
-      }
-
-      const commitmentHash = this.cryptoService.computeCommitmentHash({
-        title: input.title,
-        pitch: input.pitch,
-        story: input.story,
-        category: input.category,
-        goal: input.goal,
-        fundingDuration: input.fundingDuration,
-        tiers: createdTiers.map(t => ({
-          tierIndex: t.tierIndex,
-          title: t.title,
-          description: t.description,
-          price: t.price,
-          maxQuantity: t.maxQuantity,
-          isDigital: t.isDigital,
-          rewardItems: t.rewardItems as string[],
-          estimatedDeliveryAt: t.estimatedDeliveryAt?.toISOString(),
-        })),
-        ipDeclaration: profile.ipDeclaration,
-      });
-
-      const [updated] = await tx.update(rewardCampaigns)
-        .set({ commitmentHash, updatedAt: new Date() })
-        .where(eq(rewardCampaigns.id, campaign.id))
-        .returning();
-
-      return { ...updated, tiers: createdTiers };
-    });
+    const config = parsed.data;
+    const [campaign] = await this.db.insert(rewardCampaigns).values({
+      creatorUserId: userId,
+      title: config.title,
+      pitch: config.pitch,
+      story: config.story,
+      category: config.category,
+      goal: config.goal,
+      fundingDuration: config.fundingDuration,
+      draftConfig: config,
+      status: "DRAFT",
+    }).returning();
+    return { ...campaign, tiers: [] };
   }
 
   /**
@@ -171,6 +132,7 @@ export class RewardCampaignService {
     const [campaign] = await this.db.select().from(rewardCampaigns).where(eq(rewardCampaigns.id, id));
     if (!campaign) throw new NotFoundException("Reward campaign not found");
     if (campaign.creatorUserId !== userId) throw new ForbiddenException("Only creator can freeze campaign draft");
+    requireLegacyRewardCampaign(campaign);
     if (campaign.frozenAt) throw new ConflictException("Campaign draft already frozen");
 
     const tiers = await this.db.select().from(rewardTiers).where(eq(rewardTiers.campaignId, id));
@@ -213,6 +175,7 @@ export class RewardCampaignService {
     const [campaign] = await this.db.select().from(rewardCampaigns).where(eq(rewardCampaigns.id, id));
     if (!campaign) throw new NotFoundException("Reward campaign not found");
     if (campaign.creatorUserId !== userId) throw new ForbiddenException("Only creator can submit for review");
+    requireLegacyRewardCampaign(campaign);
     if (campaign.status !== "FROZEN") throw new BadRequestException("Campaign must be frozen before submitting for review");
 
     const [updated] = await this.db.update(rewardCampaigns).set({
@@ -234,6 +197,7 @@ export class RewardCampaignService {
 
     const [campaign] = await this.db.select().from(rewardCampaigns).where(eq(rewardCampaigns.id, campaignId));
     if (!campaign) throw new NotFoundException("Reward campaign not found");
+    requireLegacyRewardCampaign(campaign);
     if (campaign.status !== "UNDER_REVIEW") throw new BadRequestException("Campaign is not pending review");
 
     return this.db.transaction(async tx => {
@@ -274,6 +238,7 @@ export class RewardCampaignService {
     const [campaign] = await this.db.select().from(rewardCampaigns).where(eq(rewardCampaigns.id, id));
     if (!campaign) throw new NotFoundException("Reward campaign not found");
     if (campaign.creatorUserId !== userId) throw new ForbiddenException("Only creator can register on-chain ID");
+    requireLegacyRewardCampaign(campaign);
 
     // Must be approved by Resolver (Flow V2)
     if (campaign.status !== "APPROVED") {
@@ -381,6 +346,7 @@ export class RewardCampaignService {
 
     const [campaign] = await this.db.select().from(rewardCampaigns).where(eq(rewardCampaigns.id, campaignId));
     if (!campaign) throw new NotFoundException("Reward campaign not found");
+    requireLegacyRewardCampaign(campaign);
     if (!campaign.onchainCampaignId) {
       throw new BadRequestException("Campaign is not registered on-chain");
     }
@@ -410,6 +376,7 @@ export class RewardCampaignService {
 
     const [campaign] = await this.db.select().from(rewardCampaigns).where(eq(rewardCampaigns.id, campaignId));
     if (!campaign) throw new NotFoundException("Reward campaign not found");
+    requireLegacyRewardCampaign(campaign);
     if (!campaign.onchainCampaignId) {
       throw new BadRequestException("Campaign is not registered on-chain");
     }
@@ -441,6 +408,7 @@ export class RewardCampaignService {
     if (campaign.creatorUserId !== userId && !isResolver) {
       throw new ForbiddenException("Only the campaign creator or a Resolver can complete the campaign");
     }
+    requireLegacyRewardCampaign(campaign);
     if (!campaign.onchainCampaignId) {
       throw new BadRequestException("Campaign is not registered on-chain");
     }
@@ -470,9 +438,13 @@ export class RewardCampaignService {
     }
   }
 
-  async getById(id: string) {
+  async getById(id: string, requesterUserId?: string) {
     const [campaign] = await this.db.select().from(rewardCampaigns).where(eq(rewardCampaigns.id, id));
     if (!campaign) throw new NotFoundException("Reward campaign not found");
+    if (isEditionsCampaign(campaign)) {
+      if (!requesterUserId) throw new NotFoundException("Reward campaign not found");
+      if (campaign.creatorUserId !== requesterUserId) throw new ForbiddenException("Only creator can read this Editions draft");
+    }
     const tiers = await this.db.select().from(rewardTiers).where(eq(rewardTiers.campaignId, id));
     const reviews = await this.db.select().from(rewardReviews).where(eq(rewardReviews.campaignId, id));
     let projection: any = null;
@@ -488,19 +460,22 @@ export class RewardCampaignService {
     const campaigns = await this.db.select().from(rewardCampaigns).where(eq(rewardCampaigns.creatorUserId, userId));
     return Promise.all(campaigns.map(async c => {
       const tiers = await this.db.select().from(rewardTiers).where(eq(rewardTiers.campaignId, c.id));
+      const reviews = await this.db.select().from(rewardReviews).where(eq(rewardReviews.campaignId, c.id));
       let projection: any = null;
       if (c.onchainCampaignId) {
         const [proj] = await this.db.select().from(rewardCampaignProjection)
           .where(eq(rewardCampaignProjection.campaignMetadataId, c.id));
         projection = proj?.snapshot ?? null;
       }
-      return { ...c, tiers, projection };
+      return { ...c, tiers, reviews, projection };
     }));
   }
 
   async listAllForResolver() {
     const campaigns = await this.db.select().from(rewardCampaigns);
-    return Promise.all(campaigns.map(async c => {
+    const submitted = campaigns.filter(c => !isEditionsCampaign(c) ||
+      (c.frozenSnapshot && ["UNDER_REVIEW", "APPROVED", "STOPPED"].includes(c.status)));
+    return Promise.all(submitted.map(async c => {
       const tiers = await this.db.select().from(rewardTiers).where(eq(rewardTiers.campaignId, c.id));
       const reviews = await this.db.select().from(rewardReviews).where(eq(rewardReviews.campaignId, c.id));
       let projection: any = null;
@@ -523,7 +498,7 @@ export class RewardCampaignService {
       "COMPLETED",
       "STOPPED",
     ]);
-    const visible = allCampaigns.filter(c => publicStatuses.has(c.status));
+    const visible = allCampaigns.filter(c => !isEditionsCampaign(c) && publicStatuses.has(c.status));
     return Promise.all(visible.map(async c => {
       const tiers = await this.db.select().from(rewardTiers).where(eq(rewardTiers.campaignId, c.id));
       let projection: any = null;

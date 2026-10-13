@@ -3,10 +3,9 @@ import type { Request } from "express";
 import { AuthGuard } from "../modules/auth/auth.guard";
 import { RewardResolverGuard } from "./reward-roles.guard";
 import { RewardCampaignService } from "./reward-campaign.service";
-import { RewardFulfillmentService } from "./reward-fulfillment.service";
+import { RewardPledgeService } from "./reward-pledge.service";
 import {
   resolverReviewCampaignSchema,
-  attestFulfillmentCompleteSchema,
   resolverActivateCampaignSchema,
   resolverVerifyProductionSchema,
 } from "./reward-campaign.schema";
@@ -17,7 +16,7 @@ import { resolveRewardDisputeSchema } from "./reward-pledge.schema";
 export class RewardResolverController {
   constructor(
     private readonly campaigns: RewardCampaignService,
-    private readonly fulfillment: RewardFulfillmentService,
+    private readonly pledges: RewardPledgeService,
   ) {}
 
   @Get("campaigns")
@@ -27,7 +26,7 @@ export class RewardResolverController {
 
   @Get("disputes")
   listDisputes() {
-    return this.fulfillment.listDisputesForResolver();
+    return this.pledges.listDisputesForResolver();
   }
 
   @Post("campaigns/:id/review")
@@ -79,26 +78,7 @@ export class RewardResolverController {
     if (!parsed.success) {
       throw new BadRequestException({ message: "Invalid dispute resolution payload", issues: parsed.error.issues });
     }
-    return this.fulfillment.resolveDispute(req.account!.userId, id, parsed.data);
+    return this.pledges.resolveDispute(req.account!.userId, id, parsed.data);
   }
 
-  @Post("campaigns/:id/fulfillment-complete")
-  attestFulfillmentComplete(
-    @Param("id", new ParseUUIDPipe()) id: string,
-    @Body() body: unknown,
-    @Req() req: Request,
-  ) {
-    const parsed = attestFulfillmentCompleteSchema.safeParse(body);
-    if (!parsed.success) {
-      throw new BadRequestException({ message: "Invalid fulfillment complete payload", issues: parsed.error.issues });
-    }
-    return this.fulfillment.attestFulfillmentComplete(
-      req.account!.userId,
-      id,
-      parsed.data.fulfillmentReportHash,
-      parsed.data.txHash,
-    );
-  }
 }
-
-

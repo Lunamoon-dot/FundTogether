@@ -1,18 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { keccak256, toHex } from "viem";
-
-export interface ShippingDetails {
-  fullName: string;
-  address: string;
-  phone: string;
-}
-
-export interface EncryptedShippingResult {
-  encrypted: string;
-  iv: string;
-  tag: string;
-}
 
 export interface CanonicalTierCommitment {
   tierIndex: number;
@@ -39,51 +26,6 @@ export interface CanonicalCampaignCommitment {
 
 @Injectable()
 export class RewardCryptoService {
-  private readonly encryptionKey: Buffer;
-
-  constructor() {
-    const rawKey = process.env.REWARD_PII_ENCRYPTION_KEY;
-    if (!rawKey || Buffer.from(rawKey, "utf-8").length < 32) {
-      throw new Error(
-        "REWARD_PII_ENCRYPTION_KEY environment variable is required and must be at least 32 bytes for secure AES-256-GCM encryption"
-      );
-    }
-    this.encryptionKey = Buffer.alloc(32);
-    Buffer.from(rawKey, "utf-8").copy(this.encryptionKey);
-  }
-
-  encryptShipping(data: ShippingDetails): EncryptedShippingResult {
-    const iv = randomBytes(12); // 96-bit IV standard for GCM
-    const cipher = createCipheriv("aes-256-gcm", this.encryptionKey, iv);
-    const plaintext = JSON.stringify({
-      fullName: data.fullName.trim(),
-      address: data.address.trim(),
-      phone: data.phone.trim(),
-    });
-
-    let encrypted = cipher.update(plaintext, "utf8", "hex");
-    encrypted += cipher.final("hex");
-    const tag = cipher.getAuthTag().toString("hex");
-
-    return {
-      encrypted,
-      iv: iv.toString("hex"),
-      tag,
-    };
-  }
-
-  decryptShipping(encrypted: string, ivHex: string, tagHex: string): ShippingDetails {
-    const iv = Buffer.from(ivHex, "hex");
-    const tag = Buffer.from(tagHex, "hex");
-    const decipher = createDecipheriv("aes-256-gcm", this.encryptionKey, iv);
-    decipher.setAuthTag(tag);
-
-    let decrypted = decipher.update(encrypted, "hex", "utf8");
-    decrypted += decipher.final("utf8");
-
-    return JSON.parse(decrypted) as ShippingDetails;
-  }
-
   computeCommitmentHash(payload: CanonicalCampaignCommitment): `0x${string}` {
     // Canonical sort & formatting to guarantee deterministic byte representation
     const canonical = {

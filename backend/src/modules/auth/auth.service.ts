@@ -19,6 +19,7 @@ import {
   users,
   walletLinks,
   organizations,
+  rewardCampaigns,
 } from "../../database/schema";
 
 export const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -169,6 +170,9 @@ export class AuthService {
       const [organization] = await tx.select({ id: organizations.id }).from(organizations)
         .where(eq(organizations.representativeWalletLinkId, wallet.id)).limit(1);
       if (organization) throw new ConflictException("Không thể gỡ ví đại diện tổ chức. Ví này đang ràng buộc quyền quản lý campaign.");
+      const [edition] = await tx.select({ id: rewardCampaigns.id }).from(rewardCampaigns)
+        .where(eq(rewardCampaigns.payoutWalletLinkId, wallet.id)).limit(1);
+      if (edition) throw new ConflictException("Ví này đang gắn với cam kết Editions đã khóa; không thể gỡ liên kết.");
       await tx.delete(walletLinks).where(and(eq(walletLinks.id, wallet.id), eq(walletLinks.userId, userId)));
       // Old authenticated sessions must not retain access after wallet removal.
       await tx.delete(authSessions).where(and(eq(authSessions.userId, userId), ne(authSessions.tokenHash, hashToken(token))));

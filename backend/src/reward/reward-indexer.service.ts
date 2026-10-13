@@ -766,8 +766,6 @@ export class RewardIndexerService implements OnModuleInit, OnModuleDestroy {
               eq(rewardEntitlements.logIndex, orph.logIndex)
             ));
           for (const ent of orphEnts) {
-            await this.db.delete(schema.rewardBatchEntitlements)
-              .where(eq(schema.rewardBatchEntitlements.entitlementId, ent.id));
             await this.db.delete(schema.rewardDisputes)
               .where(eq(schema.rewardDisputes.entitlementId, ent.id));
             await this.db.delete(rewardEntitlements)
@@ -830,8 +828,6 @@ export class RewardIndexerService implements OnModuleInit, OnModuleDestroy {
         const campEnts = await this.db.select().from(rewardEntitlements)
           .where(eq(rewardEntitlements.campaignId, camp.id));
         for (const ent of campEnts) {
-          await this.db.delete(schema.rewardBatchEntitlements)
-            .where(eq(schema.rewardBatchEntitlements.entitlementId, ent.id));
           await this.db.delete(schema.rewardDisputes)
             .where(eq(schema.rewardDisputes.entitlementId, ent.id));
           await this.db.delete(rewardEntitlements)

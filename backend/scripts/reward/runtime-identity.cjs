@@ -25,11 +25,15 @@ function isOwnedRewardWeb(manifest, identity, listenerPid, listenerStartedAt) {
 
 if (require.main === module) {
   try {
-    const [mode, manifestFile, value, listenerPid, listenerStartedAt] = process.argv.slice(2);
+    const [mode, manifestFile, ...args] = process.argv.slice(2);
     const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
-    if (mode === 'health') assertRewardHealthIdentity(manifest, JSON.parse(value));
+    if (mode === 'health') {
+      const [status, protocolKind, chainId, contractAddress] = args;
+      assertRewardHealthIdentity(manifest, { status, protocolKind, chainId, contractAddress });
+    }
     else if (mode === 'web') {
-      const identity = JSON.parse(fs.readFileSync(value, 'utf8'));
+      const [identityFile, listenerPid, listenerStartedAt] = args;
+      const identity = JSON.parse(fs.readFileSync(identityFile, 'utf8'));
       if (!isOwnedRewardWeb(manifest, identity, listenerPid, listenerStartedAt)) throw new Error('Reward web listener identity does not match the current deployment manifest');
     } else throw new Error('Reward runtime identity mode invalid');
   } catch (error) {

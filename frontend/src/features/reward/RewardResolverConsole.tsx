@@ -9,13 +9,14 @@ import {
   reviewResolverRewardCampaign,
   activateResolverRewardCampaign,
   verifyResolverRewardProduction,
-  attestResolverRewardFulfillmentComplete,
   listResolverRewardDisputes,
   resolveResolverRewardDispute,
   syncRewardReceipt,
 } from '../../lib/api/reward';
 import type { RewardCampaign, RewardCreatorProfile, RewardDispute } from '../../lib/api/reward';
 import { getErrorMessage } from '../../lib/api/error';
+import { EditionsResolverReview } from './EditionsReview';
+import { EditionsCommunity } from './EditionsCampaign';
 import {
   rewardAbi,
   rewardContractAddress,
@@ -23,25 +24,25 @@ import {
 } from '../../lib/web3/reward-deployment';
 import './reward.css';
 
-export function RewardResolverConsole() {
+export function RewardResolverConsole({ userId }: { userId: string }) {
   const account = useAccount();
   const client = usePublicClient({ chainId: activeChain.id });
   const { data: wallet } = useWalletClient({ account: account.address, connector: account.connector });
 
   const { data: profiles, refetch: refetchProfiles } = useQuery({
-    queryKey: ['reward-admin-creators'],
+    queryKey: ['reward-admin-creators', userId],
     queryFn: ({ signal }) => listAdminCreatorProfiles(signal),
     retry: false,
   });
 
   const { data: campaigns, refetch: refetchCampaigns } = useQuery({
-    queryKey: ['reward-resolver-campaigns'],
+    queryKey: ['reward-resolver-campaigns', userId],
     queryFn: ({ signal }) => listResolverRewardCampaigns(signal),
     retry: false,
   });
 
   const { data: disputes, refetch: refetchDisputes } = useQuery({
-    queryKey: ['reward-resolver-disputes'],
+    queryKey: ['reward-resolver-disputes', userId],
     queryFn: ({ signal }) => listResolverRewardDisputes(signal),
     retry: false,
   });
@@ -266,40 +267,6 @@ export function RewardResolverConsole() {
     }
   }
 
-  async function handleAttestFulfillmentCompleteOnchain(c: RewardCampaign) {
-    if (!c.onchainCampaignId || !account.address || !client || !wallet) {
-      setErrorMsg('Vui lòng kết nối ví Resolver để xác nhận hoàn tất giao nhận (Flow V4).');
-      return;
-    }
-    setBusy(true);
-    setNotice('');
-    setErrorMsg('');
-    try {
-      const fulfillmentReportHash = keccak256(toHex(`fulfillment-complete-${c.id}-${Date.now()}`));
-      const call = await client.simulateContract({
-        account: account.address,
-        address: rewardContractAddress,
-        abi: rewardAbi,
-        functionName: 'recordFulfillmentComplete',
-        args: [BigInt(c.onchainCampaignId), fulfillmentReportHash],
-      });
-      const hash = await wallet.writeContract(call.request);
-      const receipt = await client.waitForTransactionReceipt({ hash, confirmations: 1 });
-      if (receipt.status !== 'success') throw new Error('Giao dịch recordFulfillmentComplete bị revert.');
-
-      await attestResolverRewardFulfillmentComplete(c.id, {
-        fulfillmentReportHash,
-        txHash: hash,
-      });
-      setNotice('Đã xác nhận hoàn tất giao nhận (FULFILLMENT_COMPLETE) trên chuỗi và đồng bộ DB!');
-      void refetchCampaigns();
-    } catch (err) {
-      setErrorMsg(getErrorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function handleStartWindDownOnchain(c: RewardCampaign) {
     if (!c.onchainCampaignId || !account.address || !client || !wallet) {
       setErrorMsg('Vui lòng kết nối ví để kích hoạt Wind-down hoàn tiền.');
@@ -360,7 +327,7 @@ export function RewardResolverConsole() {
         <span className="reward-badge-category">Quản trị & Thẩm định · Admin / Resolver Console</span>
         <h1 className="reward-hero-title">Trung Tâm Thẩm Định & Nghiệm Thu On-Chain (V1 – V4)</h1>
         <p className="reward-hero-pitch">
-          Duyệt tác giả (V1), thẩm định cam kết chiến dịch (V2), nghiệm thu mẫu in xuất bản (V3), xác nhận hoàn tất giao nhận (V4) và phân xử khiếu nại.
+          Duyệt hồ sơ tác giả và cam kết PDF Editions. Các thao tác hợp đồng bên dưới áp dụng cho campaign đã tồn tại.
         </p>
       </header>
 
@@ -405,7 +372,13 @@ export function RewardResolverConsole() {
           <p className="muted">Chưa có chiến dịch nào hoặc tài khoản hiện tại không có quyền RESOLVER.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '12px' }}>
-            {campaigns!.map(c => (
+            {campaigns!.map(c => c.draftConfig || c.category === 'COMICS_ARTBOOK' ? (
+              <div key={c.id}>
+                {c.commitmentHash && ['UNDER_REVIEW', 'APPROVED'].includes(c.status) && <EditionsCommunity id={c.id} userId={userId} commitmentHash={c.commitmentHash} />}
+                <EditionsResolverReview campaign={c} onChange={() => void refetchCampaigns()} />
+                {c.status === 'APPROVED' && <a className="button button--secondary" href={`#/reward/editions/${c.id}/resolver`}>Mở duyệt hợp đồng, sản xuất & PDF local</a>}
+              </div>
+            ) : (
               <div key={c.id} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '14px', background: '#fff' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
                   <div>
@@ -449,11 +422,7 @@ export function RewardResolverConsole() {
                         </button>
                       </>
                     )}
-                    {c.status === 'PRODUCTION_VERIFIED' && c.onchainCampaignId && (
-                      <button className="button button--primary" disabled={busy} onClick={() => void handleAttestFulfillmentCompleteOnchain(c)}>
-                        Nghiệm thu Giao nhận V4 (recordFulfillmentComplete)
-                      </button>
-                    )}
+
                     {(c.status === 'ACTIVE' || c.status === 'PRODUCTION_VERIFIED' || c.status === 'FULFILLMENT_COMPLETE') && c.onchainCampaignId && (
                       <button
                         className="button button--secondary"

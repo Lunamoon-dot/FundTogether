@@ -22,11 +22,16 @@ export interface RewardCampaign {
   title: string;
   pitch: string;
   story: string;
-  category: 'COMICS' | 'ARTBOOK' | 'ILLUSTRATION' | 'OTHER';
+  category: 'COMICS_ARTBOOK' | 'COMICS' | 'ARTBOOK' | 'ILLUSTRATION' | 'OTHER';
+  draftConfig: CreateRewardCampaignInput | null;
+  reviewPreparation?: EditionsPreparation | null;
+  frozenSnapshot?: EditionsSnapshot | null;
+  revision?: number;
+  reviews?: { id: string; outcome: string; decisionReason: string; commitmentHash: string }[];
   commitmentHash: string | null;
   goal: string;
   fundingDuration: number;
-  policyHash: string;
+  policyHash: string | null;
   onchainCampaignId: string | null;
   status:
     | 'DRAFT'
@@ -66,31 +71,15 @@ export interface RewardEntitlement {
     | 'REFUND_ELIGIBLE'
     | 'REFUNDED';
   digitalAccessCode: string | null;
-  shippingFullName: string | null;
-  shippingAddress: string | null;
-  shippingPhone: string | null;
-  carrierTrackingCode: string | null;
-  deliveredAt: string | null;
-  confirmedAt: string | null;
   createdAt: string;
   updatedAt: string;
   tier: RewardTier;
   campaignTitle: string;
   campaignStatus: string;
   onchainCampaignId: string | null;
+  contractAddress: string | null;
 }
 
-export interface RewardFulfillmentBatch {
-  id: string;
-  campaignId: string;
-  batchNumber: number;
-  title: string;
-  carrier: string;
-  manifestHash: string;
-  shippedItemCount: number;
-  shippedAt: string;
-  createdAt: string;
-}
 
 export interface RewardCreatorProfile {
   id: string;
@@ -120,22 +109,67 @@ export interface RewardDispute {
 }
 
 export interface CreateRewardCampaignInput {
+  mode: 'REWARD_V1';
+  policyVersion: 'reward-comic-download-mvp-v1';
   title: string;
   pitch: string;
   story: string;
-  category: 'COMICS' | 'ARTBOOK' | 'ILLUSTRATION' | 'OTHER';
+  category: 'COMICS_ARTBOOK';
   goal: string;
   fundingDuration: number;
-  policyHash: string;
   tiers: {
+    tierType: 'STANDARD';
     title: string;
     description: string;
     price: string;
-    maxQuantity: number;
-    isDigital: boolean;
-    rewardItems: string[];
+    rewardItems: { type: 'DIGITAL_DOWNLOAD'; format: 'PDF'; title: string; description: string }[];
     estimatedDeliveryAt?: string;
   }[];
+}
+
+export interface EditionsSample { id: string; sha256: string; mediaType: string; sizeBytes: number }
+export interface EditionsPreparation {
+  payoutWalletLinkId: string;
+  sampleIds: string[];
+  contentOutline: string;
+  budgetPlan: string;
+  evidencePlan: string;
+  releaseWindow: { start: string; end: string };
+}
+export interface EditionsSnapshot {
+  commitmentVersion: 'editions-review-v1';
+  config: CreateRewardCampaignInput;
+  creator: { userId: string; profileId: string; displayName: string; ipDeclaration: string };
+  payoutWallet: { linkId: string; address: string; chainId: string };
+  preparation: Omit<EditionsPreparation, 'payoutWalletLinkId' | 'sampleIds'>;
+  samples: EditionsSample[];
+}
+const editionsPath = (id: string) => `/v1/reward/editions/campaigns/${id}`;
+export async function listEditionsWallets(signal?: AbortSignal) {
+  return (await http.get<{ id: string; address: string; chainId: string }[]>('/v1/reward/editions/wallets', { signal })).data;
+}
+export async function listEditionsSamples(id: string, signal?: AbortSignal) {
+  return (await http.get<EditionsSample[]>(`${editionsPath(id)}/samples`, { signal })).data;
+}
+export async function uploadEditionsSample(id: string, file: File) {
+  const body = new FormData();
+  body.append('file', file);
+  return (await http.post<EditionsSample>(`${editionsPath(id)}/samples`, body, { headers: { 'Content-Type': undefined } })).data;
+}
+export async function getEditionsSample(id: string, sampleId: string) {
+  return (await http.get<Blob>(`${editionsPath(id)}/samples/${sampleId}`, { responseType: 'blob' })).data;
+}
+export async function updateEditionsPreparation(id: string, data: { revision: number; config: CreateRewardCampaignInput; preparation: EditionsPreparation }) {
+  return (await http.patch<RewardCampaign>(editionsPath(id), data)).data;
+}
+export async function freezeEditions(id: string, revision: number) {
+  return (await http.post<RewardCampaign>(`${editionsPath(id)}/freeze`, { revision })).data;
+}
+export async function submitEditionsReview(id: string, revision: number) {
+  return (await http.post<RewardCampaign>(`${editionsPath(id)}/submit-review`, { revision })).data;
+}
+export async function reviewEditions(id: string, data: { outcome: 'APPROVED' | 'CHANGES_REQUESTED' | 'REJECTED'; decisionReason: string; commitmentHash: string }) {
+  return (await http.post<RewardCampaign>(`${editionsPath(id)}/review`, data)).data;
 }
 
 export async function listRewardPublicCampaigns(signal?: AbortSignal) {
@@ -176,9 +210,6 @@ export async function completeRewardCampaign(id: string, txHash: string) {
   return (await http.post<RewardCampaign>(`/v1/reward/creator/campaigns/${id}/complete`, { txHash })).data;
 }
 
-export async function markRewardEntitlementDelivered(entitlementId: string) {
-  return (await http.post<RewardEntitlement>(`/v1/reward/creator/entitlements/${entitlementId}/delivered`)).data;
-}
 
 export async function notifyRewardPledge(data: { txHash: string }) {
   return (await http.post<{ entitlement: RewardEntitlement }>('/v1/reward/backer/notify-pledge', data)).data;
@@ -211,40 +242,15 @@ export async function listMyRewardEntitlements(signal?: AbortSignal) {
   return (await http.get<RewardEntitlement[]>('/v1/reward/backer/entitlements', { signal })).data;
 }
 
-export async function updateRewardShipping(entitlementId: string, data: { fullName: string; address: string; phone: string }) {
-  return (await http.post<RewardEntitlement>(`/v1/reward/backer/entitlements/${entitlementId}/shipping`, data)).data;
-}
 
-export async function getDecryptedShipping(entitlementId: string, signal?: AbortSignal) {
-  return (await http.get<{ fullName: string; address: string; phone: string } | null>(`/v1/reward/backer/entitlements/${entitlementId}/shipping`, { signal })).data;
-}
 
-export async function confirmRewardDelivery(entitlementId: string) {
-  return (await http.post<RewardEntitlement>(`/v1/reward/backer/entitlements/${entitlementId}/confirm`)).data;
-}
 
 export async function openRewardDispute(entitlementId: string, data: { reason: string; evidenceHash?: string }) {
   return (await http.post(`/v1/reward/backer/entitlements/${entitlementId}/dispute`, data)).data;
 }
 
-export async function createFulfillmentBatch(campaignId: string, data: {
-  batchNumber: number;
-  title: string;
-  carrier: string;
-  manifestHash: string;
-  shippedItemCount: number;
-  trackingCodes: Record<string, string>;
-}) {
-  return (await http.post<RewardFulfillmentBatch>(`/v1/reward/creator/campaigns/${campaignId}/batches`, data)).data;
-}
 
-export async function listFulfillmentBatches(campaignId: string, signal?: AbortSignal) {
-  return (await http.get<RewardFulfillmentBatch[]>(`/v1/reward/creator/campaigns/${campaignId}/batches`, { signal })).data;
-}
 
-export async function listEntitlementsToFulfill(campaignId: string, signal?: AbortSignal) {
-  return (await http.get<RewardEntitlement[]>(`/v1/reward/creator/campaigns/${campaignId}/entitlements`, { signal })).data;
-}
 
 export async function listAdminCreatorProfiles(signal?: AbortSignal) {
   return (await http.get<RewardCreatorProfile[]>('/v1/reward/admin/creators', { signal })).data;
@@ -286,15 +292,6 @@ export async function verifyResolverRewardProduction(
   )).data;
 }
 
-export async function attestResolverRewardFulfillmentComplete(
-  campaignId: string,
-  data: { fulfillmentReportHash: string; txHash: string },
-) {
-  return (await http.post<RewardCampaign>(
-    `/v1/reward/resolver/campaigns/${campaignId}/fulfillment-complete`,
-    data,
-  )).data;
-}
 
 export async function resolveResolverRewardDispute(
   disputeId: string,

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
-import { keccak256, parseEventLogs, toHex } from 'viem';
+import { formatUnits, keccak256, parseEventLogs, toHex } from 'viem';
 import {
   listMyRewardCampaigns,
   createRewardCampaignDraft,
@@ -9,14 +9,13 @@ import {
   submitCampaignReview,
   registerRewardOnchain,
   completeRewardCampaign,
-  createFulfillmentBatch,
-  listEntitlementsToFulfill,
-  markRewardEntitlementDelivered,
   getCreatorProfile,
   applyCreatorVerification,
   syncRewardReceipt,
 } from '../../lib/api/reward';
-import type { RewardCampaign, CreateRewardCampaignInput } from '../../lib/api/reward';
+import { buildEditionsDraft } from './editions-draft';
+import { EditionsPreparationPanel } from './EditionsReview';
+import type { RewardCampaign } from '../../lib/api/reward';
 import { getErrorMessage } from '../../lib/api/error';
 import {
   rewardAbi,
@@ -25,27 +24,18 @@ import {
 } from '../../lib/web3/reward-deployment';
 import './reward.css';
 
-interface TierDraft {
-  title: string;
-  description: string;
-  price: string;
-  maxQuantity: number;
-  isDigital: boolean;
-  rewardItemsStr: string;
-}
-
-export function RewardCreatorStudio() {
+export function RewardCreatorStudio({ userId }: { userId: string }) {
   const account = useAccount();
   const client = usePublicClient({ chainId: activeChain.id });
   const { data: wallet } = useWalletClient({ account: account.address, connector: account.connector });
 
   const { data: profile, refetch: refetchProfile } = useQuery({
-    queryKey: ['my-reward-creator-profile'],
+    queryKey: ['my-reward-creator-profile', userId],
     queryFn: ({ signal }) => getCreatorProfile(signal),
   });
 
   const { data: campaigns, isPending, error, refetch } = useQuery({
-    queryKey: ['my-reward-campaigns'],
+    queryKey: ['my-reward-campaigns', userId],
     queryFn: ({ signal }) => listMyRewardCampaigns(signal),
     refetchInterval: 10_000,
   });
@@ -61,32 +51,15 @@ export function RewardCreatorStudio() {
   const [title, setTitle] = useState('');
   const [pitch, setPitch] = useState('');
   const [story, setStory] = useState('');
-  const [category, setCategory] = useState<'COMICS' | 'ARTBOOK' | 'ILLUSTRATION' | 'OTHER'>('COMICS');
   const [goal, setGoal] = useState('1000'); // USDC
   const [duration, setDuration] = useState(30); // days
-  const [tiers, setTiers] = useState<TierDraft[]>([
-    {
-      title: 'Ấn phẩm số Early Bird (Digital PDF)',
-      description: 'Nhận file truyện tranh PDF độ phân giải cao kèm artbook số và postcard điện tử.',
-      price: '10',
-      maxQuantity: 100,
-      isDigital: true,
-      rewardItemsStr: 'File PDF độ phân giải cao, Artbook kỹ thuật số, Lời cảm ơn đặc biệt',
-    },
-    {
-      title: 'Tập 1 Bản in Giấy Định Lượng Cao (Bìa Cứng)',
-      description: 'Sách in offset bìa cứng mạ kim ép nhũ, kèm bộ 3 postcard và bookmark độc quyền.',
-      price: '25',
-      maxQuantity: 200,
-      isDigital: false,
-      rewardItemsStr: 'Sách in bìa cứng 180 trang, 3 postcard giới hạn, Bookmark ép kim, File PDF bản số',
-    },
-  ]);
+  const [price, setPrice] = useState('10');
+  const [rewardTitle, setRewardTitle] = useState('Ấn phẩm PDF');
+  const [rewardDescription, setRewardDescription] = useState('Một file PDF hoàn chỉnh của truyện tranh hoặc artbook.');
 
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState('');
   const [successNotice, setSuccessNotice] = useState('');
-  const [selectedCampaignForBatch, setSelectedCampaignForBatch] = useState<string | null>(null);
 
   async function handleApplyProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -104,29 +77,6 @@ export function RewardCreatorStudio() {
     }
   }
 
-  function addTierRow() {
-    setTiers(prev => [
-      ...prev,
-      {
-        title: `Gói quà #${prev.length + 1}`,
-        description: 'Mô tả chi tiết các phần quà đi kèm...',
-        price: '30',
-        maxQuantity: 50,
-        isDigital: false,
-        rewardItemsStr: 'Sách in, Quà tặng giới hạn',
-      },
-    ]);
-  }
-
-  function updateTierRow(idx: number, patch: Partial<TierDraft>) {
-    setTiers(prev => prev.map((t, i) => (i === idx ? { ...t, ...patch } : t)));
-  }
-
-  function removeTierRow(idx: number) {
-    if (tiers.length <= 1) return;
-    setTiers(prev => prev.filter((_, i) => i !== idx));
-  }
-
   async function handleCreateDraft(e: React.FormEvent) {
     e.preventDefault();
     setFormError('');
@@ -136,34 +86,12 @@ export function RewardCreatorStudio() {
     try {
       if (title.trim().length < 5) throw new Error('Tiêu đề dự án phải từ 5 ký tự trở lên.');
       if (pitch.trim().length < 10) throw new Error('Lời giới thiệu (Pitch) phải từ 10 ký tự trở lên.');
-      if (Number(goal) <= 0) throw new Error('Mục tiêu gây quỹ phải lớn hơn 0 USDC.');
-
-      const formattedTiers = tiers.map(t => {
-        const p = Math.round(Number(t.price) * 1e6).toString();
-        const items = t.rewardItemsStr.split(',').map(s => s.trim()).filter(Boolean);
-        return {
-          title: t.title,
-          description: t.description,
-          price: p,
-          maxQuantity: Number(t.maxQuantity),
-          isDigital: Boolean(t.isDigital),
-          rewardItems: items,
-        };
+      const payload = buildEditionsDraft({
+        title, pitch, story, goal, durationDays: duration, price, rewardTitle, rewardDescription,
       });
 
-      const payload: CreateRewardCampaignInput = {
-        title,
-        pitch,
-        story,
-        category,
-        goal: Math.round(Number(goal) * 1e6).toString(),
-        fundingDuration: duration * 86400,
-        policyHash: '0x' + '1'.repeat(64),
-        tiers: formattedTiers,
-      };
-
       await createRewardCampaignDraft(payload);
-      setSuccessNotice('Tạo bản thảo chiến dịch thành công! Bạn có thể đóng băng cam kết và gửi thẩm định ở danh sách bên dưới.');
+      setSuccessNotice('Đã lưu bản thảo Editions. Mở hồ sơ để bổ sung trang mẫu, khóa cam kết và gửi thẩm định.');
       setTitle('');
       setPitch('');
       setStory('');
@@ -204,6 +132,10 @@ export function RewardCreatorStudio() {
   }
 
   async function handlePublishOnchain(c: RewardCampaign) {
+    if (c.draftConfig != null || c.category === 'COMICS_ARTBOOK') {
+      setFormError('Editions hiện chỉ hỗ trợ bản thảo, chưa mở phát hành on-chain.');
+      return;
+    }
     if (!account.address || !client || !wallet || busy) {
       setFormError('Vui lòng kết nối ví để phát hành hợp đồng on-chain.');
       return;
@@ -323,10 +255,10 @@ export function RewardCreatorStudio() {
   return (
     <div className="reward-container">
       <header className="reward-hero">
-        <span className="reward-badge-category">Studio Tác giả · Creator Studio</span>
-        <h1 className="reward-hero-title">Quản lý Xuất bản & Cam kết Phần thưởng</h1>
+        <span className="reward-badge-category">FundTogether Editions · Creator Studio</span>
+        <h1 className="reward-hero-title">Truyện tranh & Artbook PDF</h1>
         <p className="reward-hero-pitch">
-          Xác minh bản quyền (V1), thiết lập gói quà tặng (Tiers), thẩm định cam kết (V2), phát hành hợp đồng thông minh và quản lý giao nhận (V4).
+          Chuẩn bị một ấn phẩm PDF với một gói Standard. Hiện tại chỉ lưu bản thảo; chưa mở nhận tiền hoặc tải PDF.
         </p>
       </header>
 
@@ -343,7 +275,7 @@ export function RewardCreatorStudio() {
         </div>
         {profile?.status === 'VERIFIED' ? (
           <p className="muted" style={{ marginTop: '8px' }}>
-            ✓ Bút danh <strong>{profile.displayName}</strong> đã được Admin xác minh bản quyền (Flow V1). Bạn có toàn quyền khởi tạo chiến dịch mới.
+            ✓ Bút danh <strong>{profile.displayName}</strong> đã được Admin xác minh bản quyền (Flow V1). Bạn có thể khởi tạo bản thảo Editions.
           </p>
         ) : (
           <form onSubmit={handleApplyProfile} style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
@@ -368,7 +300,7 @@ export function RewardCreatorStudio() {
 
       {/* Form Section */}
       <section className="panel">
-        <h2>Khởi tạo Chiến dịch Truyện tranh / Sách ảnh Mới</h2>
+        <h2>Tạo bản thảo FundTogether Editions</h2>
         <form onSubmit={handleCreateDraft} style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '12px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
             <label>
@@ -377,12 +309,7 @@ export function RewardCreatorStudio() {
             </label>
             <label>
               Thể loại:
-              <select value={category} onChange={e => setCategory(e.target.value as any)}>
-                <option value="COMICS">Truyện tranh (Comics)</option>
-                <option value="ARTBOOK">Artbook / Sách ảnh</option>
-                <option value="ILLUSTRATION">Tranh minh họa</option>
-                <option value="OTHER">Khác</option>
-              </select>
+              <input value="COMICS_ARTBOOK · Truyện tranh / Artbook" readOnly />
             </label>
           </div>
 
@@ -393,13 +320,13 @@ export function RewardCreatorStudio() {
 
           <label>
             Cốt truyện & Kế hoạch sản xuất:
-            <textarea rows={4} value={story} onChange={e => setStory(e.target.value)} placeholder="Giới thiệu chi tiết thế giới, nhân vật, số trang, chất liệu in ấn..." />
+            <textarea rows={4} value={story} onChange={e => setStory(e.target.value)} placeholder="Giới thiệu nội dung, số trang dự kiến và kế hoạch hoàn thiện PDF..." />
           </label>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <label>
-              Mục tiêu gây quỹ (USDC):
-              <input required type="number" min="1" value={goal} onChange={e => setGoal(e.target.value)} />
+              Mục tiêu dự kiến (MockUSDC local):
+              <input required type="text" inputMode="decimal" value={goal} onChange={e => setGoal(e.target.value)} />
             </label>
             <label>
               Thời hạn gây quỹ (Số ngày, 1 - 60):
@@ -407,47 +334,26 @@ export function RewardCreatorStudio() {
             </label>
           </div>
 
-          {/* Dynamic Tier Builder */}
           <div className="reward-studio-tiers-builder">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong>Danh sách Gói quà tặng ({tiers.length})</strong>
-              <button type="button" className="button button--secondary" onClick={addTierRow}>
-                + Thêm gói quà mới
-              </button>
+            <strong>Standard · Một PDF tải xuống</strong>
+            <p className="muted">Một truyện tranh hoặc artbook hoàn chỉnh. PDF cuối cùng được nộp ở bước phát hành sau này.</p>
+            <div className="reward-tier-builder-row">
+              <label>
+                Tên ấn phẩm PDF:
+                <input required minLength={3} maxLength={150} value={rewardTitle} onChange={e => setRewardTitle(e.target.value)} />
+              </label>
+              <label>
+                Giá gói dự kiến (MockUSDC local):
+                <input required inputMode="decimal" value={price} onChange={e => setPrice(e.target.value)} />
+              </label>
+              <label>
+                Nội dung PDF được hứa hẹn:
+                <textarea required minLength={5} maxLength={1000} value={rewardDescription} onChange={e => setRewardDescription(e.target.value)} />
+              </label>
             </div>
-
-            {tiers.map((tier, idx) => (
-              <div key={idx} className="reward-tier-builder-row">
-                <label>
-                  Tên gói:
-                  <input value={tier.title} onChange={e => updateTierRow(idx, { title: e.target.value })} />
-                </label>
-                <label>
-                  Giá (USDC):
-                  <input type="number" min="1" value={tier.price} onChange={e => updateTierRow(idx, { price: e.target.value })} />
-                </label>
-                <label>
-                  Số lượng tối đa:
-                  <input type="number" min="1" value={tier.maxQuantity} onChange={e => updateTierRow(idx, { maxQuantity: Number(e.target.value) })} />
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginTop: '20px' }}>
-                  <input type="checkbox" checked={tier.isDigital} onChange={e => updateTierRow(idx, { isDigital: e.target.checked })} />
-                  <span>Nội dung số</span>
-                </label>
-                <label style={{ gridColumn: '1 / -2' }}>
-                  Vật phẩm đi kèm (cách nhau bởi dấu phẩy):
-                  <input value={tier.rewardItemsStr} onChange={e => updateTierRow(idx, { rewardItemsStr: e.target.value })} placeholder="Ví dụ: Sách bìa cứng, Bookmark, Postcard" />
-                </label>
-                {tiers.length > 1 && (
-                  <button type="button" className="button button--secondary" style={{ color: '#ef4444', alignSelf: 'flex-end' }} onClick={() => removeTierRow(idx)}>
-                    Xóa
-                  </button>
-                )}
-              </div>
-            ))}
           </div>
 
-          <button type="submit" className="button button--primary" disabled={busy} style={{ alignSelf: 'flex-start' }}>
+          <button type="submit" className="button button--primary" disabled={busy || profile?.status !== 'VERIFIED'} style={{ alignSelf: 'flex-start' }}>
             {busy ? 'Đang lưu…' : 'Lưu Bản thảo Chiến dịch'}
           </button>
         </form>
@@ -464,196 +370,70 @@ export function RewardCreatorStudio() {
           <p className="muted">Bạn chưa tạo chiến dịch truyện tranh nào.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '12px' }}>
-            {campaigns!.map(c => (
+            {campaigns!.map(c => {
+              const editions = c.draftConfig != null || c.category === 'COMICS_ARTBOOK';
+              const standardTier = c.draftConfig?.tiers[0];
+              const pdf = standardTier?.rewardItems[0];
+              return (
               <div key={c.id} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px', background: '#fff' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
                   <div>
                     <h3 style={{ margin: '0 0 4px 0' }}>{c.title}</h3>
                     <span className="reward-status-pill status-active" style={{ fontSize: '11px' }}>{c.status}</span>
                     <span style={{ fontSize: '13px', color: '#64748b', marginLeft: '10px' }}>
-                      Mục tiêu: {(Number(c.goal) / 1e6).toLocaleString()} USDC · {c.tiers?.length ?? 0} gói quà
+                      Mục tiêu: {editions ? formatUnits(BigInt(c.goal), 6) : (Number(c.goal) / 1e6).toLocaleString()} MockUSDC · {c.draftConfig?.tiers.length ?? c.tiers?.length ?? 0} gói
                       {c.onchainCampaignId ? ` · On-chain #${c.onchainCampaignId}` : ''}
                     </span>
+                    {standardTier && pdf && (
+                      <div>
+                        <p><strong>{pdf.title}</strong> · Standard PDF · {formatUnits(BigInt(standardTier.price), 6)} MockUSDC</p>
+                        <p className="muted">{pdf.description}</p>
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {c.status === 'DRAFT' && (
+                    {editions && <p className="muted">Standard PDF · Hoàn thiện hồ sơ và gửi thẩm định; bản thảo chưa nhận pledge.</p>}
+                    {editions && c.frozenSnapshot && ['UNDER_REVIEW', 'APPROVED'].includes(c.status) && <a className="button button--secondary" href={`#/reward/editions/${c.id}/creator`}>Mở community & phát hành PDF local</a>}
+                    {!editions && c.status === 'DRAFT' && (
                       <button className="button button--secondary" disabled={busy} onClick={() => void handleFreeze(c.id)}>
                         1. Đóng băng cam kết
                       </button>
                     )}
-                    {c.status === 'FROZEN' && (
+                    {!editions && c.status === 'FROZEN' && (
                       <button className="button button--primary" disabled={busy} onClick={() => void handleSubmitReview(c.id)}>
                         2. Gửi Resolver thẩm định (V2)
                       </button>
                     )}
-                    {c.status === 'APPROVED' && (
+                    {!editions && c.status === 'APPROVED' && (
                       <button className="button button--primary" disabled={busy} onClick={() => void handlePublishOnchain(c)}>
                         3. Phát hành On-chain
                       </button>
                     )}
-                    {c.status === 'ACTIVE' && (
+                    {!editions && c.status === 'ACTIVE' && (
                       <button className="button button--secondary" disabled={busy} onClick={() => void handleRequestProductionDeposit(c)}>
                         Yêu cầu cọc in ấn (≤50% Goal)
                       </button>
                     )}
-                    {c.status === 'FULFILLMENT_COMPLETE' && (
+                    {!editions && c.status === 'FULFILLMENT_COMPLETE' && (
                       <button className="button button--primary" disabled={busy} onClick={() => void handleCompleteCampaignOnchain(c)}>
                         Hoàn tất Chiến dịch On-chain (completeCampaign)
                       </button>
                     )}
-                    <a className="button button--secondary" href={`#/reward/campaigns/${c.id}`}>
+                    {!editions && <a className="button button--secondary" href={`#/reward/campaigns/${c.id}`}>
                       Xem công khai
-                    </a>
-                    {(c.status === 'PUBLISHED' || c.status === 'ACTIVE' || c.status === 'PRODUCTION_VERIFIED' || c.status === 'FULFILLMENT_COMPLETE') && (
-                      <button
-                        className="button button--secondary"
-                        onClick={() => setSelectedCampaignForBatch(selectedCampaignForBatch === c.id ? null : c.id)}
-                      >
-                        Quản lý Giao hàng (Fulfillment)
-                      </button>
-                    )}
+                    </a>}
+
                   </div>
                 </div>
 
-                {/* Fulfillment Batch Management Sub-panel */}
-                {selectedCampaignForBatch === c.id && (
-                  <BatchFulfillmentManager campaignId={c.id} onComplete={() => void refetch()} />
-                )}
+                {editions && <EditionsPreparationPanel campaign={c} onChange={() => void refetch()} />}
+
               </div>
-            ))}
+            ); })}
           </div>
         )}
       </section>
-    </div>
-  );
-}
-
-function generateManifestHash(campaignId: string, count: number): `0x${string}` {
-  return keccak256(toHex(`manifest-${campaignId}-${count}-${Date.now()}`));
-}
-
-function BatchFulfillmentManager({ campaignId, onComplete }: { campaignId: string; onComplete: () => void }) {
-  const { data: entitlements, isPending, refetch } = useQuery({
-    queryKey: ['entitlements-to-fulfill', campaignId],
-    queryFn: ({ signal }) => listEntitlementsToFulfill(campaignId, signal),
-  });
-
-  const [batchTitle, setBatchTitle] = useState('Đợt giao hàng #1');
-  const [carrier, setCarrier] = useState('VNPost');
-  const [trackingMap, setTrackingMap] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState(false);
-  const [statusMsg, setStatusMsg] = useState('');
-
-  if (isPending) return <p className="muted" style={{ marginTop: '12px' }}>Đang tải danh sách backer cần giao...</p>;
-
-  const physicalEntitlements = (entitlements || []).filter(e => !e.tier?.isDigital);
-
-  async function handleCreateBatch(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setStatusMsg('');
-
-    try {
-      const pendingItems = physicalEntitlements.filter(x => x.status === 'ACTIVE' || x.status === 'REDEEM_REQUESTED');
-      if (pendingItems.length === 0) {
-        throw new Error('Tất cả đơn vật lý đã được xuất lô giao hàng.');
-      }
-      const codesPayload: Record<string, string> = {};
-      for (const item of pendingItems) {
-        codesPayload[item.id] = trackingMap[item.id]?.trim() || `VNPOST-${item.id.slice(0, 8).toUpperCase()}`;
-      }
-      const manifestHash = generateManifestHash(campaignId, pendingItems.length);
-      await createFulfillmentBatch(campaignId, {
-        batchNumber: 1,
-        title: batchTitle,
-        carrier,
-        manifestHash,
-        shippedItemCount: pendingItems.length,
-        trackingCodes: codesPayload,
-      });
-
-      setStatusMsg('Đã tạo đợt giao hàng và cập nhật mã vận đơn cho backer thành công!');
-      void refetch();
-      onComplete();
-    } catch (err) {
-      setStatusMsg(getErrorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleMarkDelivered(entitlementId: string) {
-    setBusy(true);
-    setStatusMsg('');
-    try {
-      await markRewardEntitlementDelivered(entitlementId);
-      setStatusMsg('Đã đánh dấu bưu kiện DELIVERED thành công!');
-      void refetch();
-      onComplete();
-    } catch (err) {
-      setStatusMsg(getErrorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div style={{ marginTop: '16px', background: '#f8fafc', padding: '16px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
-      <h4 style={{ margin: '0 0 10px 0' }}>Quản lý Lô Giao Hàng Vật Lý ({physicalEntitlements.length} đơn)</h4>
-      {statusMsg && <p className="toast toast--success">{statusMsg}</p>}
-
-      {physicalEntitlements.length === 0 ? (
-        <p className="muted" style={{ fontSize: '13px' }}>Chưa có người ủng hộ nào cần giao gói vật lý hoặc các đơn đều là gói nội dung số.</p>
-      ) : (
-        <form onSubmit={handleCreateBatch} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <label>
-              Tên đợt gửi:
-              <input value={batchTitle} onChange={e => setBatchTitle(e.target.value)} />
-            </label>
-            <label>
-              Đơn vị vận chuyển:
-              <select value={carrier} onChange={e => setCarrier(e.target.value)}>
-                <option value="VNPost">VNPost</option>
-                <option value="ViettelPost">Viettel Post</option>
-                <option value="GHTK">Giao Hàng Tiết Kiệm</option>
-                <option value="DHL">DHL Express</option>
-              </select>
-            </label>
-          </div>
-
-          <div style={{ maxHeight: '240px', overflowY: 'auto', background: '#fff', padding: '8px', border: '1px solid #e2e8f0' }}>
-            {physicalEntitlements.map(e => (
-              <div key={e.id} style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.5fr auto', gap: '8px', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
-                <span style={{ fontSize: '13px' }}>{e.backerWallet.slice(0, 10) + '...'}</span>
-                <span style={{ fontSize: '12px', color: '#047857', fontWeight: 600 }}>{e.status}</span>
-                <input
-                  placeholder="Mã vận đơn (Tracking)"
-                  style={{ fontSize: '12px', padding: '4px 6px' }}
-                  value={trackingMap[e.id] ?? e.carrierTrackingCode ?? ''}
-                  onChange={evt => setTrackingMap({ ...trackingMap, [e.id]: evt.target.value })}
-                />
-                {e.status === 'FULFILLING' && (
-                  <button
-                    type="button"
-                    className="button button--secondary"
-                    style={{ fontSize: '11px', padding: '4px 8px' }}
-                    disabled={busy}
-                    onClick={() => void handleMarkDelivered(e.id)}
-                  >
-                    Đánh dấu Đã giao (DELIVERED)
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <button type="submit" className="button button--primary" disabled={busy} style={{ alignSelf: 'flex-start' }}>
-            {busy ? 'Đang tạo lô...' : 'Xác nhận Đã Xuất Lô Giao Hàng'}
-          </button>
-        </form>
-      )}
     </div>
   );
 }

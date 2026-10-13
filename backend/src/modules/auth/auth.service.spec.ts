@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import * as argon2 from "argon2";
 import { AuthService } from "./auth.service";
 import { AuthController } from "./auth.controller";
+import { authSessions, organizations, rewardCampaigns, users, walletLinks } from "../../database/schema";
 
 jest.mock("@nestjs/config", () => ({
   ConfigService: class {
@@ -32,15 +33,16 @@ describe("account authentication", () => {
   let database: any;
   let rows: unknown[][];
   let inserted: unknown[];
+  let readsByTable: Map<unknown, unknown[][]> | undefined;
 
   beforeEach(() => {
     jest.clearAllMocks();
     rows = [];
     inserted = [];
-    const query = (): any => {
+    readsByTable = undefined;
+    const query = (operation: string, table?: unknown): any => {
       const builder: any = {};
       for (const key of [
-        "from",
         "where",
         "limit",
         "for",
@@ -51,18 +53,25 @@ describe("account authentication", () => {
       ]) {
         builder[key] = jest.fn(() => builder);
       }
+      builder.from = jest.fn((target: unknown) => { table = target; return builder; });
       builder.values = jest.fn((value) => {
         inserted.push(value);
         return builder;
       });
-      builder.then = (resolve: (value: unknown[]) => unknown) =>
-        Promise.resolve(rows.shift() ?? []).then(resolve);
+      builder.then = (resolve: (value: unknown[]) => unknown) => {
+        if (readsByTable && operation === "select") {
+          const result = readsByTable.get(table)?.shift();
+          if (!result) throw new Error("Unexpected table read in auth fixture");
+          return Promise.resolve(result).then(resolve);
+        }
+        return Promise.resolve(readsByTable ? [] : rows.shift() ?? []).then(resolve);
+      };
       return builder;
     };
     database = {
-      select: jest.fn(query),
-      insert: jest.fn(query),
-      delete: jest.fn(query),
+      select: jest.fn(() => query("select")),
+      insert: jest.fn(table => query("insert", table)),
+      delete: jest.fn(table => query("delete", table)),
     };
     database.transaction = async (callback: (tx: unknown) => unknown) =>
       callback(database);
@@ -121,63 +130,65 @@ describe("account authentication", () => {
   describe("unlink wallet with account password", () => {
     const address = `0x${"1".repeat(40)}`;
     const token = "a".repeat(64);
-    const wallet = { id: "link-1", userId: user.id, address, chainId: "31338" };
-    beforeEach(() => { jest.mocked(argon2.verify).mockResolvedValue(true); });
+    const wallet = { id: "link-1", userId: user.id, address, chainId: "31339" };
+    beforeEach(() => {
+      jest.mocked(argon2.verify).mockResolvedValue(true);
+      readsByTable = new Map<unknown, unknown[][]>([
+        [users, [[user], [user]]], [authSessions, [[{ userId: user.id }]]],
+        [walletLinks, [[wallet], []]], [organizations, [[]]], [rewardCampaigns, [[]]],
+      ]);
+    });
     it("controller rejects malformed targets and caller-supplied user IDs", () => {
       const controller = new AuthController(service, new ConfigService());
       const request = { account: { userId: user.id }, sessionToken: token } as any;
       for (const body of [
-        { address: 'wrong', chainId: 31338, password: 'password' },
+        { address: 'wrong', chainId: 31339, password: 'password' },
         { address, chainId: -1, password: 'password' },
-        { address, chainId: 31338, password: '' },
-        { address, chainId: 31338, password: 'password', userId: 'another-user' },
+        { address, chainId: 31339, password: '' },
+        { address, chainId: 31339, password: 'password', userId: 'another-user' },
       ]) expect(() => controller.unlinkWallet(body, request)).toThrow(BadRequestException);
       expect(database.delete).not.toHaveBeenCalled();
     });
     it("controller takes owner and session exclusively from authentication", () => {
       const controller = new AuthController(service, new ConfigService());
       const unlink = jest.spyOn(service, 'unlinkWallet').mockResolvedValue({ userId: user.id } as any);
-      controller.unlinkWallet({ address, chainId: 31338, password: 'password' }, { account: { userId: user.id }, sessionToken: token } as any);
-      expect(unlink).toHaveBeenCalledWith(user.id, token, address, 31338, 'password');
+      controller.unlinkWallet({ address, chainId: 31339, password: 'password' }, { account: { userId: user.id }, sessionToken: token } as any);
+      expect(unlink).toHaveBeenCalledWith(user.id, token, address, 31339, 'password');
     });
     it("rejects the wrong password before deleting anything", async () => {
-      rows.push([user]);
       jest.mocked(argon2.verify).mockResolvedValue(false);
-      await expect(service.unlinkWallet(user.id, token, address, 31338, "wrong")).rejects.toBeInstanceOf(UnauthorizedException);
+      await expect(service.unlinkWallet(user.id, token, address, 31339, "wrong")).rejects.toBeInstanceOf(UnauthorizedException);
       expect(database.delete).not.toHaveBeenCalled();
     });
     it("protects accounts without a password login", async () => {
-      rows.push([{ ...user, passwordHash: null }]);
-      await expect(service.unlinkWallet(user.id, token, address, 31338, "password")).rejects.toBeInstanceOf(ConflictException);
+      readsByTable!.set(users, [[{ ...user, passwordHash: null }]]);
+      await expect(service.unlinkWallet(user.id, token, address, 31339, "password")).rejects.toBeInstanceOf(ConflictException);
       expect(database.delete).not.toHaveBeenCalled();
     });
     it("rejects a revoked session even when password is correct", async () => {
-      rows.push([user], []);
-      await expect(service.unlinkWallet(user.id, token, address, 31338, "password")).rejects.toBeInstanceOf(UnauthorizedException);
+      readsByTable!.set(authSessions, [[]]);
+      await expect(service.unlinkWallet(user.id, token, address, 31339, "password")).rejects.toBeInstanceOf(UnauthorizedException);
       expect(database.delete).not.toHaveBeenCalled();
     });
     it("blocks organization representatives", async () => {
-      rows.push([user], [{ userId: user.id }], [wallet], [{ id: "org" }]);
-      await expect(service.unlinkWallet(user.id, token, address, 31338, "password")).rejects.toBeInstanceOf(ConflictException);
+      readsByTable!.set(organizations, [[{ id: "org" }]]);
+      await expect(service.unlinkWallet(user.id, token, address, 31339, "password")).rejects.toBeInstanceOf(ConflictException);
       expect(database.delete).not.toHaveBeenCalled();
     });
-    for (const [label, advance, legacy] of [["B frozen plan", [{ id: "plan" }], []], ["A submission", [], [{ id: "plan" }]]] as const) {
-      it(`blocks ${label}`, async () => {
-        rows.push([user], [{ userId: user.id }], [wallet], [], [...advance], [...legacy]);
-        await expect(service.unlinkWallet(user.id, token, address, 31338, "password")).rejects.toBeInstanceOf(ConflictException);
-        expect(database.delete).not.toHaveBeenCalled();
-      });
-    }
+    it.each(["FROZEN", "APPROVED"])("blocks a wallet pinned to an Editions %s commitment", async status => {
+      readsByTable!.set(rewardCampaigns, [[{ id: "edition", status }]]);
+      await expect(service.unlinkWallet(user.id, token, address, 31339, "password")).rejects.toThrow("cam kết Editions đã khóa");
+      expect(database.delete).not.toHaveBeenCalled();
+    });
     it("removes an unused link and invalidates other sessions and pending challenges", async () => {
-      rows.push([user], [{ userId: user.id }], [wallet], [], [], [], [], [], [], [user], []);
-      const result = await service.unlinkWallet(user.id, token, address, 31338, "password");
+      const result = await service.unlinkWallet(user.id, token, address, 31339, "password");
       expect(result.userId).toBe(user.id);
       expect(result.wallets).toEqual([]);
       expect(database.delete).toHaveBeenCalledTimes(3);
     });
     it("retries safely when the scoped wallet link is absent", async () => {
-      rows.push([user], [{ userId: user.id }], [], [user], []);
-      await expect(service.unlinkWallet(user.id, token, address, 31338, "password")).resolves.toMatchObject({ userId: user.id });
+      readsByTable!.set(walletLinks, [[], []]);
+      await expect(service.unlinkWallet(user.id, token, address, 31339, "password")).resolves.toMatchObject({ userId: user.id });
       expect(database.delete).not.toHaveBeenCalled();
     });
   });

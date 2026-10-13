@@ -4,14 +4,16 @@ import * as request from "supertest";
 import * as path from "node:path";
 import * as dotenv from "dotenv";
 import { randomBytes } from "node:crypto";
+import { Client } from "pg";
 import { createPublicClient, createWalletClient, defineChain, http, keccak256, toHex } from "viem";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { and, eq } from "drizzle-orm";
 
-dotenv.config({ path: path.resolve(__dirname, "../../.env"), quiet: true } as any);
-process.env.REWARD_PII_ENCRYPTION_KEY = "test_reward_pii_encryption_key_32bytes_safe!!";
+dotenv.config({ path: path.resolve(__dirname, "../../../.local/reward/backend.env"), quiet: true, override: true } as any);
 process.env.REWARD_RPC_URL = process.env.REWARD_RPC_URL || "http://127.0.0.1:9548";
 process.env.NODE_ENV = "test";
+// This suite drives runOnce/receipts explicitly, including reorg assertions.
+process.env.REWARD_INDEXER_POLL_ENABLED = "false";
 
 const testOrigin = "http://127.0.0.1:5173";
 
@@ -87,6 +89,7 @@ class GlobalConfigTestModule {}
 })
 class RewardTestAppModule {}
 
+const { seedLegacyCampaign } = require("../../scripts/reward/testing/legacy-campaign.cjs");
 const { artifacts, policy, hashJson } = require("../../scripts/reward/generate-artifacts.cjs");
 
 describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
@@ -97,6 +100,10 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
   let authService: AuthService;
   let indexerService: RewardIndexerService;
   let cryptoService: RewardCryptoService;
+  let databaseAdmin: Client;
+  let databaseCreated = false;
+  const originalDatabaseUrl = process.env.DATABASE_URL;
+  const databaseName = `fundtogether_reward_legacy_test_${process.pid}`;
 
   const rpcUrl = process.env.REWARD_RPC_URL!;
   const chain = defineChain({
@@ -117,6 +124,7 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
 
   let tokenAddress: `0x${string}`;
   let rewardAddress: `0x${string}`;
+  let suiteSnapshot: string | undefined;
   let rewardArtifact: any;
   let tokenArtifact: any;
   let policyHash: `0x${string}`;
@@ -162,9 +170,22 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
   const get = (url: string) => request(app.getHttpServer()).get(url).set("Connection", "close");
 
   beforeAll(async () => {
+    const url = new URL(process.env.DATABASE_URL!);
+    url.pathname = "/postgres";
+    databaseAdmin = new Client({ connectionString: url.toString(), connectionTimeoutMillis: 5000 });
+    await databaseAdmin.connect();
+    await databaseAdmin.query(`CREATE DATABASE "${databaseName}"`);
+    databaseCreated = true;
+    url.pathname = `/${databaseName}`;
+    process.env.DATABASE_URL = url.toString();
+    await require("../../scripts/reward/migrate-isolated.cjs").migrateRewardDatabase(path.resolve(__dirname, "../../.."), {
+      databaseUrl: url.toString(), expectedDatabaseName: databaseName,
+    });
     // 1. Get Anvil accounts
     accounts = (await (publicClient.request as any)({ method: "eth_accounts" })) as `0x${string}`[];
     expect(accounts.length).toBeGreaterThanOrEqual(5);
+    expect(await (publicClient.request as any)({ method: "web3_clientVersion" })).toMatch(/anvil/i);
+    suiteSnapshot = await (publicClient.request as any)({ method: "evm_snapshot", params: [] });
     [creatorWallet, resolverWallet, backupResolverWallet, backerWallet, intruderWallet] = accounts;
 
     // 2. Deploy Contracts
@@ -210,7 +231,7 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
     indexerService.setClient(publicClient);
     indexerService.setContractAddress(rewardAddress);
 
-    // 4. Create isolated test user fixtures (additive only, ZERO destructive DELETE operations)
+    // 4. Fixtures belong only to the disposable test database, never the running app.
     const createTestUser = async (role?: "ADMIN" | "RESOLVER", linkedWallet?: `0x${string}`) => {
       const email = `test_${randomBytes(8).toString("hex")}@fundtogether.local`;
       const [u] = await db.insert(schema.users).values({ email }).returning();
@@ -257,18 +278,30 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
   }, 60000);
 
   afterAll(async () => {
-    if (indexerService) {
-      await indexerService.onModuleDestroy();
-    }
-    if (app) {
-      const httpServer = app.getHttpServer();
-      if (httpServer && typeof httpServer.close === "function" && httpServer.listening) {
-        await new Promise<void>(resolve => httpServer.close(() => resolve()));
+    try {
+      if (indexerService) {
+        await indexerService.onModuleDestroy();
       }
-      await app.close();
-    }
-    if (db && (db as any).$client) {
-      await (db as any).$client.end().catch(() => undefined);
+      if (app) {
+        const httpServer = app.getHttpServer();
+        if (httpServer && typeof httpServer.close === "function" && httpServer.listening) {
+          await new Promise<void>(resolve => httpServer.close(() => resolve()));
+        }
+        await app.close();
+      }
+      if (db && (db as any).$client) {
+        await (db as any).$client.end().catch(() => undefined);
+      }
+      if (databaseCreated) {
+        await databaseAdmin.query(`DROP DATABASE IF EXISTS "${databaseName}"`);
+      }
+      await databaseAdmin?.end();
+      if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+      else process.env.DATABASE_URL = originalDatabaseUrl;
+    } finally {
+      if (suiteSnapshot) {
+        expect(await (publicClient.request as any)({ method: "evm_revert", params: [suiteSnapshot] })).toBe(true);
+      }
     }
   });
 
@@ -306,13 +339,6 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
       expect(res.status).toBe(403);
     });
 
-    it("rejects regular backer from accessing Resolver Fulfillment Completion with 403 Forbidden", async () => {
-      const dummyId = "00000000-0000-0000-0000-000000000004";
-      const res = await post(`/v1/reward/resolver/campaigns/${dummyId}/fulfillment-complete`)
-        .set("Cookie", `ft_session=${intruderSessionToken}`)
-        .send({ fulfillmentReportHash: "0x" + "1".repeat(64) });
-      expect(res.status).toBe(403);
-    });
   });
 
   // =========================================================================
@@ -345,10 +371,8 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
   // PRIORITY 4: FLOW V2 - CAMPAIGN DRAFT, FREEZE & RESOLVER REVIEW
   // =========================================================================
   describe("Priority 4: Flow V2 - Campaign Drafting, Freezing & Resolver Approval", () => {
-    it("creator creates draft with 2 tiers and computes commitmentHash", async () => {
-      const res = await post("/v1/reward/creator/campaigns")
-        .set("Cookie", `ft_session=${creatorSessionToken}`)
-        .send({
+    it("loads an existing mixed-tier campaign fixture for legacy regression coverage", async () => {
+      const legacyCampaign = await seedLegacyCampaign(db, schema, cryptoService, creatorUserId, {
           title: "Neon City Chronicles: Volume 1",
           pitch: "A 120-page cyberpunk graphic novel following underground couriers in Saigon 2088.",
           story: "Detailed production timeline, character sheets, offset printing budget, and delivery manifest.",
@@ -376,14 +400,13 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
           ],
         });
 
-      expect(res.status).toBe(201);
-      expect(res.body.status).toBe("DRAFT");
-      expect(res.body.commitmentHash).toMatch(/^0x[a-fA-F0-9]{64}$/);
-      expect(res.body.tiers).toHaveLength(2);
+      expect(legacyCampaign.status).toBe("DRAFT");
+      expect(legacyCampaign.commitmentHash).toMatch(/^0x[a-fA-F0-9]{64}$/);
+      expect(legacyCampaign.tiers).toHaveLength(2);
 
-      campaignId = res.body.id;
-      tier0Id = res.body.tiers[0].id;
-      tier1Id = res.body.tiers[1].id;
+      campaignId = legacyCampaign.id;
+      tier0Id = legacyCampaign.tiers[0].id;
+      tier1Id = legacyCampaign.tiers[1].id;
     });
 
     it("creator freezes campaign commitment", async () => {
@@ -573,45 +596,21 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
   // =========================================================================
   // PRIORITY 3: BACKER SHIPPING DETAILS & AES-256-GCM ENCRYPTION
   // =========================================================================
-  describe("Priority 3: Backer Shipping Address Privacy & Encryption", () => {
-    it("encrypts shipping details with AES-256-GCM and stores ciphertext & masked phone", async () => {
-      const res = await post(`/v1/reward/backer/entitlements/${physicalEntitlementId}/shipping`)
-        .set("Cookie", `ft_session=${backerSessionToken}`)
-        .send({
-          fullName: "Nguyen Van A",
-          address: "Số 456 Đường Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh",
-          phone: "+84901234567",
-        });
-
-      expect(res.status).toBe(201);
-      expect(res.body.status).toBe("REDEEM_REQUESTED");
-
-      // Verify raw database row: plaintext address and full phone MUST NOT exist
-      const [row] = await db.select().from(schema.rewardEntitlements)
-        .where(eq(schema.rewardEntitlements.id, physicalEntitlementId));
-      expect(row.shippingEncrypted).toBeDefined();
-      expect(row.shippingIv).toHaveLength(24);
-      expect(row.shippingTag).toHaveLength(32);
-      expect(row.shippingFullName).toBe("*** Protected ***");
-      expect(row.shippingAddress).toContain("Encrypted");
-      expect(row.shippingPhone).toBe("*** Protected ***");
-    });
-
-    it("rejects unauthorized user from reading decrypted shipping details with 403 Forbidden", async () => {
-      const res = await get(`/v1/reward/creator/entitlements/${physicalEntitlementId}/shipping`)
-        .set("Cookie", `ft_session=${intruderSessionToken}`);
-      expect(res.status).toBe(403);
-    });
-
-    it("allows authorized creator to decrypt shipping details", async () => {
-      const res = await get(`/v1/reward/creator/entitlements/${physicalEntitlementId}/shipping`)
-        .set("Cookie", `ft_session=${creatorSessionToken}`);
-
-      expect(res.status).toBe(200);
-      expect(res.body.fullName).toBe("Nguyen Van A");
-      expect(res.body.address).toContain("Nguyễn Huệ");
-      expect(res.body.phone).toBe("+84901234567");
-    });
+  it("rejects retired physical endpoints for historical backers and creators", async () => {
+    for (const actor of [backerSessionToken, creatorSessionToken, intruderSessionToken]) {
+      for (const url of [
+        `/v1/reward/backer/entitlements/${physicalEntitlementId}/shipping`,
+        `/v1/reward/creator/entitlements/${physicalEntitlementId}/shipping`,
+        `/v1/reward/creator/entitlements/${physicalEntitlementId}/delivered`,
+        `/v1/reward/backer/entitlements/${physicalEntitlementId}/confirm`,
+        `/v1/reward/creator/campaigns/${campaignId}/batches`,
+      ]) {
+        expect((await post(url).set("Cookie", `ft_session=${actor}`).send({ address: "Rejected physical data" })).status).toBe(404);
+        expect((await get(url).set("Cookie", `ft_session=${actor}`)).status).toBe(404);
+      }
+    }
+    const [row] = await db.select().from(schema.rewardEntitlements).where(eq(schema.rewardEntitlements.id, physicalEntitlementId));
+    expect(Object.keys(row).some(key => /shipping|tracking|deliveredAt/i.test(key))).toBe(false);
   });
 
   // =========================================================================
@@ -705,35 +704,6 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
   describe("Priority 5: Fulfillment Batches, Dispute Resolution & State Separation", () => {
     let disputeId: string;
 
-    it("creator creates physical fulfillment batch and marks delivered via HTTP", async () => {
-      const res = await post(`/v1/reward/creator/campaigns/${campaignId}/batches`)
-        .set("Cookie", `ft_session=${creatorSessionToken}`)
-        .send({
-          batchNumber: 1,
-          title: "Batch 1 - Ho Chi Minh City Deliveries",
-          carrier: "VNPost",
-          manifestHash: "0x" + "2".repeat(64),
-          shippedItemCount: 1,
-          trackingCodes: {
-            [physicalEntitlementId]: "VNP123456789VN",
-          },
-        });
-
-      expect(res.status).toBe(201);
-      expect(res.body.batchNumber).toBe(1);
-
-      const [ent] = await db.select().from(schema.rewardEntitlements)
-        .where(eq(schema.rewardEntitlements.id, physicalEntitlementId));
-      expect(ent.status).toBe("FULFILLING");
-      expect(ent.carrierTrackingCode).toBe("VNP123456789VN");
-
-      // Mark delivered via Creator HTTP endpoint
-      const delivRes = await post(`/v1/reward/creator/entitlements/${physicalEntitlementId}/delivered`)
-        .set("Cookie", `ft_session=${creatorSessionToken}`);
-      expect(delivRes.status).toBe(201);
-      expect(delivRes.body.status).toBe("DELIVERED");
-    });
-
     it("backer opens dispute for physical package damage", async () => {
       const res = await post(`/v1/reward/backer/entitlements/${physicalEntitlementId}/dispute`)
         .set("Cookie", `ft_session=${backerSessionToken}`)
@@ -746,15 +716,14 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
       disputeId = res.body.id;
     });
 
-    it("rejects attestFulfillmentComplete with 409 Conflict when physical entitlements are not yet CONFIRMED or resolved", async () => {
+    it("rejects the retired fulfillment attestation endpoint", async () => {
       const prematureRes = await post(`/v1/reward/resolver/campaigns/${campaignId}/fulfillment-complete`)
         .set("Cookie", `ft_session=${resolverSessionToken}`)
         .send({
           fulfillmentReportHash: "0x" + "3".repeat(64),
           txHash: "0x" + "4".repeat(64),
         });
-      expect(prematureRes.status).toBe(409);
-      expect(prematureRes.body.message).toMatch(/physical entitlement/i);
+      expect(prematureRes.status).toBe(404);
     });
 
     it("resolver resolves dispute in backer favor, unlocking REFUND_ELIGIBLE status", async () => {
@@ -788,7 +757,7 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
       }
     });
 
-    it("resolver attests fulfillment completion on-chain and via HTTP receipt, then creator completes campaign on-chain and via HTTP receipt", async () => {
+    it("preserves historic completion events and financial synchronization after physical API retirement", async () => {
       const reportHash = "0x" + "3".repeat(64);
 
       // 1. On-chain recordFulfillmentComplete first
@@ -797,16 +766,8 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
         reportHash as `0x${string}`,
       ]);
 
-      // 2. HTTP attest fulfillment complete with canonical txHash receipt
-      const res = await post(`/v1/reward/resolver/campaigns/${campaignId}/fulfillment-complete`)
-        .set("Cookie", `ft_session=${resolverSessionToken}`)
-        .send({
-          fulfillmentReportHash: reportHash,
-          txHash: fulfillReceipt.transactionHash,
-        });
-
-      expect(res.status).toBe(201);
-      expect(res.body.status).toBe("FULFILLMENT_COMPLETE");
+      // Historical event decoding is retained, without a physical workflow endpoint.
+      await indexerService.processReceipt(fulfillReceipt.transactionHash);
 
       const onchainCamp = await publicClient.readContract({
         address: rewardAddress,
@@ -841,9 +802,7 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
   describe("Priority 6: Reorg Rollback/Replay, Block-Aligned Checkpoints, Wind-Down & Refund Claim", () => {
     it("invalidates orphaned events (canonical=false), rolls back orphaned entitlements/digital keys/projections on chain reorg, and indexes canonical wind-down & refund", async () => {
       // 1. Create, freeze, review & approve Campaign #2 with 1 digital tier and 1 physical tier
-      const draftRes = await post("/v1/reward/creator/campaigns")
-        .set("Cookie", `ft_session=${creatorSessionToken}`)
-        .send({
+      const legacyCampaign = await seedLegacyCampaign(db, schema, cryptoService, creatorUserId, {
           title: "Wind-Down & Reorg Verification Comic Vol 2",
           pitch: "Testing canonical reorg rollback, wind-down, and pro-rata refund claim indexing.",
           story: "Detailed production schedule for volume 2.",
@@ -862,9 +821,8 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
             },
           ],
         });
-      expect(draftRes.status).toBe(201);
-      const camp2Id = draftRes.body.id;
-      const camp2Tier0Id = draftRes.body.tiers[0].id;
+      const camp2Id = legacyCampaign.id;
+      const camp2Tier0Id = legacyCampaign.tiers[0].id;
 
       const freezeRes = await post(`/v1/reward/creator/campaigns/${camp2Id}/freeze`)
         .set("Cookie", `ft_session=${creatorSessionToken}`);

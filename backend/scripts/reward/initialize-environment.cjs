@@ -14,7 +14,6 @@ if (fs.existsSync(file)) {
     .replace('LOCAL_REWARD_PASSWORD', password)
     .replace('LOCAL_REWARD_ACCESS_KEY', `reward-${randomBytes(8).toString('hex')}`)
     .replace('LOCAL_REWARD_STORAGE_PASSWORD', randomBytes(24).toString('hex'))
-    .replace('LOCAL_REWARD_PII_ENCRYPTION_KEY', randomBytes(32).toString('hex'))
     + `\nREWARD_DATABASE_PASSWORD=${password}\n`;
   guardEnvironment(require('dotenv').parse(contents));
   fs.mkdirSync(path.dirname(file), { recursive: true });

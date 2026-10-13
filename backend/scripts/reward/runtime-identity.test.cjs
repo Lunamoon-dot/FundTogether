@@ -1,4 +1,8 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 const { test } = require('node:test');
 const {
   assertRewardHealthIdentity,
@@ -19,6 +23,28 @@ test('accepts matching Reward manifest and API health identity', () => {
     status: 'ok', protocolKind: 'REWARD', chainId: 31339,
     contractAddress: manifest.contractAddress,
   }));
+});
+
+test('health CLI accepts PowerShell-safe scalar identity arguments', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'reward-runtime-identity-'));
+  const manifestFile = path.join(directory, 'deployment.json');
+  fs.writeFileSync(manifestFile, JSON.stringify(manifest));
+
+  try {
+    const result = spawnSync(process.execPath, [
+      path.join(__dirname, 'runtime-identity.cjs'),
+      'health',
+      manifestFile,
+      'ok',
+      'REWARD',
+      '31339',
+      manifest.contractAddress,
+    ], { encoding: 'utf8' });
+
+    assert.equal(result.status, 0, result.stderr);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('rejects a placeholder deployment manifest', () => {

@@ -7,6 +7,7 @@ import { RewardPublicCampaign } from '../reward/RewardPublicCampaign';
 import { RewardCreatorStudio } from '../reward/RewardCreatorStudio';
 import { RewardBackerEntitlements } from '../reward/RewardBackerEntitlements';
 import { RewardResolverConsole } from '../reward/RewardResolverConsole';
+import { EditionsCampaign, EditionsFeed, EditionsLibrary } from '../reward/EditionsCampaign';
 import './PublicArea.css';
 
 interface PublicAreaProps {
@@ -29,6 +30,9 @@ export function PublicArea({
   const isRewardCreator = path === '/reward/creator';
   const isRewardMyRewards = path === '/reward/my-rewards';
   const isRewardResolver = path === '/reward/resolver';
+  const edition = /^\/reward\/editions\/([^/]+)(?:\/(creator|resolver))?$/.exec(path);
+  const history = path === '/reward/history';
+  const historicalRewards = path === '/reward/history/my-rewards';
 
   const account = path === '/account' || path === '/workspace';
   const organizationProfile = /^\/organizations\/([^/]+)$/.exec(path);
@@ -88,11 +92,16 @@ export function PublicArea({
         )}
 
         {/* Reward Crowdfunding Views */}
-        {isRewardFeed && <RewardPublicFeed />}
+        {isRewardFeed && <EditionsFeed />}
+        {history && <RewardPublicFeed />}
+        {edition && <EditionsCampaign key={`${edition[1]}:${session?.userId ?? 'public'}:${edition[2] ?? 'public'}`} id={edition[1]} session={session} mode={(edition[2] as 'creator' | 'resolver') || 'public'} />}
+        {historicalRewards && session && <RewardBackerEntitlements key={session.userId} />}
         {rewardDetail && <RewardPublicCampaign key={rewardDetail[1]} campaignId={rewardDetail[1]} />}
-        {isRewardCreator && <RewardCreatorStudio />}
-        {isRewardMyRewards && <RewardBackerEntitlements />}
-        {isRewardResolver && <RewardResolverConsole />}
+        {isRewardCreator && session && <RewardCreatorStudio key={session.userId} userId={session.userId} />}
+        {isRewardMyRewards && (session ? <EditionsLibrary key={session.userId} userId={session.userId} /> : <p>Đăng nhập để xem thư viện PDF của bạn.</p>)}
+        {isRewardResolver && session && staff && <RewardResolverConsole key={session.userId} userId={session.userId} />}
+        {(isRewardCreator || isRewardResolver) && !session && <p>Đăng nhập để mở hồ sơ riêng tư. <a href="#/account">Đăng nhập</a></p>}
+        {isRewardResolver && session && !staff && <p>Tài khoản cần quyền ADMIN hoặc RESOLVER.</p>}
 
         {/* Account / Workspace View */}
         {account && (
@@ -138,7 +147,7 @@ export function PublicArea({
           </section>
         ))}
 
-        {!isRewardFeed && !rewardDetail && !isRewardCreator && !isRewardMyRewards && !isRewardResolver && !account && !organizations && (
+        {!isRewardFeed && !rewardDetail && !edition && !history && !historicalRewards && !isRewardCreator && !isRewardMyRewards && !isRewardResolver && !account && !organizations && (
           <section className="panel public-empty">
             <h1>Không tìm thấy trang</h1>
             <a className="button button--secondary" href="#/">

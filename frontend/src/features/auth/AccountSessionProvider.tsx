@@ -30,7 +30,10 @@ export function AccountSessionProvider({ children }: PropsWithChildren) {
     if (sessionLoading) return
     const accountId = session?.userId ?? null
     if (previousAccountId.current === accountId) return
-    if (previousAccountId.current !== undefined) queryClient.removeQueries({ predicate: q => String(q.queryKey[0]).startsWith('reward-') })
+    if (previousAccountId.current !== undefined) queryClient.removeQueries({ predicate: q => {
+      const scope = String(q.queryKey[0])
+      return scope.startsWith('reward-') || scope.startsWith('my-reward-')
+    } })
     previousAccountId.current = accountId
 
     for (const connection of connections) {
