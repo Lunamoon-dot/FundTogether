@@ -12,6 +12,8 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/src/main.js",
     "artifacts:reward": "node scripts/reward/generate-artifacts.cjs",
+    "start:reward": "node scripts/reward/run-backend.cjs",
+    "db:reward:migrate": "node scripts/reward/migrate-isolated.cjs",
     "test:reward": "jest --runInBand src/reward/reward-campaign.schema.spec.ts src/reward/reward-pledge.schema.spec.ts src/reward/reward-crypto.service.spec.ts src/reward/reward-indexer.service.spec.ts",
     "test:reward:e2e": "node scripts/reward/reward-scenarios-e2e.cjs && jest --runInBand src/reward/reward-http-acceptance.spec.ts",
     "lint": "eslint \"{src,test}/**/*.ts\" --fix",
