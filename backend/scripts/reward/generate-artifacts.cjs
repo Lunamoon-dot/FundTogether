@@ -60,6 +60,46 @@ function atomicWrite(file, value) {
   fs.renameSync(pending, file);
 }
 
+function validateManifest(manifest) {
+  const address = /^0x[a-fA-F0-9]{40}$/;
+  const hash = /^0x[a-fA-F0-9]{64}$/;
+  const validUrl = value => {
+    try {
+      const url = new URL(value);
+      return url.protocol === 'http:' && (url.hostname === '127.0.0.1' || url.hostname === 'localhost')
+        && url.port === '9548' && url.pathname === '/' && !url.username && !url.password && !url.search && !url.hash;
+    } catch { return false; }
+  };
+  if (!manifest || manifest.protocolKind !== 'REWARD' || manifest.chainId !== 31339 || !validUrl(manifest.rpcUrl)
+    || !address.test(manifest.contractAddress || '') || !address.test(manifest.tokenAddress || '')
+    || !address.test(manifest.resolver || '') || !address.test(manifest.backupResolver || '')
+    || manifest.contractAddress === `0x${'0'.repeat(40)}` || manifest.tokenAddress === `0x${'0'.repeat(40)}`
+    || manifest.resolver.toLowerCase() === manifest.backupResolver.toLowerCase() || manifest.tokenDecimals !== 6
+    || manifest.confirmations !== 1 || manifest.abiVersion !== '1' || !/^\d+$/.test(manifest.deploymentBlockNumber || '')
+    || BigInt(manifest.deploymentBlockNumber || '0') === 0n) throw new Error('Reward manifest identity/configuration invalid');
+  for (const key of ['genesisHash', 'contractCodeHash', 'tokenCodeHash', 'deploymentBlockHash', 'abiHash', 'policyHash']) {
+    if (!hash.test(manifest[key] || '')) throw new Error('Reward manifest identity/configuration invalid');
+  }
+}
+
+async function verifyDeployment(client, manifest, rewardAbi, tokenAbi) {
+  validateManifest(manifest);
+  if (await client.getChainId() !== manifest.chainId) throw new Error('Reward chain mismatch');
+  if ((await client.getBlock({ blockNumber: 0n })).hash !== manifest.genesisHash) throw new Error('Reward genesis mismatch');
+  if ((await client.getBlock({ blockNumber: BigInt(manifest.deploymentBlockNumber) })).hash !== manifest.deploymentBlockHash)
+    throw new Error('Reward deployment anchor mismatch');
+  const contractCode = await client.getCode({ address: manifest.contractAddress });
+  const tokenCode = await client.getCode({ address: manifest.tokenAddress });
+  if (!contractCode || contractCode === '0x' || keccak256(contractCode) !== manifest.contractCodeHash) throw new Error('Reward contract code mismatch');
+  if (!tokenCode || tokenCode === '0x' || keccak256(tokenCode) !== manifest.tokenCodeHash) throw new Error('Reward token code mismatch');
+  const read = functionName => client.readContract({ address: manifest.contractAddress, abi: rewardAbi, functionName });
+  for (const [functionName, expected] of Object.entries({ supportedToken: manifest.tokenAddress, resolver: manifest.resolver, backupResolver: manifest.backupResolver, policyHash: manifest.policyHash })) {
+    if (String(await read(functionName)).toLowerCase() !== expected.toLowerCase()) throw new Error(`Reward ${functionName} mismatch`);
+  }
+  const decimals = await client.readContract({ address: manifest.tokenAddress, abi: tokenAbi, functionName: 'decimals' });
+  if (Number(decimals) !== manifest.tokenDecimals) throw new Error('Reward token decimals mismatch');
+}
+
 function generate(root = path.resolve(__dirname, '../../..'), out = path.join(root, 'backend/src/blockchain/generated/reward')) {
   const result = artifacts(root);
   atomicWrite(path.join(out, 'fund-together-reward.abi.json'), result.reward.abi);
@@ -73,4 +113,4 @@ if (require.main === module) {
   console.log(JSON.stringify({ runtimeBytes: result.runtimeBytes, policyHash: result.policyHash }, null, 2));
 }
 
-module.exports = { generate, artifacts, policy, hashJson };
+module.exports = { generate, artifacts, policy, hashJson, atomicWrite, validateManifest, verifyDeployment };
