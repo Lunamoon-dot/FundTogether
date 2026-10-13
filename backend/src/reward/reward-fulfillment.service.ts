@@ -11,10 +11,15 @@ import {
   rewardFulfillmentBatches,
 } from "../database/schema";
 import type { CreateFulfillmentBatchInput, ResolveRewardDisputeInput } from "./reward-pledge.schema";
+import { RewardIndexerService } from "./reward-indexer.service";
+import rewardAbiJson = require("../blockchain/generated/reward/fund-together-reward.abi.json");
 
 @Injectable()
 export class RewardFulfillmentService {
-  constructor(@Inject(DRIZZLE_DB) private readonly db: NodePgDatabase<typeof schema>) {}
+  constructor(
+    @Inject(DRIZZLE_DB) private readonly db: NodePgDatabase<typeof schema>,
+    private readonly indexerService: RewardIndexerService
+  ) {}
 
   /**
    * Flow V4: Create physical fulfillment batch.
@@ -70,11 +75,20 @@ export class RewardFulfillmentService {
   }
 
   /**
-   * Mark entitlement as delivered by postal carrier
+   * Mark entitlement as delivered by postal carrier (creator or resolver)
    */
-  async markDelivered(entitlementId: string) {
+  async markDelivered(actorUserId: string, entitlementId: string) {
     const [entitlement] = await this.db.select().from(rewardEntitlements).where(eq(rewardEntitlements.id, entitlementId));
     if (!entitlement) throw new NotFoundException("Entitlement not found");
+
+    const [campaign] = await this.db.select().from(rewardCampaigns).where(eq(rewardCampaigns.id, entitlement.campaignId));
+    if (!campaign) throw new NotFoundException("Campaign not found");
+
+    const [role] = await this.db.select().from(schema.platformRoles).where(eq(schema.platformRoles.userId, actorUserId)).limit(1);
+    const isResolver = Boolean(role?.roles.includes("RESOLVER"));
+    if (campaign.creatorUserId !== actorUserId && !isResolver) {
+      throw new ForbiddenException("Only campaign creator or Resolver can mark entitlement as delivered");
+    }
 
     const [updated] = await this.db.update(rewardEntitlements).set({
       status: "DELIVERED",
@@ -123,6 +137,10 @@ export class RewardFulfillmentService {
     });
   }
 
+  async listDisputesForResolver() {
+    return this.db.select().from(rewardDisputes);
+  }
+
   async listBatches(campaignId: string) {
     return this.db.select().from(rewardFulfillmentBatches)
       .where(eq(rewardFulfillmentBatches.campaignId, campaignId));
@@ -136,16 +154,22 @@ export class RewardFulfillmentService {
     return this.db.select().from(rewardEntitlements).where(
       and(
         eq(rewardEntitlements.campaignId, campaignId),
-        inArray(rewardEntitlements.status, ["ACTIVE", "REDEEM_REQUESTED", "FULFILLING"])
+        inArray(rewardEntitlements.status, ["ACTIVE", "REDEEM_REQUESTED", "FULFILLING", "DELIVERED", "CONFIRMED"])
       )
     );
   }
 
   /**
-   * Flow V4: Resolver attests that physical fulfillment / reward delivery is complete.
-   * Gated: Requires PRODUCTION_VERIFIED status!
+   * Flow V4: Resolver attests on-chain (`recordFulfillmentComplete`) that physical fulfillment / reward delivery
+   * is complete, and Backend verifies + indexes the canonical `FulfillmentComplete` event from `txHash`.
+   * Gated: Requires PRODUCTION_VERIFIED status and valid on-chain receipt!
    */
-  async attestFulfillmentComplete(resolverUserId: string, campaignId: string, fulfillmentReportHash: string) {
+  async attestFulfillmentComplete(
+    resolverUserId: string,
+    campaignId: string,
+    fulfillmentReportHash: string,
+    txHash: string
+  ) {
     const [role] = await this.db.select().from(schema.platformRoles).where(eq(schema.platformRoles.userId, resolverUserId)).limit(1);
     if (!role?.roles.includes("RESOLVER")) {
       throw new ForbiddenException("RESOLVER platform role required to attest fulfillment completion");
@@ -156,12 +180,41 @@ export class RewardFulfillmentService {
     if (campaign.status !== "PRODUCTION_VERIFIED") {
       throw new ConflictException("Campaign must be in PRODUCTION_VERIFIED status to attest fulfillment complete");
     }
+    if (!campaign.onchainCampaignId) {
+      throw new BadRequestException("Campaign is not registered on-chain");
+    }
 
-    const [updated] = await this.db.update(rewardCampaigns).set({
-      status: "FULFILLMENT_COMPLETE",
-      updatedAt: new Date(),
-    }).where(eq(rewardCampaigns.id, campaignId)).returning();
+    try {
+      await this.indexerService.processReceipt(txHash as `0x${string}`);
+    } catch (err: any) {
+      throw new BadRequestException(`Failed to verify and index FulfillmentComplete receipt: ${err.message}`);
+    }
+
+    const client = this.indexerService.getClient();
+    const contractAddress = this.indexerService.getContractAddress();
+    if (client && contractAddress) {
+      try {
+        const onchainData: any = await client.readContract({
+          address: contractAddress,
+          abi: rewardAbiJson as any,
+          functionName: "campaign",
+          args: [BigInt(campaign.onchainCampaignId)],
+        });
+        const onchainReportHash = onchainData.fulfillmentReportHash ?? onchainData[13];
+        if (onchainReportHash && onchainReportHash.toLowerCase() !== fulfillmentReportHash.toLowerCase()) {
+          throw new BadRequestException("On-chain fulfillmentReportHash does not match submitted fulfillmentReportHash");
+        }
+      } catch (err: any) {
+        if (err instanceof BadRequestException) throw err;
+      }
+    }
+
+    const [updated] = await this.db.select().from(rewardCampaigns).where(eq(rewardCampaigns.id, campaignId));
+    if (!updated || updated.status !== "FULFILLMENT_COMPLETE") {
+      throw new BadRequestException("Transaction receipt did not transition campaign to FULFILLMENT_COMPLETE on-chain");
+    }
 
     return updated;
   }
 }
+

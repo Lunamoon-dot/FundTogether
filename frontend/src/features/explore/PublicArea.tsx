@@ -7,6 +7,7 @@ import { RewardPublicFeed } from '../reward/RewardPublicFeed';
 import { RewardPublicCampaign } from '../reward/RewardPublicCampaign';
 import { RewardCreatorStudio } from '../reward/RewardCreatorStudio';
 import { RewardBackerEntitlements } from '../reward/RewardBackerEntitlements';
+import { RewardResolverConsole } from '../reward/RewardResolverConsole';
 import './PublicArea.css';
 
 interface PublicAreaProps {
@@ -28,6 +29,7 @@ export function PublicArea({
   const rewardDetail = /^\/reward\/campaigns\/([^/]+)$/.exec(path);
   const isRewardCreator = path === '/reward/creator';
   const isRewardMyRewards = path === '/reward/my-rewards';
+  const isRewardResolver = path === '/reward/resolver';
   const isHedFeed = path === '/hed';
 
   const account = path === '/account' || path === '/workspace';
@@ -57,6 +59,11 @@ export function PublicArea({
           {session && (
             <a href="#/reward/creator" aria-current={isRewardCreator ? 'page' : undefined}>
               Creator Studio
+            </a>
+          )}
+          {staff && (
+            <a href="#/reward/resolver" aria-current={isRewardResolver ? 'page' : undefined}>
+              Thẩm định Reward (V1–V4)
             </a>
           )}
           <a href="#/hed" aria-current={isHedFeed ? 'page' : undefined}>
@@ -95,6 +102,7 @@ export function PublicArea({
         {rewardDetail && <RewardPublicCampaign key={rewardDetail[1]} campaignId={rewardDetail[1]} />}
         {isRewardCreator && <RewardCreatorStudio />}
         {isRewardMyRewards && <RewardBackerEntitlements />}
+        {isRewardResolver && <RewardResolverConsole />}
 
         {/* Historical HED Charity Views */}
         {isHedFeed && <HedCampaignFeed />}
@@ -118,6 +126,7 @@ export function PublicArea({
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       <a className="button button--primary" href="#/reward/creator">Mở Creator Studio</a>
                       <a className="button button--secondary" href="#/reward/my-rewards">Xem phần thưởng đã ủng hộ</a>
+                      {staff && <a className="button button--secondary" href="#/reward/resolver">Thẩm định Reward (V1–V4)</a>}
                       <a className="button button--secondary" href="#/workspace">Mở quản lý gây quỹ</a>
                       {staff && <a className="button button--secondary" href={internalHref}>{internalLabel}</a>}
                     </div>
@@ -144,7 +153,7 @@ export function PublicArea({
           </section>
         ))}
 
-        {!isRewardFeed && !rewardDetail && !isRewardCreator && !isRewardMyRewards && !isHedFeed && !account && !hedDetail && !organizations && (
+        {!isRewardFeed && !rewardDetail && !isRewardCreator && !isRewardMyRewards && !isRewardResolver && !isHedFeed && !account && !hedDetail && !organizations && (
           <section className="panel public-empty">
             <h1>Không tìm thấy trang</h1>
             <a className="button button--secondary" href="#/">
@@ -157,3 +166,4 @@ export function PublicArea({
     </div>
   );
 }
+

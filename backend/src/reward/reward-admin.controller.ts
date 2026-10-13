@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Param, ParseUUIDPipe, Post, Req, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Post, Req, UseGuards } from "@nestjs/common";
 import type { Request } from "express";
 import { AuthGuard } from "../modules/auth/auth.guard";
 import { RewardAdminGuard } from "./reward-roles.guard";
@@ -9,6 +9,11 @@ import { adminReviewCreatorSchema } from "./reward-campaign.schema";
 @UseGuards(AuthGuard, RewardAdminGuard)
 export class RewardAdminController {
   constructor(private readonly campaigns: RewardCampaignService) {}
+
+  @Get("creators")
+  listCreators() {
+    return this.campaigns.listCreatorProfilesForAdmin();
+  }
 
   @Post("creators/:id/review")
   reviewCreator(
@@ -23,3 +28,4 @@ export class RewardAdminController {
     return this.campaigns.adminReviewCreator(req.account!.userId, id, parsed.data);
   }
 }
+

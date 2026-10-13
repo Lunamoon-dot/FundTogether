@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { parseEventLogs } from 'viem';
-import { getRewardPublicCampaign, createRewardPledge } from '../../lib/api/reward';
+import { getRewardPublicCampaign, createRewardPledge, claimRewardRefund } from '../../lib/api/reward';
 import type { RewardTier } from '../../lib/api/reward';
 import { getErrorMessage } from '../../lib/api/error';
 import {
@@ -67,67 +67,65 @@ export function RewardPublicCampaign({ campaignId }: RewardPublicCampaignProps) 
     setBusy(true);
 
     try {
-      if (!account.address) {
+      if (!account.address || !client || !wallet) {
         throw new Error('Vui lòng kết nối ví Web3 để tiếp tục.');
       }
       if (account.chainId !== activeChain.id) {
         throw new Error(`Vui lòng chuyển mạng ví sang ${activeChain.name} (Chain ID: ${activeChain.id}).`);
       }
-
-      const totalAmount = BigInt(selectedTier.price) * BigInt(quantity);
-      let txHash = '0x' + '1'.repeat(64);
-
-      // On-chain interaction if campaign has onchainCampaignId and client/wallet available
-      if (campaign?.onchainCampaignId && client && wallet) {
-        // 1. Approve USDC
-        const approveCall = await client.simulateContract({
-          account: account.address,
-          address: rewardTokenAddress,
-          abi: tokenAbi,
-          functionName: 'approve',
-          args: [rewardContractAddress, totalAmount],
-        });
-        const appHash = await wallet.writeContract(approveCall.request);
-        const appReceipt = await client.waitForTransactionReceipt({ hash: appHash, confirmations: 1 });
-        if (appReceipt.status !== 'success') {
-          throw new Error('Giao dịch cấp quyền MockUSDC bị từ chối/revert.');
-        }
-
-        // 2. Pledge to Reward Escrow
-        const pledgeCall = await client.simulateContract({
-          account: account.address,
-          address: rewardContractAddress,
-          abi: rewardAbi,
-          functionName: 'pledge',
-          args: [BigInt(campaign.onchainCampaignId), BigInt(selectedTier.tierIndex), BigInt(quantity)],
-        });
-        const pledgeHash = await wallet.writeContract(pledgeCall.request);
-        const pledgeReceipt = await client.waitForTransactionReceipt({ hash: pledgeHash, confirmations: 1 });
-        if (pledgeReceipt.status !== 'success') {
-          throw new Error('Giao dịch ủng hộ (pledge) trên hợp đồng bị revert.');
-        }
-
-        const pledgeEvent = parseEventLogs({
-          abi: rewardAbi,
-          logs: pledgeReceipt.logs,
-          eventName: 'RewardPledged',
-          strict: false,
-        });
-        if (!pledgeEvent.length) {
-          throw new Error('Không tìm thấy sự kiện RewardPledged trong receipt.');
-        }
-        txHash = pledgeHash;
+      if (!campaign?.onchainCampaignId) {
+        throw new Error('Chiến dịch chưa được đăng ký hợp đồng thông minh trên chuỗi.');
       }
 
-      // 3. Record backer entitlement in backend database
+      const totalAmount = BigInt(selectedTier.price) * BigInt(quantity);
+
+      // 1. Approve USDC
+      const approveCall = await client.simulateContract({
+        account: account.address,
+        address: rewardTokenAddress,
+        abi: tokenAbi,
+        functionName: 'approve',
+        args: [rewardContractAddress, totalAmount],
+      });
+      const appHash = await wallet.writeContract(approveCall.request);
+      const appReceipt = await client.waitForTransactionReceipt({ hash: appHash, confirmations: 1 });
+      if (appReceipt.status !== 'success') {
+        throw new Error('Giao dịch cấp quyền MockUSDC bị từ chối/revert.');
+      }
+
+      // 2. Pledge to Reward Escrow
+      const pledgeCall = await client.simulateContract({
+        account: account.address,
+        address: rewardContractAddress,
+        abi: rewardAbi,
+        functionName: 'pledge',
+        args: [BigInt(campaign.onchainCampaignId), BigInt(selectedTier.tierIndex), BigInt(quantity)],
+      });
+      const pledgeHash = await wallet.writeContract(pledgeCall.request);
+      const pledgeReceipt = await client.waitForTransactionReceipt({ hash: pledgeHash, confirmations: 1 });
+      if (pledgeReceipt.status !== 'success') {
+        throw new Error('Giao dịch ủng hộ (pledge) trên hợp đồng bị revert.');
+      }
+
+      const pledgeEvent = parseEventLogs({
+        abi: rewardAbi,
+        logs: pledgeReceipt.logs,
+        eventName: 'RewardPledged',
+        strict: false,
+      });
+      if (!pledgeEvent.length) {
+        throw new Error('Không tìm thấy sự kiện RewardPledged trong receipt.');
+      }
+
+      // 3. Synchronize canonical receipt via backend indexer
       await createRewardPledge({
         tierId: selectedTier.id,
         quantity,
-        txHash,
+        txHash: pledgeHash,
         backerWallet: account.address,
       });
 
-      setSuccessMsg(`Ủng hộ thành công gói "${selectedTier.title}"! Bạn có thể xem phần thưởng trong trang Phần thưởng của tôi.`);
+      setSuccessMsg(`Ủng hộ thành công gói "${selectedTier.title}"! Quyền nhận quà đã được xác thực từ sự kiện On-chain.`);
       setSelectedTier(null);
       void refetch();
     } catch (err) {
@@ -155,7 +153,9 @@ export function RewardPublicCampaign({ campaignId }: RewardPublicCampaignProps) 
       const receipt = await client.waitForTransactionReceipt({ hash, confirmations: 1 });
       if (receipt.status !== 'success') throw new Error('Yêu cầu rút tiền hoàn trả bị revert.');
 
-      setSuccessMsg('Đã rút tiền hoàn trả từ Escrow về ví thành công!');
+      await claimRewardRefund({ txHash: hash });
+
+      setSuccessMsg('Đã rút tiền hoàn trả từ Escrow về ví và đồng bộ trạng thái REFUNDED thành công!');
       void refetch();
     } catch (err) {
       setActionError(getErrorMessage(err));
@@ -163,6 +163,7 @@ export function RewardPublicCampaign({ campaignId }: RewardPublicCampaignProps) 
       setBusy(false);
     }
   }
+
 
   return (
     <div className="reward-container">

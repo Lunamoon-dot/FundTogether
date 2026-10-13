@@ -1,13 +1,20 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import {
   listMyRewardEntitlements,
   updateRewardShipping,
   confirmRewardDelivery,
   openRewardDispute,
+  claimRewardRefund,
 } from '../../lib/api/reward';
 import type { RewardEntitlement } from '../../lib/api/reward';
 import { getErrorMessage } from '../../lib/api/error';
+import {
+  rewardAbi,
+  rewardContractAddress,
+  activeChain,
+} from '../../lib/web3/reward-deployment';
 import './reward.css';
 
 export function RewardBackerEntitlements() {
@@ -55,7 +62,7 @@ export function RewardBackerEntitlements() {
         <span className="reward-badge-category">Tủ quà của bạn · My Rewards</span>
         <h1 className="reward-hero-title">Phần Thưởng & Ấn Phẩm Của Tôi</h1>
         <p className="reward-hero-pitch">
-          Theo dõi tiến độ sản xuất, cập nhật địa chỉ nhận ấn phẩm vật lý, mở khóa mã đọc truyện tranh số và quản lý giao nhận.
+          Theo dõi tiến độ sản xuất, cập nhật địa chỉ nhận ấn phẩm vật lý, mở khóa mã đọc truyện tranh số, quản lý giao nhận và rút hoàn tiền Escrow.
         </p>
       </header>
 
@@ -138,6 +145,10 @@ function EntitlementItem({
   onToggleDispute: () => void;
   onUpdated: (msg: string, isErr?: boolean) => void;
 }) {
+  const account = useAccount();
+  const client = usePublicClient({ chainId: activeChain.id });
+  const { data: wallet } = useWalletClient({ account: account.address, connector: account.connector });
+
   const [fullName, setFullName] = useState(entitlement.shippingFullName || '');
   const [address, setAddress] = useState(entitlement.shippingAddress || '');
   const [phone, setPhone] = useState(entitlement.shippingPhone || '');
@@ -182,10 +193,41 @@ function EntitlementItem({
     }
   }
 
+  async function handleClaimRefund() {
+    if (!entitlement.onchainCampaignId || !account.address || !client || !wallet) {
+      onUpdated('Vui lòng kết nối ví Web3 đã dùng ủng hộ để rút hoàn tiền từ Escrow.', true);
+      return;
+    }
+    setBusy(true);
+    try {
+      const call = await client.simulateContract({
+        account: account.address,
+        address: rewardContractAddress,
+        abi: rewardAbi,
+        functionName: 'claimRefund',
+        args: [BigInt(entitlement.onchainCampaignId)],
+      });
+      const hash = await wallet.writeContract(call.request);
+      const receipt = await client.waitForTransactionReceipt({ hash, confirmations: 1 });
+      if (receipt.status !== 'success') {
+        throw new Error('Giao dịch claimRefund bị revert.');
+      }
+
+      await claimRewardRefund({ txHash: hash });
+      onUpdated('Đã rút hoàn tiền từ hợp đồng Escrow về ví và đồng bộ trạng thái REFUNDED!');
+    } catch (cause) {
+      onUpdated(getErrorMessage(cause), true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const isDigital = entitlement.tier?.isDigital;
   const isDelivered = entitlement.status === 'DELIVERED';
   const isConfirmed = entitlement.status === 'CONFIRMED';
   const isDisputed = entitlement.status === 'DISPUTED';
+  const isRefundEligible = entitlement.status === 'REFUND_ELIGIBLE';
+  const isRefunded = entitlement.status === 'REFUNDED';
 
   return (
     <article className="reward-entitlement-card">
@@ -212,6 +254,32 @@ function EntitlementItem({
           </div>
         </div>
       </div>
+
+      {/* Refund Claim Banner when REFUND_ELIGIBLE or REFUNDED */}
+      {(isRefundEligible || isRefunded) && (
+        <div style={{ background: isRefunded ? '#ecfdf5' : '#fffbeb', border: `1px solid ${isRefunded ? '#34d399' : '#f59e0b'}`, padding: '12px', borderRadius: '6px', marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <div>
+            <strong style={{ color: isRefunded ? '#065f46' : '#92400e' }}>
+              {isRefunded ? '✓ Đã hoàn tiền về ví Web3 (REFUNDED)' : '⚠️ Đủ điều kiện rút tiền hoàn trả từ Escrow (REFUND_ELIGIBLE)'}
+            </strong>
+            <p style={{ margin: '4px 0 0 0', fontSize: '12.5px', color: '#475569' }}>
+              {isRefunded
+                ? 'Khoản hoàn trả theo tỷ lệ từ BasePool/SupplementPool đã được chuyển về ví của bạn.'
+                : 'Chiến dịch đã dừng (Wind-down) hoặc khiếu nại được chấp thuận. Bạn có thể rút tiền hoàn trả trực tiếp từ hợp đồng thông minh.'}
+            </p>
+          </div>
+          {isRefundEligible && entitlement.onchainCampaignId && (
+            <button
+              type="button"
+              className="button button--primary"
+              disabled={busy}
+              onClick={() => void handleClaimRefund()}
+            >
+              {busy ? 'Đang rút từ hợp đồng…' : 'Rút Hoàn Tiền On-chain'}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Digital Rewards Section */}
       {isDigital && (
@@ -287,7 +355,7 @@ function EntitlementItem({
                 ✓ Xác nhận đã nhận hàng
               </button>
             )}
-            {!isConfirmed && !isDisputed && (
+            {!isConfirmed && !isDisputed && !isRefunded && (
               <button
                 className="button button--secondary"
                 style={{ fontSize: '13px', color: '#dc2626' }}
@@ -325,3 +393,4 @@ function EntitlementItem({
     </article>
   );
 }
+

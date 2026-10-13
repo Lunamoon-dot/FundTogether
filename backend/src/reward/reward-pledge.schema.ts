@@ -36,9 +36,15 @@ export const resolveRewardDisputeSchema = z.object({
   resolutionNote: z.string().trim().min(5).max(2000),
 });
 
+export const claimRewardRefundSchema = z.object({
+  txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, "Must be a 32-byte transaction hash"),
+});
+
 export type NotifyRewardPledgeInput = z.infer<typeof notifyRewardPledgeSchema>;
 export type CreateRewardPledgeInput = z.infer<typeof createRewardPledgeSchema>;
 export type UpdateShippingAddressInput = z.infer<typeof updateShippingAddressSchema>;
 export type CreateFulfillmentBatchInput = z.infer<typeof createFulfillmentBatchSchema>;
 export type OpenRewardDisputeInput = z.infer<typeof openRewardDisputeSchema>;
 export type ResolveRewardDisputeInput = z.infer<typeof resolveRewardDisputeSchema>;
+export type ClaimRewardRefundInput = z.infer<typeof claimRewardRefundSchema>;
+

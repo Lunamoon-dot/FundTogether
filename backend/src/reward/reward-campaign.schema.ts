@@ -23,6 +23,7 @@ export const createRewardCampaignDraftSchema = z.object({
 
 export const registerRewardOnchainSchema = z.object({
   onchainCampaignId: z.string().regex(/^[0-9]+$/, "Onchain campaign ID must be numeric string"),
+  txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, "Must be a 32-byte transaction hash").optional(),
 });
 
 export const creatorVerificationInputSchema = z.object({
@@ -43,6 +44,24 @@ export const resolverReviewCampaignSchema = z.object({
 
 export const attestFulfillmentCompleteSchema = z.object({
   fulfillmentReportHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, "Must be a 32-byte hex hash"),
+  txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, "Must be a 32-byte transaction hash"),
+});
+
+export const resolverActivateCampaignSchema = z.object({
+  txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, "Must be a 32-byte transaction hash"),
+});
+
+export const resolverVerifyProductionSchema = z.object({
+  txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, "Must be a 32-byte transaction hash"),
+  productionReportHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, "Must be a 32-byte hex hash").optional(),
+});
+
+export const completeRewardCampaignSchema = z.object({
+  txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, "Must be a 32-byte transaction hash"),
+});
+
+export const syncRewardReceiptSchema = z.object({
+  txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, "Must be a 32-byte transaction hash"),
 });
 
 export type RewardTierInput = z.infer<typeof rewardTierInputSchema>;
@@ -52,4 +71,9 @@ export type CreatorVerificationInput = z.infer<typeof creatorVerificationInputSc
 export type AdminReviewCreatorInput = z.infer<typeof adminReviewCreatorSchema>;
 export type ResolverReviewCampaignInput = z.infer<typeof resolverReviewCampaignSchema>;
 export type AttestFulfillmentCompleteInput = z.infer<typeof attestFulfillmentCompleteSchema>;
+export type ResolverActivateCampaignInput = z.infer<typeof resolverActivateCampaignSchema>;
+export type ResolverVerifyProductionInput = z.infer<typeof resolverVerifyProductionSchema>;
+export type CompleteRewardCampaignInput = z.infer<typeof completeRewardCampaignSchema>;
+export type SyncRewardReceiptInput = z.infer<typeof syncRewardReceiptSchema>;
+
 

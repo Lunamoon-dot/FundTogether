@@ -398,6 +398,23 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
   // PRIORITY 4: ON-CHAIN CAMPAIGN CREATION & REGISTRATION
   // =========================================================================
   describe("Priority 4: On-Chain Deployment & Registration Verification", () => {
+    it("rejects registerOnchain with 400 when contract address or RPC is unconfigured", async () => {
+      const savedEnvAddr = process.env.REWARD_CONTRACT_ADDRESS;
+      delete process.env.REWARD_CONTRACT_ADDRESS;
+      indexerService.setContractAddress("0x0000000000000000000000000000000000000000");
+
+      try {
+        const res = await post(`/v1/reward/creator/campaigns/${campaignId}/onchain`)
+          .set("Cookie", `ft_session=${creatorSessionToken}`)
+          .send({ onchainCampaignId: "0" });
+        expect(res.status).toBe(400);
+        expect(res.body.message).toMatch(/configured/i);
+      } finally {
+        process.env.REWARD_CONTRACT_ADDRESS = savedEnvAddr;
+        indexerService.setContractAddress(rewardAddress);
+      }
+    });
+
     it("rejects registering invalid on-chain campaign ID", async () => {
       const res = await post(`/v1/reward/creator/campaigns/${campaignId}/onchain`)
         .set("Cookie", `ft_session=${creatorSessionToken}`)
@@ -405,7 +422,7 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
       expect(res.status).toBe(400);
     });
 
-    it("registers valid on-chain campaign with matching commitmentHash and linked creator wallet", async () => {
+    it("registers valid on-chain campaign with matching commitmentHash, linked creator wallet, and txHash receipt", async () => {
       const [camp] = await db.select().from(schema.rewardCampaigns).where(eq(schema.rewardCampaigns.id, campaignId));
 
       const onchainTiers = [
@@ -413,7 +430,7 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
         { price: 100_000_000n, maxQuantity: 200n, pledgedQuantity: 0n, isDigital: false },
       ];
 
-      await send(
+      const createReceipt = await send(
         creatorWallet,
         rewardArtifact.abi,
         rewardAddress,
@@ -430,7 +447,10 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
 
       const res = await post(`/v1/reward/creator/campaigns/${campaignId}/onchain`)
         .set("Cookie", `ft_session=${creatorSessionToken}`)
-        .send({ onchainCampaignId: onchainCampaignId.toString() });
+        .send({
+          onchainCampaignId: onchainCampaignId.toString(),
+          txHash: createReceipt.transactionHash,
+        });
 
       expect(res.status).toBe(201);
       expect(res.body.status).toBe("PUBLISHED");
@@ -466,19 +486,23 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
       expect(result.entitlementsCreated).toBe(0);
     });
 
-    it("processes live RewardPledged events and idempotently creates entitlements with gated digital key", async () => {
+    it("processes live RewardPledged events via HTTP notify-pledge and idempotently creates entitlements with gated digital key", async () => {
       // Mint USDC to backer and approve contract
-      await send(creatorWallet, tokenArtifact.abi, tokenAddress, "mint", [backerWallet, 5_000_000_000n]);
-      await send(backerWallet, tokenArtifact.abi, tokenAddress, "approve", [rewardAddress, 5_000_000_000n]);
+      await send(creatorWallet, tokenArtifact.abi, tokenAddress, "mint", [backerWallet, 10_000_000_000n]);
+      await send(backerWallet, tokenArtifact.abi, tokenAddress, "approve", [rewardAddress, 10_000_000_000n]);
 
       // Pledge 1 digital tier (50 USDC) + 1 physical tier (100 USDC)
       const r1 = await send(backerWallet, rewardArtifact.abi, rewardAddress, "pledge", [onchainCampaignId, 0n, 1n]);
       const r2 = await send(backerWallet, rewardArtifact.abi, rewardAddress, "pledge", [onchainCampaignId, 1n, 1n]);
 
-      const idxRes1 = await indexerService.processReceipt(r1.transactionHash);
-      const idxRes2 = await indexerService.processReceipt(r2.transactionHash);
-      expect(idxRes1.entitlementsCreated).toBe(1);
-      expect(idxRes2.entitlementsCreated).toBe(1);
+      const notify1 = await post("/v1/reward/backer/notify-pledge")
+        .set("Cookie", `ft_session=${backerSessionToken}`)
+        .send({ txHash: r1.transactionHash });
+      const notify2 = await post("/v1/reward/backer/notify-pledge")
+        .set("Cookie", `ft_session=${backerSessionToken}`)
+        .send({ txHash: r2.transactionHash });
+      expect(notify1.status).toBe(201);
+      expect(notify2.status).toBe(201);
 
       // Verify entitlements in DB
       const entitlements = await db.select().from(schema.rewardEntitlements)
@@ -549,7 +573,7 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
   });
 
   // =========================================================================
-  // PRIORITY 5: MILESTONE GATING & DIGITAL KEY ISSUANCE
+  // PRIORITY 5: MILESTONE GATING & DIGITAL KEY ISSUANCE VIA HTTP RECEIPT SYNC
   // =========================================================================
   describe("Priority 5: Production Verification & Gated Digital Access Unlock", () => {
     it("digital access code is initially NULL before production verification", async () => {
@@ -560,57 +584,75 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
       expect(dig.digitalAccessCode).toBeNull();
     });
 
-    it("production verification unlocks digital access keys for digital tier backers", async () => {
+    it("production verification via HTTP receipt endpoint unlocks digital access keys for digital tier backers", async () => {
       // 1. Backer pledges remainder to hit 100% funding goal (4,000 USDC)
       const rRemain1 = await send(backerWallet, rewardArtifact.abi, rewardAddress, "pledge", [onchainCampaignId, 0n, 19n]);
       const rRemain2 = await send(backerWallet, rewardArtifact.abi, rewardAddress, "pledge", [onchainCampaignId, 1n, 29n]);
-      await indexerService.processReceipt(rRemain1.transactionHash);
-      await indexerService.processReceipt(rRemain2.transactionHash);
+      await post("/v1/reward/backer/notify-pledge")
+        .set("Cookie", `ft_session=${backerSessionToken}`)
+        .send({ txHash: rRemain1.transactionHash });
+      await post("/v1/reward/backer/notify-pledge")
+        .set("Cookie", `ft_session=${backerSessionToken}`)
+        .send({ txHash: rRemain2.transactionHash });
 
-      // 2. Resolver activates campaign on-chain
+      // 2. Resolver activates campaign on-chain and syncs via Resolver HTTP endpoint
       const actReceipt = await send(resolverWallet, rewardArtifact.abi, rewardAddress, "activateCampaign", [
         onchainCampaignId,
         keccak256(toHex("comic-ready")),
       ]);
-      await indexerService.processReceipt(actReceipt.transactionHash);
+      const actHttpRes = await post(`/v1/reward/resolver/campaigns/${campaignId}/activate`)
+        .set("Cookie", `ft_session=${resolverSessionToken}`)
+        .send({ txHash: actReceipt.transactionHash });
+      expect(actHttpRes.status).toBe(201);
+      expect(actHttpRes.body.status).toBe("ACTIVE");
 
-      // 3. Creator requests 500 USDC print deposit, resolver approves
+      // 3. Creator requests 500 USDC print deposit, resolver approves & syncs via public sync-receipt endpoint
       const reqHash = keccak256(toHex("deposit-req"));
-      await send(creatorWallet, rewardArtifact.abi, rewardAddress, "submitDisbursementRequest", [
+      const subReceipt = await send(creatorWallet, rewardArtifact.abi, rewardAddress, "submitDisbursementRequest", [
         onchainCampaignId,
         reqHash,
         creatorWallet,
         500_000_000n,
       ]);
-      await send(resolverWallet, rewardArtifact.abi, rewardAddress, "approveAndDisburse", [
+      const syncSub = await post("/v1/reward/public/sync-receipt").send({ txHash: subReceipt.transactionHash });
+      expect(syncSub.status).toBe(201);
+
+      const appReceipt = await send(resolverWallet, rewardArtifact.abi, rewardAddress, "approveAndDisburse", [
         onchainCampaignId,
         0n,
         reqHash,
       ]);
+      await post("/v1/reward/public/sync-receipt").send({ txHash: appReceipt.transactionHash });
 
       // 4. Settle invoice
-      await send(resolverWallet, rewardArtifact.abi, rewardAddress, "candidateExpenditure", [
+      const candReceipt = await send(resolverWallet, rewardArtifact.abi, rewardAddress, "candidateExpenditure", [
         onchainCampaignId,
         0n,
         500_000_000n,
         keccak256(toHex("invoice-proof")),
       ]);
+      await post("/v1/reward/public/sync-receipt").send({ txHash: candReceipt.transactionHash });
+
       await (publicClient.request as any)({ method: "evm_increaseTime", params: [3 * 86400 + 1] });
       await (publicClient.request as any)({ method: "evm_mine" });
-      await send(resolverWallet, rewardArtifact.abi, rewardAddress, "finalizeExpenditure", [onchainCampaignId, 0n]);
+      const finReceipt = await send(resolverWallet, rewardArtifact.abi, rewardAddress, "finalizeExpenditure", [onchainCampaignId, 0n]);
+      await post("/v1/reward/public/sync-receipt").send({ txHash: finReceipt.transactionHash });
 
-      // 5. Resolver records production verified on-chain
+      // 5. Resolver records production verified on-chain and calls Resolver HTTP endpoint with txHash
       const prodProof = keccak256(toHex("printed-sample-books"));
       const prodReceipt = await send(resolverWallet, rewardArtifact.abi, rewardAddress, "recordProductionVerified", [
         onchainCampaignId,
         prodProof,
       ]);
 
-      // 6. Indexer processes ProductionVerified event
-      const prodIndexResult = await indexerService.processReceipt(prodReceipt.transactionHash);
-      expect(prodIndexResult.digitalKeysIssued).toBeGreaterThanOrEqual(1);
+      const prodHttpRes = await post(`/v1/reward/resolver/campaigns/${campaignId}/production-verified`)
+        .set("Cookie", `ft_session=${resolverSessionToken}`)
+        .send({ txHash: prodReceipt.transactionHash, productionReportHash: prodProof });
+      expect(prodHttpRes.status).toBe(201);
+      expect(prodHttpRes.body.status).toBe("PRODUCTION_VERIFIED");
+      expect(prodHttpRes.body.digitalKeysIssued).toBeGreaterThanOrEqual(1);
 
-      // 7. Verify backer now receives unlocked digital access code
+      // 6. Verify backer now receives unlocked digital access code
       const res = await get("/v1/reward/backer/entitlements")
         .set("Cookie", `ft_session=${backerSessionToken}`);
       expect(res.status).toBe(200);
@@ -625,7 +667,7 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
   describe("Priority 5: Fulfillment Batches, Dispute Resolution & State Separation", () => {
     let disputeId: string;
 
-    it("creator creates physical fulfillment batch", async () => {
+    it("creator creates physical fulfillment batch and marks delivered via HTTP", async () => {
       const res = await post(`/v1/reward/creator/campaigns/${campaignId}/batches`)
         .set("Cookie", `ft_session=${creatorSessionToken}`)
         .send({
@@ -642,18 +684,19 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
       expect(res.status).toBe(201);
       expect(res.body.batchNumber).toBe(1);
 
-      // Verify entitlement status transitioned to FULFILLING
       const [ent] = await db.select().from(schema.rewardEntitlements)
         .where(eq(schema.rewardEntitlements.id, physicalEntitlementId));
       expect(ent.status).toBe("FULFILLING");
       expect(ent.carrierTrackingCode).toBe("VNP123456789VN");
+
+      // Mark delivered via Creator HTTP endpoint
+      const delivRes = await post(`/v1/reward/creator/entitlements/${physicalEntitlementId}/delivered`)
+        .set("Cookie", `ft_session=${creatorSessionToken}`);
+      expect(delivRes.status).toBe(201);
+      expect(delivRes.body.status).toBe("DELIVERED");
     });
 
     it("backer opens dispute for physical package damage", async () => {
-      // Mark delivered first
-      await db.update(schema.rewardEntitlements).set({ status: "DELIVERED" })
-        .where(eq(schema.rewardEntitlements.id, physicalEntitlementId));
-
       const res = await post(`/v1/reward/backer/entitlements/${physicalEntitlementId}/dispute`)
         .set("Cookie", `ft_session=${backerSessionToken}`)
         .send({
@@ -676,15 +719,12 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
       expect(res.status).toBe(201);
       expect(res.body.status).toBe("RESOLVED_BACKER");
 
-      // Verify entitlement transitioned to REFUND_ELIGIBLE
       const [ent] = await db.select().from(schema.rewardEntitlements)
         .where(eq(schema.rewardEntitlements.id, physicalEntitlementId));
       expect(ent.status).toBe("REFUND_ELIGIBLE");
     });
 
     it("enforces state separation: premature completeCampaign on contract reverts", async () => {
-      // In contract, campaign state is PRODUCTION_VERIFIED (enum index 2)
-      // completeCampaign() strictly requires FULFILLMENT_COMPLETE (enum index 3)
       try {
         await publicClient.simulateContract({
           account: creatorWallet,
@@ -693,29 +733,31 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
           functionName: "completeCampaign",
           args: [onchainCampaignId],
         });
-        expect(true).toBe(false); // Should have reverted!
+        expect(true).toBe(false);
       } catch (err: any) {
         expect(err.message).toMatch(/revert|WrongState/i);
       }
     });
 
-    it("resolver attests fulfillment completion via HTTP and smart contract", async () => {
+    it("resolver attests fulfillment completion on-chain and via HTTP receipt, then creator completes campaign on-chain and via HTTP receipt", async () => {
       const reportHash = "0x" + "3".repeat(64);
 
-      // HTTP attest fulfillment complete
-      const res = await post(`/v1/reward/resolver/campaigns/${campaignId}/fulfillment-complete`)
-        .set("Cookie", `ft_session=${resolverSessionToken}`)
-        .send({ fulfillmentReportHash: reportHash });
-
-      expect(res.status).toBe(201);
-      expect(res.body.status).toBe("FULFILLMENT_COMPLETE");
-
-      // On-chain record fulfillment complete
+      // 1. On-chain recordFulfillmentComplete first
       const fulfillReceipt = await send(resolverWallet, rewardArtifact.abi, rewardAddress, "recordFulfillmentComplete", [
         onchainCampaignId,
         reportHash as `0x${string}`,
       ]);
-      await indexerService.processReceipt(fulfillReceipt.transactionHash);
+
+      // 2. HTTP attest fulfillment complete with canonical txHash receipt
+      const res = await post(`/v1/reward/resolver/campaigns/${campaignId}/fulfillment-complete`)
+        .set("Cookie", `ft_session=${resolverSessionToken}`)
+        .send({
+          fulfillmentReportHash: reportHash,
+          txHash: fulfillReceipt.transactionHash,
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.status).toBe("FULFILLMENT_COMPLETE");
 
       const onchainCamp = await publicClient.readContract({
         address: rewardAddress,
@@ -725,8 +767,15 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
       }) as any;
       expect(onchainCamp.state).toBe(3); // FULFILLMENT_COMPLETE
 
-      // Finalize campaign completion
-      await send(creatorWallet, rewardArtifact.abi, rewardAddress, "completeCampaign", [onchainCampaignId]);
+      // 3. Finalize campaign completion on-chain and via Creator HTTP endpoint
+      const completeReceipt = await send(creatorWallet, rewardArtifact.abi, rewardAddress, "completeCampaign", [onchainCampaignId]);
+      const completeHttpRes = await post(`/v1/reward/creator/campaigns/${campaignId}/complete`)
+        .set("Cookie", `ft_session=${creatorSessionToken}`)
+        .send({ txHash: completeReceipt.transactionHash });
+
+      expect(completeHttpRes.status).toBe(201);
+      expect(completeHttpRes.body.status).toBe("COMPLETED");
+
       const finalizedCamp = await publicClient.readContract({
         address: rewardAddress,
         abi: rewardArtifact.abi,
@@ -736,4 +785,111 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
       expect(finalizedCamp.state).toBe(4); // COMPLETED
     });
   });
+
+  // =========================================================================
+  // PRIORITY 6: WIND-DOWN / REFUND CLAIM RECEIPT SYNC & BACKGROUND WORKER
+  // =========================================================================
+  describe("Priority 6: Wind-Down, Background Indexer Block Sync & On-Chain Refund Claim", () => {
+    it("synchronizes WindDownStarted via background block scanner runOnce() and indexes RefundClaimed via /v1/reward/backer/claim-refund", async () => {
+      // 1. Create, freeze, review & approve a second campaign
+      const draftRes = await post("/v1/reward/creator/campaigns")
+        .set("Cookie", `ft_session=${creatorSessionToken}`)
+        .send({
+          title: "Wind-Down Refund Verification Comic Vol 2",
+          pitch: "Testing canonical wind-down and pro-rata refund claim indexing.",
+          story: "Detailed production schedule for volume 2.",
+          category: "COMICS",
+          goal: "1000000000", // 1,000 USDC
+          fundingDuration: 2592000,
+          policyHash: "0x" + "1".repeat(64),
+          tiers: [
+            {
+              title: "Collector Edition",
+              description: "Hardcover collector edition",
+              price: "1000000000",
+              maxQuantity: 10,
+              isDigital: false,
+              rewardItems: ["Hardcover Book"],
+            },
+          ],
+        });
+      expect(draftRes.status).toBe(201);
+      const camp2Id = draftRes.body.id;
+
+      const freezeRes = await post(`/v1/reward/creator/campaigns/${camp2Id}/freeze`)
+        .set("Cookie", `ft_session=${creatorSessionToken}`);
+      expect(freezeRes.status).toBe(201);
+      const commitment2 = freezeRes.body.commitmentHash as `0x${string}`;
+
+      await post(`/v1/reward/creator/campaigns/${camp2Id}/submit-review`)
+        .set("Cookie", `ft_session=${creatorSessionToken}`);
+      await post(`/v1/reward/resolver/campaigns/${camp2Id}/review`)
+        .set("Cookie", `ft_session=${resolverSessionToken}`)
+        .send({ outcome: "APPROVED", decisionReason: "Approved for wind-down test." });
+
+      // 2. Deploy campaign #2 on-chain and register
+      const create2Receipt = await send(
+        creatorWallet,
+        rewardArtifact.abi,
+        rewardAddress,
+        "createCampaign",
+        [commitment2, 1_000_000_000n, 2592000n, [{ price: 1_000_000_000n, maxQuantity: 10n, pledgedQuantity: 0n, isDigital: false }]]
+      );
+      const nextId = await publicClient.readContract({
+        address: rewardAddress,
+        abi: rewardArtifact.abi,
+        functionName: "nextCampaignId",
+      }) as bigint;
+      const onchainId2 = nextId - 1n;
+
+      const regRes = await post(`/v1/reward/creator/campaigns/${camp2Id}/onchain`)
+        .set("Cookie", `ft_session=${creatorSessionToken}`)
+        .send({ onchainCampaignId: onchainId2.toString(), txHash: create2Receipt.transactionHash });
+      expect(regRes.status).toBe(201);
+
+      // 3. Backer pledges 1,000 USDC and notifies backend
+      const pledge2Receipt = await send(backerWallet, rewardArtifact.abi, rewardAddress, "pledge", [onchainId2, 0n, 1n]);
+      const notifyRes = await post("/v1/reward/backer/notify-pledge")
+        .set("Cookie", `ft_session=${backerSessionToken}`)
+        .send({ txHash: pledge2Receipt.transactionHash });
+      expect(notifyRes.status).toBe(201);
+      const ent2Id = notifyRes.body.entitlement.id;
+
+      // 4. Resolver activates campaign #2
+      const act2Receipt = await send(resolverWallet, rewardArtifact.abi, rewardAddress, "activateCampaign", [
+        onchainId2,
+        keccak256(toHex("activate-2")),
+      ]);
+      await post(`/v1/reward/resolver/campaigns/${camp2Id}/activate`)
+        .set("Cookie", `ft_session=${resolverSessionToken}`)
+        .send({ txHash: act2Receipt.transactionHash });
+
+      // 5. Warp past EXECUTION_HORIZON (180 days) and call startWindDown on-chain
+      await (publicClient.request as any)({ method: "evm_increaseTime", params: [181 * 86400] });
+      await (publicClient.request as any)({ method: "evm_mine" });
+      await send(resolverWallet, rewardArtifact.abi, rewardAddress, "startWindDown", [onchainId2]);
+
+      // Use background block scanner runOnce() (without passing txHash!) to index WindDownStarted
+      const scanRes = await indexerService.runOnce();
+      expect(scanRes.logsProcessed).toBeGreaterThanOrEqual(1);
+
+      const [stoppedCamp] = await db.select().from(schema.rewardCampaigns).where(eq(schema.rewardCampaigns.id, camp2Id));
+      expect(stoppedCamp.status).toBe("STOPPED");
+
+      const [eligibleEnt] = await db.select().from(schema.rewardEntitlements).where(eq(schema.rewardEntitlements.id, ent2Id));
+      expect(eligibleEnt.status).toBe("REFUND_ELIGIBLE");
+
+      // 6. Backer executes claimRefund on-chain and calls POST /v1/reward/backer/claim-refund
+      const refundReceipt = await send(backerWallet, rewardArtifact.abi, rewardAddress, "claimRefund", [onchainId2]);
+      const claimHttpRes = await post("/v1/reward/backer/claim-refund")
+        .set("Cookie", `ft_session=${backerSessionToken}`)
+        .send({ txHash: refundReceipt.transactionHash });
+      expect(claimHttpRes.status).toBe(201);
+      expect(claimHttpRes.body.synced).toBe(true);
+
+      const [refundedEnt] = await db.select().from(schema.rewardEntitlements).where(eq(schema.rewardEntitlements.id, ent2Id));
+      expect(refundedEnt.status).toBe("REFUNDED");
+    });
+  });
 });
+

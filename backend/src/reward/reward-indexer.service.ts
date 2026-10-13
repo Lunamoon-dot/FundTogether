@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { and, eq, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { createPublicClient, defineChain, http, parseEventLogs } from "viem";
@@ -27,25 +27,51 @@ export interface SyncRewardResult {
 }
 
 @Injectable()
-export class RewardIndexerService {
+export class RewardIndexerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RewardIndexerService.name);
   private client: PublicClient | null = null;
   private rewardContractAddress: `0x${string}` = "0x0000000000000000000000000000000000000000";
+  private rpcUrl: string = "";
   private readonly chainId: number;
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private isSyncing = false;
 
   constructor(@Inject(DRIZZLE_DB) private readonly db: NodePgDatabase<typeof schema>) {
-    const rpcUrl = process.env.HED_BLOCKCHAIN_RPC_URL || "http://127.0.0.1:9548";
+    this.rpcUrl = process.env.HED_BLOCKCHAIN_RPC_URL || "http://127.0.0.1:9548";
     this.chainId = Number(process.env.CHAIN_ID) || 31339;
     const chain = defineChain({
       id: this.chainId,
       name: "FundTogether Local",
       nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-      rpcUrls: { default: { http: [rpcUrl] } },
+      rpcUrls: { default: { http: [this.rpcUrl] } },
     });
-    this.client = createPublicClient({ chain, transport: http(rpcUrl) });
+    this.client = createPublicClient({ chain, transport: http(this.rpcUrl) });
 
     if (process.env.REWARD_CONTRACT_ADDRESS) {
       this.rewardContractAddress = process.env.REWARD_CONTRACT_ADDRESS as `0x${string}`;
+    }
+  }
+
+  onModuleInit() {
+    const pollEnabled = process.env.REWARD_INDEXER_POLL_ENABLED === "true" ||
+      (process.env.NODE_ENV !== "test" && process.env.REWARD_INDEXER_POLL_ENABLED !== "false");
+    if (!pollEnabled) return;
+
+    const intervalMs = Number(process.env.REWARD_INDEXER_POLL_MS) || 4000;
+    this.pollTimer = setInterval(() => {
+      void this.syncFromChain().catch(err => {
+        this.logger.debug(`Reward background poll skipped: ${err.message}`);
+      });
+    }, intervalMs);
+    if (typeof (this.pollTimer as any)?.unref === "function") {
+      (this.pollTimer as any).unref();
+    }
+  }
+
+  onModuleDestroy() {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
     }
   }
 
@@ -53,8 +79,139 @@ export class RewardIndexerService {
     this.rewardContractAddress = address;
   }
 
+  getContractAddress(): `0x${string}` | undefined {
+    const addr = (this.rewardContractAddress !== "0x0000000000000000000000000000000000000000"
+      ? this.rewardContractAddress
+      : process.env.REWARD_CONTRACT_ADDRESS) as `0x${string}` | undefined;
+    if (!addr || addr === "0x0000000000000000000000000000000000000000") {
+      return undefined;
+    }
+    return addr;
+  }
+
+  getRpcUrl(): string | undefined {
+    const url = this.rpcUrl || process.env.HED_BLOCKCHAIN_RPC_URL;
+    return url && url.trim().length > 0 ? url.trim() : undefined;
+  }
+
   setClient(client: PublicClient) {
     this.client = client;
+  }
+
+  getClient(): PublicClient | null {
+    return this.client;
+  }
+
+  /**
+   * Background / manual block scanner that pulls all logs emitted by the registered
+   * Reward contract from last indexed block + 1 up to current headBlock.
+   */
+  async runOnce(): Promise<SyncRewardResult> {
+    return this.syncFromChain();
+  }
+
+  async syncFromChain(): Promise<SyncRewardResult> {
+    const contractAddress = this.getContractAddress();
+    if (!this.client || !contractAddress || this.isSyncing) {
+      return { fromBlock: 0n, toBlock: 0n, logsProcessed: 0, entitlementsCreated: 0, digitalKeysIssued: 0 };
+    }
+
+    this.isSyncing = true;
+    try {
+      const activeAddress = contractAddress.toLowerCase();
+      const streamId = `REWARD:${this.chainId}:${activeAddress}`;
+      const headBlock = await this.client.getBlockNumber({ cacheTime: 0 });
+
+      let fromBlock = 0n;
+
+      const [streamRow] = await this.db.select().from(indexerStreams)
+        .where(eq(indexerStreams.streamId, streamId));
+
+      if (streamRow && streamRow.lastBlock) {
+        const prevBlockNum = BigInt(streamRow.lastBlock);
+        // Reorg check on last indexed block if hash was non-zero
+        if (
+          streamRow.lastBlockHash &&
+          streamRow.lastBlockHash !== "0x" + "0".repeat(64) &&
+          prevBlockNum <= headBlock
+        ) {
+          try {
+            const onchainBlock = await this.client.getBlock({ blockNumber: prevBlockNum });
+            if (onchainBlock.hash && onchainBlock.hash.toLowerCase() !== streamRow.lastBlockHash.toLowerCase()) {
+              this.logger.warn(`Reorg detected at block ${prevBlockNum}: expected ${streamRow.lastBlockHash}, got ${onchainBlock.hash}`);
+              fromBlock = prevBlockNum > 10n ? prevBlockNum - 10n : 0n;
+            } else {
+              fromBlock = prevBlockNum + 1n;
+            }
+          } catch {
+            fromBlock = prevBlockNum + 1n;
+          }
+        } else {
+          fromBlock = prevBlockNum + 1n;
+        }
+      }
+
+      if (fromBlock > headBlock) {
+        return { fromBlock: headBlock, toBlock: headBlock, logsProcessed: 0, entitlementsCreated: 0, digitalKeysIssued: 0 };
+      }
+
+      const rawLogs = await this.client.getLogs({
+        address: contractAddress,
+        fromBlock,
+        toBlock: headBlock,
+      });
+
+      const parsedLogs = parseEventLogs({
+        abi: rewardAbiJson as any,
+        logs: rawLogs,
+        strict: false,
+      });
+
+      let entitlementsCreated = 0;
+      let digitalKeysIssued = 0;
+
+      if (parsedLogs.length > 0) {
+        const res = await this.processEvents(
+          parsedLogs as any,
+          undefined,
+          contractAddress,
+          headBlock,
+          rawLogs[rawLogs.length - 1]?.blockHash as `0x${string}` | undefined
+        );
+        entitlementsCreated = res.entitlementsCreated;
+        digitalKeysIssued = res.digitalKeysIssued;
+      } else {
+        const headBlockObj = await this.client.getBlock({ blockNumber: headBlock });
+        const bHash = headBlockObj.hash ?? (("0x" + "0".repeat(64)) as `0x${string}`);
+        await this.db.insert(schema.indexerStreams).values({
+          streamId,
+          lastBlock: headBlock.toString(),
+          lastBlockHash: bHash,
+          headBlock: headBlock.toString(),
+          status: "synced",
+          updatedAt: new Date(),
+        }).onConflictDoUpdate({
+          target: schema.indexerStreams.streamId,
+          set: {
+            lastBlock: headBlock.toString(),
+            lastBlockHash: bHash,
+            headBlock: headBlock.toString(),
+            status: "synced",
+            updatedAt: new Date(),
+          },
+        });
+      }
+
+      return {
+        fromBlock,
+        toBlock: headBlock,
+        logsProcessed: parsedLogs.length,
+        entitlementsCreated,
+        digitalKeysIssued,
+      };
+    } finally {
+      this.isSyncing = false;
+    }
   }
 
   /**
@@ -64,11 +221,8 @@ export class RewardIndexerService {
   async processReceipt(txHash: `0x${string}`) {
     if (!this.client) throw new Error("Chain client not initialized");
 
-    const contractAddress = (this.rewardContractAddress !== "0x0000000000000000000000000000000000000000"
-      ? this.rewardContractAddress
-      : process.env.REWARD_CONTRACT_ADDRESS) as `0x${string}` | undefined;
-
-    if (!contractAddress || contractAddress === "0x0000000000000000000000000000000000000000") {
+    const contractAddress = this.getContractAddress();
+    if (!contractAddress) {
       throw new Error("Registered Reward contract address required before processing receipts");
     }
 
@@ -85,7 +239,7 @@ export class RewardIndexerService {
 
     if (contractLogs.length === 0) {
       this.logger.warn(`Transaction receipt ${txHash} contains 0 events from registered Reward contract ${contractAddress}`);
-      return { entitlementsCreated: 0, digitalKeysIssued: 0 };
+      return { entitlementsCreated: 0, digitalKeysIssued: 0, eventsProcessed: 0 };
     }
 
     const parsedLogs = parseEventLogs({
@@ -94,13 +248,14 @@ export class RewardIndexerService {
       strict: false,
     });
 
-    return this.processEvents(
+    const result = await this.processEvents(
       parsedLogs as any,
       txHash,
       contractAddress,
       receipt.blockNumber,
       receipt.blockHash
     );
+    return { ...result, eventsProcessed: parsedLogs.length };
   }
 
   /**
@@ -108,7 +263,7 @@ export class RewardIndexerService {
    * Records stream checkpoint and canonical chain_events.
    */
   async processEvents(
-    events: Array<{ eventName: string; args: any; logIndex?: number; transactionHash?: string }>,
+    events: Array<{ eventName: string; args: any; logIndex?: number; transactionHash?: string; blockNumber?: bigint; blockHash?: `0x${string}` }>,
     fallbackTxHash?: string,
     contractAddress?: `0x${string}`,
     blockNumber?: bigint,
@@ -117,9 +272,7 @@ export class RewardIndexerService {
     let entitlementsCreated = 0;
     let digitalKeysIssued = 0;
 
-    const registeredAddress = (this.rewardContractAddress !== "0x0000000000000000000000000000000000000000"
-      ? this.rewardContractAddress
-      : process.env.REWARD_CONTRACT_ADDRESS) as `0x${string}` | undefined;
+    const registeredAddress = this.getContractAddress();
 
     if (registeredAddress && contractAddress && contractAddress.toLowerCase() !== registeredAddress.toLowerCase()) {
       this.logger.warn(`processEvents rejected events from unauthorized contract address: ${contractAddress}`);
@@ -127,8 +280,8 @@ export class RewardIndexerService {
     }
 
     const bNum = blockNumber ?? 1n;
-    const bHash = blockHash ?? ("0x" + "0".repeat(64));
-    const activeAddress = (contractAddress || this.rewardContractAddress).toLowerCase();
+    const bHash = blockHash ?? (("0x" + "0".repeat(64)) as `0x${string}`);
+    const activeAddress = (contractAddress || registeredAddress || this.rewardContractAddress).toLowerCase();
     const streamId = `REWARD:${this.chainId}:${activeAddress}`;
 
     // Maintain indexerStreams checkpoint
@@ -162,6 +315,8 @@ export class RewardIndexerService {
     for (const event of events) {
       const txHash = event.transactionHash || fallbackTxHash || "0x" + "0".repeat(64);
       const logIdx = event.logIndex ?? 0;
+      const evBlockNum = event.blockNumber ?? bNum;
+      const evBlockHash = event.blockHash ?? bHash;
 
       // Helper to serialize BigInts safely for JSON/jsonb columns
       const serializeBigInts = (val: any): any => {
@@ -183,8 +338,8 @@ export class RewardIndexerService {
         streamId,
         transactionHash: txHash,
         logIndex: logIdx,
-        blockHash: bHash,
-        blockNumber: bNum.toString(),
+        blockHash: evBlockHash,
+        blockNumber: evBlockNum.toString(),
         eventName: event.eventName,
         args: serializeBigInts(event.args),
         canonical: true,
@@ -192,7 +347,7 @@ export class RewardIndexerService {
 
       switch (event.eventName) {
         case "CampaignCreated": {
-          const { campaignId, creator, commitmentHash, goal } = event.args;
+          const { campaignId, commitmentHash } = event.args;
           const onchainId = campaignId.toString();
 
           const [existing] = await this.db.select().from(rewardCampaigns)
@@ -205,7 +360,7 @@ export class RewardIndexerService {
               updatedAt: new Date(),
             }).where(eq(rewardCampaigns.id, existing.id));
 
-            await this.updateProjection(streamId, onchainId, existing.id, "PUBLISHED", event.eventName, txHash, bNum);
+            await this.updateProjection(streamId, onchainId, existing.id, "PUBLISHED", event.eventName, txHash, evBlockNum, serializeBigInts(event.args));
             this.logger.log(`Linked on-chain campaign #${onchainId} to DB campaign ${existing.id}`);
           }
           break;
@@ -233,7 +388,7 @@ export class RewardIndexerService {
           }
 
           // Find or create backer user
-          let [walletLink] = await this.db.select().from(walletLinks)
+          const [walletLink] = await this.db.select().from(walletLinks)
             .where(and(eq(walletLinks.address, backerWallet), eq(walletLinks.chainId, String(this.chainId))));
           let backerUserId: string;
 
@@ -277,7 +432,7 @@ export class RewardIndexerService {
           if (inserted) {
             entitlementsCreated++;
             this.logger.log(`Indexed RewardPledged: backer ${backerWallet}, tier ${tierIndex}, qty ${pledgeQty}`);
-            await this.updateProjection(streamId, onchainId, campaign.id, campaign.status, event.eventName, txHash, bNum);
+            await this.updateProjection(streamId, onchainId, campaign.id, campaign.status, event.eventName, txHash, evBlockNum, serializeBigInts(event.args));
           }
           break;
         }
@@ -291,13 +446,13 @@ export class RewardIndexerService {
               status: "ACTIVE",
               updatedAt: new Date(),
             }).where(eq(rewardCampaigns.id, campaign.id));
-            await this.updateProjection(streamId, onchainId, campaign.id, "ACTIVE", event.eventName, txHash, bNum);
+            await this.updateProjection(streamId, onchainId, campaign.id, "ACTIVE", event.eventName, txHash, evBlockNum, serializeBigInts(event.args));
           }
           break;
         }
 
         case "ProductionVerified": {
-          const { campaignId, reportHash } = event.args;
+          const { campaignId } = event.args;
           const onchainId = campaignId.toString();
 
           const campaign = await findCampaign(onchainId);
@@ -330,13 +485,30 @@ export class RewardIndexerService {
             digitalKeysIssued++;
           }
 
-          await this.updateProjection(streamId, onchainId, campaign.id, "PRODUCTION_VERIFIED", event.eventName, txHash, bNum);
+          await this.updateProjection(streamId, onchainId, campaign.id, "PRODUCTION_VERIFIED", event.eventName, txHash, evBlockNum, serializeBigInts(event.args));
           this.logger.log(`Production verified for #${onchainId}: issued ${digitalKeysIssued} digital access keys.`);
           break;
         }
 
         case "FulfillmentComplete": {
-          const { campaignId, fulfillmentReportHash } = event.args;
+          const { campaignId } = event.args;
+          const onchainId = campaignId.toString();
+
+          const campaign = await findCampaign(onchainId);
+          if (!campaign) continue;
+
+          await this.db.update(rewardCampaigns).set({
+            status: "FULFILLMENT_COMPLETE",
+            updatedAt: new Date(),
+          }).where(eq(rewardCampaigns.id, campaign.id));
+
+          await this.updateProjection(streamId, onchainId, campaign.id, "FULFILLMENT_COMPLETE", event.eventName, txHash, evBlockNum, serializeBigInts(event.args));
+          this.logger.log(`Fulfillment complete verified for #${onchainId}`);
+          break;
+        }
+
+        case "CampaignCompleted": {
+          const { campaignId } = event.args;
           const onchainId = campaignId.toString();
 
           const campaign = await findCampaign(onchainId);
@@ -347,11 +519,12 @@ export class RewardIndexerService {
             updatedAt: new Date(),
           }).where(eq(rewardCampaigns.id, campaign.id));
 
-          await this.updateProjection(streamId, onchainId, campaign.id, "COMPLETED", event.eventName, txHash, bNum);
-          this.logger.log(`Fulfillment complete verified for #${onchainId}`);
+          await this.updateProjection(streamId, onchainId, campaign.id, "COMPLETED", event.eventName, txHash, evBlockNum, serializeBigInts(event.args));
+          this.logger.log(`Campaign completed on-chain for #${onchainId}`);
           break;
         }
 
+        case "FundingFailed":
         case "WindDownStarted": {
           const { campaignId } = event.args;
           const onchainId = campaignId.toString();
@@ -372,7 +545,7 @@ export class RewardIndexerService {
             sql`${rewardEntitlements.status} IN ('ACTIVE', 'REDEEM_REQUESTED')`
           ));
 
-          await this.updateProjection(streamId, onchainId, campaign.id, "STOPPED", event.eventName, txHash, bNum);
+          await this.updateProjection(streamId, onchainId, campaign.id, "STOPPED", event.eventName, txHash, evBlockNum, serializeBigInts(event.args));
           break;
         }
 
@@ -392,7 +565,40 @@ export class RewardIndexerService {
             eq(rewardEntitlements.backerWallet, backerWallet)
           ));
 
-          await this.updateProjection(streamId, onchainId, campaign.id, "STOPPED", event.eventName, txHash, bNum);
+          await this.updateProjection(streamId, onchainId, campaign.id, "STOPPED", event.eventName, txHash, evBlockNum, serializeBigInts(event.args));
+          break;
+        }
+
+        case "EligibilityTakenOver":
+        case "DisbursementRequestSubmitted":
+        case "RequestApprovedAndDisbursed":
+        case "RequestApprovalTakenOver":
+        case "RequestCancelled":
+        case "ExpenditureCandidate":
+        case "ExpenditureReviewTakenOver":
+        case "ExpenditureSettled":
+        case "DisputeCaseOpened":
+        case "DisputeCaseUpheld":
+        case "DisputeCaseTakenOver":
+        case "FundsReturned":
+        case "ExpenditureAuthorizationInvalidated": {
+          const campaignIdArg = event.args?.campaignId;
+          if (campaignIdArg !== undefined) {
+            const onchainId = campaignIdArg.toString();
+            const campaign = await findCampaign(onchainId);
+            if (campaign) {
+              await this.updateProjection(
+                streamId,
+                onchainId,
+                campaign.id,
+                campaign.status,
+                event.eventName,
+                txHash,
+                evBlockNum,
+                serializeBigInts(event.args)
+              );
+            }
+          }
           break;
         }
       }
@@ -408,32 +614,59 @@ export class RewardIndexerService {
     status: string,
     lastEvent: string,
     lastTxHash: string,
-    blockNumber: bigint
+    blockNumber: bigint,
+    lastEventArgs?: Record<string, any>
   ) {
     try {
+      let onchainSnapshot: Record<string, any> = {};
+      const contractAddress = this.getContractAddress();
+      if (this.client && contractAddress) {
+        try {
+          const cData = (await this.client.readContract({
+            address: contractAddress,
+            abi: rewardAbiJson as any,
+            functionName: "campaign",
+            args: [BigInt(onchainCampaignId)],
+          })) as any;
+          if (cData) {
+            onchainSnapshot = {
+              creator: cData.creator ?? cData[0],
+              commitmentHash: cData.commitmentHash ?? cData[1],
+              goal: String(cData.goal ?? cData[2] ?? "0"),
+              contributed: String(cData.contributed ?? cData[3] ?? "0"),
+              available: String(cData.available ?? cData[4] ?? "0"),
+              grossPaid: String(cData.grossPaid ?? cData[5] ?? "0"),
+              refunded: String(cData.refunded ?? cData[6] ?? "0"),
+              basePool: String(cData.basePool ?? cData[7] ?? "0"),
+              supplementPool: String(cData.supplementPool ?? cData[8] ?? "0"),
+              onchainState: Number(cData.state ?? cData[14] ?? 0),
+            };
+          }
+        } catch {
+          // Non-fatal if contract read is mocked or unavailable during synthetic unit test
+        }
+      }
+
+      const snapshotPayload = {
+        onchainCampaignId,
+        status,
+        lastEvent,
+        lastEventArgs: lastEventArgs ?? null,
+        lastTxHash,
+        blockNumber: blockNumber.toString(),
+        ...onchainSnapshot,
+        updatedAt: new Date().toISOString(),
+      };
+
       await this.db.insert(rewardCampaignProjection).values({
         streamId,
         onchainCampaignId,
         campaignMetadataId: campaignId,
-        snapshot: {
-          onchainCampaignId,
-          status,
-          lastEvent,
-          lastTxHash,
-          blockNumber: blockNumber.toString(),
-          updatedAt: new Date().toISOString(),
-        },
+        snapshot: snapshotPayload,
       }).onConflictDoUpdate({
         target: [rewardCampaignProjection.streamId, rewardCampaignProjection.onchainCampaignId],
         set: {
-          snapshot: {
-            onchainCampaignId,
-            status,
-            lastEvent,
-            lastTxHash,
-            blockNumber: blockNumber.toString(),
-            updatedAt: new Date().toISOString(),
-          },
+          snapshot: snapshotPayload,
         },
       });
     } catch (err: any) {
@@ -441,3 +674,4 @@ export class RewardIndexerService {
     }
   }
 }
+

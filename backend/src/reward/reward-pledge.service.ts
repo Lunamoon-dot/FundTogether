@@ -11,12 +11,14 @@ import {
   users,
 } from "../database/schema";
 import type {
+  ClaimRewardRefundInput,
   NotifyRewardPledgeInput,
   OpenRewardDisputeInput,
   UpdateShippingAddressInput,
 } from "./reward-pledge.schema";
 import { RewardCryptoService } from "./reward-crypto.service";
 import { RewardIndexerService } from "./reward-indexer.service";
+
 
 @Injectable()
 export class RewardPledgeService {
@@ -164,4 +166,36 @@ export class RewardPledgeService {
       return dispute;
     });
   }
+
+  /**
+   * Verified on-chain refund claim indexing:
+   * Backer submits txHash of `claimRefund` -> Indexer verifies receipt and `RefundClaimed` event
+   * from registered Reward contract -> updates backer's entitlements to `REFUNDED`.
+   */
+  async claimRefund(userId: string, input: ClaimRewardRefundInput) {
+    const txHash = input.txHash as `0x${string}`;
+    try {
+      await this.indexerService.processReceipt(txHash);
+    } catch (err: any) {
+      throw new BadRequestException(`Failed to verify and index RefundClaimed receipt: ${err.message}`);
+    }
+
+    const refundedEntitlements = await this.db.select().from(rewardEntitlements).where(
+      and(
+        eq(rewardEntitlements.backerUserId, userId),
+        eq(rewardEntitlements.status, "REFUNDED")
+      )
+    );
+
+    if (refundedEntitlements.length === 0) {
+      throw new BadRequestException("No valid RefundClaimed event found for this backer in transaction receipt");
+    }
+
+    return {
+      synced: true,
+      txHash,
+      refundedEntitlements,
+    };
+  }
 }
+

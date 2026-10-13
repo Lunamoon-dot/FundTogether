@@ -8,6 +8,7 @@ import {
   createRewardCampaignDraftSchema,
   registerRewardOnchainSchema,
   creatorVerificationInputSchema,
+  completeRewardCampaignSchema,
 } from "./reward-campaign.schema";
 import { createFulfillmentBatchSchema } from "./reward-pledge.schema";
 
@@ -69,7 +70,21 @@ export class RewardCreatorController {
     if (!parsed.success) {
       throw new BadRequestException({ message: "Invalid onchain ID", issues: parsed.error.issues });
     }
-    return this.campaigns.registerOnchain(id, req.account!.userId, parsed.data.onchainCampaignId);
+    return this.campaigns.registerOnchain(
+      id,
+      req.account!.userId,
+      parsed.data.onchainCampaignId,
+      parsed.data.txHash,
+    );
+  }
+
+  @Post("campaigns/:id/complete")
+  completeCampaign(@Param("id", new ParseUUIDPipe()) id: string, @Body() body: unknown, @Req() req: Request) {
+    const parsed = completeRewardCampaignSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException({ message: "Invalid complete campaign payload", issues: parsed.error.issues });
+    }
+    return this.campaigns.completeCampaignOnchain(req.account!.userId, id, parsed.data.txHash);
   }
 
   @Post("campaigns/:id/batches")
@@ -91,8 +106,14 @@ export class RewardCreatorController {
     return this.fulfillment.listEntitlementsToFulfill(req.account!.userId, id);
   }
 
+  @Post("entitlements/:id/delivered")
+  markDelivered(@Param("id", new ParseUUIDPipe()) id: string, @Req() req: Request) {
+    return this.fulfillment.markDelivered(req.account!.userId, id);
+  }
+
   @Get("entitlements/:id/shipping")
   getDecryptedShipping(@Param("id", new ParseUUIDPipe()) id: string, @Req() req: Request) {
     return this.pledgeService.getDecryptedShipping(req.account!.userId, id);
   }
 }
+

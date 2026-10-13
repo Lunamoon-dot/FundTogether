@@ -1,10 +1,15 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+if (!process.env.REWARD_PII_ENCRYPTION_KEY) {
+  process.env.REWARD_PII_ENCRYPTION_KEY = 'test_reward_pii_encryption_key_32bytes_safe!!';
+}
 const { Pool } = require('pg');
 const { drizzle } = require('drizzle-orm/node-postgres');
 const { eq, and, sql } = require('drizzle-orm');
 const { createPublicClient, createWalletClient, defineChain, http, keccak256, toHex } = require('viem');
 const { artifacts, policy, hashJson } = require('./generate-artifacts.cjs');
+
 
 // Import database schemas
 const schema = require('../../dist/src/database/schema');
@@ -94,39 +99,55 @@ async function main() {
   const indexerService = new RewardIndexerService(db);
   indexerService.setClient(client);
   indexerService.setContractAddress(rewardAddress);
-  const campaignService = new RewardCampaignService(db, cryptoService);
+  const campaignService = new RewardCampaignService(db, cryptoService, indexerService);
   const pledgeService = new RewardPledgeService(db, cryptoService, indexerService);
-  const fulfillmentService = new RewardFulfillmentService(db);
+  const fulfillmentService = new RewardFulfillmentService(db, indexerService);
 
   // Helper to ensure user and wallet link exist in DB
-  const getOrCreateUser = async (walletAddr) => {
+  const getOrCreateUser = async (walletAddr, roles = []) => {
     const addr = walletAddr.toLowerCase();
+    let userId;
     const [link] = await db.select().from(walletLinks)
       .where(and(eq(walletLinks.address, addr), eq(walletLinks.chainId, '31339')));
-    if (link) return link.userId;
-    const [u] = await db.insert(users).values({}).returning();
-    await db.insert(walletLinks).values({
-      userId: u.id,
-      chainId: '31339',
-      address: addr,
-      isPrimary: true,
-    });
-    return u.id;
+    if (link) {
+      userId = link.userId;
+    } else {
+      const [u] = await db.insert(users).values({}).returning();
+      await db.insert(walletLinks).values({
+        userId: u.id,
+        chainId: '31339',
+        address: addr,
+        isPrimary: true,
+      });
+      userId = u.id;
+    }
+    if (roles.length > 0 && schema.platformRoles) {
+      await db.insert(schema.platformRoles).values({
+        userId,
+        roles,
+      }).onConflictDoUpdate({
+        target: schema.platformRoles.userId,
+        set: { roles },
+      });
+    }
+    return userId;
   };
 
   const creatorUserId = await getOrCreateUser(creatorWallet);
-  const resolverUserId = await getOrCreateUser(resolverWallet);
-  const adminUserId = await getOrCreateUser(backupResolverWallet);
+  const resolverUserId = await getOrCreateUser(resolverWallet, ['RESOLVER']);
+  const adminUserId = await getOrCreateUser(backupResolverWallet, ['ADMIN', 'RESOLVER']);
   const backer1UserId = await getOrCreateUser(backerWallet1);
   const backer2UserId = await getOrCreateUser(backerWallet2);
+
 
   // ------------------------------------------------------------------------
   // PHASE 1: Flow V1 - Organization & Creator Verification by Admin
   // ------------------------------------------------------------------------
   console.log('\n--- Phase 1: Flow V1 - Creator Verification by Admin ---');
+  const [unverifiedUser] = await db.insert(users).values({}).returning();
   // Attempt to create draft before verification -> MUST FAIL
   try {
-    await campaignService.createDraft(creatorUserId, {
+    await campaignService.createDraft(unverifiedUser.id, {
       title: 'Unverified Comic',
       pitch: 'Pitch that should fail before verification',
       story: 'Story that should fail before creator verification',
@@ -149,8 +170,8 @@ async function main() {
     console.log(`✓ Flow V1 Gate Verified: Unverified creator rejected (${err.message})`);
   }
 
-  // Creator applies for verification
-  const creatorProfile = await campaignService.applyCreatorVerification(creatorUserId, {
+  // Creator applies for verification (Flow V1 full cycle on fresh user)
+  const creatorProfile = await campaignService.applyCreatorVerification(unverifiedUser.id, {
     displayName: 'Studio Neon Comics',
     bio: 'Independent sci-fi comic publishing house founded in 2024.',
     ipDeclaration: 'Original screenplay, lineart, and character designs registered under Vietnam Copyright Office #2026-NEON.',
@@ -162,6 +183,18 @@ async function main() {
     outcome: 'VERIFIED',
   });
   assert.equal(reviewedProfile.status, 'VERIFIED');
+
+  // Ensure primary Anvil creatorUserId is also verified for subsequent on-chain phases
+  try {
+    const primaryProfile = await campaignService.applyCreatorVerification(creatorUserId, {
+      displayName: 'Studio Neon Comics Primary',
+      bio: 'Independent sci-fi comic publishing house founded in 2024.',
+      ipDeclaration: 'Original screenplay, lineart, and character designs registered under Vietnam Copyright Office #2026-NEON.',
+    });
+    await campaignService.adminReviewCreator(adminUserId, primaryProfile.id, { outcome: 'VERIFIED' });
+  } catch (e) {
+    if (e.status !== 409) throw e;
+  }
   console.log('✓ Flow V1 Passed: Creator identity and rights verified by Admin.');
 
   // ------------------------------------------------------------------------
@@ -329,9 +362,10 @@ async function main() {
   await send(backerWallet1, rewardArtifact.abi, rewardAddress, 'pledge', [BigInt(onchainCampaignId), 0n, 98n]); // 98x25 = 2,450 USDC
   await send(backerWallet1, rewardArtifact.abi, rewardAddress, 'pledge', [BigInt(onchainCampaignId), 1n, 29n]); // 29x50 = 1,450 USDC
 
-  // Activate campaign on-chain
+  // Activate campaign on-chain and verify via Resolver service endpoint
   const activateReceipt = await send(resolverWallet, rewardArtifact.abi, rewardAddress, 'activateCampaign', [BigInt(onchainCampaignId), hashJson({ active: true })]);
-  await indexerService.processReceipt(activateReceipt.transactionHash);
+  const activatedCampaign = await campaignService.activateCampaignOnchain(resolverUserId, draftCampaign.id, activateReceipt.transactionHash);
+  assert.equal(activatedCampaign.status, 'ACTIVE');
 
   // Creator requests 37.5% Print Deposit ($1,500 <= 50% max deposit)
   const depositReq = 1_500_000_000n;
@@ -358,9 +392,14 @@ async function main() {
   const prodVerifyReceipt = await send(resolverWallet, rewardArtifact.abi, rewardAddress, 'recordProductionVerified', [BigInt(onchainCampaignId), sampleProofHash]);
   console.log('✓ On-Chain ProductionVerified event emitted.');
 
-  // Indexer syncs event into PostgreSQL
-  const indexerProdResult = await indexerService.processReceipt(prodVerifyReceipt.transactionHash);
-  assert.ok(indexerProdResult.digitalKeysIssued >= 1, 'Indexer must issue digital keys upon production verification');
+  // Resolver service verifies canonical receipt and issues digital keys into PostgreSQL
+  const prodVerifiedCampaign = await campaignService.recordProductionVerifiedOnchain(
+    resolverUserId,
+    draftCampaign.id,
+    prodVerifyReceipt.transactionHash
+  );
+  assert.equal(prodVerifiedCampaign.status, 'PRODUCTION_VERIFIED');
+  assert.ok(prodVerifiedCampaign.digitalKeysIssued >= 1, 'Indexer must issue digital keys upon production verification');
 
   // CRITICAL UNLOCK VERIFICATION: Backer 1's digital entitlement now HAS a generated code!
   const [digitalEntitlementAfter] = await db.select().from(rewardEntitlements).where(eq(rewardEntitlements.id, notifyResult1.entitlement.id));
@@ -390,7 +429,7 @@ async function main() {
   assert.equal(joinRow.carrierTrackingCode, 'VNPOST-2026-NEON-001');
 
   // Carrier delivery & backer confirmation
-  await fulfillmentService.markDelivered(physicalEntitlementId);
+  await fulfillmentService.markDelivered(creatorUserId, physicalEntitlementId);
   const confirmedEntitlement = await pledgeService.confirmDelivery(backer2UserId, physicalEntitlementId);
   assert.equal(confirmedEntitlement.status, 'CONFIRMED');
   console.log('✓ Flow V4 Passed: Fulfillment batch tracked in join table; carrier delivered and confirmed.');
@@ -430,13 +469,14 @@ async function main() {
   const [stoppedCampaign] = await db.select().from(rewardCampaigns).where(eq(rewardCampaigns.id, draftCampaign.id));
   assert.equal(stoppedCampaign.status, 'STOPPED');
 
-  // Backer claims proportional refund on-chain
+  // Backer claims proportional refund on-chain and syncs via pledgeService.claimRefund
   const claimRefundReceipt = await send(backerWallet2, rewardArtifact.abi, rewardAddress, 'claimRefund', [BigInt(onchainCampaignId)]);
-  await indexerService.processReceipt(claimRefundReceipt.transactionHash);
+  await pledgeService.claimRefund(backer2UserId, { txHash: claimRefundReceipt.transactionHash });
 
   const [refundedEntitlement] = await db.select().from(rewardEntitlements).where(eq(rewardEntitlements.id, physicalEntitlementId));
   assert.equal(refundedEntitlement.status, 'REFUNDED');
   console.log('✓ Wind-Down & Refund Lifecycle Passed: Indexed on-chain refund prevents double spend.');
+
 
   console.log('\n========================================================================');
   console.log('   ALL 9 INTEGRATION PHASES PASSED VERIFICATION WITH CONCRETE EVIDENCE!   ');
