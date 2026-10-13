@@ -1,0 +1,476 @@
+/* Modern Account Profile Styles */
+.account-profile-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+/* Profile Header Card */
+.profile-card {
+  background: #ffffff;
+  border: 1px solid #e2e8e2;
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 1px 4px rgba(22, 60, 36, 0.04);
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.profile-header__user {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.profile-avatar {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #267450 0%, #155e3c 100%);
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(38, 116, 80, 0.25);
+  flex-shrink: 0;
+}
+
+.profile-header__details h2 {
+  margin: 0 0 6px;
+  font-size: 19px;
+  font-weight: 650;
+  color: #1a2e22;
+  letter-spacing: -0.3px;
+}
+
+.profile-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  background: #eef6ee;
+  color: #267450;
+  border: 1px solid #d5e5d5;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-badge__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
+}
+
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.role-badge--user {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+.role-badge--resolver {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.role-badge--admin {
+  background: #ede9fe;
+  color: #5b21b6;
+  border: 1px solid #ddd6fe;
+}
+
+/* Quick Navigation Shortcuts */
+.profile-quick-nav {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #edf2ed;
+}
+
+.profile-nav-tile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #f9fbf9;
+  border: 1px solid #e5ebe5;
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.15s ease;
+}
+
+.profile-nav-tile:hover {
+  background: #eef5ee;
+  border-color: #c2d6c3;
+  transform: translateY(-1px);
+}
+
+.profile-nav-tile__icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.profile-nav-tile strong {
+  display: block;
+  font-size: 13px;
+  color: #1a2e22;
+  margin-bottom: 2px;
+}
+
+.profile-nav-tile p {
+  margin: 0;
+  font-size: 11px;
+  color: #6a7c70;
+}
+
+/* Section Header */
+.profile-section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0 0 14px;
+}
+
+.profile-section-title h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  color: #1e3325;
+}
+
+.profile-section-subtitle {
+  font-size: 12px;
+  color: #6f7f73;
+}
+
+/* Linked Wallet List */
+.linked-wallet-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Modern Linked Wallet Card */
+.linked-wallet-item {
+  background: #fbfdfb;
+  border: 1px solid #dde5dd;
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: border-color 0.15s ease;
+}
+
+.linked-wallet-item:hover {
+  border-color: #b8ccb9;
+}
+
+.linked-wallet-item__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.linked-wallet-item__network {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #386146;
+  font-weight: 550;
+  background: #edf4ed;
+  padding: 3px 10px;
+  border-radius: 99px;
+  border: 1px solid #d4e2d4;
+}
+
+.linked-wallet-item__address-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.linked-wallet-item__address-group code {
+  font-size: 13px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #1e3325;
+  background: #edf2ed;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #dce5dc;
+  overflow-wrap: anywhere;
+}
+
+.button--copy-wallet {
+  font-size: 12px;
+  padding: 4px 10px;
+  min-height: 28px;
+  border-radius: 6px;
+}
+
+/* Balance Cards Grid */
+.balance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.balance-tile {
+  background: #ffffff;
+  border: 1px solid #e2e8e2;
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.balance-tile__icon {
+  font-size: 20px;
+  line-height: 1;
+  padding: 6px;
+  background: #f2f7f2;
+  border-radius: 8px;
+}
+
+.balance-tile__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.balance-tile__caption {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #728376;
+  margin-bottom: 4px;
+}
+
+.balance-tile__amount {
+  font-size: 14px;
+  color: #192e21;
+  margin: 0;
+}
+
+.balance-tile__amount strong {
+  font-size: 16px;
+  color: #155e3c;
+  font-variant-numeric: tabular-nums;
+}
+
+.balance-tile__status {
+  font-size: 12px;
+  color: #6a7b6e;
+  margin: 0;
+}
+
+.balance-tile__error {
+  font-size: 12px;
+  color: #b91c1c;
+  margin: 0;
+}
+
+/* Wallet Card Actions Footer */
+.linked-wallet-item__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #edf2ed;
+}
+
+.button--sm {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.button--danger-soft {
+  color: #b91c1c;
+  border-color: #fee2e2;
+  background: #fff;
+}
+
+.button--danger-soft:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+/* Browser Wallet Section */
+.browser-wallet-card {
+  background: #fbfdfb;
+  border: 1px solid #dde5dd;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.browser-wallet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.sync-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 99px;
+}
+
+.sync-status-pill--synced {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.sync-status-pill--unlinked {
+  background: #fef9c3;
+  color: #854d0e;
+  border: 1px solid #fef08a;
+}
+
+.browser-wallet-details {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #55665a;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.browser-wallet-details code {
+  color: #1a2e22;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  background: #eef3ee;
+  padding: 3px 8px;
+  border-radius: 5px;
+}
+
+.browser-wallet-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Signature guidance banner */
+.signature-waiting-box {
+  margin-top: 16px;
+  background: #fffbeb;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.signature-waiting-box__icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.signature-waiting-box__content strong {
+  display: block;
+  color: #92400e;
+  font-size: 13px;
+  margin-bottom: 3px;
+}
+
+.signature-waiting-box__content p {
+  margin: 0;
+  font-size: 12px;
+  color: #78350f;
+  line-height: 1.5;
+}
+
+/* Troubleshooting Recovery Bar */
+.profile-recovery-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #e7eee7;
+}
+
+/* Resolver Banner */
+.resolver-portal-banner {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.resolver-portal-banner__left strong {
+  display: block;
+  color: #166534;
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+
+.resolver-portal-banner__left p {
+  margin: 0;
+  font-size: 12px;
+  color: #3f6212;
+}
+
+.resolver-portal-banner code {
+  font-size: 12px;
+  background: #dcfce7;
+  padding: 2px 6px;
+  border-radius: 4px;
+}

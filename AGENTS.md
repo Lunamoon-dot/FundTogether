@@ -3,150 +3,90 @@
 ## Mandatory first read — research direction
 
 Before reasoning about FundTogether, proposing a change or finalizing a decision,
-read `docs/research-direction.md` first. The user explicitly made this the primary
-research-direction reference on 2026-10-08. Then read relevant overview/progress,
-business-validation documents, specifications and source code.
+read `docs/research-direction.md` and `docs/PROJECT_OVERVIEW.md` first.
+The current project direction was explicitly locked on 2026-10-08 and updated through 2026-10-13.
 
-Align decisions with its research goals, flexible scope and evaluation criteria.
-Distinguish research proposals, approved financial rules and verified implementation.
-This direction does not automatically authorize changes to funds, authority or
-existing campaign obligations. Later explicit user decisions take precedence;
-update the direction and affected specifications when the user changes the scope.
-Historical bond, delivery-order and scaffold statements below must be interpreted
-against the current direction and verified project documentation.
+Align decisions with its research goals, narrow scope and evaluation criteria:
+- Current product scope is **FundTogether Editions**: a deliberately narrow **Reward Crowdfunding** pilot for independent digital comics and artbooks (`COMICS_ARTBOOK`).
+- Core capabilities: Evidence-backed creator/IP review, one standard digital-download tier (PDF), escrowed pledges in MockUSDC, production-evidence review, private PDF release, disputes and refunds.
+- **Out of scope:** Physical fulfilment, shipping/logistics, inventory tiers, and legacy charity/donation crowdfunding workflows. The repository does not retain active legacy charity workflow implementation.
 
-## Project context
-
-FundTogether is a donation-based charitable crowdfunding protocol. Its core model is:
-
-- Milestone escrow
-- Organizer bond with maximum-exposure protection
-- Evidence submission and verification
-- Challenge-based governance
-- Refunds for failed or cancelled campaigns
-- Reputation and research layers after the MVP
-
-The design reference is the `v0.2` documentation in:
-`C:\Users\dell\OneDrive\Desktop\NCKH\v0.2`.
-
-The current repository is being prepared. At the time this file was created, only the `frontend` directory existed and no backend or smart-contract implementation had been verified.
-
-## Target architecture
-
-The project has three boundaries:
+## Project architecture
 
 ```text
-Frontend  ↔  Backend/API  ↔  PostgreSQL / storage / indexer
-    │              │
-    └──────────────┴────────────── Blockchain / smart contracts
+React frontend (Vite/TS) ↔ NestJS API ↔ PostgreSQL (Drizzle) / MinIO (S3 storage)
+          │                     │
+          └─────────────────────┴────── Blockchain / Anvil (MockUSDC escrow)
+                                           │
+                         Idempotent indexer ┘
 ```
 
-- The frontend owns user experience, forms, API state, wallet interaction, and transaction status display.
-- The backend owns authentication, wallet linking, metadata, authorization, uploads, API contracts, and blockchain-derived projections.
-- Smart contracts own critical financial state: escrow, bond, milestone transitions, settlement, challenge effects, and refunds.
-- PostgreSQL is application and projection data; it must not silently replace the blockchain as the source of truth for financial state.
-- Frontend and backend communicate through a versioned API contract, preferably OpenAPI-generated client types.
-- Frontend/backend and contracts communicate through versioned ABI, chain ID, contract address, and deployment metadata. ABI must not be copied manually in multiple places.
+- **Frontend:** Owns user experience, forms, API state, wallet interaction (Wagmi + Viem + RainbowKit), and transaction status display. Uses hash-based routing.
+- **Backend:** NestJS owning SIWE authentication, creator/IP declarations, drafts, evidence review, S3-compatible private storage, and blockchain-derived projections.
+- **Smart contracts:** Foundry-managed contracts owning critical financial state: escrow pledges, deadlines, resolver approval, disputes, payouts, and refunds.
+- **PostgreSQL:** Stores application metadata, draft configs, and indexed blockchain projections. Blockchain remains the source of truth for financial transitions.
+- **MinIO:** S3-compatible object storage holding private final-PDF releases and sample evidence. Backers receive short-lived authenticated download tickets.
 
-## Recommended technology direction
-
-These are the v0.2 recommendations. Treat them as proposed until the repository contains the actual setup and the team confirms a decision.
+## Current technology stack
 
 ### Frontend
-
-- React + TypeScript
+- React 19 + TypeScript + Vite
 - TanStack Query for server state
-- Zustand or local React state for client-only state
-- React Hook Form + Zod for forms and validation
-- Axios or the generated API client for HTTP transport
 - Wagmi + Viem for wallet and contract interaction
-- RainbowKit if a wallet connection UI is needed
-- date-fns and sonner where useful
+- RainbowKit for wallet connection modal
+- Hash-based client routing (`window.location.hash`)
+- Tailwind CSS
 
 ### Backend
-
 - NestJS + TypeScript
-- PostgreSQL + Drizzle
-- Zod and/or NestJS DTO validation, following one consistent API convention
-- SIWE for wallet authentication if that remains the selected auth design
-- Pino for structured logging
-- Redis/BullMQ only when the project has a concrete background-job need
-- S3-compatible object storage for private evidence
-- IPFS/Pinata only for evidence that is intentionally public
-- Viem/Ponder for chain reads and event synchronization after the contract event model is stable
+- PostgreSQL + Drizzle ORM
+- Zod schema validation
+- SIWE (Sign-In with Ethereum) for wallet authentication
+- MinIO (S3-compatible) for private PDF and evidence storage
+- Idempotent event indexer synchronizing on-chain events to database
 
-### Blockchain preparation
+### Smart contracts & local runtime
+- Foundry (Solidity contracts + tests + fuzzing)
+- Local Anvil RPC node (chain `31339`)
+- Local ports: PostgreSQL `5436`, MinIO `9202/9203`, API `3002`, Web `5175`, Anvil RPC `9548`
 
-- Keep contract-facing code behind a small typed boundary.
-- Use integer-safe token amounts and `bigint`; never use JavaScript floating point for financial values.
-- Track transaction lifecycle separately: wallet request, submitted, receipt success/revert, confirmation policy, and indexed.
-- Do not mark an operation complete because a transaction was merely submitted or because an API record was created.
+## Editions core journeys
 
-## Delivery order
+1. **Creator journey:**
+   - Connect wallet & sign in via SIWE.
+   - Complete Step 0: Creator profile & IP Declaration (author/studio pen name, bio, 100% IP ownership pledge).
+   - Draft campaign: comic/artbook title, pitch, story, funding goal (MockUSDC), duration, and 1 standard PDF reward.
+   - Submit sample evidence and production plan, then freeze draft for review.
 
-Follow this dependency order when implementation begins:
+2. **Resolver journey (Admin/Resolver):**
+   - Inspect frozen draft, IP declaration, and sample evidence.
+   - Approve or request correction/reject on-chain with documented reasoning.
 
-1. Protocol decisions, state machine, accounting rules, and invariants
-2. Smart-contract prototype and tests
-3. Contract hardening and ABI/event agreement
-4. Backend foundation and database migrations
-5. Blockchain event indexing and idempotent synchronization
-6. Evidence storage pipeline
-7. Frontend vertical journeys
-8. End-to-end MVP verification
-9. Reputation and research experiments
+3. **Backer journey:**
+   - Browse approved campaigns in Editions feed.
+   - Approve MockUSDC token and pledge into the escrow contract.
+   - Indexer records canonical pledge and issues versioned entitlement.
 
-For the current FE/BE setup phase, focus on clean project structure, type safety, API boundaries, validation, error handling, configuration, and testability. Do not encode unresolved financial rules in UI or backend CRUD logic.
-
-## MVP journeys
-
-The MVP should eventually verify these complete journeys:
-
-- Organizer: connect/login → create draft → define milestones → lock bond → publish
-- Donor: view campaign → approve token if needed → donate → see indexed contribution
-- Milestone: activate → submit evidence → review → challenge or settle → continue
-- Failure: campaign fails or is cancelled → refund becomes claimable → donor claims refund
-
-The UI must distinguish upload success, transaction success, and indexed/confirmed application state.
+4. **Production, Delivery & Settlement:**
+   - Creator submits production progress evidence and final PDF hash.
+   - Resolver verifies and accepts the final PDF release.
+   - Backers access private PDF download with short-lived authenticated tickets.
+   - If campaign succeeds and challenge window passes: Creator settles payout.
+   - If campaign is cancelled or dispute upheld: Backers claim full escrow refund.
 
 ## Working rules
 
-- Read nearby files and existing configuration before editing.
-- Keep changes focused; do not introduce speculative services or dependencies.
-- Preserve existing behavior unless the requested task requires a change.
-- Validate inputs on the server even when the frontend already validates them.
-- Never commit secrets, private keys, real `.env` files, tokens, or complete presigned URLs.
-- Use migrations for database schema changes.
-- Make event handlers and background jobs idempotent.
-- Prefer explicit error states over a generic success or failure toast.
-- Add tests for meaningful behavior, especially validation, authorization, financial boundaries, transaction lifecycle, and synchronization.
-
-## Documentation and progress tracking
-
-The v0.2 reference documents describe proposals and learning material; they do not prove that code exists. When this repository gains project documentation, keep these concerns separate:
-
-- `docs/PROJECT_OVERVIEW.md`: current architecture, verified stack, repository map, setup instructions, and approved decisions.
-- `docs/research-direction.md`: first-read research goals, proposed form content, flexible scope, open business decisions and evaluation requirements.
-- `docs/PROJECT_PROGRESS.md`: implementation status, evidence of verification, blockers, next actions, and a dated change log.
-- `docs/protocol-spec.md`: MVP protocol actors, authority, data ownership, actions and events.
-- `docs/state-machine.md`: campaign, milestone, evidence, challenge and refund transitions.
-- `docs/financial-rules.md`: token accounting, bond, release, refund and invariants.
-- `docs/mvp-scope.md`: MVP journeys, in/out scope, delivery phases and definition of done.
-- `docs/web3-conventions.md`: shared network, identifier, amount, ABI, event and transaction conventions.
-
-When working on a task:
-
-1. Read `docs/research-direction.md` first, then the relevant overview or progress section.
-2. Update progress only after checking the repository, command output, tests, or other concrete evidence.
-3. Use `TODO`, `IN_PROGRESS`, `BLOCKED`, and `DONE` consistently.
-4. Do not mark a feature `DONE` because it is documented or visually mocked.
-5. Update the overview when the actual stack, architecture, public API, or approved protocol decision changes.
+- Read nearby files, `docs/research-direction.md`, and `docs/PROJECT_OVERVIEW.md` before making changes.
+- Never reintroduce legacy charity/organization crowdfunding or physical shipping logic into the Editions product flow.
+- Integer-safe token amounts and `bigint` only; never use floating point for financial calculations.
+- Track transaction lifecycle explicitly: wallet request → submitted → canonical receipt → indexer projection.
+- Validate inputs on the server even when the frontend validates them.
+- Keep tests passing: Backend Jest suite, Frontend test runner (`npm test`), and Foundry tests.
 
 ## Current status
 
-- Project documentation source: v0.2 exists outside this repository.
-- Frontend directory: Vite + React + TypeScript scaffold installed; feature-first structure, API/Web3 boundaries, Tailwind, build, and lint verified.
-- Backend directory: NestJS foundation installed; config, Drizzle database boundary, health, blockchain, and indexer boundaries are scaffolded; build, migration generation, and `/health` endpoint verified.
-- Contracts directory: Foundry scaffold created; Foundry/Anvil toolchain is not installed or verified yet.
-- API currently exposes only the foundation health endpoint; domain API is not yet implemented.
-- Database schema, ABI, events, chain configuration, and deployment configuration: not yet verified.
+- **Scope:** Reward Crowdfunding only (FundTogether Editions — Comics & Artbooks). Legacy physical delivery and charity workflows are retired/archived.
+- **Backend:** NestJS Reward module (`src/reward`), controllers, services, indexers, storage, and migrations 0000–0005 fully verified (195/195 Jest tests pass).
+- **Frontend:** Editions feed, Creator Studio, Resolver console, Backer library, and Web3 integration verified (29/29 tests pass).
+- **Contracts:** Foundry Editions escrow contracts, fuzzing, and deployment manifests verified.
+- **Local runtime:** Fully automated launcher via `backend/scripts/reward/start-services.ps1`.

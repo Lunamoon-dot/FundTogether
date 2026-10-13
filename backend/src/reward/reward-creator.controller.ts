@@ -21,7 +21,8 @@ export class RewardCreatorController {
   applyVerification(@Body() body: unknown, @Req() req: Request) {
     const parsed = creatorVerificationInputSchema.safeParse(body);
     if (!parsed.success) {
-      throw new BadRequestException({ message: "Invalid creator verification payload", issues: parsed.error.issues });
+      const details = parsed.error.issues.map(i => `${i.path.join('.') || 'field'}: ${i.message}`).join(', ');
+      throw new BadRequestException({ message: `Invalid creator verification payload: ${details}`, issues: parsed.error.issues });
     }
     return this.campaigns.applyCreatorVerification(req.account!.userId, parsed.data);
   }
@@ -35,7 +36,8 @@ export class RewardCreatorController {
   createCampaign(@Body() body: unknown, @Req() req: Request) {
     const parsed = createRewardCampaignDraftSchema.safeParse(body);
     if (!parsed.success) {
-      throw new BadRequestException({ message: "Invalid reward campaign payload", issues: parsed.error.issues });
+      const details = parsed.error.issues.map(i => `${i.path.join('.') || 'field'}: ${i.message}`).join(', ');
+      throw new BadRequestException({ message: `Invalid reward campaign payload: ${details}`, issues: parsed.error.issues });
     }
     return this.campaigns.createDraft(req.account!.userId, parsed.data);
   }

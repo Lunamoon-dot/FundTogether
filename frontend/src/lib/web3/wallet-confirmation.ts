@@ -7,6 +7,10 @@ export function assertWalletRequestAvailable(connectorUid: string) {
     throw new Error('Ví còn một yêu cầu xác nhận chưa xử lý. Mở extension để xác nhận hoặc từ chối yêu cầu cũ trước khi thử lại.')
 }
 
+export function releaseWalletRequest(connectorUid: string) {
+  pendingRequests.delete(connectorUid)
+}
+
 export async function requestWalletConfirmation<T>({ connectorUid, request, onResult, timeoutMs = 90_000, signal, timeoutMessage, releaseOnAbandon = false }: {
   connectorUid: string
   request: () => Promise<T>

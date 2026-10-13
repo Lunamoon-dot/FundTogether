@@ -24,10 +24,14 @@ import {
 } from '../../lib/web3/reward-deployment';
 import './reward.css';
 
-export function RewardCreatorStudio({ userId }: { userId: string }) {
+export function RewardCreatorStudio({ userId, path }: { userId: string; path?: string }) {
   const account = useAccount();
   const client = usePublicClient({ chainId: activeChain.id });
   const { data: wallet } = useWalletClient({ account: account.address, connector: account.connector });
+
+  const tab: 'studio' | 'draft' | 'all' = path
+    ? (path === '/reward/creator/draft' || path === '/reward/creator/new' ? 'draft' : 'studio')
+    : 'all';
 
   const { data: profile, refetch: refetchProfile } = useQuery({
     queryKey: ['my-reward-creator-profile', userId],
@@ -63,11 +67,25 @@ export function RewardCreatorStudio({ userId }: { userId: string }) {
 
   async function handleApplyProfile(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true);
     setFormError('');
     setSuccessNotice('');
+
+    if (displayName.trim().length < 3) {
+      setFormError('Bút danh / Tên Studio xuất bản phải từ 3 ký tự trở lên.');
+      return;
+    }
+    if (bio.trim().length < 10) {
+      setFormError('Tiểu sử & Kinh nghiệm sáng tác phải có ít nhất 10 ký tự.');
+      return;
+    }
+    if (ipDeclaration.trim().length < 10) {
+      setFormError('Cam kết Bản quyền Sở hữu Trí tuệ (IP Declaration) phải từ 10 ký tự trở lên.');
+      return;
+    }
+
+    setBusy(true);
     try {
-      await applyCreatorVerification({ displayName, bio, ipDeclaration });
+      await applyCreatorVerification({ displayName: displayName.trim(), bio: bio.trim(), ipDeclaration: ipDeclaration.trim() });
       setSuccessNotice('Đã gửi hồ sơ xác minh Tác giả (Flow V1). Vui lòng chờ Admin phê duyệt.');
       void refetchProfile();
     } catch (err) {
@@ -96,6 +114,9 @@ export function RewardCreatorStudio({ userId }: { userId: string }) {
       setPitch('');
       setStory('');
       void refetch();
+      if (typeof window !== 'undefined') {
+        window.location.hash = '#/reward/creator';
+      }
     } catch (err) {
       setFormError(getErrorMessage(err));
     } finally {
@@ -254,186 +275,274 @@ export function RewardCreatorStudio({ userId }: { userId: string }) {
 
   return (
     <div className="reward-container">
-      <header className="reward-hero">
-        <span className="reward-badge-category">FundTogether Editions · Creator Studio</span>
-        <h1 className="reward-hero-title">Truyện tranh & Artbook PDF</h1>
-        <p className="reward-hero-pitch">
-          Chuẩn bị một ấn phẩm PDF với một gói Standard. Hiện tại chỉ lưu bản thảo; chưa mở nhận tiền hoặc tải PDF.
-        </p>
-      </header>
+      {/* Tabs navigation */}
+      <div className="reward-tabs" style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+        <a
+          href="#/reward/creator"
+          className={`button ${tab === 'studio' ? 'button--primary' : 'button--secondary'}`}
+        >
+          Studio của tôi
+        </a>
+        <a
+          href="#/reward/creator/draft"
+          className={`button ${tab === 'draft' ? 'button--primary' : 'button--secondary'}`}
+        >
+          Tạo bản thảo
+        </a>
+      </div>
 
       {formError && <p className="toast toast--error" role="alert">{formError}</p>}
       {successNotice && <p className="toast toast--success" role="status">{successNotice}</p>}
 
-      {/* Flow V1: Creator Verification Section */}
-      <section className="panel">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>Bước 0 (Flow V1): Hồ sơ Xác minh Tác giả & Bản quyền IP</h2>
-          <span className="reward-status-pill status-active">
-            {profile?.status || 'CHƯA ĐĂNG KÝ'}
-          </span>
-        </div>
-        {profile?.status === 'VERIFIED' ? (
-          <p className="muted" style={{ marginTop: '8px' }}>
-            ✓ Bút danh <strong>{profile.displayName}</strong> đã được Admin xác minh bản quyền (Flow V1). Bạn có thể khởi tạo bản thảo Editions.
-          </p>
-        ) : (
-          <form onSubmit={handleApplyProfile} style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
-            <label>
-              Bút danh / Tên Studio xuất bản:
-              <input required value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Ví dụ: Studio Truyện Tranh Việt" />
-            </label>
-            <label>
-              Tiểu sử & Kinh nghiệm sáng tác:
-              <textarea required rows={2} value={bio} onChange={e => setBio(e.target.value)} placeholder="Giới thiệu tác giả, các tác phẩm đã xuất bản..." />
-            </label>
-            <label>
-              Cam kết Bản quyền Sở hữu Trí tuệ (IP Declaration):
-              <textarea required rows={2} value={ipDeclaration} onChange={e => setIpDeclaration(e.target.value)} />
-            </label>
-            <button type="submit" className="button button--primary" disabled={busy} style={{ alignSelf: 'flex-start' }}>
-              {profile ? 'Cập nhật & Gửi lại Hồ sơ V1' : 'Gửi Hồ sơ Xác minh Tác giả (V1)'}
-            </button>
-          </form>
-        )}
-      </section>
-
-      {/* Form Section */}
-      <section className="panel">
-        <h2>Tạo bản thảo FundTogether Editions</h2>
-        <form onSubmit={handleCreateDraft} style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '12px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
-            <label>
-              Tên dự án:
-              <input required value={title} onChange={e => setTitle(e.target.value)} placeholder="Ví dụ: Truyện tranh Địa Đàng Ký - Tập 1" />
-            </label>
-            <label>
-              Thể loại:
-              <input value="COMICS_ARTBOOK · Truyện tranh / Artbook" readOnly />
-            </label>
+      {/* Trang 1: Studio (Flow V1: Creator Verification) */}
+      {(tab === 'studio' || tab === 'all') && (
+        <section className="panel">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2>Bước 0 (Flow V1): Hồ sơ Xác minh Tác giả & Bản quyền IP</h2>
+            <span className="reward-status-pill status-active">
+              {profile?.status || 'CHƯA ĐĂNG KÝ'}
+            </span>
           </div>
-
-          <label>
-            Lời giới thiệu ngắn (Pitch):
-            <input required value={pitch} onChange={e => setPitch(e.target.value)} placeholder="Tóm tắt nội dung và điểm đặc sắc trong 1-2 câu" />
-          </label>
-
-          <label>
-            Cốt truyện & Kế hoạch sản xuất:
-            <textarea rows={4} value={story} onChange={e => setStory(e.target.value)} placeholder="Giới thiệu nội dung, số trang dự kiến và kế hoạch hoàn thiện PDF..." />
-          </label>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <label>
-              Mục tiêu dự kiến (MockUSDC local):
-              <input required type="text" inputMode="decimal" value={goal} onChange={e => setGoal(e.target.value)} />
-            </label>
-            <label>
-              Thời hạn gây quỹ (Số ngày, 1 - 60):
-              <input required type="number" min="1" max="60" value={duration} onChange={e => setDuration(Number(e.target.value))} />
-            </label>
-          </div>
-
-          <div className="reward-studio-tiers-builder">
-            <strong>Standard · Một PDF tải xuống</strong>
-            <p className="muted">Một truyện tranh hoặc artbook hoàn chỉnh. PDF cuối cùng được nộp ở bước phát hành sau này.</p>
-            <div className="reward-tier-builder-row">
-              <label>
-                Tên ấn phẩm PDF:
-                <input required minLength={3} maxLength={150} value={rewardTitle} onChange={e => setRewardTitle(e.target.value)} />
-              </label>
-              <label>
-                Giá gói dự kiến (MockUSDC local):
-                <input required inputMode="decimal" value={price} onChange={e => setPrice(e.target.value)} />
-              </label>
-              <label>
-                Nội dung PDF được hứa hẹn:
-                <textarea required minLength={5} maxLength={1000} value={rewardDescription} onChange={e => setRewardDescription(e.target.value)} />
-              </label>
-            </div>
-          </div>
-
-          <button type="submit" className="button button--primary" disabled={busy || profile?.status !== 'VERIFIED'} style={{ alignSelf: 'flex-start' }}>
-            {busy ? 'Đang lưu…' : 'Lưu Bản thảo Chiến dịch'}
-          </button>
-        </form>
-      </section>
-
-      {/* Creator Campaigns List */}
-      <section className="panel">
-        <h2>Dự án của bạn ({campaigns?.length ?? 0})</h2>
-        {isPending ? (
-          <p className="muted">Đang tải danh sách…</p>
-        ) : error ? (
-          <p className="toast toast--error">{getErrorMessage(error)}</p>
-        ) : (campaigns || []).length === 0 ? (
-          <p className="muted">Bạn chưa tạo chiến dịch truyện tranh nào.</p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '12px' }}>
-            {campaigns!.map(c => {
-              const editions = c.draftConfig != null || c.category === 'COMICS_ARTBOOK';
-              const standardTier = c.draftConfig?.tiers[0];
-              const pdf = standardTier?.rewardItems[0];
-              return (
-              <div key={c.id} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px', background: '#fff' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
-                  <div>
-                    <h3 style={{ margin: '0 0 4px 0' }}>{c.title}</h3>
-                    <span className="reward-status-pill status-active" style={{ fontSize: '11px' }}>{c.status}</span>
-                    <span style={{ fontSize: '13px', color: '#64748b', marginLeft: '10px' }}>
-                      Mục tiêu: {editions ? formatUnits(BigInt(c.goal), 6) : (Number(c.goal) / 1e6).toLocaleString()} MockUSDC · {c.draftConfig?.tiers.length ?? c.tiers?.length ?? 0} gói
-                      {c.onchainCampaignId ? ` · On-chain #${c.onchainCampaignId}` : ''}
-                    </span>
-                    {standardTier && pdf && (
-                      <div>
-                        <p><strong>{pdf.title}</strong> · Standard PDF · {formatUnits(BigInt(standardTier.price), 6)} MockUSDC</p>
-                        <p className="muted">{pdf.description}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {editions && <p className="muted">Standard PDF · Hoàn thiện hồ sơ và gửi thẩm định; bản thảo chưa nhận pledge.</p>}
-                    {editions && c.frozenSnapshot && ['UNDER_REVIEW', 'APPROVED'].includes(c.status) && <a className="button button--secondary" href={`#/reward/editions/${c.id}/creator`}>Mở community & phát hành PDF local</a>}
-                    {!editions && c.status === 'DRAFT' && (
-                      <button className="button button--secondary" disabled={busy} onClick={() => void handleFreeze(c.id)}>
-                        1. Đóng băng cam kết
-                      </button>
-                    )}
-                    {!editions && c.status === 'FROZEN' && (
-                      <button className="button button--primary" disabled={busy} onClick={() => void handleSubmitReview(c.id)}>
-                        2. Gửi Resolver thẩm định (V2)
-                      </button>
-                    )}
-                    {!editions && c.status === 'APPROVED' && (
-                      <button className="button button--primary" disabled={busy} onClick={() => void handlePublishOnchain(c)}>
-                        3. Phát hành On-chain
-                      </button>
-                    )}
-                    {!editions && c.status === 'ACTIVE' && (
-                      <button className="button button--secondary" disabled={busy} onClick={() => void handleRequestProductionDeposit(c)}>
-                        Yêu cầu cọc in ấn (≤50% Goal)
-                      </button>
-                    )}
-                    {!editions && c.status === 'FULFILLMENT_COMPLETE' && (
-                      <button className="button button--primary" disabled={busy} onClick={() => void handleCompleteCampaignOnchain(c)}>
-                        Hoàn tất Chiến dịch On-chain (completeCampaign)
-                      </button>
-                    )}
-                    {!editions && <a className="button button--secondary" href={`#/reward/campaigns/${c.id}`}>
-                      Xem công khai
-                    </a>}
-
-                  </div>
-                </div>
-
-                {editions && <EditionsPreparationPanel campaign={c} onChange={() => void refetch()} />}
-
+          {profile?.status === 'VERIFIED' ? (
+            <div style={{ marginTop: '12px' }}>
+              <p className="muted">
+                ✓ Bút danh <strong>{profile.displayName}</strong> đã được Admin xác minh bản quyền (Flow V1). Bạn có thể khởi tạo bản thảo Editions.
+              </p>
+              <div style={{ marginTop: '14px' }}>
+                <a href="#/reward/creator/draft" className="button button--primary">
+                  ➕ Tạo bản thảo mới
+                </a>
               </div>
-            ); })}
+            </div>
+          ) : (
+            <form onSubmit={handleApplyProfile} style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '12px' }}>
+              <label>
+                <span>Bút danh / Tên Studio xuất bản (tối thiểu 3 ký tự):</span>
+                <input
+                  required
+                  minLength={3}
+                  maxLength={150}
+                  value={displayName}
+                  onChange={e => setDisplayName(e.target.value)}
+                  placeholder="Ví dụ: Studio Truyện Tranh Việt"
+                />
+              </label>
+              <label>
+                <span>Tiểu sử & Kinh nghiệm sáng tác (tối thiểu 10 ký tự):</span>
+                <textarea
+                  required
+                  minLength={10}
+                  maxLength={2000}
+                  rows={3}
+                  value={bio}
+                  onChange={e => setBio(e.target.value)}
+                  placeholder="Giới thiệu tác giả, quá trình sáng tác, các tác phẩm đã xuất bản (tối thiểu 10 ký tự)..."
+                />
+                <span style={{ fontSize: '12px', color: bio.trim().length > 0 && bio.trim().length < 10 ? '#dc2626' : '#6b7280', display: 'block', marginTop: '3px' }}>
+                  {bio.trim().length < 10
+                    ? `⚠️ Cần tối thiểu 10 ký tự (hiện có ${bio.trim().length}/10 ký tự)`
+                    : `✓ Đã đạt ${bio.trim().length} ký tự`}
+                </span>
+              </label>
+              <label>
+                <span>Cam kết Bản quyền Sở hữu Trí tuệ (IP Declaration):</span>
+                <textarea
+                  required
+                  minLength={10}
+                  maxLength={2000}
+                  rows={2}
+                  value={ipDeclaration}
+                  onChange={e => setIpDeclaration(e.target.value)}
+                />
+              </label>
+              <button type="submit" className="button button--primary" disabled={busy} style={{ alignSelf: 'flex-start' }}>
+                {profile ? 'Cập nhật & Gửi lại Hồ sơ V1' : 'Gửi Hồ sơ Xác minh Tác giả (V1)'}
+              </button>
+            </form>
+          )}
+        </section>
+      )}
+
+      {/* Trang 2: Tạo bản thảo */}
+      {(tab === 'draft' || tab === 'all') && (
+        tab === 'draft' && profile?.status !== 'VERIFIED' ? (
+          <section className="panel" style={{ textAlign: 'center', padding: '36px 20px' }}>
+            <div style={{ fontSize: '48px', marginBottom: '12px' }}>🎨</div>
+            <h2 style={{ marginBottom: '8px' }}>Chưa xác minh Hồ sơ Studio / Tác giả</h2>
+            <p className="muted" style={{ maxWidth: '540px', margin: '0 auto 24px auto', lineHeight: '1.6' }}>
+              {profile?.status === 'PENDING'
+                ? 'Hồ sơ Studio của bạn đang chờ Admin thẩm định và phê duyệt (Flow V1). Vui lòng đợi phê duyệt để có thể khởi tạo bản thảo.'
+                : profile?.status === 'REJECTED'
+                ? `Hồ sơ Studio bị từ chối (${profile.rejectionReason || 'Vui lòng kiểm tra lại thông tin'}). Vui lòng cập nhật lại hồ sơ Studio.`
+                : 'Để đảm bảo tính minh bạch và bảo hộ quyền sở hữu trí tuệ, bạn cần tạo Hồ sơ Tác giả & cam kết Bản quyền IP (Bước 0) trước khi có thể khởi tạo bản thảo gọi vốn.'}
+            </p>
+            <div>
+              <a className="button button--primary" href="#/reward/creator">
+                Qua trang xác minh Studio
+              </a>
+            </div>
+          </section>
+        ) : (
+          <section className="panel">
+            <h2>Tạo bản thảo FundTogether Editions</h2>
+            <form onSubmit={handleCreateDraft} style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
+                <label>
+                  Tên dự án:
+                  <input required value={title} onChange={e => setTitle(e.target.value)} placeholder="Ví dụ: Truyện tranh Địa Đàng Ký - Tập 1" />
+                </label>
+                <label>
+                  Thể loại:
+                  <input value="COMICS_ARTBOOK · Truyện tranh / Artbook" readOnly />
+                </label>
+              </div>
+
+              <label>
+                Lời giới thiệu ngắn (Pitch):
+                <input required value={pitch} onChange={e => setPitch(e.target.value)} placeholder="Tóm tắt nội dung và điểm đặc sắc trong 1-2 câu" />
+              </label>
+
+              <label>
+                Cốt truyện & Kế hoạch sản xuất:
+                <textarea rows={4} value={story} onChange={e => setStory(e.target.value)} placeholder="Giới thiệu nội dung, số trang dự kiến và kế hoạch hoàn thiện PDF..." />
+              </label>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <label>
+                  Mục tiêu dự kiến (MockUSDC local):
+                  <input required type="text" inputMode="decimal" value={goal} onChange={e => setGoal(e.target.value)} />
+                </label>
+                <label>
+                  Thời hạn gây quỹ (Số ngày, 1 - 60):
+                  <input required type="number" min="1" max="60" value={duration} onChange={e => setDuration(Number(e.target.value))} />
+                </label>
+              </div>
+
+              <div className="reward-studio-tiers-builder">
+                <strong>Standard · Một PDF tải xuống</strong>
+                <p className="muted">Một truyện tranh hoặc artbook hoàn chỉnh. PDF cuối cùng được nộp ở bước phát hành sau này.</p>
+                <div className="reward-tier-builder-row">
+                  <label>
+                    Tên ấn phẩm PDF:
+                    <input required minLength={3} maxLength={150} value={rewardTitle} onChange={e => setRewardTitle(e.target.value)} />
+                  </label>
+                  <label>
+                    Giá gói dự kiến (MockUSDC local):
+                    <input required inputMode="decimal" value={price} onChange={e => setPrice(e.target.value)} />
+                  </label>
+                  <label>
+                    Nội dung PDF được hứa hẹn:
+                    <textarea required minLength={5} maxLength={1000} value={rewardDescription} onChange={e => setRewardDescription(e.target.value)} />
+                  </label>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <button type="submit" className="button button--primary" disabled={busy || profile?.status !== 'VERIFIED'}>
+                  {busy ? 'Đang lưu…' : 'Lưu Bản thảo Chiến dịch'}
+                </button>
+                <a href="#/reward/creator" className="button button--secondary">
+                  Hủy / Về Studio
+                </a>
+              </div>
+            </form>
+          </section>
+        )
+      )}
+
+      {/* Danh sách dự án: chỉ hiển thị ở tab Studio */}
+      {(tab === 'studio' || tab === 'all') && (
+        <section className="panel">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+            <h2>Dự án của bạn ({campaigns?.length ?? 0})</h2>
+            {profile?.status === 'VERIFIED' && (
+              <a href="#/reward/creator/draft" className="button button--secondary">
+                ➕ Tạo bản thảo mới
+              </a>
+            )}
           </div>
-        )}
-      </section>
+          {isPending ? (
+            <p className="muted">Đang tải danh sách…</p>
+          ) : error ? (
+            <p className="toast toast--error">{getErrorMessage(error)}</p>
+          ) : (campaigns || []).length === 0 ? (
+            <div style={{ marginTop: '12px' }}>
+              <p className="muted">Bạn chưa tạo chiến dịch truyện tranh nào.</p>
+              {profile?.status === 'VERIFIED' && (
+                <div style={{ marginTop: '12px' }}>
+                  <a href="#/reward/creator/draft" className="button button--primary">
+                    Khởi tạo bản thảo đầu tiên
+                  </a>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '12px' }}>
+              {campaigns!.map(c => {
+                const editions = c.draftConfig != null || c.category === 'COMICS_ARTBOOK';
+                const standardTier = c.draftConfig?.tiers[0];
+                const pdf = standardTier?.rewardItems[0];
+                return (
+                <div key={c.id} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px', background: '#fff' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+                    <div>
+                      <h3 style={{ margin: '0 0 4px 0' }}>{c.title}</h3>
+                      <span className="reward-status-pill status-active" style={{ fontSize: '11px' }}>{c.status}</span>
+                      <span style={{ fontSize: '13px', color: '#64748b', marginLeft: '10px' }}>
+                        Mục tiêu: {editions ? formatUnits(BigInt(c.goal), 6) : (Number(c.goal) / 1e6).toLocaleString()} MockUSDC · {c.draftConfig?.tiers.length ?? c.tiers?.length ?? 0} gói
+                        {c.onchainCampaignId ? ` · On-chain #${c.onchainCampaignId}` : ''}
+                      </span>
+                      {standardTier && pdf && (
+                        <div>
+                          <p><strong>{pdf.title}</strong> · Standard PDF · {formatUnits(BigInt(standardTier.price), 6)} MockUSDC</p>
+                          <p className="muted">{pdf.description}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {editions && <p className="muted">Standard PDF · Hoàn thiện hồ sơ và gửi thẩm định; bản thảo chưa nhận pledge.</p>}
+                      {editions && c.frozenSnapshot && ['UNDER_REVIEW', 'APPROVED'].includes(c.status) && <a className="button button--secondary" href={`#/reward/editions/${c.id}/creator`}>Mở community & phát hành PDF local</a>}
+                      {!editions && c.status === 'DRAFT' && (
+                        <button className="button button--secondary" disabled={busy} onClick={() => void handleFreeze(c.id)}>
+                          1. Đóng băng cam kết
+                        </button>
+                      )}
+                      {!editions && c.status === 'FROZEN' && (
+                        <button className="button button--primary" disabled={busy} onClick={() => void handleSubmitReview(c.id)}>
+                          2. Gửi Resolver thẩm định (V2)
+                        </button>
+                      )}
+                      {!editions && c.status === 'APPROVED' && (
+                        <button className="button button--primary" disabled={busy} onClick={() => void handlePublishOnchain(c)}>
+                          3. Phát hành On-chain
+                        </button>
+                      )}
+                      {!editions && c.status === 'ACTIVE' && (
+                        <button className="button button--secondary" disabled={busy} onClick={() => void handleRequestProductionDeposit(c)}>
+                          Yêu cầu cọc in ấn (≤50% Goal)
+                        </button>
+                      )}
+                      {!editions && c.status === 'FULFILLMENT_COMPLETE' && (
+                        <button className="button button--primary" disabled={busy} onClick={() => void handleCompleteCampaignOnchain(c)}>
+                          Hoàn tất Chiến dịch On-chain (completeCampaign)
+                        </button>
+                      )}
+                      {!editions && <a className="button button--secondary" href={`#/reward/campaigns/${c.id}`}>
+                        Xem công khai
+                      </a>}
+
+                    </div>
+                  </div>
+
+                  {editions && <EditionsPreparationPanel campaign={c} onChange={() => void refetch()} />}
+
+                </div>
+              ); })}
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 }

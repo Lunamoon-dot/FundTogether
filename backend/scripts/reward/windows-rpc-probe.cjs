@@ -43,10 +43,11 @@ async function requireRewardRpc(url = localAddress) {
 }
 
 if (require.main === module) {
+  const quiet = process.argv.includes('--quiet');
   requireRewardRpc(process.argv[2] || localAddress)
     .then(({ clientVersion }) => console.log(`Reward Windows RPC reachable on chain 31339 (${clientVersion})`))
     .catch((error) => {
-      console.error(error.message);
+      if (!quiet) console.error(error.message);
       process.exitCode = 1;
     });
 }
