@@ -1,6 +1,6 @@
 # FundTogether Editions — Cơ chế hiện tại và hướng dẫn test tay
 
-Ngày đối chiếu code/runtime: **13/10/2026**. Phạm vi: **MVP local, chain 31339, MockUSDC**.
+Ngày đối chiếu code/runtime: **15/10/2026**. Phạm vi: **MVP local, chain 31339, MockUSDC**.
 
 ## 1. MVP đang hoàn thiện đến đâu?
 
@@ -58,7 +58,7 @@ Hash ràng buộc đúng nội dung đã nộp; hash không chứng minh tác ph
 
 ```text
 Hồ sơ trong DB:
-DRAFT → FROZEN → UNDER_REVIEW → APPROVED
+DRAFT → FROZEN → UNDER_REVIEW → APPROVED → ACTIVATION_PENDING → FUNDING
                        ├─ Yêu cầu sửa → DRAFT, giữ lịch sử review
                        └─ Từ chối → STOPPED
 
@@ -78,7 +78,12 @@ Primary ký approveCampaign → Creator ký createCampaign
 Hủy trước payout / quá hạn release theo policy → REFUNDING (4)
 ```
 
-`APPROVED` chưa có nghĩa đã phát hành on-chain. `RELEASED` nghĩa PDF đã duyệt, **chưa phải Creator đã nhận tiền**. `COMPLETED` mới là đã payout.
+`submit-review` ghi thời điểm bắt đầu và hạn SLA **24 giờ** cho Resolver. Quá hạn
+chỉ hiển thị `OVERDUE`; không tự duyệt, từ chối, mở pledge hay chuyển tiền.
+`CHANGES_REQUESTED` xóa cửa sổ review hiện tại và trả Creator về `DRAFT`; Creator
+có thể sửa, khóa và gửi lại không giới hạn. `APPROVED` chưa có nghĩa đã phát hành
+on-chain; chỉ binding canonical có state `FUNDING` mới xuất hiện ở surface nhận pledge.
+`RELEASED` nghĩa PDF đã duyệt, **chưa phải Creator đã nhận tiền**. `COMPLETED` mới là đã payout.
 
 ### 2.4. Quy tắc tiền
 
@@ -209,10 +214,14 @@ Làm lần lượt; với mỗi giao dịch phải thấy **`ON_CHAIN_CONFIRMED`
 | H03 — C | Tạo campaign bằng bộ dữ liệu mục 3.4 → **Lưu Bản thảo Chiến dịch** | `DRAFT`; chỉ COMICS_ARTBOOK, một standard PDF; không kho/địa chỉ/tracking |
 | H04 — C | **Hồ sơ thẩm định PDF** → chọn ví đã liên kết, điền đề cương/ngân sách/evidence plan, hai ngày theo chain; upload và tick chọn mẫu → **Lưu hồ sơ thẩm định** | Lưu được revision mới; mẫu tải lại đúng file. Mẫu phải được gắn vào hồ sơ, không chỉ upload |
 | H05 — C | Kiểm nội dung → **Khóa cam kết PDF đã lưu** → **Gửi Resolver thẩm định** | `FROZEN` rồi `UNDER_REVIEW`; có commitment hash; các terms không còn sửa tự do |
+| H05a — U | Mở feed/chi tiết khi `UNDER_REVIEW` | Thấy surface `Đang chờ Resolver thẩm định`, community chỉ góp ý, chưa mở pledge; SLA tham khảo là 24 giờ |
 | H06 — U | Mở `#/reward`, vào campaign → chọn cam kết → nhập nhận xét → **Gửi phản hồi có tài khoản** | Gửi được trước khi approved; C/R đọc được chi tiết; người khác không đọc được nội dung U. Chưa có pledge |
 | H07 — R | Console → đọc snapshot, tải trang mẫu, xem phản hồi → nhập lý do → **Duyệt hồ sơ PDF** | `APPROVED`. Chưa có campaign on-chain, chưa chuyển tiền |
-| H08 — R | **Mở duyệt hợp đồng, sản xuất & PDF local** → **Ký duyệt cam kết local** bằng ví Primary | Receipt và sync thành công. Đây là `approveCampaign`, không phải ERC20 approve |
-| H09 — C | Studio → **Mở community & phát hành PDF local** → **Tạo campaign local từ cam kết** bằng ví C đã khóa | `ON_CHAIN_CONFIRMED`, ID on-chain, **Đang gây quỹ**, raised/escrow 0; hạn funding đúng 1 ngày từ block tạo |
+| H07a — R | Gửi `CHANGES_REQUESTED` | Trạng thái về `DRAFT`, lịch sử review còn; snapshot/hash active và cửa sổ SLA được xóa |
+| H07c — U/R | Với một hồ sơ khác, kiểm tra sau hạn 24 giờ | Hiện `OVERDUE`; trạng thái vẫn `UNDER_REVIEW`, không tự duyệt/từ chối hay mở pledge |
+| H07b — C | Sửa hồ sơ → **Lưu bản nháp** → **Khóa cam kết** → **Gửi Resolver thẩm định** lần hai | Vòng correction lặp được; tạo commitment mới và không dùng commitment cũ để review |
+| H08 — R | **Mở duyệt hợp đồng, sản xuất & PDF local** → **Ký duyệt cam kết local** bằng ví Primary | Receipt và sync thành công. Đây là `approveCampaign`, không phải ERC20 approve; public surface vẫn là `ACTIVATION_PENDING` |
+| H09 — C | Studio → **Mở community & phát hành PDF local** → **Tạo campaign local từ cam kết** bằng ví C đã khóa | `ON_CHAIN_CONFIRMED`, ID on-chain, public surface chuyển **Đang gây quỹ**, raised/escrow 0; hạn funding đúng 1 ngày từ block tạo |
 | H10 — B1, B2 | Mở link công khai `#/reward/editions/<UUID>` → **Ủng hộ 10 · một PDF** | Khi thiếu allowance, ví có thể hỏi hai giao dịch: ERC20 approve rồi pledge. Sau mỗi pledge, số dư token -10; mỗi tài khoản có một `PENDING_RELEASE`. Sau hai pledge: raised=20, escrow=20; chưa tải PDF |
 | H11 — người đăng nhập có ví | Thử **Chốt kết quả khi hết hạn gây quỹ** trước hạn: phải bị chặn. Chờ hết hạn hoặc dùng mục 9.3 → bấm lại | Đủ goal chuyển **Đang sản xuất / ACTIVE**; tiền vẫn escrow=20, C chưa nhận token |
 | H12 — C | Ở URL `/creator`, chọn bằng chứng sản xuất và summary → **Lưu file và hash** → **Gửi đúng hash này để Resolver duyệt** | Hai bước riêng: file đã lưu rồi giao dịch đã sync. Chưa productionApproved, chưa quyền tải PDF |
@@ -331,7 +340,7 @@ Sao chép bảng này vào ghi chú riêng. Dùng `PASS`, `FAIL`, `BLOCKED`, `NO
 
 | Dấu hiệu | Kiểm tra trước |
 | --- | --- |
-| Không thấy campaign ở feed | Feed chỉ có UNDER_REVIEW/APPROVED. Draft nằm trong Studio; reload trang sau khi đổi trạng thái |
+| Không thấy campaign ở feed | Kiểm tra đúng surface: `/review` cho UNDER_REVIEW, `/activation` cho APPROVED chưa có binding canonical, `/funding` chỉ cho binding canonical state FUNDING. Draft nằm trong Studio; reload trang sau khi đổi trạng thái |
 | Hồ sơ ghi “Publish và nhận pledge chưa mở” | Đây là chữ cũ trong panel chuẩn bị. Với hồ sơ APPROVED, mở link Editions `/creator` hoặc `/resolver` để chạy H08–H09; chỉ `ON_CHAIN_CONFIRMED` mới là phát hành xong |
 | Console có “V1–V4”, cọc/in ấn hoặc nút hợp đồng cũ | Đó là nhãn/phần lịch sử; dùng đúng card COMICS_ARTBOOK và link quản lý Editions. Không dùng thao tác advance của campaign lịch sử để test policy mới |
 | Không thấy hồ sơ chờ / không duyệt được | Kiểm role ADMIN/RESOLVER của **tài khoản**, rồi ví ký theo manifest; không suy ra từ tên account |

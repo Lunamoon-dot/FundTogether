@@ -1,5 +1,50 @@
 # Project progress
 
+## 2026-10-15 Editions Resolver review SLA and public surfaces
+
+- Added additive migrations `0006_reward_editions_review_sla` and
+  `0007_reward_editions_review_sla_backfill`. `submit-review` records a 24-hour
+  Resolver SLA; an overdue row remains `UNDER_REVIEW` and does not auto-approve,
+  reject, open pledge or move funds. `CHANGES_REQUESTED` clears the active
+  window and returns the Creator to `DRAFT` while preserving review history.
+- Public Editions is now separated into `/review`, `/activation`, and `/funding`.
+  Funding visibility requires an intact approved commitment plus a canonical
+  indexer binding in contract state `FUNDING (0)`; approved-but-unpublished rows
+  remain activation-pending.
+- Creator/public UX now labels the three surfaces and shows the 24-hour/overdue
+  review meaning. No public feedback or deadline timer can change review or
+  financial state; Resolver remains the sole campaign reviewer.
+- PASS: delivery HTTP surface suite `10/10`, review HTTP suite `14/14`, frontend
+  tests `40/40`, backend build, and frontend production build. The frontend build
+  retains the existing large-chunk warning.
+- Current local Reward DB was migrated in place without reset. Existing
+  `UNDER_REVIEW` rows were backfilled with a 24-hour read-model window; no chain,
+  indexer, pledge, refund, entitlement or token balance was reset.
+
+## 2026-10-14 scope cleanup verification
+
+- Removed the deferred progressive-funding scaffold and its interface test:
+  `IEscrowV2Types.sol`, `IFundTogetherProgressiveEscrow.sol`,
+  `IFundTogetherRefundVault.sol`, and `ProgressiveEscrowInterfaces.t.sol`.
+  `FundTogetherEditions.sol`, `FundTogetherReward.sol`, historical ABIs, and
+  existing financial obligations were not changed.
+- PASS: Foundry `30/30` — MockUSDC 3, Editions 18, legacy Reward 9.
+- PASS: Foundry `forge fmt --check` sau khi chuẩn hóa các contract/type/test Solidity
+  hiện hành bị lệch formatter.
+- PASS: backend Reward/ Editions unit suites `65/65`.
+- PASS: frontend tests `29/29`, frontend lint, and production build. The build
+  retains the existing large-chunk warning.
+- PASS after Docker restart: backend Editions integration `7 suites, 76/76`
+  against the real local PostgreSQL/MinIO/Anvil runtime; chain `31339`, current
+  deployment and API/web listeners were verified by the standard launcher.
+- PASS: `backend/scripts/reward/editions-browser-e2e.cjs` completed all six
+  browser checkpoints with isolated DB/storage and snapshot/revert chain
+  cleanup. Its injected Anvil wallet and fixture creator verification are not
+  manual MetaMask or real-world identity/IP acceptance.
+- NOT RUN: manual MetaMask acceptance with human Resolver/Backer accounts and
+  real-world Creator/IP verification. Those remain separate from automated
+  local evidence.
+
 ## Current focus — 2026-10-13 final checkpoint
 
 - DONE R0/R1: strict COMICS_ARTBOOK draft, one STANDARD DIGITAL_DOWNLOAD PDF, exact amounts and server rejection of unsupported categories/rewards/physical fields.

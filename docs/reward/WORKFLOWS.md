@@ -22,13 +22,31 @@ Identity/IP declaration, object keys và file mẫu vẫn riêng tư. Phản h�
 phiếu, quyền tải hoặc phê duyệt tiền. Retry cùng nội dung không tạo bản trùng;
 góp ý bổ sung là bản ghi mới, không sửa nội dung cũ.
 
+### SLA và vòng sửa hồ sơ
+
+Sau `submit-review`, hồ sơ vào `UNDER_REVIEW` và ghi `review_started_at` cùng
+`review_deadline_at = review_started_at + 24 giờ`. Đây là SLA tham khảo để Resolver
+ưu tiên xử lý, không phải timer tự động: quá hạn chỉ hiện `OVERDUE`; hồ sơ vẫn ở
+`UNDER_REVIEW`, không tự `APPROVED`, `STOPPED`, mở pledge hoặc chuyển tiền.
+
+Resolver là người duy nhất quyết định. Nếu `CHANGES_REQUESTED`, hồ sơ trở lại
+`DRAFT`, snapshot/hash đang review và cửa sổ SLA được xóa, còn lịch sử quyết định
+được giữ lại. Creator có thể sửa → freeze → submit lại không giới hạn cho tới khi
+Resolver duyệt hoặc từ chối.
+
+Feed công khai tách ba surface, không trộn trạng thái: `/review` chỉ hiển thị hồ sơ
+`UNDER_REVIEW`; `/activation` hiển thị `APPROVED` nhưng chưa có binding on-chain
+canonical; `/funding` chỉ hiển thị binding canonical có state `FUNDING (0)`. `APPROVED`
+không đồng nghĩa đang nhận pledge.
+
 ## 2. Phát hành và pledge
 
 ```text
-APPROVED → backend kiểm identity/ví/snapshot/review/deployment
+APPROVED → public surface ACTIVATION_PENDING
+  → backend kiểm identity/ví/snapshot/review/deployment
   → Primary Resolver ký approveCampaign đúng terms
   → Creator ký createCampaign bằng ví đã khóa
-  → successful receipt + canonical indexer → FUNDING
+  → successful receipt + canonical indexer → public surface FUNDING
   → Backer approve đúng token và pledge đúng giá standard
   → một entitlement / canonical pledge log
   → hết gây quỹ → bất kỳ ai gọi finalizeFunding

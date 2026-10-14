@@ -39,6 +39,8 @@ Creator verification + IP declaration
   -> draft one COMICS_ARTBOOK campaign
   -> submit sample pages, delivery plan and budget/evidence plan
   -> freeze commitment and Resolver campaign review
+  -> 24-hour Resolver review SLA; overdue remains actionable and does not auto-decide
+  -> CHANGES_REQUESTED returns to DRAFT for another freeze/submit cycle
   -> publish only after the financial-policy gates permit it
   -> Backer pledges one standard PDF tier on-chain
   -> canonical receipt/event index creates one entitlement per log
