@@ -11,6 +11,14 @@ import { RewardEditionsIndexerService } from "./reward-editions-indexer.service"
 export class RewardEditionsPublicationService {
   constructor(@Inject(DRIZZLE_DB) private readonly db: NodePgDatabase<typeof schema>, private readonly indexer: RewardEditionsIndexerService) {}
 
+  async canonicalCampaignStates(): Promise<Map<string, number>> {
+    await this.indexer.runOnce();
+    const bindings = await this.db.select({ campaignId: editionsChainCampaigns.campaignId, snapshot: editionsChainCampaigns.snapshot })
+      .from(editionsChainCampaigns)
+      .where(and(eq(editionsChainCampaigns.streamId, this.indexer.streamId()), eq(editionsChainCampaigns.canonical, true)));
+    return new Map(bindings.map(item => [item.campaignId, item.snapshot.state]));
+  }
+
   async terms(id: string, userId: string) {
     const [campaign] = await this.db.select().from(rewardCampaigns).where(eq(rewardCampaigns.id, id));
     if (!campaign) throw new NotFoundException("Editions campaign not found");

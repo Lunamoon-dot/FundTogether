@@ -18,6 +18,7 @@ type Sample = typeof samples.$inferSelect;
 const sha256 = (bytes: Uint8Array) => `0x${createHash("sha256").update(bytes).digest("hex")}`;
 const sampleDto = (sample: Sample) => ({ id: sample.id, sha256: sample.sha256, mediaType: sample.mediaType, sizeBytes: sample.sizeBytes });
 export const EDITIONS_REVIEW_SLA_MS = 24 * 60 * 60 * 1000;
+export type EditionsPublicStatus = "UNDER_REVIEW" | "APPROVED";
 
 function parse<T extends z.ZodType>(schema: T, body: unknown): z.output<T> {
   const result = schema.safeParse(body);
@@ -208,9 +209,9 @@ export class RewardEditionsService {
     });
   }
 
-  async publicList() {
+  async publicList(status: EditionsPublicStatus) {
     const items = await this.db.select({ id: campaigns.id }).from(campaigns).where(and(eq(campaigns.category, "COMICS_ARTBOOK"),
-      inArray(campaigns.status, ["UNDER_REVIEW", "APPROVED"])));
+      eq(campaigns.status, status)));
     return Promise.all(items.map(item => this.publicPreview(item.id)));
   }
 
@@ -223,7 +224,13 @@ export class RewardEditionsService {
     const [reports] = await this.db.select({ count: count() }).from(editionsFeedback).where(eq(editionsFeedback.campaignId, id));
     const decisions = await this.db.select({ outcome: reviews.outcome, commitmentHash: reviews.commitmentHash, reviewedAt: reviews.reviewedAt })
       .from(reviews).where(eq(reviews.campaignId, id)).orderBy(desc(reviews.reviewedAt));
+    const reviewState = campaign.status === "UNDER_REVIEW" && campaign.reviewDeadlineAt
+      ? campaign.reviewDeadlineAt.getTime() < Date.now() ? "OVERDUE" : "ACTIVE"
+      : null;
     return { id, status: campaign.status, publicationEnabled: false, commitmentHash: campaign.commitmentHash,
+      reviewStartedAt: campaign.reviewStartedAt?.toISOString() ?? null,
+      reviewDeadlineAt: campaign.reviewDeadlineAt?.toISOString() ?? null,
+      reviewState,
       config, creatorDisplayName: creator.displayName, contentOutline: preparation.contentOutline,
       budgetPlan: preparation.budgetPlan, evidencePlan: preparation.evidencePlan, feedbackCount: reports.count, decisions,
       releaseWindow: preparation.releaseWindow, evidenceHashes: evidence.map(item => item.sha256) };

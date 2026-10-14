@@ -19,6 +19,8 @@ export interface EditionsTerms {
 }
 export interface EditionsPreview {
   id: string; status: 'UNDER_REVIEW' | 'APPROVED'; commitmentHash: string; config: NonNullable<RewardCampaign['draftConfig']>;
+  surface: 'REVIEW' | 'ACTIVATION_PENDING' | 'FUNDING'; reviewStartedAt: string | null; reviewDeadlineAt: string | null;
+  reviewState: 'ACTIVE' | 'OVERDUE' | null;
   creatorDisplayName: string; contentOutline: string; budgetPlan: string; evidencePlan: string; feedbackCount: number;
   releaseWindow: { start: string; end: string }; evidenceHashes: string[];
   decisions: { outcome: string; commitmentHash: string; reviewedAt: string }[];
@@ -33,7 +35,10 @@ export interface EditionsEntitlement { id: string; campaignId: string; backerWal
 
 const base = '/v1/reward/editions';
 export const editionsApi = {
-  list: async (signal?: AbortSignal) => (await http.get<EditionsPreview[]>('/v1/reward/public/editions', { signal })).data,
+  list: async (signal?: AbortSignal) => (await http.get<EditionsPreview[]>('/v1/reward/public/editions/funding', { signal })).data,
+  review: async (signal?: AbortSignal) => (await http.get<EditionsPreview[]>('/v1/reward/public/editions/review', { signal })).data,
+  activation: async (signal?: AbortSignal) => (await http.get<EditionsPreview[]>('/v1/reward/public/editions/activation', { signal })).data,
+  funding: async (signal?: AbortSignal) => (await http.get<EditionsPreview[]>('/v1/reward/public/editions/funding', { signal })).data,
   preview: async (id: string, signal?: AbortSignal) => (await http.get<EditionsPreview>(`/v1/reward/public/editions/${id}`, { signal })).data,
   deployment: async () => (await http.get<EditionsDeployment>(`${base}/deployment`)).data,
   chain: async (id: string, signal?: AbortSignal) => (await http.get<EditionsChain>(`${base}/campaigns/${id}/chain`, { signal })).data,

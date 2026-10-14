@@ -4,6 +4,7 @@ import type { Request, Response } from "express";
 import { AuthGuard } from "../modules/auth/auth.guard";
 import { MAX_EVIDENCE_FILE_BYTES, EvidenceUploadFile } from "../modules/evidence/evidence-file-validation";
 import { assertEmptyRewardBody } from "./reward-campaign.schema";
+import { RewardEditionsPublicationService } from "./reward-editions-publication.service";
 import { RewardEditionsService } from "./reward-editions.service";
 
 @Controller("v1/reward/editions")
@@ -49,11 +50,35 @@ export class RewardEditionsController {
 
 @Controller("v1/reward/public/editions")
 export class RewardEditionsPreviewController {
-  constructor(private readonly editions: RewardEditionsService) {}
+  constructor(private readonly editions: RewardEditionsService, private readonly publication: RewardEditionsPublicationService) {}
+
+  private async withSurface(id: string) {
+    const item = await this.editions.publicPreview(id);
+    if (item.status === "UNDER_REVIEW") return { ...item, surface: "REVIEW" as const };
+    const states = await this.publication.canonicalCampaignStates();
+    return { ...item, surface: states.get(id) === 0 ? "FUNDING" as const : "ACTIVATION_PENDING" as const };
+  }
 
   @Get()
-  list() { return this.editions.publicList(); }
+  list() { return this.fundingList(); }
+
+  @Get("review")
+  async review() {
+    return (await this.editions.publicList("UNDER_REVIEW")).map(item => ({ ...item, surface: "REVIEW" as const }));
+  }
+
+  @Get("activation")
+  async activation() {
+    const [items, states] = await Promise.all([this.editions.publicList("APPROVED"), this.publication.canonicalCampaignStates()]);
+    return items.filter(item => !states.has(item.id)).map(item => ({ ...item, surface: "ACTIVATION_PENDING" as const }));
+  }
+
+  @Get("funding")
+  async fundingList() {
+    const [items, states] = await Promise.all([this.editions.publicList("APPROVED"), this.publication.canonicalCampaignStates()]);
+    return items.filter(item => states.get(item.id) === 0).map(item => ({ ...item, surface: "FUNDING" as const }));
+  }
 
   @Get(":id")
-  preview(@Param("id", new ParseUUIDPipe()) id: string) { return this.editions.publicPreview(id); }
+  preview(@Param("id", new ParseUUIDPipe()) id: string) { return this.withSurface(id); }
 }
