@@ -22,6 +22,12 @@ either: it means the reviewed commitment can be activated. The canonical
 chain snapshot is the source for whether an approved campaign is actually
 open for pledge.
 
+The Resolver review SLA is temporarily **24 hours** from the successful
+`submit-review` transition. The system stores the start and deadline on the
+campaign row. After the deadline, the campaign remains `UNDER_REVIEW` and is
+marked overdue; the Resolver can still decide it. There is no automatic
+approval, rejection, rollback, or pledge opening.
+
 ## Public surfaces
 
 The Editions entry page exposes three clearly separated sections:
@@ -51,6 +57,10 @@ canonical chain snapshot is in funding state.
 - **Resolver:** sees the private sample/evidence controls and full feedback
   review panel, then makes the only review decision.
 
+The Creator is not a reviewer. A Creator may only edit after
+`CHANGES_REQUESTED` returns the campaign to `DRAFT`, then freeze and submit a
+new commitment for another review cycle.
+
 Feedback remains off-chain in PostgreSQL, attributable to its author and
 visible to the author, Creator, and Resolver according to the existing API
 policy. It never changes the campaign status or moves funds.
@@ -75,6 +85,8 @@ preserved; the new endpoints are read-model queries only.
   links, IP declarations, and Resolver decision reasons are not exposed.
 - A stale or missing indexer binding is not funding-visible.
 - Feedback is still rejected outside `UNDER_REVIEW`/`APPROVED`.
+- The 24-hour review SLA is informational/enforced as an overdue marker only;
+  it never performs a financial or approval transition.
 - No contract, token, pledge, refund, or entitlement state is changed by this
   UX split.
 
@@ -82,6 +94,9 @@ preserved; the new endpoints are read-model queries only.
 
 - Backend HTTP tests prove each list surface contains only its intended
   campaigns and that an unbound `APPROVED` campaign is not funding-visible.
+- Review tests prove `submit-review` records a 24-hour deadline, overdue
+  review remains actionable, and `CHANGES_REQUESTED` clears the active review
+  window for the next Creator submission.
 - Frontend tests prove section labels and viewer-specific feedback controls.
 - Existing review, delivery, indexer, frontend test, build, and lint suites
   remain green.
