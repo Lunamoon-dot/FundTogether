@@ -4,7 +4,7 @@ const { Client } = require('pg');
 const { guardEnvironment } = require('./guard-environment.cjs');
 const net = require('node:net');
 
-const migrationIds = ['0000_reward_baseline', '0001_reward_editions_drafts', '0002_reward_editions_review', '0003_reward_editions_chain', '0004_reward_editions_delivery', '0005_reward_physical_retirement'];
+const migrationIds = ['0000_reward_baseline', '0001_reward_editions_drafts', '0002_reward_editions_review', '0003_reward_editions_chain', '0004_reward_editions_delivery', '0005_reward_physical_retirement', '0006_reward_editions_review_sla', '0007_reward_editions_review_sla_backfill'];
 
 function readEnvironment(file) {
   const values = {};

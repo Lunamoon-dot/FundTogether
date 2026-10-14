@@ -209,12 +209,25 @@ describe("Editions freeze/review: real HTTP, PostgreSQL and private object stora
     expect((await current()).status).toBe("UNDER_REVIEW");
   });
 
+  it("records a 24-hour Resolver review SLA without expiring the decision authority", async () => {
+    const frozen = await submit();
+    const submitted = await current();
+    expect(submitted.reviewStartedAt).not.toBeNull();
+    expect(submitted.reviewDeadlineAt).not.toBeNull();
+    expect(submitted.reviewDeadlineAt!.getTime() - submitted.reviewStartedAt!.getTime()).toBe(24 * 60 * 60 * 1000);
+
+    await db.update(schema.rewardCampaigns).set({ reviewDeadlineAt: new Date(Date.now() - 1000) }).where(eq(schema.rewardCampaigns.id, id));
+    const approved = await post("/review", { outcome: "APPROVED", decisionReason: "Reviewed after the SLA warning", commitmentHash: frozen.commitmentHash }, resolver);
+    expect(approved.status).toBe(201);
+    expect(approved.body.status).toBe("APPROVED");
+  });
+
   it("preserves old reviewed terms through corrections and rejects stale decisions", async () => {
     const frozen = await submit();
     const decision = { outcome: "CHANGES_REQUESTED", decisionReason: "Please clarify the ending in the outline", commitmentHash: frozen.commitmentHash };
     const corrected = await post("/review", decision, resolver);
     expect(corrected.status).toBe(201);
-    expect(corrected.body).toMatchObject({ status: "DRAFT", frozenSnapshot: null, commitmentHash: null, payoutWalletLinkId: null, revision: 4 });
+    expect(corrected.body).toMatchObject({ status: "DRAFT", frozenSnapshot: null, commitmentHash: null, payoutWalletLinkId: null, reviewStartedAt: null, reviewDeadlineAt: null, revision: 4 });
     const [review] = await db.select().from(schema.rewardReviews).where(eq(schema.rewardReviews.campaignId, id));
     expect(review.frozenSnapshot).toEqual(frozen.frozenSnapshot);
     const old = await current();

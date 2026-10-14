@@ -44,6 +44,8 @@ export const rewardCampaigns = pgTable("reward_campaigns", {
   onchainCampaignId: numeric("onchain_campaign_id", { precision: 78, scale: 0 }),
   status: varchar("status", { length: 32 }).notNull().default("DRAFT"),
   frozenAt: timestamp("frozen_at", { withTimezone: true }),
+  reviewStartedAt: timestamp("review_started_at", { withTimezone: true }),
+  reviewDeadlineAt: timestamp("review_deadline_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, table => [

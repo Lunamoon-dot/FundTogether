@@ -17,6 +17,7 @@ type Campaign = typeof campaigns.$inferSelect;
 type Sample = typeof samples.$inferSelect;
 const sha256 = (bytes: Uint8Array) => `0x${createHash("sha256").update(bytes).digest("hex")}`;
 const sampleDto = (sample: Sample) => ({ id: sample.id, sha256: sample.sha256, mediaType: sample.mediaType, sizeBytes: sample.sizeBytes });
+export const EDITIONS_REVIEW_SLA_MS = 24 * 60 * 60 * 1000;
 
 function parse<T extends z.ZodType>(schema: T, body: unknown): z.output<T> {
   const result = schema.safeParse(body);
@@ -175,7 +176,10 @@ export class RewardEditionsService {
       this.owner(campaign, userId);
       if (campaign.status !== "FROZEN" || campaign.revision !== revision || !campaign.frozenSnapshot ||
         editionsCommitment(campaign.frozenSnapshot) !== campaign.commitmentHash) throw new ConflictException("A current frozen commitment is required");
-      const [updated] = await tx.update(campaigns).set({ status: "UNDER_REVIEW", revision: revision + 1, updatedAt: new Date() })
+      const reviewStartedAt = new Date();
+      const reviewDeadlineAt = new Date(reviewStartedAt.getTime() + EDITIONS_REVIEW_SLA_MS);
+      const [updated] = await tx.update(campaigns).set({ status: "UNDER_REVIEW", reviewStartedAt, reviewDeadlineAt,
+        revision: revision + 1, updatedAt: reviewStartedAt })
         .where(eq(campaigns.id, id)).returning();
       return updated;
     });
@@ -197,6 +201,7 @@ export class RewardEditionsService {
         status: correction ? "DRAFT" : input.outcome === "REJECTED" ? "STOPPED" : "APPROVED",
         ...(correction ? { frozenAt: null, frozenSnapshot: null, commitmentHash: null } : {}),
         ...(input.outcome !== "APPROVED" ? { payoutWalletLinkId: null } : {}),
+        ...(correction ? { reviewStartedAt: null, reviewDeadlineAt: null } : {}),
         revision: campaign.revision + 1, updatedAt: new Date(),
       }).where(eq(campaigns.id, id)).returning();
       return updated;
