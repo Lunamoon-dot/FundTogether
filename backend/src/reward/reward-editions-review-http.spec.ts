@@ -11,6 +11,7 @@ import { AuthGuard } from "../modules/auth/auth.guard";
 import { DRIZZLE_DB } from "../database/database.constants";
 import * as schema from "../database/schema";
 import { RewardEditionsController, RewardEditionsPreviewController } from "./reward-editions.controller";
+import { RewardEditionsPublicationService } from "./reward-editions-publication.service";
 import { RewardEditionsService } from "./reward-editions.service";
 import { RewardCampaignService } from "./reward-campaign.service";
 import { RewardCryptoService } from "./reward-crypto.service";
@@ -90,6 +91,7 @@ describe("Editions freeze/review: real HTTP, PostgreSQL and private object stora
       controllers: [RewardEditionsController, RewardEditionsPreviewController],
       providers: [RewardEditionsService, EvidenceStorageService, RewardCampaignService, RewardCryptoService,
         { provide: ConfigService, useValue: config }, { provide: DRIZZLE_DB, useValue: db },
+        { provide: RewardEditionsPublicationService, useValue: { canonicalCampaignStates: async () => new Map<string, number>() } },
         { provide: RewardIndexerService, useValue: { processReceipt: () => { throw new Error("Review cannot process receipts"); } } },
       ],
     }).overrideGuard(AuthGuard).useValue({ canActivate(context: any) {

@@ -317,7 +317,7 @@ export function RewardResolverConsole({ userId }: { userId: string }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '12px' }}>
             {campaigns!.map(c => c.draftConfig || c.category === 'COMICS_ARTBOOK' ? (
               <div key={c.id}>
-                {c.commitmentHash && ['UNDER_REVIEW', 'APPROVED'].includes(c.status) && <EditionsCommunity id={c.id} userId={userId} commitmentHash={c.commitmentHash} />}
+                {c.commitmentHash && ['UNDER_REVIEW', 'APPROVED'].includes(c.status) && <EditionsCommunity id={c.id} userId={userId} viewerMode="resolver" commitmentHash={c.commitmentHash} />}
                 <EditionsResolverReview campaign={c} onChange={() => void refetchCampaigns()} />
                 {c.status === 'APPROVED' && <a className="button button--secondary" href={`#/reward/editions/${c.id}/resolver`}>Mở duyệt hợp đồng, sản xuất & PDF local</a>}
               </div>

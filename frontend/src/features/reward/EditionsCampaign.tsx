@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { formatUnits, keccak256, toHex } from 'viem';
 import type { AccountSession } from '../../lib/api/auth';
 import { editionsApi } from '../../lib/api/editions';
-import type { EditionsEvidence } from '../../lib/api/editions';
+import type { EditionsEvidence, EditionsPreview } from '../../lib/api/editions';
 import { getErrorMessage } from '../../lib/api/error';
 import { useEditionsTransaction } from './useEditionsTransaction';
 import './reward.css';
@@ -16,17 +16,40 @@ function saveBlob(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function reviewDeadline(value: string | null) {
+  return value ? new Date(value).toLocaleString('vi-VN', { timeZone: 'UTC' }) + ' UTC' : null;
+}
+
+function EditionsPublicCard({ item }: { item: EditionsPreview }) {
+  return <article className="panel" key={item.id}><h2><a href={`#/reward/editions/${item.id}`}>{item.config.title}</a></h2>
+    <p>{item.config.pitch}</p><p>{item.creatorDisplayName} · {amount(item.config.tiers[0].price)} MockUSDC / PDF</p>
+    <p>{item.feedbackCount} phản hồi gửi tới Creator và Resolver</p>
+    {item.surface === 'REVIEW' && <p>{item.reviewState === 'OVERDUE' ? 'Đã quá SLA tham khảo; hồ sơ vẫn chờ Resolver quyết định.' : 'SLA tham khảo: Resolver có 24 giờ để xử lý hồ sơ. Community đang góp ý; Resolver là người quyết định.'}
+      {item.reviewDeadlineAt && ` Hạn xử lý tham khảo: ${reviewDeadline(item.reviewDeadlineAt)}.`}</p>}
+    {item.surface === 'ACTIVATION_PENDING' && <p>Đã được Resolver duyệt; đang chờ hoàn tất phát hành on-chain. Chưa mở pledge.</p>}
+    {item.surface === 'FUNDING' && <p>Đang gây quỹ; pledge theo đúng cam kết PDF standard.</p>}
+  </article>;
+}
+
+function EditionsPublicSurface({ title, description, items, empty }: { title: string; description: string; items: EditionsPreview[] | undefined; empty: string }) {
+  return <section className="editions-public-surface" aria-label={title}><div className="editions-public-surface__heading"><div><h2>{title}</h2><p>{description}</p></div><span>{items?.length ?? 0}</span></div>
+    {items?.length ? items.map(item => <EditionsPublicCard item={item} key={item.id} />) : <p className="muted">{empty}</p>}
+  </section>;
+}
+
 export function EditionsFeed() {
-  const query = useQuery({ queryKey: ['reward-editions-public'], queryFn: ({ signal }) => editionsApi.list(signal) });
+  const review = useQuery({ queryKey: ['reward-editions-public', 'review'], queryFn: ({ signal }) => editionsApi.review(signal) });
+  const activation = useQuery({ queryKey: ['reward-editions-public', 'activation'], queryFn: ({ signal }) => editionsApi.activation(signal) });
+  const funding = useQuery({ queryKey: ['reward-editions-public', 'funding'], queryFn: ({ signal }) => editionsApi.funding(signal) });
+  const loading = review.isPending || activation.isPending || funding.isPending;
+  const error = review.error || activation.error || funding.error;
   return <div className="reward-container">
     <section className="panel"><h2>Pilot local · MockUSDC</h2><p>Không ứng tiền. Creator chỉ nhận tiền sau PDF được Resolver duyệt, hết 7 ngày challenge và không còn tranh chấp mở. Community góp ý; Resolver ra quyết định.</p>
       <p>Không đạt mục tiêu, hủy trước payout hoặc hết thời hạn theo policy sẽ mở hoàn tiền. Sau payout không có hoàn tiền tự động. Không cam kết lưu trữ vĩnh viễn hay DRM.</p></section>
-    {query.isPending && <p role="status">Đang tải Editions…</p>}{query.error && <p role="alert">{getErrorMessage(query.error)}</p>}
-    {query.data?.length === 0 && <p>Chưa có hồ sơ Editions gửi thẩm định.</p>}
-    {query.data?.map(item => <article className="panel" key={item.id}><h2><a href={`#/reward/editions/${item.id}`}>{item.config.title}</a></h2>
-      <p>{item.config.pitch}</p><p>{item.creatorDisplayName} · {amount(item.config.tiers[0].price)} / PDF</p>
-      <p>{item.status === 'UNDER_REVIEW' ? 'Đang nhận phản hồi và thẩm định; chưa nhận pledge.' : 'Hồ sơ đã duyệt; xem trạng thái hợp đồng trong chi tiết.'}</p>
-      <p>{item.feedbackCount} phản hồi gửi tới Creator và Resolver</p></article>)}
+    {loading && <p role="status">Đang tải trạng thái Editions…</p>}{error && <p role="alert">{getErrorMessage(error)}</p>}
+    <EditionsPublicSurface title="Đang chờ Resolver thẩm định" description="Community chỉ góp ý; không mở pledge. Resolver quyết định hồ sơ." items={review.data} empty="Chưa có hồ sơ đang chờ Resolver." />
+    <EditionsPublicSurface title="Chờ Creator và Resolver kích hoạt" description="Hồ sơ đã được duyệt, nhưng chưa có campaign on-chain canonical để nhận pledge." items={activation.data} empty="Không có hồ sơ đang chờ kích hoạt." />
+    <EditionsPublicSurface title="Đang gây quỹ" description="Campaign đã được indexer xác nhận trên contract; backer có thể pledge theo cam kết." items={funding.data} empty="Chưa có campaign đang nhận pledge." />
     <a href="#/reward/history">Campaign Reward đã tồn tại</a>
   </div>;
 }
@@ -101,7 +124,9 @@ export function EditionsCampaign({ id, session, mode = 'public' }: { id: string;
     {notice && <p role="status">{notice}</p>}
     {tx.notice && <p role="status">{tx.notice}</p>}
     {!userId && <p><a href="#/account">Đăng nhập</a> để góp ý, liên kết ví và ủng hộ bằng MockUSDC local.</p>}
-    {!approved && <p>Hồ sơ đang thẩm định. Chưa mở pledge.</p>}
+    {!approved && <section className="panel"><h2>Đang chờ Resolver thẩm định</h2><p>Community chỉ gửi phản hồi tham khảo; Resolver là người quyết định. Hồ sơ chưa mở pledge.</p>
+      {item.reviewDeadlineAt && <p>{item.reviewState === 'OVERDUE' ? 'Đã quá SLA tham khảo 24 giờ; hồ sơ không tự được duyệt hoặc đóng.' : 'SLA tham khảo: Resolver có 24 giờ để xử lý hồ sơ.'} Hạn: {reviewDeadline(item.reviewDeadlineAt)}.</p>}
+    </section>}
     {approved && chain.data && !state && <section className="panel"><h2>Chưa phát hành trên hợp đồng Editions</h2><p>Hồ sơ được duyệt và giao dịch phát hành là hai bước riêng. Primary Resolver ký đúng cam kết trước khi Creator tạo campaign.</p>
       {userId && mode !== 'public' && <button className="button button--primary" disabled={busy} onClick={() => void publication()}>{mode === 'resolver' ? 'Ký duyệt cam kết local' : 'Tạo campaign local từ cam kết'}</button>}</section>}
     {state && activeId !== null && <>
@@ -153,20 +178,20 @@ export function EditionsCampaign({ id, session, mode = 'public' }: { id: string;
         <p>Hết hạn challenge hoặc đã payout: báo sự cố qua phản hồi bên dưới; không có hoàn tiền hợp đồng tự động sau payout.</p>
       </section>}
     </>}
-    {userId && <EditionsCommunity id={id} userId={userId} commitmentHash={item.commitmentHash} evidence={evidence.data ?? []} />}
+    {userId && <EditionsCommunity id={id} userId={userId} viewerMode={mode === 'creator' ? 'creator' : mode === 'resolver' ? 'resolver' : 'community'} commitmentHash={item.commitmentHash} evidence={evidence.data ?? []} />}
   </div>;
 }
 
-export function EditionsCommunity({ id, userId, commitmentHash, evidence = [] }: { id: string; userId: string; commitmentHash: string; evidence?: EditionsEvidence[] }) {
+export function EditionsCommunity({ id, userId, viewerMode = 'community', commitmentHash, evidence = [] }: { id: string; userId: string; viewerMode?: 'community' | 'creator' | 'resolver'; commitmentHash: string; evidence?: EditionsEvidence[] }) {
   const query = useQuery({ queryKey: ['reward-editions-feedback', id, userId], queryFn: ({ signal }) => editionsApi.feedback(id, signal) });
   const [body, setBody] = useState(''); const [kind, setKind] = useState<'COMMENT' | 'ISSUE'>('COMMENT'); const [target, setTarget] = useState(commitmentHash);
   const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   return <section className="panel"><h2>Community kiểm tra cùng Resolver</h2><p>Nội dung gửi tới Creator và Resolver; thành viên khác chỉ thấy số lượng phản hồi. Phản hồi không là phiếu biểu quyết và không tự khóa hay chuyển tiền.</p>
-    <form onSubmit={event => { event.preventDefault(); setBusy(true); setError(''); void editionsApi.comment(id, { targetHash: target, kind, body }).then(async () => { setBody(''); await query.refetch(); }).catch(err => setError(getErrorMessage(err))).finally(() => setBusy(false)); }}>
+    {viewerMode === 'creator' ? <p className="muted">Creator chỉ đọc phản hồi; không thể gửi phản hồi từ chính campaign này.</p> : <form onSubmit={event => { event.preventDefault(); setBusy(true); setError(''); void editionsApi.comment(id, { targetHash: target, kind, body }).then(async () => { setBody(''); await query.refetch(); }).catch(err => setError(getErrorMessage(err))).finally(() => setBusy(false)); }}>
       <label className="field">Nội dung đang kiểm tra<select value={target} onChange={event => setTarget(event.target.value)}><option value={commitmentHash}>Cam kết campaign</option>{evidence.map(item => <option key={item.id} value={item.evidenceHash}>{item.purpose} · {item.evidenceHash.slice(0, 12)}</option>)}</select></label>
       <label className="field">Loại phản hồi<select value={kind} onChange={event => setKind(event.target.value as 'COMMENT' | 'ISSUE')}><option value="COMMENT">Nhận xét</option><option value="ISSUE">Báo sự cố</option></select></label>
       <label className="field">Chi tiết cần kiểm tra<textarea required minLength={10} maxLength={3000} value={body} onChange={event => setBody(event.target.value)} /></label><button disabled={busy} className="button button--primary">Gửi phản hồi có tài khoản</button>
-    </form>{(error || query.error) && <p role="alert">{error || getErrorMessage(query.error)}</p>}
+    </form>}{(error || query.error) && <p role="alert">{error || getErrorMessage(query.error)}</p>}
     {query.data?.map(item => <div key={item.id}><p>{item.kind} · {item.createdAt} · tài khoản {item.authorUserId}</p><p>{item.body}</p><p style={{ overflowWrap: 'anywhere' }}>Đối tượng: {item.targetHash}</p></div>)}
   </section>;
 }
