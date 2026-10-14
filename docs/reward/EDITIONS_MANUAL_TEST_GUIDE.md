@@ -10,7 +10,7 @@ R0–R5 đã triển khai và chuyển runtime chính sang Editions: một campa
 
 | Bằng chứng hiện có | Kết quả đã ghi nhận |
 | --- | --- |
-| Editions backend | 76 test đạt |
+| Editions backend | 78 test đạt |
 | Toàn backend | 195/195 test đạt; 20/20 suite đạt |
 | Frontend | 29 test đạt; lint/build đạt |
 | Contract | 30 test đạt, gồm 18 test Editions và fuzz; pledge, challenge và payout đã kiểm tra tại một giây trước và đúng deadline |

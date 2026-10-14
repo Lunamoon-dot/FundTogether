@@ -14,8 +14,9 @@
 - Creator/public UX now labels the three surfaces and shows the 24-hour/overdue
   review meaning. No public feedback or deadline timer can change review or
   financial state; Resolver remains the sole campaign reviewer.
-- PASS: delivery HTTP surface suite `10/10`, review HTTP suite `14/14`, frontend
-  tests `40/40`, backend build, and frontend production build. The frontend build
+- PASS: full Editions backend suite `7 suites / 78 tests`, including delivery
+  surface `10/10` and review HTTP `14/14`; frontend tests `40/40`, backend build,
+  and frontend production build. The frontend build
   retains the existing large-chunk warning.
 - Current local Reward DB was migrated in place without reset. Existing
   `UNDER_REVIEW` rows were backfilled with a 24-hour read-model window; no chain,
