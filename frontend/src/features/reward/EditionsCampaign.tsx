@@ -11,6 +11,7 @@ import { EditionStatusBadge } from './ui/EditionStatusBadge';
 import { EditorialCampaignCard } from './ui/EditorialCampaignCard';
 import { EditionProgressChart } from './ui/EditionProgressChart';
 import { EditionTimeline, type EditionTimelineEvent } from './ui/EditionTimeline';
+import { EditionsCommitmentCard } from './ui/EditionsCommitmentCard';
 import './reward.css';
 
 const stages = ['Đang gây quỹ', 'Đang sản xuất', 'Chờ duyệt PDF', 'PDF đã được duyệt', 'Mở hoàn tiền', 'Đã trả Creator'];
@@ -268,20 +269,27 @@ export function EditionsCampaign({ id, session, mode = 'public' }: { id: string;
     },
     {
       label: 'Gây quỹ on-chain',
-      detail: state ? (state.state === 0 ? 'Đang mở gây quỹ trên hợp đồng' : 'Giai đoạn gây quỹ hoàn tất') : 'Chờ kích hoạt campaign trên hợp đồng',
+      detail: state
+        ? state.state === 0
+          ? 'Đang mở gây quỹ trên hợp đồng'
+          : state.state === 4
+            ? 'Không đạt mục tiêu · Contract đã chuyển sang hoàn tiền'
+            : 'Giai đoạn gây quỹ hoàn tất'
+        : 'Chờ kích hoạt campaign trên hợp đồng',
       tone: !state ? 'pending' : (state.state === 0 ? 'current' : 'done'),
-    },
-    {
-      label: 'Sản xuất & Duyệt PDF',
-      detail: state ? (state.productionApproved ? 'EVIDENCE_REVIEWED · Bằng chứng sản xuất đã được duyệt.' : state.state >= 1 && state.state <= 3 ? 'Creator đang sản xuất và nộp bằng chứng' : 'Chờ hoàn tất gây quỹ') : 'Chờ sau giai đoạn gây quỹ',
-      tone: state?.productionApproved ? 'done' : (state && state.state >= 1 && state.state <= 3 ? 'current' : 'pending'),
     },
   ];
   if (state?.state === 4) {
     timelineEvents.push({
       label: 'Hoàn tiền',
-      detail: 'Campaign không đạt mục tiêu · Mở hoàn tiền cho backer',
+      detail: 'Campaign không đạt mục tiêu · Backer tự nhận hoàn tiền',
       tone: 'current',
+    });
+  } else {
+    timelineEvents.push({
+      label: 'Sản xuất & Duyệt PDF',
+      detail: state ? (state.productionApproved ? 'EVIDENCE_REVIEWED · Bằng chứng sản xuất đã được duyệt.' : state.state >= 1 && state.state <= 3 ? 'Creator đang sản xuất và nộp bằng chứng' : 'Chờ sau giai đoạn gây quỹ') : 'Chờ sau giai đoạn gây quỹ',
+      tone: state?.productionApproved ? 'done' : (state && state.state >= 1 && state.state <= 3 ? 'current' : 'pending'),
     });
   }
 
@@ -302,22 +310,7 @@ export function EditionsCampaign({ id, session, mode = 'public' }: { id: string;
       <div className="campaign-detail-layout">
         {/* Main Column */}
         <div className="campaign-detail-main">
-          <section className="panel">
-            <h2>Cam kết tác phẩm</h2>
-            <p>{item.config.story}</p>
-            <p>{item.config.tiers[0].rewardItems[0].description}</p>
-            <h3>Đề cương</h3>
-            <p>{item.contentOutline}</p>
-            <h3>Ngân sách tự sản xuất</h3>
-            <p>{item.budgetPlan}</p>
-            <h3>Kế hoạch bằng chứng</h3>
-            <p>{item.evidencePlan}</p>
-            {item.config.tiers[0].estimatedDeliveryAt && <p>Ngày dự kiến phát hành PDF (UTC): {item.config.tiers[0].estimatedDeliveryAt}</p>}
-            <p>Hạn cam kết phát hành PDF (UTC): {item.releaseWindow.end}</p>
-            <p>Mục tiêu: {amount(item.config.goal)} · {item.config.fundingDuration / 86400} ngày gây quỹ</p>
-            <p style={{ overflowWrap: 'anywhere' }}>Cam kết: {item.commitmentHash}</p>
-            {item.decisions.map((decision, index) => <p key={index}>Resolver: {decision.outcome} · {decision.reviewedAt}</p>)}
-          </section>
+          <EditionsCommitmentCard item={item} amount={amount} />
 
           {/* Timeline */}
           <section className="panel">

@@ -15,6 +15,9 @@ import {
 import { EditionsPreparationPanel, NewEditionsPreparationPanel } from './EditionsReview';
 import { CreatorPipeline } from './ui/CreatorPipeline';
 import { CreatorTaskCard } from './ui/CreatorTaskCard';
+import { isCreatorActionable } from './ui/creatorTaskUtils';
+import { EditionStatusBadge } from './ui/EditionStatusBadge';
+import { getCampaignUiState, getProjectedChainState } from './ui/campaignState';
 import type { RewardCampaign } from '../../lib/api/reward';
 import { getErrorMessage } from '../../lib/api/error';
 import {
@@ -43,6 +46,7 @@ export function RewardCreatorStudio({ userId, path }: { userId: string; path?: s
     queryFn: ({ signal }) => listMyRewardCampaigns(signal),
     refetchInterval: 10_000,
   });
+  const creatorTasks = (campaigns ?? []).filter(isCreatorActionable);
 
   // Flow V1 Creator Verification State
   const [displayName, setDisplayName] = useState('');
@@ -367,11 +371,11 @@ export function RewardCreatorStudio({ userId, path }: { userId: string; path?: s
       )}
 
       {/* Cần bạn làm task cards */}
-      {(tab === 'studio' || tab === 'all') && campaigns && campaigns.length > 0 && (
+      {(tab === 'studio' || tab === 'all') && creatorTasks.length > 0 && (
         <section className="creator-tasks-section panel" aria-label="Cần bạn làm">
-          <h2>Cần bạn làm ({campaigns.length})</h2>
+          <h2>Cần bạn làm ({creatorTasks.length})</h2>
           <div className="creator-tasks-grid">
-            {campaigns.map(c => {
+            {creatorTasks.map(c => {
               const editHref = c.status === 'CHANGES_REQUESTED'
                 ? `#/reward/creator?edit=${c.id}&step=3`
                 : c.status === 'APPROVED'
@@ -386,6 +390,13 @@ export function RewardCreatorStudio({ userId, path }: { userId: string; path?: s
               );
             })}
           </div>
+        </section>
+      )}
+
+      {(tab === 'studio' || tab === 'all') && campaigns?.some(c => getProjectedChainState(c.projection) === 4) && (
+        <section className="panel creator-no-action-notice" aria-label="Campaign đang hoàn tiền">
+          <h2>Campaign thất bại và đang hoàn tiền</h2>
+          <p className="muted">Campaign không đạt mục tiêu. Backer tự nhận lại pledge của mình; bạn không cần thao tác nào ở bước này.</p>
         </section>
       )}
 
@@ -419,6 +430,8 @@ export function RewardCreatorStudio({ userId, path }: { userId: string; path?: s
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '12px' }}>
               {campaigns!.map(c => {
                 const editions = c.draftConfig != null || c.category === 'COMICS_ARTBOOK';
+                const projectedChainState = getProjectedChainState(c.projection);
+                const projectUiState = getCampaignUiState({ status: c.status, chainState: projectedChainState, role: 'creator' });
                 const standardTier = c.draftConfig?.tiers[0];
                 const pdf = standardTier?.rewardItems[0];
                 return (
@@ -426,7 +439,7 @@ export function RewardCreatorStudio({ userId, path }: { userId: string; path?: s
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
                     <div>
                       <h3 style={{ margin: '0 0 4px 0' }}>{c.title}</h3>
-                      <span className="reward-status-pill status-active" style={{ fontSize: '11px' }}>{c.status}</span>
+                      {editions ? <EditionStatusBadge state={projectUiState} /> : <span className="reward-status-pill status-active" style={{ fontSize: '11px' }}>{c.status}</span>}
                       <span style={{ fontSize: '13px', color: '#64748b', marginLeft: '10px' }}>
                         Mục tiêu: {editions ? formatUnits(BigInt(c.goal), 6) : (Number(c.goal) / 1e6).toLocaleString()} MockUSDC · {c.draftConfig?.tiers.length ?? c.tiers?.length ?? 0} gói
                         {c.onchainCampaignId ? ` · On-chain #${c.onchainCampaignId}` : ''}
@@ -440,9 +453,12 @@ export function RewardCreatorStudio({ userId, path }: { userId: string; path?: s
                     </div>
 
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      {editions && <p className="muted">Standard PDF · Hoàn thiện hồ sơ và gửi thẩm định; bản thảo chưa nhận pledge.</p>}
-                      {editions && c.status === 'UNDER_REVIEW_PRIVATE' && <p className="muted">Hồ sơ đang được Resolver kiểm tra riêng; chưa mở community review.</p>}
-                      {editions && c.frozenSnapshot && ['COMMUNITY_REVIEW', 'APPROVED'].includes(c.status) && <a className="button button--secondary" href={`#/reward/editions/${c.id}/creator`}>Mở community & phát hành PDF local</a>}
+                      {editions && projectedChainState === 4 && <p className="muted">Campaign không đạt mục tiêu. Backer tự nhận hoàn tiền; Creator không cần thao tác.</p>}
+                      {editions && projectedChainState === 0 && <p className="muted">Campaign đang gây quỹ trên chain. Hiện chưa có việc nào cần Creator xử lý.</p>}
+                      {editions && projectedChainState === 1 && <a className="button button--primary" href={`#/reward/editions/${c.id}/creator`}>Cập nhật tiến độ sản xuất →</a>}
+                      {editions && projectedChainState === null && <p className="muted">Standard PDF · Hoàn thiện hồ sơ và gửi thẩm định; bản thảo chưa nhận pledge.</p>}
+                      {editions && projectedChainState === null && c.status === 'UNDER_REVIEW_PRIVATE' && <p className="muted">Hồ sơ đang được Resolver kiểm tra riêng; chưa mở community review.</p>}
+                      {editions && projectedChainState === null && c.frozenSnapshot && ['COMMUNITY_REVIEW', 'APPROVED'].includes(c.status) && <a className="button button--secondary" href={`#/reward/editions/${c.id}/creator`}>Mở chi tiết campaign →</a>}
                       {!editions && c.status === 'DRAFT' && (
                         <button className="button button--secondary" disabled={busy} onClick={() => void handleFreeze(c.id)}>
                           1. Đóng băng cam kết
@@ -475,7 +491,7 @@ export function RewardCreatorStudio({ userId, path }: { userId: string; path?: s
                     </div>
                   </div>
 
-                  {editions && <EditionsPreparationPanel campaign={c} onChange={() => refetch()} />}
+                  {editions && projectedChainState === null && <EditionsPreparationPanel campaign={c} onChange={() => refetch()} />}
 
                 </div>
               ); })}

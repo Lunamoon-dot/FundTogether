@@ -1,5 +1,5 @@
 import type { RewardCampaign } from '../../../lib/api/reward';
-import { getCampaignUiState } from './campaignState';
+import { getCampaignUiState, getProjectedChainState } from './campaignState';
 import { EditionStatusBadge } from './EditionStatusBadge';
 
 interface ReviewHistoryItem {
@@ -19,8 +19,10 @@ interface CreatorTaskCardProps {
 }
 
 export function CreatorTaskCard({ campaign, href, className = '' }: CreatorTaskCardProps) {
+  const chainState = getProjectedChainState(campaign.projection);
   const uiState = getCampaignUiState({
     status: campaign.status,
+    chainState,
     role: 'creator',
   });
 
@@ -45,6 +47,11 @@ export function CreatorTaskCard({ campaign, href, className = '' }: CreatorTaskC
   } else if (campaign.status === 'APPROVED') {
     taskAction = 'Mở trang kích hoạt on-chain →';
     taskInstruction = 'Hồ sơ đã được duyệt thành công. Tiến hành kích hoạt campaign trên smart contract.';
+  }
+
+  if (chainState === 1) {
+    taskAction = 'Cập nhật tiến độ sản xuất →';
+    taskInstruction = 'Campaign đã đạt mục tiêu. Cập nhật bằng chứng sản xuất để Resolver kiểm tra.';
   }
 
   return (
