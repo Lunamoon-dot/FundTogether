@@ -1584,4 +1584,183 @@
   }
 }
 
+/* ==========================================================================
+   Creator Workspace: Pipeline & Task Cards
+   ========================================================================== */
+.creator-pipeline {
+  padding: 16px 20px;
+  background: #ffffff;
+  border: 1px solid #dce4dd;
+  border-radius: 12px;
+  margin: 16px 0;
+}
+
+.creator-pipeline__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.creator-pipeline__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e2924;
+}
+
+.creator-pipeline__summary {
+  font-size: 12px;
+  color: #627267;
+}
+
+.creator-pipeline__strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.creator-pipeline__step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  font-size: 13px;
+  color: #627267;
+}
+
+.creator-pipeline__step--has-items {
+  color: #1e2924;
+  font-weight: 600;
+}
+
+.creator-pipeline__step-indicator {
+  display: flex;
+  align-items: center;
+}
+
+.creator-pipeline__step-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #edf2ee;
+  font-size: 11px;
+  font-weight: 700;
+  color: #354a3c;
+}
+
+.creator-pipeline__step--has-items .creator-pipeline__step-count {
+  background: #2b6140;
+  color: #ffffff;
+}
+
+.creator-pipeline__step-divider {
+  color: #a4b3a8;
+  margin: 0 4px;
+}
+
+.creator-tasks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  margin: 14px 0;
+}
+
+.creator-task-card {
+  padding: 18px 20px;
+  border-radius: 12px;
+  border: 1px solid #dce4dd;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.creator-task-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.creator-task-card__title-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.creator-task-card__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.creator-task-card__revision {
+  font-size: 12px;
+  color: #68796d;
+  font-weight: 500;
+}
+
+.creator-task-card__eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #58685d;
+}
+
+.creator-task-card__instruction {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #2e3d33;
+}
+
+.creator-task-card__actions {
+  margin-top: auto;
+}
+
+.creator-task-card__actions .button {
+  width: 100%;
+  justify-content: center;
+  text-align: center;
+}
+
+.creator-task-card__history {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.creator-task-card__history-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.creator-task-card__history-item {
+  padding: 8px 10px;
+  background: #f7f9f7;
+  border-radius: 6px;
+  border: 1px solid #e5ede6;
+}
+
+.creator-task-card__history-reason {
+  margin: 2px 0;
+  color: #445448;
+}
+
+.creator-task-card__history-time {
+  font-size: 11px;
+  color: #78887e;
+}
+
+
 

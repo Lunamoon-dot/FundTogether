@@ -4,7 +4,6 @@ import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { formatUnits, keccak256, parseEventLogs, toHex } from 'viem';
 import {
   listMyRewardCampaigns,
-  createRewardCampaignDraft,
   freezeRewardCampaign,
   submitCampaignReview,
   registerRewardOnchain,
@@ -13,8 +12,9 @@ import {
   applyCreatorVerification,
   syncRewardReceipt,
 } from '../../lib/api/reward';
-import { buildEditionsDraft } from './editions-draft';
-import { EditionsPreparationPanel } from './EditionsReview';
+import { EditionsPreparationPanel, NewEditionsPreparationPanel } from './EditionsReview';
+import { CreatorPipeline } from './ui/CreatorPipeline';
+import { CreatorTaskCard } from './ui/CreatorTaskCard';
 import type { RewardCampaign } from '../../lib/api/reward';
 import { getErrorMessage } from '../../lib/api/error';
 import {
@@ -51,19 +51,22 @@ export function RewardCreatorStudio({ userId, path }: { userId: string; path?: s
     'Tôi cam kết là tác giả/đồng tác giả hợp pháp sở hữu 100% bản quyền xuất bản tác phẩm này.'
   );
 
-  // Draft Creation Form State
-  const [title, setTitle] = useState('');
-  const [pitch, setPitch] = useState('');
-  const [story, setStory] = useState('');
-  const [goal, setGoal] = useState('1000'); // USDC
-  const [duration, setDuration] = useState(30); // days
-  const [price, setPrice] = useState('10');
-  const [rewardTitle, setRewardTitle] = useState('Ấn phẩm PDF');
-  const [rewardDescription, setRewardDescription] = useState('Một file PDF hoàn chỉnh của truyện tranh hoặc artbook.');
-
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState('');
   const [successNotice, setSuccessNotice] = useState('');
+  const [newlyCreatedCampaign, setNewlyCreatedCampaign] = useState<RewardCampaign | null>(null);
+
+  async function handleNewCampaignCreated(campaign: RewardCampaign) {
+    const result = await refetch();
+    setNewlyCreatedCampaign(result.data?.find(item => item.id === campaign.id) ?? campaign);
+  }
+
+  async function refreshNewlyCreatedCampaign() {
+    if (!newlyCreatedCampaign) return;
+    const result = await refetch();
+    const updated = result.data?.find(item => item.id === newlyCreatedCampaign.id);
+    if (updated) setNewlyCreatedCampaign(updated);
+  }
 
   async function handleApplyProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -88,35 +91,6 @@ export function RewardCreatorStudio({ userId, path }: { userId: string; path?: s
       await applyCreatorVerification({ displayName: displayName.trim(), bio: bio.trim(), ipDeclaration: ipDeclaration.trim() });
       setSuccessNotice('Đã gửi hồ sơ xác minh Tác giả (Flow V1). Vui lòng chờ Admin phê duyệt.');
       void refetchProfile();
-    } catch (err) {
-      setFormError(getErrorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleCreateDraft(e: React.FormEvent) {
-    e.preventDefault();
-    setFormError('');
-    setSuccessNotice('');
-    setBusy(true);
-
-    try {
-      if (title.trim().length < 5) throw new Error('Tiêu đề dự án phải từ 5 ký tự trở lên.');
-      if (pitch.trim().length < 10) throw new Error('Lời giới thiệu (Pitch) phải từ 10 ký tự trở lên.');
-      const payload = buildEditionsDraft({
-        title, pitch, story, goal, durationDays: duration, price, rewardTitle, rewardDescription,
-      });
-
-      await createRewardCampaignDraft(payload);
-      setSuccessNotice('Đã lưu bản thảo Editions. Mở hồ sơ để bổ sung trang mẫu, khóa cam kết và gửi thẩm định.');
-      setTitle('');
-      setPitch('');
-      setStory('');
-      void refetch();
-      if (typeof window !== 'undefined') {
-        window.location.hash = '#/reward/creator';
-      }
     } catch (err) {
       setFormError(getErrorMessage(err));
     } finally {
@@ -364,8 +338,8 @@ export function RewardCreatorStudio({ userId, path }: { userId: string; path?: s
       )}
 
       {/* Trang 2: Tạo bản thảo */}
-      {(tab === 'draft' || tab === 'all') && (
-        tab === 'draft' && profile?.status !== 'VERIFIED' ? (
+      {tab === 'draft' && (
+        profile?.status !== 'VERIFIED' ? (
           <section className="panel" style={{ textAlign: 'center', padding: '36px 20px' }}>
             <div style={{ fontSize: '48px', marginBottom: '12px' }}>🎨</div>
             <h2 style={{ marginBottom: '8px' }}>Chưa xác minh Hồ sơ Studio / Tác giả</h2>
@@ -376,78 +350,43 @@ export function RewardCreatorStudio({ userId, path }: { userId: string; path?: s
                 ? `Hồ sơ Studio bị từ chối (${profile.rejectionReason || 'Vui lòng kiểm tra lại thông tin'}). Vui lòng cập nhật lại hồ sơ Studio.`
                 : 'Để đảm bảo tính minh bạch và bảo hộ quyền sở hữu trí tuệ, bạn cần tạo Hồ sơ Tác giả & cam kết Bản quyền IP (Bước 0) trước khi có thể khởi tạo bản thảo gọi vốn.'}
             </p>
-            <div>
-              <a className="button button--primary" href="#/reward/creator">
-                Qua trang xác minh Studio
-              </a>
-            </div>
+            <div><a className="button button--primary" href="#/reward/creator">Qua trang xác minh Studio</a></div>
           </section>
         ) : (
-          <section className="panel">
-            <h2>Tạo bản thảo FundTogether Editions</h2>
-            <form onSubmit={handleCreateDraft} style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '12px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
-                <label>
-                  Tên dự án:
-                  <input required value={title} onChange={e => setTitle(e.target.value)} placeholder="Ví dụ: Truyện tranh Địa Đàng Ký - Tập 1" />
-                </label>
-                <label>
-                  Thể loại:
-                  <input value="COMICS_ARTBOOK · Truyện tranh / Artbook" readOnly />
-                </label>
-              </div>
-
-              <label>
-                Lời giới thiệu ngắn (Pitch):
-                <input required value={pitch} onChange={e => setPitch(e.target.value)} placeholder="Tóm tắt nội dung và điểm đặc sắc trong 1-2 câu" />
-              </label>
-
-              <label>
-                Cốt truyện & Kế hoạch sản xuất:
-                <textarea rows={4} value={story} onChange={e => setStory(e.target.value)} placeholder="Giới thiệu nội dung, số trang dự kiến và kế hoạch hoàn thiện PDF..." />
-              </label>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <label>
-                  Mục tiêu dự kiến (MockUSDC local):
-                  <input required type="text" inputMode="decimal" value={goal} onChange={e => setGoal(e.target.value)} />
-                </label>
-                <label>
-                  Thời hạn gây quỹ (Số ngày, 1 - 60):
-                  <input required type="number" min="1" max="60" value={duration} onChange={e => setDuration(Number(e.target.value))} />
-                </label>
-              </div>
-
-              <div className="reward-studio-tiers-builder">
-                <strong>Standard · Một PDF tải xuống</strong>
-                <p className="muted">Một truyện tranh hoặc artbook hoàn chỉnh. PDF cuối cùng được nộp ở bước phát hành sau này.</p>
-                <div className="reward-tier-builder-row">
-                  <label>
-                    Tên ấn phẩm PDF:
-                    <input required minLength={3} maxLength={150} value={rewardTitle} onChange={e => setRewardTitle(e.target.value)} />
-                  </label>
-                  <label>
-                    Giá gói dự kiến (MockUSDC local):
-                    <input required inputMode="decimal" value={price} onChange={e => setPrice(e.target.value)} />
-                  </label>
-                  <label>
-                    Nội dung PDF được hứa hẹn:
-                    <textarea required minLength={5} maxLength={1000} value={rewardDescription} onChange={e => setRewardDescription(e.target.value)} />
-                  </label>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <button type="submit" className="button button--primary" disabled={busy || profile?.status !== 'VERIFIED'}>
-                  {busy ? 'Đang lưu…' : 'Lưu Bản thảo Chiến dịch'}
-                </button>
-                <a href="#/reward/creator" className="button button--secondary">
-                  Hủy / Về Studio
-                </a>
-              </div>
-            </form>
-          </section>
+          newlyCreatedCampaign ? (
+            <EditionsPreparationPanel campaign={newlyCreatedCampaign} initialStep={2} onChange={refreshNewlyCreatedCampaign} />
+          ) : (
+            <NewEditionsPreparationPanel onCreated={handleNewCampaignCreated} />
+          )
         )
+      )}
+
+      {/* Tiến trình sản xuất */}
+      {(tab === 'studio' || tab === 'all') && (
+        <CreatorPipeline campaigns={campaigns ?? []} />
+      )}
+
+      {/* Cần bạn làm task cards */}
+      {(tab === 'studio' || tab === 'all') && campaigns && campaigns.length > 0 && (
+        <section className="creator-tasks-section panel" aria-label="Cần bạn làm">
+          <h2>Cần bạn làm ({campaigns.length})</h2>
+          <div className="creator-tasks-grid">
+            {campaigns.map(c => {
+              const editHref = c.status === 'CHANGES_REQUESTED'
+                ? `#/reward/creator?edit=${c.id}&step=3`
+                : c.status === 'APPROVED'
+                ? `#/reward/editions/${c.id}/creator`
+                : `#/reward/creator?edit=${c.id}`;
+              return (
+                <CreatorTaskCard
+                  key={c.id}
+                  campaign={c}
+                  href={editHref}
+                />
+              );
+            })}
+          </div>
+        </section>
       )}
 
       {/* Danh sách dự án: chỉ hiển thị ở tab Studio */}
@@ -502,7 +441,8 @@ export function RewardCreatorStudio({ userId, path }: { userId: string; path?: s
 
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       {editions && <p className="muted">Standard PDF · Hoàn thiện hồ sơ và gửi thẩm định; bản thảo chưa nhận pledge.</p>}
-                      {editions && c.frozenSnapshot && ['UNDER_REVIEW', 'APPROVED'].includes(c.status) && <a className="button button--secondary" href={`#/reward/editions/${c.id}/creator`}>Mở community & phát hành PDF local</a>}
+                      {editions && c.status === 'UNDER_REVIEW_PRIVATE' && <p className="muted">Hồ sơ đang được Resolver kiểm tra riêng; chưa mở community review.</p>}
+                      {editions && c.frozenSnapshot && ['COMMUNITY_REVIEW', 'APPROVED'].includes(c.status) && <a className="button button--secondary" href={`#/reward/editions/${c.id}/creator`}>Mở community & phát hành PDF local</a>}
                       {!editions && c.status === 'DRAFT' && (
                         <button className="button button--secondary" disabled={busy} onClick={() => void handleFreeze(c.id)}>
                           1. Đóng băng cam kết
@@ -535,7 +475,7 @@ export function RewardCreatorStudio({ userId, path }: { userId: string; path?: s
                     </div>
                   </div>
 
-                  {editions && <EditionsPreparationPanel campaign={c} onChange={() => void refetch()} />}
+                  {editions && <EditionsPreparationPanel campaign={c} onChange={() => refetch()} />}
 
                 </div>
               ); })}

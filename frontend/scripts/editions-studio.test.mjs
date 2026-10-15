@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { after, test } from 'node:test'
+import { readFile } from 'node:fs/promises'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -9,26 +10,143 @@ import { createServer } from 'vite'
 const server = await createServer({ mode: 'reward', server: { middlewareMode: true, ws: false }, logLevel: 'error' })
 after(() => server.close())
 const { RewardCreatorStudio } = await server.ssrLoadModule('/src/features/reward/RewardCreatorStudio.tsx')
-const { EditionsResolverReview } = await server.ssrLoadModule('/src/features/reward/EditionsReview.tsx')
+const { EditionsPreparationPanel, NewEditionsPreparationPanel, EditionsResolverReview } = await server.ssrLoadModule('/src/features/reward/EditionsReview.tsx')
+const { CreatorPipeline } = await server.ssrLoadModule('/src/features/reward/ui/CreatorPipeline.tsx')
+const { CreatorTaskCard } = await server.ssrLoadModule('/src/features/reward/ui/CreatorTaskCard.tsx')
+const { RewardResolverConsole } = await server.ssrLoadModule('/src/features/reward/RewardResolverConsole.tsx')
 const { default: deployment, activeChain } = await server.ssrLoadModule('/src/lib/web3/deployment-context.ts')
 const config = createConfig({ chains: [activeChain], transports: { [activeChain.id]: http(deployment.rpcUrl) }, ssr: true })
 
-function render(campaigns = [], actor = 'owner') {
+function render(campaigns = [], actor = 'owner', path) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   client.setQueryData(['my-reward-creator-profile', 'owner'], { status: 'VERIFIED', displayName: 'Comic artist' })
   client.setQueryData(['my-reward-campaigns', 'owner'], campaigns)
   const html = renderToStaticMarkup(createElement(WagmiProvider, { config },
-    createElement(QueryClientProvider, { client }, createElement(RewardCreatorStudio, { userId: actor }))))
+    createElement(QueryClientProvider, { client }, createElement(RewardCreatorStudio, { userId: actor, path }))))
   client.clear()
   return html
 }
 
-test('new creator form offers one PDF without a physical, inventory or add-tier input', () => {
-  const html = render()
+function renderPreparation(campaign) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const html = renderToStaticMarkup(createElement(QueryClientProvider, { client },
+    createElement(EditionsPreparationPanel, { campaign, onChange() {} })))
+  client.clear()
+  return html
+}
+
+function renderNewPreparation() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const html = renderToStaticMarkup(createElement(QueryClientProvider, { client },
+    createElement(NewEditionsPreparationPanel, { onCreated() {} })))
+  client.clear()
+  return html
+}
+
+function renderResolver(campaigns = [], disputes = []) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  client.setQueryData(['reward-resolver-campaigns', 'resolver'], campaigns)
+  client.setQueryData(['reward-resolver-disputes', 'resolver'], disputes)
+  const html = renderToStaticMarkup(createElement(WagmiProvider, { config },
+    createElement(QueryClientProvider, { client }, createElement(RewardResolverConsole, { userId: 'resolver' }))))
+  client.clear()
+  return html
+}
+
+test('Resolver console uses compact, role-aware empty states', () => {
+  const html = renderResolver()
+  assert.match(html, /Chiến dịch cần xử lý <span[^>]*>0<\/span>/)
+  assert.match(html, /Không có chiến dịch nào cần thẩm định lúc này\./)
+  assert.match(html, /Khiếu nại cần phân xử <span[^>]*>0<\/span>/)
+  assert.match(html, /Không có khiếu nại nào cần xử lý\./)
+  assert.doesNotMatch(html, /Flow V2 – V4/)
+  assert.doesNotMatch(html, /tài khoản hiện tại không có quyền RESOLVER/)
+})
+
+test('Resolver console makes the decision panel primary and community feedback secondary', () => {
+  const campaign = { ...reviewCampaign('COMMUNITY_REVIEW'), category: 'COMICS_ARTBOOK' }
+  const html = renderResolver([campaign])
+  assert.match(html, /Quyết định Resolver/)
+  assert.match(html, /Phản hồi cộng đồng/)
+  assert.match(html, /resolver-community-details/)
+  assert.ok(html.indexOf('Quyết định Resolver') < html.indexOf('Phản hồi cộng đồng'))
+})
+
+test('approved Editions expose the on-chain action directly in the Resolver queue', () => {
+  const campaign = { ...reviewCampaign('APPROVED'), category: 'COMICS_ARTBOOK' }
+  const html = renderResolver([campaign])
+  assert.match(html, /Mở trang xử lý on-chain →/)
+  assert.match(html, /href="#\/reward\/editions\/edition\/resolver"/)
+})
+
+test('new creator flow opens the single Editions preparation wizard instead of a duplicate campaign form', () => {
+  const html = render([], 'owner', '/reward/creator/draft')
+  assert.match(html, /Bước 1 trên 3/)
+  assert.match(html, /Thông tin ấn phẩm/)
+  assert.doesNotMatch(html, /Tạo bản thảo FundTogether Editions/)
+})
+
+test('saving a new draft keeps the creator in the step-three editor', async () => {
+  const source = await readFile(new URL('../src/features/reward/RewardCreatorStudio.tsx', import.meta.url), 'utf8')
+  assert.match(source, /initialStep=\{2\}/)
+  assert.doesNotMatch(source, /window\.location\.hash = '#\/reward\/creator'/)
+})
+
+test('creator publication waits for the Resolver approval that exists on chain', async () => {
+  const source = await readFile(new URL('../src/features/reward/EditionsCampaign.tsx', import.meta.url), 'utf8')
+  assert.match(source, /onchainApproved/)
+  assert.match(source, /Primary Resolver chưa ký duyệt cam kết trên chain/)
+  assert.match(source, /Kiểm tra lại chữ ký/)
+})
+
+test('new Editions wizard offers one PDF without a physical, inventory or add-tier input', () => {
+  const html = renderNewPreparation()
   assert.match(html, /FundTogether Editions/)
   assert.match(html, /COMICS_ARTBOOK/)
-  assert.match(html, /Standard · Một PDF tải xuống/)
+  assert.match(html, /một Standard PDF tải xuống/)
   assert.doesNotMatch(html, /<select|type="checkbox"|Thêm gói|Số lượng tối đa|Vật phẩm đi kèm/)
+})
+
+test('sample upload states are explicit before and during persistence', async () => {
+  const source = await readFile(new URL('../src/features/reward/EditionsReview.tsx', import.meta.url), 'utf8')
+  assert.match(source, /sẽ được tải lên khi lưu bản nháp/)
+  assert.match(source, /Đang tải tài liệu mẫu lên/)
+  assert.match(source, /queryClient\.setQueryData/)
+})
+
+test('new draft form puts the story minimum beside the matching input', () => {
+  const html = renderNewPreparation()
+  assert.match(html, /Cốt truyện &amp; Kế hoạch sản xuất:.*tối thiểu 20 ký tự/s)
+  assert.match(html, /minLength="20"/)
+})
+
+test('Editions preparation form explains the three review groups and save versus lock', () => {
+  const html = renderPreparation({
+    id: 'edition', creatorUserId: 'owner', status: 'DRAFT', revision: 1,
+    draftConfig: { title: 'Saigon comic', pitch: 'An illustrated city story', story: 'The complete frozen story.', goal: '10000000', fundingDuration: 2592000,
+      tiers: [{ title: 'Standard', description: 'Digital comic', price: '10000000', rewardItems: [{ title: 'Final PDF', description: 'A complete comic.' }] }] },
+    reviewPreparation: null,
+  })
+  assert.match(html, /<span>1<\/span>Thông tin ấn phẩm/)
+  assert.match(html, /<span>2<\/span>Mục tiêu gây quỹ/)
+  assert.match(html, /<span>3<\/span>Kế hoạch phát hành/)
+  assert.match(html, /mũi tên để quay lại/)
+  assert.match(html, /Ở bước 3 mới lưu bản nháp hoặc khóa cam kết/)
+  assert.match(html, /chưa có pledge và chưa có giao dịch tiền/)
+})
+
+test('Editions preparation wizard shows one group with forward navigation at a time', () => {
+  const html = renderPreparation({
+    id: 'edition', creatorUserId: 'owner', status: 'DRAFT', revision: 1,
+    draftConfig: { title: 'Saigon comic', pitch: 'An illustrated city story', story: 'The complete frozen story.', goal: '10000000', fundingDuration: 2592000,
+      tiers: [{ title: 'Standard', description: 'Digital comic', price: '10000000', rewardItems: [{ title: 'Final PDF', description: 'A complete comic.' }] }] },
+    reviewPreparation: null,
+  })
+  assert.match(html, /Bước 1 trên 3/)
+  assert.match(html, /Tiếp tục →/)
+  assert.doesNotMatch(html, /<h4>Mục tiêu gây quỹ<\/h4>/)
+  assert.doesNotMatch(html, /<h4>Kế hoạch hoàn thiện và phát hành<\/h4>/)
+  assert.doesNotMatch(html, /Lưu bản thảo để tiếp tục/)
 })
 
 test('Editions cards cannot offer legacy publish or physical actions even with advanced statuses', () => {
@@ -50,7 +168,7 @@ test('saved Editions card shows the promised PDF and exact proposed price and go
   assert.match(html, /9007199254\.740993/)
 })
 
-function reviewCampaign(status = 'UNDER_REVIEW') {
+function reviewCampaign(status = 'COMMUNITY_REVIEW') {
   return { id: 'edition', title: 'Saigon comic', status, commitmentHash: `0x${'1'.repeat(64)}`, frozenSnapshot: {
     config: { title: 'Saigon comic', pitch: 'An illustrated city story', story: 'The complete frozen story.', goal: '9007199254740993', fundingDuration: 2592000,
       tiers: [{ title: 'Standard edition', description: 'Digital comic', price: '10000001', rewardItems: [{ title: 'Final PDF', description: 'A 120-page illustrated comic.' }] }] },
@@ -80,3 +198,75 @@ test('switching creator accounts cannot render the previous account cached draft
   const html = render([{ id: 'private', category: 'COMICS_ARTBOOK', title: 'CONFIDENTIAL DRAFT FROM OWNER', goal: '10000000', status: 'DRAFT', tiers: [] }], 'stranger')
   assert.doesNotMatch(html, /CONFIDENTIAL DRAFT FROM OWNER/)
 })
+
+test('Creator workspace renders pipeline stages and Cần bạn làm task cards', () => {
+  const campaigns = [
+    {
+      id: 'c1',
+      category: 'COMICS_ARTBOOK',
+      title: 'Comic One',
+      goal: '10000000',
+      status: 'CHANGES_REQUESTED',
+      revision: 2,
+      tiers: [],
+      draftConfig: {
+        title: 'Comic One',
+        tiers: [{ price: '10000000', rewardItems: [{ title: 'PDF', description: 'desc' }] }],
+      },
+    },
+    {
+      id: 'c2',
+      category: 'COMICS_ARTBOOK',
+      title: 'Comic Two',
+      goal: '20000000',
+      status: 'APPROVED',
+      revision: 1,
+      tiers: [],
+      draftConfig: {
+        title: 'Comic Two',
+        tiers: [{ price: '20000000', rewardItems: [{ title: 'PDF', description: 'desc' }] }],
+      },
+    },
+  ]
+  const html = render(campaigns, 'owner', '/reward/creator')
+  const pipelineHtml = renderToStaticMarkup(createElement(CreatorPipeline, { campaigns }))
+  assert.match(pipelineHtml, /creator-pipeline/)
+  assert.match(html, /creator-pipeline/)
+  assert.match(html, /Bản nháp/)
+  assert.match(html, /Được duyệt/)
+  assert.match(html, /Cần bạn làm/)
+  assert.match(html, /Revision #2/)
+  assert.match(html, /Cần bổ sung/)
+  assert.doesNotMatch(html, /Duyệt hồ sơ PDF|Yêu cầu sửa/)
+})
+
+test('CreatorTaskCard renders single primary action, revision, and collapses history', () => {
+  const campaign = {
+    id: 'c-task',
+    category: 'COMICS_ARTBOOK',
+    title: 'Comic In Need',
+    goal: '10000000',
+    status: 'CHANGES_REQUESTED',
+    revision: 3,
+    tiers: [],
+    draftConfig: {
+      title: 'Comic In Need',
+      tiers: [{ price: '10000000', rewardItems: [{ title: 'PDF', description: 'desc' }] }],
+    },
+    reviewHistory: [
+      { outcome: 'CHANGES_REQUESTED', reason: 'Thiếu trang bìa', reviewedAt: '2026-10-15T00:00:00.000Z' },
+    ],
+  }
+
+  const html = renderToStaticMarkup(createElement(CreatorTaskCard, {
+    campaign,
+    href: '#/reward/creator?edit=c-task&step=3',
+  }))
+
+  assert.match(html, /Comic In Need/)
+  assert.match(html, /Revision #3/)
+  assert.match(html, /Cần bổ sung/)
+  assert.match(html, /href="#\/reward\/creator\?edit=c-task&amp;step=3"/)
+  assert.match(html, /Thiếu trang bìa/)
+})
+

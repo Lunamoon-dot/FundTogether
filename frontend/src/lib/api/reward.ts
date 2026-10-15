@@ -37,13 +37,17 @@ export interface RewardCampaign {
     | 'DRAFT'
     | 'FROZEN'
     | 'UNDER_REVIEW'
+    | 'UNDER_REVIEW_PRIVATE'
+    | 'COMMUNITY_REVIEW'
     | 'APPROVED'
     | 'PUBLISHED'
     | 'ACTIVE'
     | 'PRODUCTION_VERIFIED'
     | 'FULFILLMENT_COMPLETE'
     | 'COMPLETED'
-    | 'STOPPED';
+    | 'STOPPED'
+    | 'CHANGES_REQUESTED'
+    | 'REJECTED';
   frozenAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -167,6 +171,9 @@ export async function freezeEditions(id: string, revision: number) {
 }
 export async function submitEditionsReview(id: string, revision: number) {
   return (await http.post<RewardCampaign>(`${editionsPath(id)}/submit-review`, { revision })).data;
+}
+export async function openEditionsCommunityReview(id: string) {
+  return (await http.post<RewardCampaign>(`${editionsPath(id)}/open-community-review`, {})).data;
 }
 export async function reviewEditions(id: string, data: { outcome: 'APPROVED' | 'CHANGES_REQUESTED' | 'REJECTED'; decisionReason: string; commitmentHash: string }) {
   return (await http.post<RewardCampaign>(`${editionsPath(id)}/review`, data)).data;
