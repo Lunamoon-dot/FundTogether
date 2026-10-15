@@ -423,3 +423,78 @@
   .public-campaign-grid > .campaign-tile { transition: none; }
   .public-campaign-grid > .campaign-tile:hover { transform: none; }
 }
+
+/* ==========================================================================
+   Edition App Shell & Navigation
+   ========================================================================== */
+.edition-shell {
+  background: #f7f9f6;
+  color: #1e2924;
+}
+
+.edition-shell__brand-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.edition-shell__tagline {
+  font-size: 11px;
+  font-weight: 600;
+  color: #65776d;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding-left: 2px;
+}
+
+.edition-shell__nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.edition-shell__nav-heading {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7d8e83;
+  padding: 6px 12px 2px;
+}
+
+.edition-shell__account {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.edition-shell__account-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  text-align: left;
+}
+
+.edition-shell__account-name {
+  font-weight: 600;
+  color: #243a2c;
+  font-size: 13px;
+}
+
+.edition-shell__account-role {
+  font-size: 11px;
+  color: #6a7b70;
+}
+
+.edition-shell__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #6a7c71;
+  background: #ffffff;
+  border-top: 1px solid #dce4dd;
+  padding: 16px 24px;
+}
+

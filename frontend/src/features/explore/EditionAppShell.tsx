@@ -1,0 +1,116 @@
+import type React from 'react';
+import type { AccountSession } from '../../lib/api/auth';
+import './PublicArea.css';
+
+export interface PublicAreaProps {
+  path: string;
+  session: AccountSession | null;
+  sessionLoading: boolean;
+  error: string;
+  onSession: (session: AccountSession | null) => void;
+}
+
+export interface EditionAppShellProps extends PublicAreaProps {
+  children: React.ReactNode;
+}
+
+export function EditionAppShell({
+  path,
+  session,
+  children,
+}: EditionAppShellProps) {
+  const isRewardFeed = path === '/' || path === '/reward';
+  const isRewardCommunityReview = path === '/reward/review';
+  const isRewardCreatorStudio = path === '/reward/creator';
+  const isRewardCreatorDraft = path === '/reward/creator/draft' || path === '/reward/creator/new';
+  const isRewardCreator = isRewardCreatorStudio || isRewardCreatorDraft;
+  const isRewardMyRewards = path === '/reward/my-rewards';
+  const isAdmin = path === '/admin' || path === '/reward/admin';
+  const isRewardResolver = path === '/reward/resolver';
+  const isAccount = path === '/account' || path === '/workspace';
+
+  const hasAdminRole = session?.roles.includes('ADMIN') ?? false;
+  const hasResolverRole = session?.roles.includes('RESOLVER') ?? false;
+
+  return (
+    <div className="public-area edition-shell">
+      <aside className="public-sidebar edition-shell__sidebar" aria-label="Khu vực người dùng">
+        <div className="edition-shell__brand-block">
+          <a className="brand" href="#/" aria-label="FundTogether — Khám phá">
+            <span className="brand-mark">F</span>
+            <span className="brand-text">FundTogether</span>
+          </a>
+          <span className="edition-shell__tagline">Editions · Comics & Artbooks</span>
+        </div>
+
+        <nav className="public-nav edition-shell__nav" aria-label="Điều hướng chính">
+          <div className="edition-shell__nav-group">
+            <span className="edition-shell__nav-heading">Khám phá</span>
+            <a href="#/reward" aria-current={isRewardFeed ? 'page' : undefined}>
+              Truyện tranh & Artbook
+            </a>
+            <a href="#/reward/review" aria-current={isRewardCommunityReview ? 'page' : undefined}>
+              Community Review
+            </a>
+            {session && (
+              <a href="#/reward/my-rewards" aria-current={isRewardMyRewards ? 'page' : undefined}>
+                Phần thưởng của tôi
+              </a>
+            )}
+          </div>
+
+          {session && (
+            <div className="edition-shell__nav-group">
+              <span className="edition-shell__nav-heading">Không gian làm việc</span>
+              <a href="#/reward/creator" aria-current={isRewardCreator ? 'page' : undefined}>
+                🎨 Creator Studio
+              </a>
+              {hasResolverRole && (
+                <a href="#/reward/resolver" aria-current={isRewardResolver ? 'page' : undefined}>
+                  ⚖️ Thẩm định Resolver
+                </a>
+              )}
+              {hasAdminRole && (
+                <a href="#/admin" aria-current={isAdmin ? 'page' : undefined}>
+                  🛡️ Quản trị Admin
+                </a>
+              )}
+            </div>
+          )}
+        </nav>
+
+        <div className="public-sidebar-account edition-shell__account">
+          <span className="network-pill">Mạng thử nghiệm · MockUSDC</span>
+          <a
+            className="public-sidebar-action"
+            href="#/account"
+            aria-current={isAccount ? 'page' : undefined}
+          >
+            <span className="public-avatar" aria-hidden="true">
+              {session ? 'U' : '↗'}
+            </span>
+            <div className="edition-shell__account-meta">
+              <span className="edition-shell__account-name">
+                {session ? 'Tài khoản' : 'Đăng nhập'}
+              </span>
+              {session?.userId && (
+                <span className="edition-shell__account-role">
+                  {hasAdminRole ? 'Admin' : hasResolverRole ? 'Resolver' : 'Creator / Backer'}
+                </span>
+              )}
+            </div>
+          </a>
+        </div>
+      </aside>
+
+      <main className="public-content edition-shell__main">
+        {children}
+      </main>
+
+      <footer className="public-footer edition-shell__footer">
+        <span>FundTogether Editions</span>
+        <span>Môi trường phát triển · Mạng thử nghiệm Anvil (31339)</span>
+      </footer>
+    </div>
+  );
+}
