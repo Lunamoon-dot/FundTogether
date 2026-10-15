@@ -2436,7 +2436,59 @@
   margin-top: 8px;
 }
 
+/* ==========================================================================
+   Accessibility & Responsive Primitives
+   ========================================================================== */
 
+/* Visible Focus Styles */
+:focus-visible {
+  outline: 2px solid #28734f;
+  outline-offset: 2px;
+}
 
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 2px solid #28734f;
+  outline-offset: 2px;
+}
 
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
+/* Cryptographic Hashes & Technical Code Wrapping */
+.transaction-lifecycle__hash,
+.reward-address,
+.edition-hash,
+code,
+pre {
+  overflow-wrap: break-word;
+  word-break: break-all;
+}
+
+/* Small screen adjustments */
+@media (max-width: 640px) {
+  .reward-container {
+    padding: 8px 12px 32px;
+  }
+
+  .reward-hero {
+    padding: 20px;
+  }
+
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
