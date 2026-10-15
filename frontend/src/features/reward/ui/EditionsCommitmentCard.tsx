@@ -56,124 +56,115 @@ export function EditionsCommitmentCard({
   const latestDecision = item.decisions[0];
 
   return (
-    <section className={`panel commitment-card ${className}`} aria-labelledby="commitment-card-title">
-      {/* 1. Card Header */}
-      <div className="commitment-card__header">
-        <div className="commitment-card__badge-row">
-          <span className="commitment-card__kicker">📜 Cam kết xuất bản chính thức</span>
+    <section className={`bg-white border border-neutral-200 rounded-xl p-5 sm:p-6 space-y-5 shadow-xs ${className}`}>
+      {/* 1. Header */}
+      <div className="border-b border-neutral-100 pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-semibold text-neutral-900">
+            Cam kết tác phẩm & Kế hoạch sản xuất
+          </h2>
           {latestDecision && (
-            <span
-              className={`commitment-card__decision-pill ${
-                latestDecision.outcome === 'APPROVED'
-                  ? 'commitment-card__decision-pill--approved'
-                  : 'commitment-card__decision-pill--other'
-              }`}
-            >
-              ⚖️ Resolver: {latestDecision.outcome}
+            <span className="text-xs font-medium px-2 py-0.5 rounded bg-neutral-100 text-neutral-700 border border-neutral-200">
+              Resolver: {latestDecision.outcome}
             </span>
           )}
         </div>
-        <h2 id="commitment-card-title" className="commitment-card__title">
-          Cam kết tác phẩm & Kế hoạch sản xuất
-        </h2>
-        <p className="commitment-card__pitch muted">
+        <p className="text-xs text-neutral-500 mt-1">
           Hồ sơ điều khoản kỹ thuật số đã được đóng băng và thẩm định trước khi mở gây quỹ.
         </p>
       </div>
 
-      {/* 2. Story / Narrative Section */}
-      <div className="commitment-card__block commitment-card__story-block">
-        <h3 className="commitment-card__block-title">
-          <span className="commitment-card__icon" aria-hidden="true">📖</span> Cốt truyện & Tác phẩm
+      {/* 2. Story / Narrative */}
+      <div className="space-y-1.5">
+        <h3 className="text-xs font-semibold uppercase text-neutral-500">
+          Cốt truyện & Tác phẩm
         </h3>
-        <p className="commitment-card__story-text">{item.config.story}</p>
+        <div className="text-sm text-neutral-700 leading-relaxed bg-neutral-50 rounded-lg p-3.5 border border-neutral-100 whitespace-pre-wrap">
+          {item.config.story}
+        </div>
       </div>
 
-      {/* 3. Deliverable Tier Banner */}
+      {/* 3. Deliverable Standard Tier */}
       {primaryItem && (
-        <div className="commitment-deliverable-card">
-          <div className="commitment-deliverable-card__icon" aria-hidden="true">📄</div>
-          <div className="commitment-deliverable-card__body">
-            <div className="commitment-deliverable-card__headline">
-              <h4 className="commitment-deliverable-card__title">
-                Ấn phẩm số tiêu chuẩn (Standard PDF)
-              </h4>
-              <span className="commitment-deliverable-card__tag">100% Digital Download</span>
-            </div>
-            <p className="commitment-deliverable-card__desc">
-              {primaryItem.description}
-            </p>
-            <div className="commitment-deliverable-card__tags">
-              <span className="commitment-mini-tag">✓ Đọc trên mọi thiết bị</span>
-              <span className="commitment-mini-tag">✓ Không phí vận chuyển</span>
-              <span className="commitment-mini-tag">✓ Vé tải có chữ ký bảo mật</span>
-            </div>
+        <div className="rounded-lg border border-neutral-200 bg-neutral-50/50 p-4 space-y-1">
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="text-sm font-semibold text-neutral-900">
+              Ấn phẩm số tiêu chuẩn (Standard PDF)
+            </h4>
+            <span className="text-xs text-neutral-500">
+              Digital Download
+            </span>
           </div>
+          <p className="text-sm text-neutral-600">
+            {primaryItem.description}
+          </p>
         </div>
       )}
 
       {/* 4. Three Review Pillars Grid */}
-      <div className="commitment-pillars-section">
-        <h3 className="commitment-pillars-title">Ba trụ cột chuẩn bị sản xuất (Review Pillars)</h3>
-        <div className="commitment-pillars-grid">
-          {/* Pillar 1: Content Outline */}
-          <article className="commitment-pillar-card">
-            <div className="commitment-pillar-card__header">
-              <span className="commitment-pillar-card__icon" aria-hidden="true">📑</span>
-              <h3 className="commitment-pillar-card__title">Đề cương</h3>
-            </div>
-            <p className="commitment-pillar-card__text">{item.contentOutline}</p>
-          </article>
+      <div className="space-y-2">
+        <h3 className="text-xs font-semibold uppercase text-neutral-500">
+          Hồ sơ thẩm định sản xuất
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="rounded-lg border border-neutral-200 p-3.5 bg-neutral-50/30 flex flex-col gap-1">
+            <span className="text-xs font-medium text-neutral-500">Đề cương</span>
+            <p className="text-sm text-neutral-800 leading-relaxed whitespace-pre-wrap break-words m-0">
+              {item.contentOutline}
+            </p>
+          </div>
 
-          {/* Pillar 2: Budget Plan */}
-          <article className="commitment-pillar-card">
-            <div className="commitment-pillar-card__header">
-              <span className="commitment-pillar-card__icon" aria-hidden="true">💰</span>
-              <h3 className="commitment-pillar-card__title">Ngân sách tự sản xuất</h3>
-            </div>
-            <p className="commitment-pillar-card__text">{item.budgetPlan}</p>
-          </article>
+          <div className="rounded-lg border border-neutral-200 p-3.5 bg-neutral-50/30 flex flex-col gap-1">
+            <span className="text-xs font-medium text-neutral-500">Kế hoạch ngân sách</span>
+            <p className="text-sm text-neutral-800 leading-relaxed whitespace-pre-wrap break-words m-0">
+              {item.budgetPlan}
+            </p>
+          </div>
 
-          {/* Pillar 3: Evidence Plan */}
-          <article className="commitment-pillar-card">
-            <div className="commitment-pillar-card__header">
-              <span className="commitment-pillar-card__icon" aria-hidden="true">🔍</span>
-              <h3 className="commitment-pillar-card__title">Kế hoạch bằng chứng</h3>
-            </div>
-            <p className="commitment-pillar-card__text">{item.evidencePlan}</p>
-          </article>
+          <div className="rounded-lg border border-neutral-200 p-3.5 bg-neutral-50/30 flex flex-col gap-1">
+            <span className="text-xs font-medium text-neutral-500">Kế hoạch bằng chứng</span>
+            <p className="text-sm text-neutral-800 leading-relaxed whitespace-pre-wrap break-words m-0">
+              {item.evidencePlan}
+            </p>
+          </div>
         </div>
       </div>
 
       {/* 5. Metrics & Release Deadlines Grid */}
-      <div className="commitment-metrics-grid">
-        <div className="commitment-metric-tile">
-          <span className="commitment-metric-tile__label">🎯 Mục tiêu & Thời gian</span>
-          <strong className="commitment-metric-tile__val">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="rounded-lg border border-neutral-200 p-3.5 bg-white">
+          <span className="block text-xs font-medium uppercase text-neutral-500 mb-1">
+            Mục tiêu & Thời gian
+          </span>
+          <strong className="block text-base font-bold text-neutral-900">
             Mục tiêu: {amount(item.config.goal)}
           </strong>
-          <span className="commitment-metric-tile__sub">
+          <span className="block text-xs text-neutral-500 mt-1">
             Thời hạn: {item.config.fundingDuration / 86400} ngày gây quỹ
           </span>
         </div>
 
-        <div className="commitment-metric-tile">
-          <span className="commitment-metric-tile__label">⏳ Hạn cam kết phát hành</span>
-          <strong className="commitment-metric-tile__val">
+        <div className="rounded-lg border border-neutral-200 p-3.5 bg-white">
+          <span className="block text-xs font-medium uppercase text-neutral-500 mb-1">
+            Hạn cam kết phát hành
+          </span>
+          <strong className="block text-base font-bold text-neutral-900">
             {formatDate(item.releaseWindow.end)}
           </strong>
-          <span className="commitment-metric-tile__sub">
+          <span className="block text-xs text-neutral-500 mt-1 font-mono break-all" title={item.releaseWindow.end}>
             Hạn cam kết phát hành PDF (UTC): {item.releaseWindow.end}
           </span>
         </div>
 
         {primaryTier?.estimatedDeliveryAt && (
-          <div className="commitment-metric-tile">
-            <span className="commitment-metric-tile__label">🗓️ Dự kiến ban đầu</span>
-            <strong className="commitment-metric-tile__val">
+          <div className="rounded-lg border border-neutral-200 p-3.5 bg-white sm:col-span-2 lg:col-span-1">
+            <span className="block text-xs font-medium uppercase text-neutral-500 mb-1">
+              Dự kiến ban đầu
+            </span>
+            <strong className="block text-base font-bold text-neutral-900">
               {formatDate(primaryTier.estimatedDeliveryAt)}
             </strong>
-            <span className="commitment-metric-tile__sub">
+            <span className="block text-xs text-neutral-500 mt-1 font-mono break-all" title={primaryTier.estimatedDeliveryAt}>
               Ngày dự kiến phát hành PDF (UTC): {primaryTier.estimatedDeliveryAt}
             </span>
           </div>
@@ -181,30 +172,22 @@ export function EditionsCommitmentCard({
       </div>
 
       {/* 6. Hash & Resolver Decisions Footer */}
-      <div className="commitment-card__footer">
-        <div className="commitment-hash-row">
-          <span className="commitment-hash-row__label">
-            <span aria-hidden="true">🔒</span> Cam kết:
-          </span>
-          <code className="commitment-hash-row__code" title={item.commitmentHash}>
+      <div className="border-t border-neutral-100 pt-3 space-y-2">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="font-medium text-neutral-500">Mã cam kết:</span>
+          <code className="font-mono text-xs bg-neutral-100 text-neutral-700 px-2 py-0.5 rounded border border-neutral-200 break-all select-all">
             {item.commitmentHash}
           </code>
         </div>
 
         {item.decisions.length > 0 && (
-          <div className="commitment-decisions-container">
+          <div className="flex flex-wrap gap-2 pt-1">
             {item.decisions.map((decision, index) => (
-              <div key={index} className="commitment-decision-badge">
-                <span className="commitment-decision-badge__status">
-                  Resolver: {decision.outcome}
-                </span>
-                <span className="commitment-decision-badge__time">
-                  · {decision.reviewedAt}
-                </span>
+              <div key={index} className="inline-flex items-center gap-1.5 text-xs bg-neutral-100 text-neutral-700 px-2.5 py-1 rounded border border-neutral-200">
+                <span className="font-semibold">Resolver: {decision.outcome}</span>
+                <span className="text-neutral-500">· {decision.reviewedAt}</span>
                 {decision.decisionReason && (
-                  <span className="commitment-decision-badge__reason">
-                    — {decision.decisionReason}
-                  </span>
+                  <span className="text-neutral-600">— {decision.decisionReason}</span>
                 )}
               </div>
             ))}
