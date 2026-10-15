@@ -54,6 +54,11 @@ test('public Editions feed keeps activation and funding separate from community 
   assert.doesNotMatch(html, /Hồ sơ đã duyệt; xem trạng thái hợp đồng trong chi tiết\.<\/p>/)
 })
 
+test('public Editions feed does not render the obsolete pilot policy banner', () => {
+  const html = renderFeed()
+  assert.doesNotMatch(html, /Pilot local · MockUSDC|Không ứng tiền|Không cam kết lưu trữ vĩnh viễn hay DRM/)
+})
+
 test('community review has its own page and preserves the public review explanation', () => {
   const html = renderReviewPage()
   assert.match(html, /Community Review/)

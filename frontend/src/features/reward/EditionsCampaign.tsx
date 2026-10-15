@@ -119,12 +119,6 @@ export function EditionsFeed() {
 
   return (
     <div className="reward-container">
-      <section className="panel edition-hero-banner">
-        <h2>Pilot local · MockUSDC</h2>
-        <p>Không ứng tiền. Creator chỉ nhận tiền sau PDF được Resolver duyệt, hết 7 ngày challenge và không còn tranh chấp mở. Community góp ý; Resolver ra quyết định.</p>
-        <p>Không đạt mục tiêu, hủy trước payout hoặc hết thời hạn theo policy sẽ mở hoàn tiền. Sau payout không có hoàn tiền tự động. Không cam kết lưu trữ vĩnh viễn hay DRM.</p>
-      </section>
-
       {loading && <p role="status">Đang tải trạng thái Editions…</p>}
       {error && <p role="alert">{getErrorMessage(error)}</p>}
 
