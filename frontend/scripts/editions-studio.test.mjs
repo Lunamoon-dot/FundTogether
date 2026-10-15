@@ -13,6 +13,9 @@ const { RewardCreatorStudio } = await server.ssrLoadModule('/src/features/reward
 const { EditionsPreparationPanel, NewEditionsPreparationPanel, EditionsResolverReview } = await server.ssrLoadModule('/src/features/reward/EditionsReview.tsx')
 const { CreatorPipeline } = await server.ssrLoadModule('/src/features/reward/ui/CreatorPipeline.tsx')
 const { CreatorTaskCard } = await server.ssrLoadModule('/src/features/reward/ui/CreatorTaskCard.tsx')
+const { ReviewQueue } = await server.ssrLoadModule('/src/features/reward/ui/ReviewQueue.tsx')
+const { ReviewHistoryDisclosure } = await server.ssrLoadModule('/src/features/reward/ui/ReviewHistoryDisclosure.tsx')
+const { TransactionLifecycle } = await server.ssrLoadModule('/src/features/reward/ui/TransactionLifecycle.tsx')
 const { RewardResolverConsole } = await server.ssrLoadModule('/src/features/reward/RewardResolverConsole.tsx')
 const { default: deployment, activeChain } = await server.ssrLoadModule('/src/lib/web3/deployment-context.ts')
 const config = createConfig({ chains: [activeChain], transports: { [activeChain.id]: http(deployment.rpcUrl) }, ssr: true })
@@ -269,4 +272,63 @@ test('CreatorTaskCard renders single primary action, revision, and collapses his
   assert.match(html, /href="#\/reward\/creator\?edit=c-task&amp;step=3"/)
   assert.match(html, /Thiếu trang bìa/)
 })
+
+test('ReviewQueue renders groups by actionable state, highlights selected, and uses compact empty state', () => {
+  const campaigns = [
+    { id: 'q1', title: 'Queue One', status: 'UNDER_REVIEW_PRIVATE', category: 'COMICS_ARTBOOK' },
+    { id: 'q2', title: 'Queue Two', status: 'COMMUNITY_REVIEW', category: 'COMICS_ARTBOOK' },
+    { id: 'q3', title: 'Queue Three', status: 'APPROVED', category: 'COMICS_ARTBOOK' },
+  ]
+
+  const html = renderToStaticMarkup(createElement(ReviewQueue, {
+    campaigns,
+    selectedId: 'q2',
+    onSelect() {},
+  }))
+
+  assert.match(html, /review-queue/)
+  assert.match(html, /Cần mở review/)
+  assert.match(html, /Community review/)
+  assert.match(html, /Chờ kích hoạt/)
+  assert.match(html, /Queue Two/)
+  assert.match(html, /aria-selected="true"/)
+
+  const emptyHtml = renderToStaticMarkup(createElement(ReviewQueue, {
+    campaigns: [],
+    onSelect() {},
+  }))
+  assert.match(emptyHtml, /Không có hồ sơ cần thẩm định/)
+})
+
+test('ReviewHistoryDisclosure collapses past reviews and shows outcome and reason', () => {
+  const reviews = [
+    { outcome: 'CHANGES_REQUESTED', decisionReason: 'Bổ sung kế hoạch xuất bản', reviewedAt: '2026-10-14T00:00:00.000Z' },
+  ]
+  const html = renderToStaticMarkup(createElement(ReviewHistoryDisclosure, { reviews }))
+  assert.match(html, /review-history-disclosure/)
+  assert.match(html, /Lịch sử thẩm định \(1\)/)
+  assert.match(html, /CHANGES_REQUESTED/)
+  assert.match(html, /Bổ sung kế hoạch xuất bản/)
+})
+
+test('TransactionLifecycle renders 4-stage feedback and distinguishes submitted from confirmed/indexed', () => {
+  const submittedHtml = renderToStaticMarkup(createElement(TransactionLifecycle, {
+    phase: 'submitted',
+    hash: '0x1234567890abcdef1234567890abcdef12345678',
+  }))
+  assert.match(submittedHtml, /transaction-lifecycle/)
+  assert.match(submittedHtml, /Yêu cầu ký/)
+  assert.match(submittedHtml, /Đã gửi/)
+  assert.match(submittedHtml, /Đã xác nhận/)
+  assert.match(submittedHtml, /Đã đồng bộ/)
+  assert.match(submittedHtml, /transaction-lifecycle__step--done/)
+  assert.match(submittedHtml, /transaction-lifecycle__step--current/)
+
+  const confirmedHtml = renderToStaticMarkup(createElement(TransactionLifecycle, {
+    phase: 'confirmed',
+    hash: '0x1234567890abcdef1234567890abcdef12345678',
+  }))
+  assert.match(confirmedHtml, /transaction-lifecycle__step--done/)
+})
+
 

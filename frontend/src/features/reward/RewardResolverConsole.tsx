@@ -15,12 +15,32 @@ import type { RewardCampaign, RewardDispute } from '../../lib/api/reward';
 import { getErrorMessage } from '../../lib/api/error';
 import { EditionsResolverReview } from './EditionsReview';
 import { EditionsCommunity } from './EditionsCampaign';
+import { ReviewQueue } from './ui/ReviewQueue';
+import { ReviewHistoryDisclosure } from './ui/ReviewHistoryDisclosure';
+import { TransactionLifecycle, type TransactionPhase } from './ui/TransactionLifecycle';
 import {
   rewardAbi,
   rewardContractAddress,
   activeChain,
 } from '../../lib/web3/reward-deployment';
 import './reward.css';
+
+function resolverStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    UNDER_REVIEW: 'Chờ Resolver kiểm tra',
+    UNDER_REVIEW_PRIVATE: 'Đang kiểm tra riêng',
+    COMMUNITY_REVIEW: 'Chờ Resolver quyết định',
+    APPROVED: 'Đã duyệt · chờ kích hoạt',
+    CHANGES_REQUESTED: 'Cần Creator bổ sung',
+    REJECTED: 'Đã từ chối',
+    PUBLISHED: 'Chờ kích hoạt on-chain',
+    ACTIVE: 'Đang gây quỹ',
+    PRODUCTION_VERIFIED: 'Đã nghiệm thu sản xuất',
+    FULFILLMENT_COMPLETE: 'Đã hoàn tất phát hành',
+    STOPPED: 'Đã dừng',
+  };
+  return labels[status] ?? status;
+}
 
 export function RewardResolverConsole({ userId }: { userId: string }) {
   const account = useAccount();
@@ -42,6 +62,11 @@ export function RewardResolverConsole({ userId }: { userId: string }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [txPhase, setTxPhase] = useState<TransactionPhase>('idle');
+  const [txHash, setTxHash] = useState<string | undefined>();
+  const activeSelectedId = selectedId ?? campaigns?.[0]?.id ?? undefined;
+  const selectedCampaign = campaigns?.find(c => c.id === activeSelectedId) ?? campaigns?.[0] ?? null;
 
   async function handleReviewCampaign(
     c: RewardCampaign,
@@ -106,6 +131,8 @@ export function RewardResolverConsole({ userId }: { userId: string }) {
     setBusy(true);
     setNotice('');
     setErrorMsg('');
+    setTxPhase('signing');
+    setTxHash(undefined);
     try {
       const reqData: any = await client.readContract({
         address: rewardContractAddress,
@@ -123,13 +150,18 @@ export function RewardResolverConsole({ userId }: { userId: string }) {
         args: [BigInt(c.onchainCampaignId), 0n, expectedRequestHash],
       });
       const hash = await wallet.writeContract(call.request);
+      setTxHash(hash);
+      setTxPhase('submitted');
       const receipt = await client.waitForTransactionReceipt({ hash, confirmations: 1 });
       if (receipt.status !== 'success') throw new Error('Giao dịch approveAndDisburse bị revert.');
 
+      setTxPhase('confirmed');
       await syncRewardReceipt(hash);
+      setTxPhase('indexed');
       setNotice(`Đã giải ngân cọc in ấn cho chiến dịch #${c.onchainCampaignId} và đồng bộ Indexer!`);
       void refetchCampaigns();
     } catch (err) {
+      setTxPhase('error');
       setErrorMsg(getErrorMessage(err));
     } finally {
       setBusy(false);
@@ -144,6 +176,8 @@ export function RewardResolverConsole({ userId }: { userId: string }) {
     setBusy(true);
     setNotice('');
     setErrorMsg('');
+    setTxPhase('signing');
+    setTxHash(undefined);
     try {
       const reqData: any = await client.readContract({
         address: rewardContractAddress,
@@ -162,13 +196,18 @@ export function RewardResolverConsole({ userId }: { userId: string }) {
         args: [BigInt(c.onchainCampaignId), 0n, approvedAmount, reportHash],
       });
       const hash = await wallet.writeContract(call.request);
+      setTxHash(hash);
+      setTxPhase('submitted');
       const receipt = await client.waitForTransactionReceipt({ hash, confirmations: 1 });
       if (receipt.status !== 'success') throw new Error('Giao dịch candidateExpenditure bị revert.');
 
+      setTxPhase('confirmed');
       await syncRewardReceipt(hash);
+      setTxPhase('indexed');
       setNotice('Đã ghi nhận chứng từ chi tiêu (ExpenditureCandidate) trên chuỗi và đồng bộ Indexer!');
       void refetchCampaigns();
     } catch (err) {
+      setTxPhase('error');
       setErrorMsg(getErrorMessage(err));
     } finally {
       setBusy(false);
@@ -183,6 +222,8 @@ export function RewardResolverConsole({ userId }: { userId: string }) {
     setBusy(true);
     setNotice('');
     setErrorMsg('');
+    setTxPhase('signing');
+    setTxHash(undefined);
     try {
       const call = await client.simulateContract({
         account: account.address,
@@ -192,13 +233,18 @@ export function RewardResolverConsole({ userId }: { userId: string }) {
         args: [BigInt(c.onchainCampaignId), 0n],
       });
       const hash = await wallet.writeContract(call.request);
+      setTxHash(hash);
+      setTxPhase('submitted');
       const receipt = await client.waitForTransactionReceipt({ hash, confirmations: 1 });
       if (receipt.status !== 'success') throw new Error('Giao dịch finalizeExpenditure bị revert.');
 
+      setTxPhase('confirmed');
       await syncRewardReceipt(hash);
+      setTxPhase('indexed');
       setNotice('Đã tất toán đợt chi tiêu (FINANCIALLY_SETTLED) trên chuỗi và đồng bộ Indexer!');
       void refetchCampaigns();
     } catch (err) {
+      setTxPhase('error');
       setErrorMsg(getErrorMessage(err));
     } finally {
       setBusy(false);
@@ -213,6 +259,8 @@ export function RewardResolverConsole({ userId }: { userId: string }) {
     setBusy(true);
     setNotice('');
     setErrorMsg('');
+    setTxPhase('signing');
+    setTxHash(undefined);
     try {
       const reportHash = keccak256(toHex(`production-verified-${c.id}-${Date.now()}`));
       const call = await client.simulateContract({
@@ -223,18 +271,23 @@ export function RewardResolverConsole({ userId }: { userId: string }) {
         args: [BigInt(c.onchainCampaignId), reportHash],
       });
       const hash = await wallet.writeContract(call.request);
+      setTxHash(hash);
+      setTxPhase('submitted');
       const receipt = await client.waitForTransactionReceipt({ hash, confirmations: 1 });
       if (receipt.status !== 'success') throw new Error('Giao dịch recordProductionVerified bị revert.');
 
+      setTxPhase('confirmed');
       const res = await verifyResolverRewardProduction(c.id, {
         txHash: hash,
         productionReportHash: reportHash,
       });
+      setTxPhase('indexed');
       setNotice(
         `Đã nghiệm thu sản xuất (PRODUCTION_VERIFIED) trên chuỗi! Đã tự động cấp phát ${res.digitalKeysIssued ?? 0} mã đọc kỹ thuật số.`,
       );
       void refetchCampaigns();
     } catch (err) {
+      setTxPhase('error');
       setErrorMsg(getErrorMessage(err));
     } finally {
       setBusy(false);
@@ -249,6 +302,8 @@ export function RewardResolverConsole({ userId }: { userId: string }) {
     setBusy(true);
     setNotice('');
     setErrorMsg('');
+    setTxPhase('signing');
+    setTxHash(undefined);
     try {
       const call = await client.simulateContract({
         account: account.address,
@@ -258,13 +313,18 @@ export function RewardResolverConsole({ userId }: { userId: string }) {
         args: [BigInt(c.onchainCampaignId)],
       });
       const hash = await wallet.writeContract(call.request);
+      setTxHash(hash);
+      setTxPhase('submitted');
       const receipt = await client.waitForTransactionReceipt({ hash, confirmations: 1 });
       if (receipt.status !== 'success') throw new Error('Giao dịch startWindDown bị revert.');
 
+      setTxPhase('confirmed');
       await syncRewardReceipt(hash);
+      setTxPhase('indexed');
       setNotice('Đã kích hoạt Wind-down dừng dự án (STOPPED) và mở khóa REFUND_ELIGIBLE cho toàn bộ backer!');
       void refetchCampaigns();
     } catch (err) {
+      setTxPhase('error');
       setErrorMsg(getErrorMessage(err));
     } finally {
       setBusy(false);
@@ -296,109 +356,158 @@ export function RewardResolverConsole({ userId }: { userId: string }) {
   }
 
   return (
-    <div className="reward-container">
+    <div className="reward-container resolver-console">
       <header className="reward-hero">
         <span className="reward-badge-category">⚖️ Thẩm quyền Hợp đồng · Resolver Console</span>
-        <h1 className="reward-hero-title">Trung Tâm Thẩm Định & Nghiệm Thu On-Chain (V2 – V4)</h1>
+        <h1 className="reward-hero-title">Resolver Console</h1>
         <p className="reward-hero-pitch">
-          Thẩm định cam kết ấn phẩm Editions, ký kích hoạt chiến dịch và nghiệm thu bằng chứng sản xuất / PDF trên smart contract.
+          Kiểm tra hồ sơ Editions, ra quyết định và xử lý các bước nghiệm thu cần chữ ký Resolver.
         </p>
       </header>
 
       {errorMsg && <p className="toast toast--error" role="alert">{errorMsg}</p>}
       {notice && <p className="toast toast--success" role="status">{notice}</p>}
 
-      {/* Flow V2 - V4: Resolver Campaign Lifecycle Queue */}
-      <section className="panel">
-        <h2>Flow V2 – V4: Thẩm Định Chiến Dịch & Nghiệm Thu Hợp Đồng ({campaigns?.length ?? 0})</h2>
+      <section className="panel resolver-queue" aria-labelledby="resolver-queue-title">
+        <div className="resolver-section-heading">
+          <div>
+            <span className="resolver-section-kicker">Hàng đợi Resolver</span>
+            <h2 id="resolver-queue-title">Chiến dịch cần xử lý <span className="resolver-count">{campaigns?.length ?? 0}</span></h2>
+            <p className="muted">Chọn hồ sơ để kiểm tra cam kết, phản hồi và quyết định bước tiếp theo.</p>
+          </div>
+        </div>
         {(campaigns || []).length === 0 ? (
-          <p className="muted">Chưa có chiến dịch nào hoặc tài khoản hiện tại không có quyền RESOLVER.</p>
+          <div className="resolver-empty-state" role="status">
+            <span className="resolver-empty-state__icon" aria-hidden="true">✓</span>
+            <div>
+              <strong>Không có chiến dịch nào cần thẩm định lúc này.</strong>
+              <p>Chiến dịch mới sẽ xuất hiện sau khi Creator gửi hồ sơ cho Resolver.</p>
+            </div>
+          </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '12px' }}>
-            {campaigns!.map(c => c.draftConfig || c.category === 'COMICS_ARTBOOK' ? (
-              <div key={c.id}>
-                {c.commitmentHash && ['UNDER_REVIEW', 'APPROVED'].includes(c.status) && <EditionsCommunity id={c.id} userId={userId} viewerMode="resolver" commitmentHash={c.commitmentHash} />}
-                <EditionsResolverReview campaign={c} onChange={() => void refetchCampaigns()} />
-                {c.status === 'APPROVED' && <a className="button button--secondary" href={`#/reward/editions/${c.id}/resolver`}>Mở duyệt hợp đồng, sản xuất & PDF local</a>}
-              </div>
-            ) : (
-              <div key={c.id} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '14px', background: '#fff' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
-                  <div>
-                    <h3 style={{ margin: '0 0 4px 0' }}>{c.title}</h3>
-                    <span className="reward-status-pill status-active" style={{ fontSize: '11px' }}>{c.status}</span>
-                    <span style={{ fontSize: '13px', color: '#64748b', marginLeft: '10px' }}>
-                      Goal: {(Number(c.goal) / 1e6).toLocaleString()} USDC
-                      {c.onchainCampaignId ? ` · On-chain ID #${c.onchainCampaignId}` : ''}
-                    </span>
-                  </div>
+          <div className="resolver-master-detail">
+            <aside className="resolver-master-detail__sidebar">
+              <ReviewQueue
+                campaigns={campaigns || []}
+                selectedId={activeSelectedId}
+                onSelect={id => setSelectedId(id)}
+                onRefresh={() => void refetchCampaigns()}
+              />
+            </aside>
 
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {c.status === 'UNDER_REVIEW' && (
-                      <>
-                        <button className="button button--primary" disabled={busy} onClick={() => void handleReviewCampaign(c, 'APPROVED')}>
-                          Duyệt Cam Kết (V2 APPROVED)
-                        </button>
-                        <button className="button button--secondary" disabled={busy} onClick={() => void handleReviewCampaign(c, 'CHANGES_REQUESTED')}>
-                          Yêu cầu sửa
-                        </button>
-                      </>
-                    )}
-                    {c.status === 'PUBLISHED' && c.onchainCampaignId && (
-                      <button className="button button--primary" disabled={busy} onClick={() => void handleActivateOnchain(c)}>
-                        Kích hoạt On-chain (activateCampaign)
-                      </button>
-                    )}
-                    {c.status === 'ACTIVE' && c.onchainCampaignId && (
-                      <>
-                        <button className="button button--secondary" disabled={busy} onClick={() => void handleApproveDepositOnchain(c)}>
-                          1. Giải ngân Cọc (approveAndDisburse)
-                        </button>
-                        <button className="button button--secondary" disabled={busy} onClick={() => void handleCandidateExpenditureOnchain(c)}>
-                          2. Duyệt Hóa đơn (candidateExpenditure)
-                        </button>
-                        <button className="button button--secondary" disabled={busy} onClick={() => void handleFinalizeExpenditureOnchain(c)}>
-                          3. Tất toán Cọc (finalizeExpenditure)
-                        </button>
-                        <button className="button button--primary" disabled={busy} onClick={() => void handleVerifyProductionOnchain(c)}>
-                          4. Nghiệm thu Sản xuất V3 (recordProductionVerified)
-                        </button>
-                      </>
-                    )}
+            <main className="resolver-master-detail__main">
+              {txPhase !== 'idle' && (
+                <TransactionLifecycle phase={txPhase} hash={txHash} error={errorMsg} />
+              )}
+              {selectedCampaign && (selectedCampaign.draftConfig || selectedCampaign.category === 'COMICS_ARTBOOK') ? (
+                <article className="resolver-campaign-card" key={selectedCampaign.id}>
+                  <EditionsResolverReview campaign={selectedCampaign} onChange={() => void refetchCampaigns()} />
+                  {selectedCampaign.status === 'APPROVED' && (
+                    <div className="resolver-next-action">
+                      <p>Hồ sơ đã được duyệt. Tiếp tục sang trang on-chain để chốt funding, nghiệm thu sản xuất và PDF.</p>
+                      <a className="button button--primary" href={`#/reward/editions/${selectedCampaign.id}/resolver`}>Mở trang xử lý on-chain →</a>
+                    </div>
+                  )}
+                  {selectedCampaign.reviews && selectedCampaign.reviews.length > 0 && (
+                    <ReviewHistoryDisclosure reviews={selectedCampaign.reviews} />
+                  )}
+                  {selectedCampaign.commitmentHash && ['COMMUNITY_REVIEW', 'APPROVED'].includes(selectedCampaign.status) && (
+                    <details className="resolver-community-details">
+                      <summary>Phản hồi cộng đồng <span>Góp ý tham khảo · không phải phiếu quyết định</span></summary>
+                      <EditionsCommunity id={selectedCampaign.id} userId={userId} viewerMode="resolver" commitmentHash={selectedCampaign.commitmentHash} />
+                    </details>
+                  )}
+                </article>
+              ) : selectedCampaign ? (
+                <article className="resolver-campaign-card" key={selectedCampaign.id}>
+                  <div className="resolver-campaign-card__header">
+                    <div>
+                      <h3>{selectedCampaign.title}</h3>
+                      <span className="resolver-status-pill">{resolverStatusLabel(selectedCampaign.status)}</span>
+                      <span className="resolver-campaign-card__meta">
+                        Goal: {(Number(selectedCampaign.goal) / 1e6).toLocaleString()} USDC
+                        {selectedCampaign.onchainCampaignId ? ` · On-chain ID #${selectedCampaign.onchainCampaignId}` : ''}
+                      </span>
+                    </div>
 
-                    {(c.status === 'ACTIVE' || c.status === 'PRODUCTION_VERIFIED' || c.status === 'FULFILLMENT_COMPLETE') && c.onchainCampaignId && (
-                      <button
-                        className="button button--secondary"
-                        style={{ color: '#dc2626' }}
-                        disabled={busy}
-                        onClick={() => void handleStartWindDownOnchain(c)}
-                      >
-                        Dừng & Hoàn tiền (startWindDown)
-                      </button>
-                    )}
+                    <div className="resolver-action-group">
+                      {selectedCampaign.status === 'UNDER_REVIEW' && (
+                        <>
+                          <button className="button button--primary" disabled={busy} onClick={() => void handleReviewCampaign(selectedCampaign, 'APPROVED')}>
+                            Duyệt cam kết
+                          </button>
+                          <button className="button button--secondary" disabled={busy} onClick={() => void handleReviewCampaign(selectedCampaign, 'CHANGES_REQUESTED')}>
+                            Yêu cầu sửa
+                          </button>
+                        </>
+                      )}
+                      {selectedCampaign.status === 'PUBLISHED' && selectedCampaign.onchainCampaignId && (
+                        <button className="button button--primary" disabled={busy} onClick={() => void handleActivateOnchain(selectedCampaign)}>
+                          Kích hoạt On-chain (activateCampaign)
+                        </button>
+                      )}
+                      {selectedCampaign.status === 'ACTIVE' && selectedCampaign.onchainCampaignId && (
+                        <>
+                          <button className="button button--secondary" disabled={busy} onClick={() => void handleApproveDepositOnchain(selectedCampaign)}>
+                            1. Giải ngân cọc
+                          </button>
+                          <button className="button button--secondary" disabled={busy} onClick={() => void handleCandidateExpenditureOnchain(selectedCampaign)}>
+                            2. Ghi nhận hóa đơn
+                          </button>
+                          <button className="button button--secondary" disabled={busy} onClick={() => void handleFinalizeExpenditureOnchain(selectedCampaign)}>
+                            3. Tất toán cọc
+                          </button>
+                          <button className="button button--primary" disabled={busy} onClick={() => void handleVerifyProductionOnchain(selectedCampaign)}>
+                            4. Nghiệm thu sản xuất
+                          </button>
+                        </>
+                      )}
+
+                      {(selectedCampaign.status === 'ACTIVE' || selectedCampaign.status === 'PRODUCTION_VERIFIED' || selectedCampaign.status === 'FULFILLMENT_COMPLETE') && selectedCampaign.onchainCampaignId && (
+                        <button
+                          className="button button--secondary"
+                          style={{ color: '#dc2626' }}
+                          disabled={busy}
+                          onClick={() => void handleStartWindDownOnchain(selectedCampaign)}
+                        >
+                          Dừng & mở hoàn tiền
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </div>
-            ))}
+                </article>
+              ) : null}
+            </main>
           </div>
         )}
       </section>
 
-      {/* Disputes Queue */}
-      <section className="panel">
-        <h2>Phân Xử Khiếu Nại Quà Tặng ({disputes?.length ?? 0})</h2>
+      <section className="panel resolver-queue resolver-disputes" aria-labelledby="resolver-disputes-title">
+        <div className="resolver-section-heading">
+          <div>
+            <span className="resolver-section-kicker">Sau phát hành</span>
+            <h2 id="resolver-disputes-title">Khiếu nại cần phân xử <span className="resolver-count">{disputes?.length ?? 0}</span></h2>
+            <p className="muted">Chỉ xuất hiện khi có backer gửi khiếu nại cần Resolver xem xét.</p>
+          </div>
+        </div>
         {(disputes || []).length === 0 ? (
-          <p className="muted">Không có khiếu nại nào cần xử lý.</p>
+          <div className="resolver-empty-state resolver-empty-state--quiet" role="status">
+            <span className="resolver-empty-state__icon" aria-hidden="true">✓</span>
+            <div>
+              <strong>Không có khiếu nại nào cần xử lý.</strong>
+              <p>Khu vực này sẽ được cập nhật khi phát sinh khiếu nại.</p>
+            </div>
+          </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+          <div className="resolver-dispute-list">
             {disputes!.map(d => (
-              <div key={d.id} style={{ border: '1px solid #fecaca', background: '#fef2f2', borderRadius: '8px', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <article className="resolver-dispute-card" key={d.id}>
                 <div>
-                  <strong>Khiếu nại #{d.id.slice(0, 8)}</strong> · Trạng thái: <strong>{d.status}</strong>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#991b1b' }}>Lý do: {d.reason}</p>
+                  <strong>Khiếu nại #{d.id.slice(0, 8)}</strong> · <strong>{d.status}</strong>
+                  <p>Lý do: {d.reason}</p>
                 </div>
                 {d.status === 'OPEN' && (
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div className="resolver-action-group">
                     <button className="button button--primary" disabled={busy} onClick={() => void handleResolveDispute(d, 'RESOLVED_BACKER')}>
                       Chấp thuận Backer (Mở REFUND_ELIGIBLE)
                     </button>
@@ -407,7 +516,7 @@ export function RewardResolverConsole({ userId }: { userId: string }) {
                     </button>
                   </div>
                 )}
-              </div>
+              </article>
             ))}
           </div>
         )}

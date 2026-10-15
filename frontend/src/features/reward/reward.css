@@ -1762,5 +1762,250 @@
   color: #78887e;
 }
 
+/* ==========================================================================
+   Resolver Master-Detail & Review Queue
+   ========================================================================== */
+.resolver-master-detail {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.resolver-master-detail__sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.resolver-master-detail__main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.review-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.review-queue__group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.review-queue__group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #58685d;
+}
+
+.review-queue__group-count {
+  font-size: 11px;
+  background: #edf2ee;
+  padding: 1px 7px;
+  border-radius: 99px;
+  color: #2e4334;
+  font-weight: 650;
+}
+
+.review-queue__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.review-queue__item {
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid #dce4dd;
+  background: #ffffff;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.review-queue__item:hover {
+  background: #f7faf7;
+  border-color: #c5d4c7;
+}
+
+.review-queue__item--selected {
+  border-color: #2b6140;
+  background: #eaf3ec;
+  box-shadow: 0 0 0 1px #2b6140;
+}
+
+.review-queue__item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.review-queue__item-title {
+  font-size: 13px;
+  font-weight: 650;
+  color: #1e2924;
+}
+
+.review-queue__item-meta {
+  font-size: 11px;
+  color: #627267;
+}
+
+/* ==========================================================================
+   Review History Disclosure
+   ========================================================================== */
+.review-history-disclosure {
+  margin: 12px 0;
+  padding: 12px 16px;
+  border: 1px solid #dce4dd;
+  border-radius: 8px;
+  background: #fafcfa;
+}
+
+.review-history-disclosure > summary {
+  font-size: 13px;
+  font-weight: 650;
+  color: #2b6140;
+  cursor: pointer;
+}
+
+.review-history-disclosure__list {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.review-history-disclosure__item {
+  padding: 8px 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8e3;
+  border-radius: 6px;
+}
+
+.review-history-disclosure__item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.review-history-disclosure__outcome {
+  font-weight: 700;
+  color: #1e2924;
+}
+
+.review-history-disclosure__time {
+  font-size: 11px;
+  color: #728277;
+}
+
+.review-history-disclosure__reason {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #3e4e43;
+}
+
+.review-history-disclosure__hash {
+  font-size: 11px;
+  color: #627267;
+  margin: 4px 0 0;
+}
+
+/* ==========================================================================
+   Transaction Lifecycle
+   ========================================================================== */
+.transaction-lifecycle {
+  padding: 14px 18px;
+  border: 1px solid #dce4dd;
+  border-radius: 10px;
+  background: #f8faf8;
+  margin: 12px 0;
+}
+
+.transaction-lifecycle__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 650;
+  color: #2b6140;
+  margin-bottom: 10px;
+}
+
+.transaction-lifecycle__hash {
+  font-family: monospace;
+  font-size: 11px;
+  color: #58685e;
+}
+
+.transaction-lifecycle__steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.transaction-lifecycle__step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #627267;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #edf2ee;
+}
+
+.transaction-lifecycle__step--done {
+  background: #eaf3ec;
+  color: #205c36;
+  font-weight: 600;
+}
+
+.transaction-lifecycle__step--current {
+  background: #fdf5e7;
+  color: #8e5507;
+  font-weight: 650;
+  box-shadow: 0 0 0 1px #fae1b8;
+}
+
+.transaction-lifecycle__step-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+@media (max-width: 768px) {
+  .resolver-master-detail {
+    grid-template-columns: 1fr;
+  }
+
+  .transaction-lifecycle__steps {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+
 
 
