@@ -20,9 +20,11 @@ import type { AccountSession } from '../../lib/api/auth'
 import { createSiweMessage } from '../../lib/web3/siwe'
 import { requestWalletProof } from '../../lib/web3/wallet-proof'
 import { assertWalletRequestAvailable, releaseWalletRequest } from '../../lib/web3/wallet-confirmation'
+import { getResolverWalletBlockReason } from '../../lib/web3/wallet-link-guard'
 import deployment from '../../lib/web3/deployment-context'
 import { getErrorMessage } from '../../lib/api/error'
 import { LinkedWalletCard } from './LinkedWalletCard'
+import { classifyAccountError, type ClassifiedAccountError } from './account-error'
 import './AccountProfile.css'
 
 interface AccountAccessProps {
@@ -44,6 +46,7 @@ export function AccountAccess({
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [accountError, setAccountError] = useState<ClassifiedAccountError | null>(null)
   const [walletStatus, setWalletStatus] = useState('')
   const [walletStage, setWalletStage] = useState<'prepare' | 'challenge' | 'signature' | 'verify' | ''>('')
   const [signatureSeconds, setSignatureSeconds] = useState(90)
@@ -66,25 +69,34 @@ export function AccountAccess({
     proofController.current?.abort(new Error('Kết nối ví hoặc tài khoản đã thay đổi. Lần xác thực cũ đã dừng; bạn có thể liên kết bằng kết nối hiện tại.'))
   }, [address, chainId, connector?.uid, session?.userId])
   const alreadyLinked = Boolean(address && session?.wallets.some(wallet => wallet.address.toLowerCase() === address.toLowerCase() && wallet.chainId === chainId))
-  const wrongResolverWallet = Boolean(session?.roles.includes('RESOLVER') && address && address.toLowerCase() !== deployment.resolver.toLowerCase())
+  const resolverWalletBlockReason = getResolverWalletBlockReason({
+    roles: session?.roles ?? [], connectedAddress: address, resolverAddress: deployment.resolver,
+  })
+  const wrongResolverWallet = Boolean(resolverWalletBlockReason)
 
   async function run(action: () => Promise<void>) {
     if (running.current) return
     running.current = true
     setBusy(true)
     setError('')
+    setAccountError(null)
     setWalletStatus('')
     setWalletStage('')
     try {
       await action()
     } catch (cause) {
-      if (mounted.current) setError(cause instanceof BaseError && cause.walk(item => item instanceof UserRejectedRequestError) instanceof UserRejectedRequestError
-        ? 'Bạn đã từ chối ký trong ví. Chưa liên kết ví; có thể thử lại khi sẵn sàng.'
-        : cause instanceof BaseError && cause.walk(item => item instanceof ResourceUnavailableRpcError) instanceof ResourceUnavailableRpcError
-          ? 'Ví chưa sẵn sàng hoặc đang có yêu cầu khác. Mở extension, xử lý yêu cầu đang chờ rồi thử lại.'
-          : getErrorMessage(cause) === 'Wallet is already linked to another account'
-            ? 'Ví này đã liên kết với tài khoản khác. Ngắt ví đang kết nối và chọn ví thuộc tài khoản hiện tại để tiếp tục.'
-            : getErrorMessage(cause))
+      if (mounted.current) {
+        const classified = classifyAccountError(cause);
+        const customMessage = cause instanceof BaseError && cause.walk(item => item instanceof UserRejectedRequestError) instanceof UserRejectedRequestError
+          ? 'Bạn đã từ chối ký trong ví. Chưa liên kết ví; có thể thử lại khi sẵn sàng.'
+          : cause instanceof BaseError && cause.walk(item => item instanceof ResourceUnavailableRpcError) instanceof ResourceUnavailableRpcError
+            ? 'Ví chưa sẵn sàng hoặc đang có yêu cầu khác. Mở extension, xử lý yêu cầu đang chờ rồi thử lại.'
+            : getErrorMessage(cause) === 'Wallet is already linked to another account'
+              ? 'Ví này đã liên kết với tài khoản khác. Ngắt ví đang kết nối và chọn ví thuộc tài khoản hiện tại để tiếp tục.'
+              : classified.message;
+        setAccountError({ ...classified, message: customMessage });
+        setError(customMessage);
+      }
     } finally {
       running.current = false
       proofController.current = null
@@ -108,6 +120,10 @@ export function AccountAccess({
   }
 
   function verifyExternalWallet() {
+    if (resolverWalletBlockReason) {
+      setError(resolverWalletBlockReason)
+      return
+    }
     void run(async () => {
       if (!address || !chainId || !connector) throw new Error('Kết nối ví trước.')
       assertWalletRequestAvailable(connector.uid)
@@ -357,8 +373,7 @@ export function AccountAccess({
 
               {wrongResolverWallet && (
                 <div className="review-notice review-notice--blocked" role="alert" style={{ marginBottom: '14px' }}>
-                  <p>Trang đang kết nối ví <code>{address}</code>, khác ví resolver <code>{deployment.resolver}</code>.</p>
-                  <p>Ngắt ví này, bấm Connect Wallet và chọn MetaMask với đúng địa chỉ resolver để ký duyệt.</p>
+                  <p>{resolverWalletBlockReason}</p>
                   <button type="button" className="button button--secondary button--sm" disabled={busy || !connector} onClick={disconnectWallet}>
                     Ngắt ví đang kết nối
                   </button>
@@ -370,10 +385,11 @@ export function AccountAccess({
                 <button
                   type="button"
                   className={`button ${alreadyLinked ? 'button--quiet' : 'button--primary'}`}
-                  disabled={!address || busy || alreadyLinked}
+                  disabled={!address || busy || alreadyLinked || wrongResolverWallet}
                   onClick={verifyExternalWallet}
                 >
-                  {busy ? linkingLabel : alreadyLinked ? '✓ Ví đã liên kết' : '🔗 Liên kết ví (Ký SIWE)'}
+                  {busy ? linkingLabel : alreadyLinked ? '✓ Ví đã liên kết'
+                    : wrongResolverWallet ? 'Chọn đúng ví Resolver' : '🔗 Liên kết ví (Ký SIWE)'}
                 </button>
               </div>
 
@@ -402,23 +418,12 @@ export function AccountAccess({
 
         {compact && <a href="#/account">Quản lý tài khoản và ví</a>}
 
-        {error && (
-          <div style={{ marginTop: '10px' }}>
-            <p className="form-error" role="alert" style={{ marginBottom: '8px' }}>
-              {error}
-            </p>
-            <button
-              type="button"
-              className="button button--secondary"
-              style={{ fontSize: '13px' }}
-              onClick={() => {
-                if (connector?.uid) releaseWalletRequest(connector.uid)
-                if (address) releaseWalletRequest(address)
-                if (typeof window !== 'undefined') window.location.reload()
-              }}
-            >
-              🔄 Đặt lại kết nối ví (Tải lại trang)
-            </button>
+        {(error || accountError) && (
+          <div className="account-error-banner" role="alert" style={{ marginTop: '14px' }}>
+            <span className={`account-error-layer-badge account-error-layer-badge--${accountError?.layer ?? 'session'}`}>
+              {accountError?.layerLabel ?? 'Phiên đăng nhập / API (Session)'}
+            </span>
+            <p className="form-error">{error || accountError?.message}</p>
           </div>
         )}
       </div>
@@ -502,23 +507,12 @@ export function AccountAccess({
         {walletStatus && <p className="wallet-note" role="status">{walletStatus}</p>}
         {walletRecovery}
       </details>
-      {error && (
-        <div style={{ marginTop: '10px' }}>
-          <p className="form-error" role="alert" style={{ marginBottom: '8px' }}>
-            {error}
-          </p>
-          <button
-            type="button"
-            className="button button--secondary"
-            style={{ fontSize: '13px' }}
-            onClick={() => {
-              if (connector?.uid) releaseWalletRequest(connector.uid)
-              if (address) releaseWalletRequest(address)
-              if (typeof window !== 'undefined') window.location.reload()
-            }}
-          >
-            🔄 Đặt lại kết nối ví (Tải lại trang)
-          </button>
+      {(error || accountError) && (
+        <div className="account-error-banner" role="alert" style={{ marginTop: '14px' }}>
+          <span className={`account-error-layer-badge account-error-layer-badge--${accountError?.layer ?? 'session'}`}>
+            {accountError?.layerLabel ?? 'Phiên đăng nhập / API (Session)'}
+          </span>
+          <p className="form-error">{error || accountError?.message}</p>
         </div>
       )}
     </section>

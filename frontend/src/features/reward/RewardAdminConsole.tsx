@@ -1,8 +1,14 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { listAdminCreatorProfiles, reviewAdminCreatorProfile } from '../../lib/api/reward';
+import {
+  listAdminCreatorProfiles,
+  listRewardPublicCampaigns,
+  reviewAdminCreatorProfile,
+} from '../../lib/api/reward';
 import type { RewardCreatorProfile } from '../../lib/api/reward';
 import { getErrorMessage } from '../../lib/api/error';
+import { LifecycleDistributionChart } from './ui/LifecycleDistributionChart';
+import { ExceptionList, type ExceptionItem } from './ui/ExceptionList';
 
 export function RewardAdminConsole({ userId }: { userId: string }) {
   const [busy, setBusy] = useState(false);
@@ -11,16 +17,27 @@ export function RewardAdminConsole({ userId }: { userId: string }) {
   const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'VERIFIED' | 'REJECTED'>('ALL');
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [pendingConfirm, setPendingConfirm] = useState<{
+    profile: RewardCreatorProfile;
+    outcome: 'VERIFIED' | 'REJECTED';
+    reason?: string;
+  } | null>(null);
 
-  const { data: profiles, refetch, isPending } = useQuery({
+  const { data: profiles, refetch: refetchProfiles, isPending: profilesPending } = useQuery({
     queryKey: ['reward-admin-creators', userId],
     queryFn: ({ signal }) => listAdminCreatorProfiles(signal),
   });
 
-  async function handleReviewCreator(profile: RewardCreatorProfile, outcome: 'VERIFIED' | 'REJECTED', reason?: string) {
+  const { data: campaigns } = useQuery({
+    queryKey: ['reward-admin-campaigns', userId],
+    queryFn: ({ signal }) => listRewardPublicCampaigns(signal),
+  });
+
+  async function executeReview(profile: RewardCreatorProfile, outcome: 'VERIFIED' | 'REJECTED', reason?: string) {
     setBusy(true);
     setErrorMsg('');
     setNotice('');
+    setPendingConfirm(null);
     try {
       await reviewAdminCreatorProfile(profile.id, {
         outcome,
@@ -28,10 +45,10 @@ export function RewardAdminConsole({ userId }: { userId: string }) {
       });
       setNotice(outcome === 'VERIFIED'
         ? `Đã phê duyệt hồ sơ tác giả "${profile.displayName}" (VERIFIED).`
-        : `Đã từ chối hồ sơ "${profile.displayName}".`);
+        : `Đã từ chối hồ sơ "${profile.displayName}" (REJECTED).`);
       setRejectingId(null);
       setRejectReason('');
-      void refetch();
+      void refetchProfiles();
     } catch (err) {
       setErrorMsg(getErrorMessage(err));
     } finally {
@@ -40,105 +57,207 @@ export function RewardAdminConsole({ userId }: { userId: string }) {
   }
 
   const allProfiles = profiles || [];
-  const pendingCount = allProfiles.filter(p => p.status === 'PENDING').length;
-  const verifiedCount = allProfiles.filter(p => p.status === 'VERIFIED').length;
-  const rejectedCount = allProfiles.filter(p => p.status === 'REJECTED').length;
+  const allCampaigns = campaigns || [];
+
+  const pendingProfilesCount = allProfiles.filter(p => p.status === 'PENDING').length;
+  const verifiedProfilesCount = allProfiles.filter(p => p.status === 'VERIFIED').length;
+  const rejectedProfilesCount = allProfiles.filter(p => p.status === 'REJECTED').length;
+
+  const pendingCampaignsCount = allCampaigns.filter(
+    c => c.status === 'FROZEN' || c.status === 'UNDER_REVIEW' || c.status === 'UNDER_REVIEW_PRIVATE'
+  ).length;
+  const fundingCampaignsCount = allCampaigns.filter(
+    c => c.status === 'PUBLISHED' || c.status === 'ACTIVE'
+  ).length;
+  const pendingActivationCount = allCampaigns.filter(c => c.status === 'APPROVED').length;
+  const stoppedCampaignsCount = allCampaigns.filter(c => c.status === 'STOPPED').length;
+
+  // 4 KPI Metrics
+  const reviewQueueTotal = pendingProfilesCount + pendingCampaignsCount;
+  const exceptionsTotal = rejectedProfilesCount + stoppedCampaignsCount;
+
+  // Lifecycle Distribution Counts (from loaded data)
+  const lifecycleCounts: Record<string, number> = {
+    'Chờ duyệt IP': pendingProfilesCount,
+    'Đã xác minh IP': verifiedProfilesCount,
+    'Đang gây quỹ': fundingCampaignsCount,
+    'Chờ kích hoạt': pendingActivationCount,
+    'Bị từ chối / dừng': exceptionsTotal,
+  };
+
+  // Operational Exceptions list
+  const exceptionItems: ExceptionItem[] = [
+    ...allProfiles.filter(p => p.status === 'PENDING').map(p => ({
+      id: `pending-prof-${p.id}`,
+      label: `Hồ sơ tác giả "${p.displayName}" đang chờ thẩm định cam kết IP`,
+      severity: 'warning' as const,
+      owner: p.displayName,
+      actionHref: `#admin-creators-list`,
+    })),
+    ...allProfiles.filter(p => p.status === 'REJECTED').map(p => ({
+      id: `rejected-prof-${p.id}`,
+      label: `Hồ sơ "${p.displayName}" bị từ chối: ${p.rejectionReason || 'Thông tin bản quyền chưa hợp lệ'}`,
+      severity: 'info' as const,
+      owner: p.displayName,
+    })),
+    ...allCampaigns.filter(c => c.status === 'STOPPED').map(c => ({
+      id: `stopped-camp-${c.id}`,
+      label: `Chiến dịch "${c.title}" đã dừng (STOPPED) - Độc giả có quyền hoàn tiền`,
+      severity: 'danger' as const,
+      owner: c.title,
+      actionHref: `#/reward/editions/${c.id}`,
+    })),
+  ];
 
   const filteredProfiles = filter === 'ALL'
     ? allProfiles
     : allProfiles.filter(p => p.status === filter);
 
   return (
-    <div className="reward-container">
+    <div className="reward-container admin-console">
       <header className="reward-hero">
         <span className="reward-badge-category">🛡️ Quản trị Nền tảng · Admin Console</span>
-        <h1 className="reward-hero-title">Quản Trị Hồ Sơ Tác Giả & Bản Quyền IP (Flow V1)</h1>
+        <h1 className="reward-hero-title">Quản Trị Vận Hành & Hồ Sơ Bản Quyền IP</h1>
         <p className="reward-hero-pitch">
-          Kiểm tra thông tin studio/bút danh và cam kết sở hữu trí tuệ của tác giả trước khi cho phép xuất bản chiến dịch gọi vốn.
+          Kiểm tra cam kết sở hữu trí tuệ tác giả, theo dõi vòng đời phát hành và xử lý ngoại lệ vận hành hệ thống Editions.
         </p>
       </header>
 
       {errorMsg && <p className="toast toast--error" role="alert">{errorMsg}</p>}
       {notice && <p className="toast toast--success" role="status">{notice}</p>}
 
-      {/* Stats summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '20px' }}>
-        <div className="panel" style={{ padding: '16px', textAlign: 'center' }}>
-          <span style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Tổng hồ sơ</span>
-          <strong style={{ fontSize: '24px', color: '#1e293b' }}>{allProfiles.length}</strong>
-        </div>
-        <div className="panel" style={{ padding: '16px', textAlign: 'center', borderColor: pendingCount > 0 ? '#f59e0b' : '#e2e8f0' }}>
-          <span style={{ fontSize: '12px', color: '#b45309', display: 'block', marginBottom: '4px' }}>⏳ Đang chờ duyệt</span>
-          <strong style={{ fontSize: '24px', color: '#d97706' }}>{pendingCount}</strong>
-        </div>
-        <div className="panel" style={{ padding: '16px', textAlign: 'center' }}>
-          <span style={{ fontSize: '12px', color: '#15803d', display: 'block', marginBottom: '4px' }}>✓ Đã phê duyệt</span>
-          <strong style={{ fontSize: '24px', color: '#16a34a' }}>{verifiedCount}</strong>
-        </div>
-        <div className="panel" style={{ padding: '16px', textAlign: 'center' }}>
-          <span style={{ fontSize: '12px', color: '#b91c1c', display: 'block', marginBottom: '4px' }}>✕ Đã từ chối</span>
-          <strong style={{ fontSize: '24px', color: '#dc2626' }}>{rejectedCount}</strong>
-        </div>
-      </div>
+      {/* Confirmation Modal / Bar */}
+      {pendingConfirm && (
+        <aside className="review-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+          <div className="review-confirm-dialog">
+            <h3 id="confirm-title">Xác nhận chuyển trạng thái hồ sơ</h3>
+            <p>
+              Bạn sắp chuyển trạng thái hồ sơ của tác giả <strong>"{pendingConfirm.profile.displayName}"</strong> sang{' '}
+              <strong className={pendingConfirm.outcome === 'VERIFIED' ? 'text-success' : 'text-danger'}>
+                {pendingConfirm.outcome}
+              </strong>.
+            </p>
+            {pendingConfirm.reason && (
+              <p className="muted">Lý do: {pendingConfirm.reason}</p>
+            )}
+            <div className="review-confirm-actions">
+              <button
+                type="button"
+                className={`button ${pendingConfirm.outcome === 'VERIFIED' ? 'button--primary' : 'button--secondary'}`}
+                disabled={busy}
+                onClick={() => void executeReview(pendingConfirm.profile, pendingConfirm.outcome, pendingConfirm.reason)}
+              >
+                {busy ? 'Đang xử lý…' : `Xác nhận ${pendingConfirm.outcome === 'VERIFIED' ? 'Phê duyệt' : 'Từ chối'}`}
+              </button>
+              <button
+                type="button"
+                className="button button--quiet"
+                disabled={busy}
+                onClick={() => setPendingConfirm(null)}
+              >
+                Hủy bỏ
+              </button>
+            </div>
+          </div>
+        </aside>
+      )}
 
-      {/* Filter Tabs */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        <button
-          type="button"
-          className={`button ${filter === 'ALL' ? 'button--primary' : 'button--quiet'}`}
-          onClick={() => setFilter('ALL')}
-        >
-          Tất cả ({allProfiles.length})
-        </button>
-        <button
-          type="button"
-          className={`button ${filter === 'PENDING' ? 'button--primary' : 'button--quiet'}`}
-          onClick={() => setFilter('PENDING')}
-        >
-          Chờ duyệt ({pendingCount})
-        </button>
-        <button
-          type="button"
-          className={`button ${filter === 'VERIFIED' ? 'button--primary' : 'button--quiet'}`}
-          onClick={() => setFilter('VERIFIED')}
-        >
-          Đã phê duyệt ({verifiedCount})
-        </button>
-        <button
-          type="button"
-          className={`button ${filter === 'REJECTED' ? 'button--primary' : 'button--quiet'}`}
-          onClick={() => setFilter('REJECTED')}
-        >
-          Đã từ chối ({rejectedCount})
-        </button>
-      </div>
+      {/* 4 Operational KPI Tiles */}
+      <section className="kpi-grid admin-kpis" aria-label="Chỉ số vận hành hệ thống">
+        <div className="panel kpi-tile">
+          <span className="kpi-tile__kicker">⏳ Hàng đợi thẩm định</span>
+          <strong className="kpi-tile__value">{reviewQueueTotal}</strong>
+          <span className="kpi-tile__note">{pendingProfilesCount} hồ sơ IP · {pendingCampaignsCount} chiến dịch</span>
+        </div>
 
-      {/* Main List */}
-      <section className="panel">
-        <h2>Danh Sách Hồ Sơ Tác Giả & Studio</h2>
+        <div className="panel kpi-tile">
+          <span className="kpi-tile__kicker">🚀 Chiến dịch đang gây quỹ</span>
+          <strong className="kpi-tile__value">{fundingCampaignsCount}</strong>
+          <span className="kpi-tile__note">Đang tiếp nhận độc giả ủng hộ</span>
+        </div>
 
-        {isPending ? (
+        <div className="panel kpi-tile">
+          <span className="kpi-tile__kicker">⛓️ Chờ đồng bộ / giao dịch</span>
+          <strong className="kpi-tile__value">{pendingActivationCount}</strong>
+          <span className="kpi-tile__note">Đã duyệt, chờ kích hoạt onchain</span>
+        </div>
+
+        <div className="panel kpi-tile">
+          <span className="kpi-tile__kicker">⚠️ Ngoại lệ vận hành</span>
+          <strong className="kpi-tile__value">{exceptionsTotal}</strong>
+          <span className="kpi-tile__note">{rejectedProfilesCount} từ chối · {stoppedCampaignsCount} dừng</span>
+        </div>
+      </section>
+
+      {/* Operations Overview: Chart & Exceptions */}
+      <section className="panel admin-overview" aria-labelledby="admin-overview-title">
+        <h2 id="admin-overview-title">Tổng quan Vận hành & Vòng đời</h2>
+
+        <div className="admin-overview__grid">
+          <div className="admin-overview__chart-block">
+            <h3>Phân bổ trạng thái vòng đời</h3>
+            <LifecycleDistributionChart counts={lifecycleCounts} />
+          </div>
+
+          <div className="admin-overview__exceptions-block">
+            <h3>Ngoại lệ & Hồ sơ cần xử lý ({exceptionItems.length})</h3>
+            <ExceptionList items={exceptionItems} />
+          </div>
+        </div>
+      </section>
+
+      {/* Creator Profiles Section */}
+      <section id="admin-creators-list" className="panel" aria-labelledby="admin-creators-title">
+        <div className="admin-section-header">
+          <div>
+            <h2 id="admin-creators-title">Hồ Sơ Tác Giả & Cam Kết Bản Quyền IP</h2>
+            <p className="muted">Kiểm tra thông tin studio/bút danh và cam kết sở hữu trí tuệ trước khi cho phép xuất bản.</p>
+          </div>
+        </div>
+
+        {/* Filter Tabs */}
+        <div className="admin-filter-tabs">
+          <button
+            type="button"
+            className={`button ${filter === 'ALL' ? 'button--primary' : 'button--quiet'}`}
+            onClick={() => setFilter('ALL')}
+          >
+            Tất cả ({allProfiles.length})
+          </button>
+          <button
+            type="button"
+            className={`button ${filter === 'PENDING' ? 'button--primary' : 'button--quiet'}`}
+            onClick={() => setFilter('PENDING')}
+          >
+            Chờ duyệt ({pendingProfilesCount})
+          </button>
+          <button
+            type="button"
+            className={`button ${filter === 'VERIFIED' ? 'button--primary' : 'button--quiet'}`}
+            onClick={() => setFilter('VERIFIED')}
+          >
+            Đã phê duyệt ({verifiedProfilesCount})
+          </button>
+          <button
+            type="button"
+            className={`button ${filter === 'REJECTED' ? 'button--primary' : 'button--quiet'}`}
+            onClick={() => setFilter('REJECTED')}
+          >
+            Đã từ chối ({rejectedProfilesCount})
+          </button>
+        </div>
+
+        {profilesPending ? (
           <p className="muted">Đang tải danh sách hồ sơ…</p>
         ) : filteredProfiles.length === 0 ? (
           <p className="muted">Không có hồ sơ nào trong mục này.</p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '14px' }}>
+          <div className="admin-profile-list">
             {filteredProfiles.map(p => (
-              <div
-                key={p.id}
-                style={{
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '10px',
-                  padding: '18px',
-                  background: '#ffffff',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <h3 style={{ margin: 0, fontSize: '17px', color: '#1e293b' }}>{p.displayName}</h3>
+              <article key={p.id} className="admin-profile-card">
+                <div className="admin-profile-card__header">
+                  <div className="admin-profile-card__identity">
+                    <h3>{p.displayName}</h3>
                     <span
                       className={`reward-status-pill ${
                         p.status === 'VERIFIED'
@@ -147,41 +266,39 @@ export function RewardAdminConsole({ userId }: { userId: string }) {
                           ? 'status-draft'
                           : 'status-under-review'
                       }`}
-                      style={{ fontSize: '11px', fontWeight: 600 }}
                     >
                       {p.status === 'PENDING' ? '⏳ CHỜ DUYỆT' : p.status === 'VERIFIED' ? '✓ ĐÃ PHÊ DUYỆT' : '✕ BỊ TỪ CHỐI'}
                     </span>
                   </div>
-
-                  <span style={{ fontSize: '12px', color: '#64748b' }}>
+                  <span className="admin-profile-card__date">
                     Ngày gửi: {new Date(p.createdAt).toLocaleString('vi-VN')}
                   </span>
                 </div>
 
-                <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', fontSize: '13px' }}>
-                  <strong style={{ color: '#475569', display: 'block', marginBottom: '4px' }}>Tiểu sử & Kinh nghiệm sáng tác:</strong>
-                  <p style={{ margin: 0, color: '#1e293b', whiteSpace: 'pre-wrap' }}>{p.bio}</p>
+                <div className="admin-profile-card__block">
+                  <strong>Tiểu sử & Kinh nghiệm sáng tác:</strong>
+                  <p>{p.bio}</p>
                 </div>
 
-                <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', fontSize: '13px' }}>
-                  <strong style={{ color: '#475569', display: 'block', marginBottom: '4px' }}>Cam kết Bản quyền Sở hữu Trí tuệ (IP Declaration):</strong>
-                  <p style={{ margin: 0, color: '#1e293b', whiteSpace: 'pre-wrap' }}>{p.ipDeclaration}</p>
+                <div className="admin-profile-card__block admin-profile-card__ip">
+                  <strong>Cam kết Bản quyền Sở hữu Trí tuệ (IP Declaration):</strong>
+                  <p>{p.ipDeclaration}</p>
                 </div>
 
                 {p.status === 'REJECTED' && p.rejectionReason && (
-                  <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', padding: '10px 12px', borderRadius: '6px', fontSize: '13px', color: '#991b1b' }}>
+                  <div className="admin-profile-card__rejection">
                     <strong>Lý do từ chối:</strong> {p.rejectionReason}
                   </div>
                 )}
 
                 {/* Actions for PENDING */}
                 {p.status === 'PENDING' && (
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '6px', flexWrap: 'wrap' }}>
+                  <div className="admin-profile-card__actions">
                     <button
                       type="button"
                       className="button button--primary"
                       disabled={busy}
-                      onClick={() => void handleReviewCreator(p, 'VERIFIED')}
+                      onClick={() => setPendingConfirm({ profile: p, outcome: 'VERIFIED' })}
                     >
                       ✓ Phê duyệt (VERIFIED)
                     </button>
@@ -199,20 +316,19 @@ export function RewardAdminConsole({ userId }: { userId: string }) {
                         ✕ Từ chối hồ sơ
                       </button>
                     ) : (
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1, minWidth: '280px' }}>
+                      <div className="admin-profile-card__reject-form">
                         <input
                           type="text"
                           placeholder="Nhập lý do từ chối..."
                           value={rejectReason}
                           onChange={e => setRejectReason(e.target.value)}
-                          style={{ flex: 1, height: '36px', fontSize: '13px' }}
                         />
                         <button
                           type="button"
                           className="button button--secondary"
                           style={{ color: '#dc2626', borderColor: '#fca5a5' }}
                           disabled={busy}
-                          onClick={() => void handleReviewCreator(p, 'REJECTED', rejectReason)}
+                          onClick={() => setPendingConfirm({ profile: p, outcome: 'REJECTED', reason: rejectReason })}
                         >
                           Xác nhận từ chối
                         </button>
@@ -228,10 +344,44 @@ export function RewardAdminConsole({ userId }: { userId: string }) {
                     )}
                   </div>
                 )}
-              </div>
+              </article>
             ))}
           </div>
         )}
+      </section>
+
+      {/* Secondary Administration Controls */}
+      <section className="panel admin-controls-section" aria-labelledby="admin-controls-title">
+        <h2 id="admin-controls-title">Quản trị hệ thống (Administrative Controls)</h2>
+        <p className="muted">
+          Các thao tác quản trị đặc quyền. Mọi can thiệp tài chính hoặc trạng thái đều có nhật ký kiểm toán và xác nhận rõ ràng.
+        </p>
+
+        <div className="admin-controls-grid">
+          <div className="admin-control-box">
+            <h4>Đồng bộ dữ liệu Indexer</h4>
+            <p>Yêu cầu quét lại các sự kiện hợp đồng từ block gần nhất nếu phát hiện độ trễ cập nhật trạng thái.</p>
+            <button
+              type="button"
+              className="button button--secondary button--sm"
+              disabled={busy}
+              onClick={() => {
+                void refetchProfiles();
+                setNotice('Đã gửi yêu cầu làm mới dữ liệu quản trị.');
+              }}
+            >
+              🔄 Làm mới dữ liệu quản trị
+            </button>
+          </div>
+
+          <div className="admin-control-box">
+            <h4>Giới hạn Thẩm quyền</h4>
+            <p>Admin chỉ có quyền thẩm định cam kết tác giả/IP (Flow V1). Quyết định tài chính và giải ngân thuộc về Resolver Console.</p>
+            <a href="#/reward/resolver" className="button button--quiet button--sm">
+              Mở Resolver Console →
+            </a>
+          </div>
+        </div>
       </section>
     </div>
   );
