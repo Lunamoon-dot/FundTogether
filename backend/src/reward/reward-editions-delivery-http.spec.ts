@@ -40,6 +40,7 @@ describe("Editions digital delivery: real HTTP, PostgreSQL, MinIO and Anvil", ()
   let owner: string, backer: string, resolver: string, stranger: string, id: string, commitment: string;
   let deadline: bigint, entitlementId: string, production: any, finalPdf: any, pdf: Buffer;
   let beforePledge: string;
+  let approvalHash: `0x${string}`, creationHash: `0x${string}`, pledgeHash: `0x${string}`;
   let suiteSnapshot: string | undefined;
   const databaseName = `fundtogether_reward_delivery_test_${process.pid}`;
   const wallet = (actor: `0x${string}`) => createWalletClient({ account: actor, chain, transport: http() });
@@ -73,8 +74,12 @@ describe("Editions digital delivery: real HTTP, PostgreSQL, MinIO and Anvil", ()
       genesisHash: (await client.getBlock({ blockNumber: 0n })).hash, contractCodeHash: keccak256((await client.getCode({ address }))!), tokenCodeHash: keccak256((await client.getCode({ address: tokenAddress }))!),
       deploymentBlockNumber: cr.blockNumber.toString(), deploymentBlockHash: cr.blockHash });
     [owner, backer, resolver, stranger] = (await db.insert(schema.users).values(["creator", "backer", "resolver", "community"].map(name => ({ email: `${name}@delivery.test` }))).returning()).map(user => user.id);
-    await db.insert(schema.platformRoles).values({ userId: resolver, roles: ["RESOLVER"] });
-    const [link] = await db.insert(schema.walletLinks).values([{ userId: owner, chainId: "31339", address: accounts[3] }, { userId: backer, chainId: "31339", address: accounts[4] }]).returning();
+    await db.insert(schema.platformRoles).values({ userId: resolver, roles: ["RESOLVER", "ADMIN"] });
+    const [link] = await db.insert(schema.walletLinks).values([
+      { userId: owner, chainId: "31339", address: accounts[3] },
+      { userId: backer, chainId: "31339", address: accounts[4] },
+      { userId: resolver, chainId: "31339", address: accounts[1] },
+    ]).returning();
     const [profile] = await db.insert(schema.rewardCreatorProfiles).values({ userId: owner, displayName: "Artist", bio: "Comic creator", ipDeclaration: "Private IP declaration", status: "VERIFIED" }).returning();
     const now = (await client.getBlock()).timestamp; deadline = now + 20n * 86400n;
     const config = editionsDraft(); config.goal = "10000000"; config.fundingDuration = 86400;
@@ -83,9 +88,8 @@ describe("Editions digital delivery: real HTTP, PostgreSQL, MinIO and Anvil", ()
         releaseWindow: { start: new Date(Number(now + 86400n) * 1000).toISOString(), end: new Date(Number(deadline) * 1000).toISOString() } }, samples: [{ id: profile.id, mediaType: "image/png", sha256: `0x${"1".repeat(64)}`, sizeBytes: 100 }] };
     commitment = editionsCommitment(frozen);
     const reviewStartedAt = new Date();
-    const reviewDeadlineAt = new Date(reviewStartedAt.getTime() + 24 * 60 * 60 * 1000);
     const [campaign] = await db.insert(schema.rewardCampaigns).values({ creatorUserId: owner, title: config.title, pitch: config.pitch, story: config.story, category: config.category,
-      goal: config.goal, fundingDuration: config.fundingDuration, draftConfig: config, frozenSnapshot: frozen, commitmentHash: commitment, status: "UNDER_REVIEW", frozenAt: new Date(), reviewStartedAt, reviewDeadlineAt, payoutWalletLinkId: link.id }).returning(); id = campaign.id;
+      goal: config.goal, fundingDuration: config.fundingDuration, draftConfig: config, frozenSnapshot: frozen, commitmentHash: commitment, status: "COMMUNITY_REVIEW", frozenAt: new Date(), reviewStartedAt, payoutWalletLinkId: link.id }).returning(); id = campaign.id;
     const module = await Test.createTestingModule({ controllers: [RewardEditionsDeliveryController, RewardEditionsPublicEvidenceController, RewardEditionsPreviewController, RewardEditionsChainController],
       providers: [RewardEditionsService, RewardEditionsDeliveryService, RewardEditionsPublicationService, RewardEditionsIndexerService, EvidenceStorageService,
         { provide: DRIZZLE_DB, useValue: db }, { provide: EDITIONS_CONNECTION, useValue: { client: client as PublicClient, manifest } },
@@ -98,18 +102,26 @@ describe("Editions digital delivery: real HTTP, PostgreSQL, MinIO and Anvil", ()
   });
 
   it("separates review, activation and funding public surfaces", async () => {
+    await db.update(schema.rewardCampaigns).set({ status: "UNDER_REVIEW_PRIVATE" }).where(eq(schema.rewardCampaigns.id, id));
+    expect((await api().get("/v1/reward/public/editions/review")).body).toEqual([]);
+    expect((await api().get(`/v1/reward/public/editions/${id}`)).status).toBe(404);
+    expect((await api().post(route("feedback")).set("x-test-user", stranger).send({ targetHash: commitment, kind: "COMMENT", body: "Private review is not public yet." })).status).toBe(409);
+    await db.update(schema.rewardCampaigns).set({ status: "COMMUNITY_REVIEW" }).where(eq(schema.rewardCampaigns.id, id));
     const review = await api().get("/v1/reward/public/editions/review");
     expect(review.status).toBe(200);
-    expect(review.body).toEqual([expect.objectContaining({ id, status: "UNDER_REVIEW", surface: "REVIEW", reviewState: "ACTIVE" })]);
-    expect(review.body[0].reviewDeadlineAt).toBeTruthy();
+    expect(review.body).toEqual([expect.objectContaining({ id, status: "COMMUNITY_REVIEW", surface: "REVIEW" })]);
+    expect(review.body[0].reviewStartedAt).toBeTruthy();
+    expect(review.body[0]).not.toHaveProperty("reviewDeadlineAt");
+    expect(review.body[0]).not.toHaveProperty("reviewState");
     expect((await api().get("/v1/reward/public/editions/activation")).body).toEqual([]);
     expect((await api().get("/v1/reward/public/editions/funding")).body).toEqual([]);
 
-    await db.update(schema.rewardCampaigns).set({ reviewDeadlineAt: new Date(Date.now() - 1000) }).where(eq(schema.rewardCampaigns.id, id));
-    const overdue = await api().get(`/v1/reward/public/editions/${id}`);
-    expect(overdue.status).toBe(200);
-    expect(overdue.body).toMatchObject({ status: "UNDER_REVIEW", surface: "REVIEW", reviewState: "OVERDUE" });
-    expect((await db.select({ status: schema.rewardCampaigns.status }).from(schema.rewardCampaigns).where(eq(schema.rewardCampaigns.id, id)))[0].status).toBe("UNDER_REVIEW");
+    const detail = await api().get(`/v1/reward/public/editions/${id}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body).toMatchObject({ status: "COMMUNITY_REVIEW", surface: "REVIEW" });
+    expect(detail.body).not.toHaveProperty("reviewDeadlineAt");
+    expect(detail.body).not.toHaveProperty("reviewState");
+    expect((await db.select({ status: schema.rewardCampaigns.status }).from(schema.rewardCampaigns).where(eq(schema.rewardCampaigns.id, id)))[0].status).toBe("COMMUNITY_REVIEW");
   });
   afterAll(async () => {
     try {
@@ -123,16 +135,30 @@ describe("Editions digital delivery: real HTTP, PostgreSQL, MinIO and Anvil", ()
 
   it("lets community inspect submitted terms and sends attributable private feedback to Resolver", async () => {
     const preview = await api().get(`/v1/reward/public/editions/${id}`);
-    expect(preview.status).toBe(200); expect(preview.body).toMatchObject({ status: "UNDER_REVIEW", budgetPlan: "Art, editing and design time.", evidencePlan: "Page proofs and complete PDF." });
+    expect(preview.status).toBe(200); expect(preview.body).toMatchObject({ status: "COMMUNITY_REVIEW", budgetPlan: "Art, editing and design time.", evidencePlan: "Page proofs and complete PDF." });
     expect(JSON.stringify(preview.body)).not.toMatch(/ipDeclaration|objectId|userId|payoutWallet/);
     const body = { targetHash: commitment, kind: "COMMENT", body: "Please inspect the promised chapter count." };
     expect((await api().post(route("feedback")).send(body)).status).toBe(403);
+    expect((await api().post(route("feedback")).set("x-test-user", owner).send(body)).status).toBe(403);
     expect((await api().post(route("feedback")).set("x-test-user", stranger).send({ ...body, shipping: {} })).status).toBe(400);
-    expect((await api().post(route("feedback")).set("x-test-user", stranger).send(body)).status).toBe(201);
+    const firstFeedback = await api().post(route("feedback")).set("x-test-user", stranger).send(body);
+    expect(firstFeedback.status).toBe(201);
     expect((await api().post(route("feedback")).set("x-test-user", stranger).send(body)).status).toBe(201);
     expect((await api().post(route("feedback")).set("x-test-user", stranger).send({ ...body, body: "An additional comment preserves the original submission" })).status).toBe(201);
-    expect((await api().get(route("feedback")).set("x-test-user", resolver)).body).toEqual(expect.arrayContaining([expect.objectContaining({ authorUserId: stranger, body: body.body })]));
-    expect((await api().get(route("feedback")).set("x-test-user", backer)).body).toEqual([]);
+    expect((await api().get(route("feedback")).set("x-test-user", owner)).body).toMatchObject({ canSubmit: false });
+    expect((await api().get(route("feedback")).set("x-test-user", resolver)).body.items).toEqual(expect.arrayContaining([expect.objectContaining({ authorUserId: stranger, body: body.body })]));
+    expect((await api().get(route("feedback")).set("x-test-user", backer)).body.items).toEqual([]);
+    const [creatorResponse] = await db.insert(schema.editionsCreatorResponses).values({ campaignId: id, creatorUserId: owner,
+      submissionRevision: 3, commitmentHash: commitment, responseBody: "Cảm ơn góp ý; tôi đã cập nhật kế hoạch." }).returning();
+    await db.insert(schema.editionsCreatorResponseFeedback).values({ responseId: creatorResponse.id, feedbackId: firstFeedback.body.id });
+    expect((await api().get(route("feedback")).set("x-test-user", owner)).body.responses).toEqual([
+      expect.objectContaining({ id: creatorResponse.id, responseBody: "Cảm ơn góp ý; tôi đã cập nhật kế hoạch.", relatedFeedbackIds: [firstFeedback.body.id] }),
+    ]);
+    expect((await api().get(route("feedback")).set("x-test-user", stranger)).body.responses).toEqual([
+      expect.objectContaining({ id: creatorResponse.id, relatedFeedbackIds: [firstFeedback.body.id] }),
+    ]);
+    await db.insert(schema.editionsFeedback).values({ campaignId: id, authorUserId: stranger, targetHash: `0x${"2".repeat(64)}`, kind: "COMMENT", body: "Feedback from an older frozen submission.", bodyHash: "older-feedback-hash" });
+    expect((await api().get(route("feedback")).set("x-test-user", resolver)).body.items).not.toEqual(expect.arrayContaining([expect.objectContaining({ body: "Feedback from an older frozen submission." })]));
     expect((await api().get(`/v1/reward/public/editions/${id}`)).body.feedbackCount).toBe(2);
   });
 
@@ -144,15 +170,36 @@ describe("Editions digital delivery: real HTTP, PostgreSQL, MinIO and Anvil", ()
     expect((await api().get("/v1/reward/public/editions/funding")).body).toEqual([]);
     expect((await api().get(route("publication-terms")).set("x-test-user", owner)).status).toBe(409);
     await db.insert(schema.rewardReviews).values({ campaignId: id, resolverUserId: resolver, outcome: "APPROVED", decisionReason: "Reviewed terms and community report", commitmentHash: commitment, frozenSnapshot: campaign.frozenSnapshot });
+    const creatorOperations = await api().get("/v1/reward/editions/operations/creator").set("x-test-user", owner);
+    expect(creatorOperations.status).toBe(200);
+    expect(creatorOperations.body).toEqual([expect.objectContaining({ campaignId: id, applicationStatus: "APPROVED", publicationStatus: "NOT_PUBLISHED", onchainCampaignId: null, contractState: null })]);
+    expect(JSON.stringify(creatorOperations.body)).not.toMatch(/ipDeclaration|objectId|payoutWallet|samples/);
+    expect((await api().get("/v1/reward/editions/operations/resolver").set("x-test-user", stranger)).status).toBe(403);
+    expect((await api().get("/v1/reward/editions/operations/admin").set("x-test-user", resolver)).status).toBe(200);
     const terms = await api().get(route("publication-terms")).set("x-test-user", owner);
-    expect(terms.status).toBe(200); expect(terms.body).toMatchObject({ creatorWallet: accounts[3], commitmentHash: commitment, price: "10000000", releaseDeadline: deadline.toString() });
+    expect(terms.status).toBe(200); expect(terms.body).toMatchObject({ creatorWallet: accounts[3], commitmentHash: commitment, price: "10000000", releaseDeadline: deadline.toString(), onchainApproved: false });
     await db.update(schema.rewardCreatorProfiles).set({ status: "REJECTED" }).where(eq(schema.rewardCreatorProfiles.userId, owner));
     expect((await api().get(route("publication-terms")).set("x-test-user", resolver)).status).toBe(409);
     await db.update(schema.rewardCreatorProfiles).set({ status: "VERIFIED" }).where(eq(schema.rewardCreatorProfiles.userId, owner));
-    await send(accounts[1], "approveCampaign", [accounts[3], commitment, 10000000n, 10000000n, 86400n, deadline]);
-    await send(accounts[3], "createCampaign", [commitment, 10000000n, 10000000n, 86400n, deadline]);
+    approvalHash = await send(accounts[1], "approveCampaign", [accounts[3], commitment, 10000000n, 10000000n, 86400n, deadline]);
+    expect((await api().post("/v1/reward/editions/sync-receipt").set("x-test-user", resolver)
+      .send({ txHash: approvalHash, campaignId: id, action: "createCampaign" })).body.state).toBe("UNRELATED");
+    expect((await api().post("/v1/reward/editions/sync-receipt").set("x-test-user", resolver)
+      .send({ txHash: approvalHash, campaignId: id, action: "approveCampaign" })).body.state).toBe("ON_CHAIN_CONFIRMED");
+    const approvedTerms = await api().get(route("publication-terms")).set("x-test-user", owner);
+    expect(approvedTerms.status).toBe(200); expect(approvedTerms.body.onchainApproved).toBe(true);
+    creationHash = await send(accounts[3], "createCampaign", [commitment, 10000000n, 10000000n, 86400n, deadline]);
+    expect((await api().post("/v1/reward/editions/sync-receipt").set("x-test-user", owner)
+      .send({ txHash: creationHash, campaignId: id, action: "createCampaign" })).body.state).toBe("ON_CHAIN_CONFIRMED");
+    const canonicalOperations = await api().get("/v1/reward/editions/operations/creator").set("x-test-user", owner);
+    expect(canonicalOperations.body[0]).toMatchObject({ campaignId: id, publicationStatus: "ON_CHAIN_CONFIRMED", onchainCampaignId: "0", contractState: 0, bindingTransactionHash: creationHash });
+    expect((await db.select({ onchainCampaignId: schema.rewardCampaigns.onchainCampaignId }).from(schema.rewardCampaigns).where(eq(schema.rewardCampaigns.id, id)))[0].onchainCampaignId).toBeNull();
     beforePledge = await client.request({ method: "evm_snapshot" as any }) as string;
-    await indexer.processReceipt(await send(accounts[4], "pledge", [0n]));
+    pledgeHash = await send(accounts[4], "pledge", [0n]);
+    expect((await api().post("/v1/reward/editions/sync-receipt").set("x-test-user", backer)
+      .send({ txHash: pledgeHash, campaignId: id, action: "createCampaign" })).body.state).toBe("UNRELATED");
+    expect((await api().post("/v1/reward/editions/sync-receipt").set("x-test-user", backer)
+      .send({ txHash: pledgeHash, campaignId: id, action: "pledge" })).body.state).toBe("ON_CHAIN_CONFIRMED");
     expect((await api().get("/v1/reward/public/editions/funding")).body).toEqual([expect.objectContaining({ id, status: "APPROVED", surface: "FUNDING" })]);
     expect((await api().get("/v1/reward/public/editions/activation")).body).toEqual([]);
     entitlementId = (await db.select().from(schema.editionsEntitlements))[0].id;
@@ -209,13 +256,43 @@ describe("Editions digital delivery: real HTTP, PostgreSQL, MinIO and Anvil", ()
     expect((await ticket()).status).toBe(201);
   });
 
+  it("keeps post-approval release and challenge feedback attached to canonical on-chain targets", async () => {
+    const report = {
+      targetHash: finalPdf.evidenceHash,
+      kind: "ISSUE",
+      body: "The accepted release needs a closer content review.",
+    };
+    expect((await api().post(route("feedback")).set("x-test-user", backer).send(report)).status).toBe(201);
+
+    const challengeHash = `0x${"4".repeat(64)}`;
+    await send(accounts[4], "challengeRelease", [0n, challengeHash]);
+    const decision = {
+      targetHash: challengeHash,
+      kind: "COMMENT",
+      body: "Resolver reviewed the canonical challenge evidence.",
+    };
+    expect((await api().post(route("feedback")).set("x-test-user", resolver).send(decision)).status).toBe(201);
+    expect((await api().get(route("feedback")).set("x-test-user", resolver)).body.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ targetHash: finalPdf.evidenceHash, body: report.body }),
+      expect.objectContaining({ targetHash: challengeHash, body: decision.body }),
+    ]));
+    await send(accounts[1], "resolveChallenge", [0n, accounts[4], false, `0x${"5".repeat(64)}`]);
+  });
+
+  it("does not advertise a downloadable reward when canonical PDF metadata is missing", async () => {
+    await db.update(schema.editionsEvidence).set({ purpose: "PRODUCTION_EVIDENCE" }).where(eq(schema.editionsEvidence.id, finalPdf.id));
+    expect((await api().get("/v1/reward/editions/entitlements").set("x-test-user", backer)).body[0]).toMatchObject({ access: "DELIVERY_UNAVAILABLE" });
+    await db.update(schema.editionsEvidence).set({ purpose: "FINAL_PDF" }).where(eq(schema.editionsEvidence.id, finalPdf.id));
+    expect((await api().get("/v1/reward/editions/entitlements").set("x-test-user", backer)).body[0]).toMatchObject({ access: "DOWNLOAD_ELIGIBLE" });
+  });
+
   it("records corrupted/missing file as a review issue without changing contract state or marking delivery", async () => {
     const [stored] = await db.select().from(schema.editionsEvidence).where(eq(schema.editionsEvidence.id, finalPdf.id));
     await storage.put(stored.objectId, Buffer.from("corrupt"), "application/pdf");
     expect((await ticket()).status).toBe(503);
     expect((await ticket()).status).toBe(503);
     const reports = await api().get(route("feedback")).set("x-test-user", resolver);
-    expect(reports.body.filter((item: any) => item.kind === "FILE_UNAVAILABLE")).toHaveLength(1);
+    expect(reports.body.items.filter((item: any) => item.kind === "FILE_UNAVAILABLE")).toHaveLength(1);
     expect((await db.select().from(schema.editionsChainCampaigns))[0].snapshot.state).toBe(3);
     expect((await db.select().from(schema.editionsEntitlements))[0].confirmedAt).toBeNull();
     await storage.put(stored.objectId, pdf, "application/pdf");
@@ -228,7 +305,7 @@ describe("Editions digital delivery: real HTTP, PostgreSQL, MinIO and Anvil", ()
     expect((await api().get(before.body.url).set("x-test-user", backer)).status).toBe(409);
     await send(accounts[4], "claimRefund", [0n]);
     expect((await ticket()).status).toBe(409);
-    expect((await api().get("/v1/reward/editions/entitlements").set("x-test-user", backer)).body[0].access).toBe("REFUNDED");
+    expect((await api().get("/v1/reward/editions/entitlements").set("x-test-user", backer)).body[0]).toMatchObject({ access: "REFUNDED", campaignTitle: expect.any(String) });
     expect(await client.request({ method: "evm_revert" as any, params: [fork] } as any)).toBe(true);
     await client.request({ method: "evm_mine" as any }); await sync();
     expect((await ticket()).status).toBe(201);

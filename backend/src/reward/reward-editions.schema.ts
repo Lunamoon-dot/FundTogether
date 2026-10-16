@@ -19,9 +19,15 @@ export const editionsUpdateSchema = z.strictObject({
   preparation: editionsPreparationSchema,
 }).refine(({ config, preparation }) => {
   const estimate = config.tiers[0].estimatedDeliveryAt;
-  return !estimate || (new Date(estimate).toISOString() >= preparation.releaseWindow.start && new Date(estimate).toISOString() <= preparation.releaseWindow.end);
-}, "Estimated delivery must be within the release window");
+  return !estimate || new Date(estimate).toISOString() <= preparation.releaseWindow.end;
+}, "Estimated delivery must be on or before the committed release deadline");
 export const editionsRevisionSchema = z.strictObject({ revision: z.number().int().nonnegative() });
+export const editionsSubmitReviewSchema = editionsRevisionSchema.extend({
+  responseBody: z.string().trim().min(10).max(3000).optional(),
+  relatedFeedbackIds: z.array(z.string().uuid()).max(20)
+    .refine(ids => new Set(ids).size === ids.length, "Duplicate feedback reference")
+    .default([]),
+}).refine(input => !input.relatedFeedbackIds.length || Boolean(input.responseBody), "Feedback links require a Creator response");
 export const editionsReviewSchema = resolverReviewCampaignSchema.extend({
   commitmentHash: z.string().regex(/^0x[0-9a-f]{64}$/),
 });

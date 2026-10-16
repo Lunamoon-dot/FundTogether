@@ -4,6 +4,7 @@ import { Test } from "@nestjs/testing";
 import * as request from "supertest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { randomUUID } from "node:crypto";
 import { Client, Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { eq } from "drizzle-orm";
@@ -159,12 +160,15 @@ describe("Editions freeze/review: real HTTP, PostgreSQL and private object stora
     await expect(app.get(RewardCampaignService).adminReviewCreator(adminUser, profile.id, { outcome: "VERIFIED" })).rejects.toMatchObject({ status: 403 });
   });
 
-  it("rejects samples from another campaign and mismatched release estimates", async () => {
+  it("rejects samples from another campaign, but does not couple the estimate to the window start", async () => {
     const sample = await upload();
     id = (await app.get(RewardCampaignService).createDraft(owner, editionsDraft())).id;
     expect((await update(input(sample.body.id))).status).toBe(400);
     const other = await upload();
     const body = input(other.body.id);
+    (body.config.tiers[0] as any).estimatedDeliveryAt = "2026-12-01T00:00:00Z";
+    expect((await update(body)).status).toBe(200);
+    body.revision = 1;
     (body.config.tiers[0] as any).estimatedDeliveryAt = "2028-01-01T00:00:00Z";
     expect((await update(body)).status).toBe(400);
   });
@@ -206,20 +210,27 @@ describe("Editions freeze/review: real HTTP, PostgreSQL and private object stora
     const frozen = await submit();
     const decision = { outcome: "APPROVED", decisionReason: "Reviewed the comic and sample evidence", commitmentHash: frozen.commitmentHash };
     for (const actor of [owner, stranger, adminUser]) expect((await post("/review", decision, actor)).status).toBe(403);
+    expect((await api().post(path("/open-community-review")).set("x-test-user", owner)).status).toBe(403);
+    expect((await api().post(path("/open-community-review")).set("x-test-user", stranger)).status).toBe(403);
+    expect((await api().post(path("/open-community-review")).set("x-test-user", adminUser)).status).toBe(403);
+    expect((await api().post(path("/open-community-review")).set("x-test-user", resolver)).status).toBe(201);
     expect((await post("/review", { ...decision, commitmentHash: `0x${"0".repeat(64)}` }, resolver)).status).toBe(409);
     expect((await post("/review", { ...decision, shipping: {} }, resolver)).status).toBe(400);
-    expect((await current()).status).toBe("UNDER_REVIEW");
+    expect((await current()).status).toBe("COMMUNITY_REVIEW");
   });
 
-  it("records a 24-hour Resolver review SLA without expiring the decision authority", async () => {
+  it("records when review starts without imposing a time-based Resolver deadline", async () => {
     const frozen = await submit();
     const submitted = await current();
     expect(submitted.reviewStartedAt).not.toBeNull();
-    expect(submitted.reviewDeadlineAt).not.toBeNull();
-    expect(submitted.reviewDeadlineAt!.getTime() - submitted.reviewStartedAt!.getTime()).toBe(24 * 60 * 60 * 1000);
+    expect(submitted).not.toHaveProperty("reviewDeadlineAt");
+    expect((await api().get(`/v1/reward/public/editions/${id}`)).status).toBe(404);
+    expect((await api().get("/v1/reward/public/editions/review")).body.some((item: any) => item.id === id)).toBe(false);
+    expect((await api().post(path("/open-community-review")).set("x-test-user", resolver)).status).toBe(201);
+    expect((await api().get(`/v1/reward/public/editions/${id}`)).status).toBe(200);
 
-    await db.update(schema.rewardCampaigns).set({ reviewDeadlineAt: new Date(Date.now() - 1000) }).where(eq(schema.rewardCampaigns.id, id));
-    const approved = await post("/review", { outcome: "APPROVED", decisionReason: "Reviewed after the SLA warning", commitmentHash: frozen.commitmentHash }, resolver);
+    await db.update(schema.rewardCampaigns).set({ reviewStartedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000) }).where(eq(schema.rewardCampaigns.id, id));
+    const approved = await post("/review", { outcome: "APPROVED", decisionReason: "Reviewed when the agreed checklist was complete", commitmentHash: frozen.commitmentHash }, resolver);
     expect(approved.status).toBe(201);
     expect(approved.body.status).toBe("APPROVED");
   });
@@ -227,22 +238,67 @@ describe("Editions freeze/review: real HTTP, PostgreSQL and private object stora
   it("preserves old reviewed terms through corrections and rejects stale decisions", async () => {
     const frozen = await submit();
     const decision = { outcome: "CHANGES_REQUESTED", decisionReason: "Please clarify the ending in the outline", commitmentHash: frozen.commitmentHash };
+    expect((await api().post(path("/open-community-review")).set("x-test-user", resolver)).status).toBe(201);
     const corrected = await post("/review", decision, resolver);
     expect(corrected.status).toBe(201);
-    expect(corrected.body).toMatchObject({ status: "DRAFT", frozenSnapshot: null, commitmentHash: null, payoutWalletLinkId: null, reviewStartedAt: null, reviewDeadlineAt: null, revision: 4 });
+    expect(corrected.body).toMatchObject({ status: "DRAFT", frozenSnapshot: null, commitmentHash: null, payoutWalletLinkId: null, reviewStartedAt: null, revision: 4 });
+    expect(corrected.body).not.toHaveProperty("reviewDeadlineAt");
     const [review] = await db.select().from(schema.rewardReviews).where(eq(schema.rewardReviews.campaignId, id));
     expect(review.frozenSnapshot).toEqual(frozen.frozenSnapshot);
     const old = await current();
     expect((await update({ revision: 4, config: { ...old.draftConfig, title: "A new title with clarified scope" }, preparation: old.reviewPreparation })).status).toBe(200);
     expect((await post("/freeze", { revision: 5 })).status).toBe(201);
-    expect((await post("/submit-review", { revision: 6 })).status).toBe(201);
+    expect((await post("/submit-review", { revision: 6, responseBody: "Cảm ơn Resolver; tôi đã làm rõ phần kết thúc theo yêu cầu." })).status).toBe(201);
     expect((await post("/review", { ...decision, outcome: "APPROVED" }, resolver)).status).toBe(409);
     expect((await current()).commitmentHash).not.toBe(frozen.commitmentHash);
+  });
+
+  it("requires and stores one general Creator response when resubmitting after feedback", async () => {
+    const frozen = await submit();
+    const [feedback] = await db.insert(schema.editionsFeedback).values({
+      campaignId: id,
+      authorUserId: stranger,
+      targetHash: frozen.commitmentHash,
+      kind: "ISSUE",
+      body: "Please clarify how the final chapter will be edited.",
+      bodyHash: "feedback-hash-for-response-test",
+    }).returning();
+    const decision = { outcome: "CHANGES_REQUESTED", decisionReason: "Clarify the production plan", commitmentHash: frozen.commitmentHash };
+    expect((await api().post(path("/open-community-review")).set("x-test-user", resolver)).status).toBe(201);
+    expect((await post("/review", decision, resolver)).status).toBe(201);
+    const old = await current();
+    const body = await update({ revision: old.revision, config: { ...old.draftConfig, title: "A clarified comic edition" }, preparation: old.reviewPreparation });
+    expect(body.status).toBe(200);
+    expect((await post("/freeze", { revision: body.body.revision })).status).toBe(201);
+    const currentFrozen = await current();
+
+    expect((await post("/submit-review", { revision: currentFrozen.revision })).status).toBe(400);
+    expect((await post("/submit-review", {
+      revision: currentFrozen.revision,
+      responseBody: "Cảm ơn góp ý; tôi đã cập nhật lại phạm vi biên tập và kế hoạch hoàn thiện.",
+      relatedFeedbackIds: [randomUUID()],
+    })).status).toBe(400);
+    expect(await db.select().from(schema.editionsCreatorResponses).where(eq(schema.editionsCreatorResponses.campaignId, id))).toHaveLength(0);
+
+    const submitted = await post("/submit-review", {
+      revision: currentFrozen.revision,
+      responseBody: "Cảm ơn góp ý; tôi đã cập nhật lại phạm vi biên tập và kế hoạch hoàn thiện.",
+      relatedFeedbackIds: [feedback.id],
+    });
+    expect(submitted.status).toBe(201);
+    expect(await db.select({ campaignId: schema.editionsCreatorResponses.campaignId, submissionRevision: schema.editionsCreatorResponses.submissionRevision,
+      commitmentHash: schema.editionsCreatorResponses.commitmentHash, responseBody: schema.editionsCreatorResponses.responseBody,
+    }).from(schema.editionsCreatorResponses).where(eq(schema.editionsCreatorResponses.campaignId, id))).toEqual([expect.objectContaining({
+      campaignId: id, submissionRevision: currentFrozen.revision, commitmentHash: currentFrozen.commitmentHash,
+      responseBody: "Cảm ơn góp ý; tôi đã cập nhật lại phạm vi biên tập và kế hoạch hoàn thiện.",
+    })]);
+    expect(await db.select().from(schema.editionsCreatorResponseFeedback).where(eq(schema.editionsCreatorResponseFeedback.feedbackId, feedback.id))).toHaveLength(1);
   });
 
   it("approves once with a redacted public preview and private sample access", async () => {
     expect((await api().get(`/v1/reward/public/editions/${id}`)).status).toBe(404);
     const frozen = await submit();
+    expect((await api().post(path("/open-community-review")).set("x-test-user", resolver)).status).toBe(201);
     const sample = await api().get(path(`/samples/${frozen.frozenSnapshot.samples[0].id}`)).set("x-test-user", resolver);
     expect(sample.status).toBe(200);
     const body = { outcome: "APPROVED", decisionReason: "Content plan, samples and IP reviewed", commitmentHash: frozen.commitmentHash };
@@ -258,6 +314,7 @@ describe("Editions freeze/review: real HTTP, PostgreSQL and private object stora
 
   it("rejection is terminal for this draft and never becomes a public paid campaign", async () => {
     const frozen = await submit();
+    expect((await api().post(path("/open-community-review")).set("x-test-user", resolver)).status).toBe(201);
     expect((await post("/review", { outcome: "REJECTED", decisionReason: "Publication rights could not be established", commitmentHash: frozen.commitmentHash }, resolver)).status).toBe(201);
     const stopped = await current();
     expect(stopped.status).toBe("STOPPED");

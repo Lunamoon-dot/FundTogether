@@ -1,14 +1,15 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
-import { and, count, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { DRIZZLE_DB } from "../database/database.constants";
 import * as schema from "../database/schema";
-import { rewardCampaigns as campaigns, rewardEditionsSamples as samples, rewardCreatorProfiles as profiles, rewardReviews as reviews, walletLinks, platformRoles, editionsFeedback } from "../database/schema";
+import { rewardCampaigns as campaigns, rewardEditionsSamples as samples, rewardCreatorProfiles as profiles, rewardReviews as reviews, walletLinks, platformRoles, editionsFeedback, editionsCreatorResponses as creatorResponses, editionsCreatorResponseFeedback as responseFeedback } from "../database/schema";
 import { EvidenceStorageService } from "../modules/evidence/evidence-storage.service";
 import { EvidenceUploadFile, validateEvidenceFile } from "../modules/evidence/evidence-file-validation";
-import { editionsPreparationSchema, editionsReviewSchema, editionsRevisionSchema, editionsUpdateSchema } from "./reward-editions.schema";
+import { currentEditionsReviewTargets } from "./reward-editions-delivery.policy";
+import { editionsPreparationSchema, editionsReviewSchema, editionsRevisionSchema, editionsSubmitReviewSchema, editionsUpdateSchema } from "./reward-editions.schema";
 import { createRewardCampaignDraftSchema } from "./reward-campaign.schema";
 import { editionsCommitment, EditionsSnapshot } from "./reward-editions-commitment";
 
@@ -17,8 +18,7 @@ type Campaign = typeof campaigns.$inferSelect;
 type Sample = typeof samples.$inferSelect;
 const sha256 = (bytes: Uint8Array) => `0x${createHash("sha256").update(bytes).digest("hex")}`;
 const sampleDto = (sample: Sample) => ({ id: sample.id, sha256: sample.sha256, mediaType: sample.mediaType, sizeBytes: sample.sizeBytes });
-export const EDITIONS_REVIEW_SLA_MS = 24 * 60 * 60 * 1000;
-export type EditionsPublicStatus = "UNDER_REVIEW" | "APPROVED";
+export type EditionsPublicStatus = "COMMUNITY_REVIEW" | "APPROVED";
 
 function parse<T extends z.ZodType>(schema: T, body: unknown): z.output<T> {
   const result = schema.safeParse(body);
@@ -122,7 +122,7 @@ export class RewardEditionsService {
   private async canReadSamples(campaign: Campaign, userId: string) {
     if (campaign.creatorUserId === userId) return;
     await this.resolver(this.db, userId);
-    if (!["UNDER_REVIEW", "APPROVED", "STOPPED"].includes(campaign.status) || !campaign.frozenSnapshot)
+    if (!["UNDER_REVIEW_PRIVATE", "COMMUNITY_REVIEW", "APPROVED", "STOPPED"].includes(campaign.status) || !campaign.frozenSnapshot)
       throw new ForbiddenException("Samples have not been submitted for review");
   }
 
@@ -171,16 +171,45 @@ export class RewardEditionsService {
   }
 
   async submit(id: string, userId: string, body: unknown) {
-    const { revision } = parse(editionsRevisionSchema, body);
+    const input = parse(editionsSubmitReviewSchema, body);
     return this.db.transaction(async tx => {
       const campaign = await this.campaign(tx, id, true);
       this.owner(campaign, userId);
-      if (campaign.status !== "FROZEN" || campaign.revision !== revision || !campaign.frozenSnapshot ||
+      if (campaign.status !== "FROZEN" || campaign.revision !== input.revision || !campaign.frozenSnapshot ||
         editionsCommitment(campaign.frozenSnapshot) !== campaign.commitmentHash) throw new ConflictException("A current frozen commitment is required");
+      const [priorFeedback] = await tx.select({ id: editionsFeedback.id }).from(editionsFeedback)
+        .where(eq(editionsFeedback.campaignId, id)).limit(1);
+      const [priorCorrection] = await tx.select({ id: reviews.id }).from(reviews)
+        .where(and(eq(reviews.campaignId, id), eq(reviews.outcome, "CHANGES_REQUESTED"))).limit(1);
+      if ((priorFeedback || priorCorrection) && !input.responseBody)
+        throw new BadRequestException("A Creator response is required when resubmitting after review feedback");
+      if (input.relatedFeedbackIds.length) {
+        const linked = await tx.select({ id: editionsFeedback.id }).from(editionsFeedback)
+          .where(and(eq(editionsFeedback.campaignId, id), inArray(editionsFeedback.id, input.relatedFeedbackIds)));
+        if (linked.length !== input.relatedFeedbackIds.length) throw new BadRequestException("Feedback references must belong to this campaign");
+      }
       const reviewStartedAt = new Date();
-      const reviewDeadlineAt = new Date(reviewStartedAt.getTime() + EDITIONS_REVIEW_SLA_MS);
-      const [updated] = await tx.update(campaigns).set({ status: "UNDER_REVIEW", reviewStartedAt, reviewDeadlineAt,
-        revision: revision + 1, updatedAt: reviewStartedAt })
+      const [updated] = await tx.update(campaigns).set({ status: "UNDER_REVIEW_PRIVATE", reviewStartedAt,
+        revision: input.revision + 1, updatedAt: reviewStartedAt })
+        .where(eq(campaigns.id, id)).returning();
+      if (input.responseBody) {
+        const [response] = await tx.insert(creatorResponses).values({ campaignId: id, creatorUserId: userId,
+          submissionRevision: input.revision, commitmentHash: campaign.commitmentHash!, responseBody: input.responseBody }).returning({ id: creatorResponses.id });
+        if (input.relatedFeedbackIds.length) await tx.insert(responseFeedback).values(input.relatedFeedbackIds.map(feedbackId => ({ responseId: response.id, feedbackId })));
+      }
+      return updated;
+    });
+  }
+
+  async openCommunityReview(id: string, userId: string) {
+    return this.db.transaction(async tx => {
+      await this.resolver(tx, userId);
+      const campaign = await this.campaign(tx, id, true);
+      if (campaign.creatorUserId === userId) throw new ForbiddenException("Creator cannot open their own campaign review");
+      if (campaign.status !== "UNDER_REVIEW_PRIVATE" || !campaign.frozenSnapshot || !campaign.commitmentHash ||
+        editionsCommitment(campaign.frozenSnapshot) !== campaign.commitmentHash)
+        throw new ConflictException("A current private frozen commitment is required");
+      const [updated] = await tx.update(campaigns).set({ status: "COMMUNITY_REVIEW", updatedAt: new Date() })
         .where(eq(campaigns.id, id)).returning();
       return updated;
     });
@@ -192,7 +221,7 @@ export class RewardEditionsService {
       await this.resolver(tx, userId);
       const campaign = await this.campaign(tx, id, true);
       if (campaign.creatorUserId === userId) throw new ForbiddenException("Creator cannot review their own campaign");
-      if (campaign.status !== "UNDER_REVIEW" || !campaign.frozenSnapshot || !campaign.commitmentHash ||
+      if (campaign.status !== "COMMUNITY_REVIEW" || !campaign.frozenSnapshot || !campaign.commitmentHash ||
         campaign.commitmentHash !== input.commitmentHash || editionsCommitment(campaign.frozenSnapshot) !== input.commitmentHash)
         throw new ConflictException("Review must target the current frozen commitment");
       await tx.insert(reviews).values({ campaignId: id, resolverUserId: userId, outcome: input.outcome,
@@ -202,7 +231,7 @@ export class RewardEditionsService {
         status: correction ? "DRAFT" : input.outcome === "REJECTED" ? "STOPPED" : "APPROVED",
         ...(correction ? { frozenAt: null, frozenSnapshot: null, commitmentHash: null } : {}),
         ...(input.outcome !== "APPROVED" ? { payoutWalletLinkId: null } : {}),
-        ...(correction ? { reviewStartedAt: null, reviewDeadlineAt: null } : {}),
+        ...(correction ? { reviewStartedAt: null } : {}),
         revision: campaign.revision + 1, updatedAt: new Date(),
       }).where(eq(campaigns.id, id)).returning();
       return updated;
@@ -217,22 +246,20 @@ export class RewardEditionsService {
 
   async publicPreview(id: string) {
     const campaign = await this.campaign(this.db, id);
-    if (!["UNDER_REVIEW", "APPROVED"].includes(campaign.status) || !campaign.frozenSnapshot || !campaign.commitmentHash ||
+    if (!["COMMUNITY_REVIEW", "APPROVED"].includes(campaign.status) || !campaign.frozenSnapshot || !campaign.commitmentHash ||
       editionsCommitment(campaign.frozenSnapshot) !== campaign.commitmentHash)
       throw new NotFoundException("Approved preview not found");
     const { config, creator, preparation, samples: evidence } = campaign.frozenSnapshot;
-    const [reports] = await this.db.select({ count: count() }).from(editionsFeedback).where(eq(editionsFeedback.campaignId, id));
+    const activeTargets = currentEditionsReviewTargets({ commitmentHash: campaign.commitmentHash, frozenSnapshot: { samples: evidence } });
+    const feedbackRows = await this.db.select({ targetHash: editionsFeedback.targetHash }).from(editionsFeedback)
+      .where(eq(editionsFeedback.campaignId, id));
     const decisions = await this.db.select({ outcome: reviews.outcome, commitmentHash: reviews.commitmentHash, reviewedAt: reviews.reviewedAt })
       .from(reviews).where(eq(reviews.campaignId, id)).orderBy(desc(reviews.reviewedAt));
-    const reviewState = campaign.status === "UNDER_REVIEW" && campaign.reviewDeadlineAt
-      ? campaign.reviewDeadlineAt.getTime() < Date.now() ? "OVERDUE" : "ACTIVE"
-      : null;
     return { id, status: campaign.status, publicationEnabled: false, commitmentHash: campaign.commitmentHash,
       reviewStartedAt: campaign.reviewStartedAt?.toISOString() ?? null,
-      reviewDeadlineAt: campaign.reviewDeadlineAt?.toISOString() ?? null,
-      reviewState,
       config, creatorDisplayName: creator.displayName, contentOutline: preparation.contentOutline,
-      budgetPlan: preparation.budgetPlan, evidencePlan: preparation.evidencePlan, feedbackCount: reports.count, decisions,
+      budgetPlan: preparation.budgetPlan, evidencePlan: preparation.evidencePlan,
+      feedbackCount: feedbackRows.filter(item => activeTargets.has(item.targetHash)).length, decisions,
       releaseWindow: preparation.releaseWindow, evidenceHashes: evidence.map(item => item.sha256) };
   }
 }

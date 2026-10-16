@@ -1,14 +1,15 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { DRIZZLE_DB } from "../database/database.constants";
 import * as schema from "../database/schema";
-import { editionsEvidence as evidence, editionsEntitlements as entitlements, editionsFeedback as feedback, editionsDownloadTickets as tickets, rewardCampaigns as campaigns, platformRoles } from "../database/schema";
+import { editionsEvidence as evidence, editionsEntitlements as entitlements, editionsFeedback as feedback, editionsDownloadTickets as tickets, editionsCreatorResponses as creatorResponses, editionsCreatorResponseFeedback as responseFeedback, rewardCampaigns as campaigns, platformRoles } from "../database/schema";
 import { EvidenceStorageService } from "../modules/evidence/evidence-storage.service";
 import { EvidenceUploadFile, validateEvidenceFile } from "../modules/evidence/evidence-file-validation";
 import { digitalText } from "./reward-campaign.schema";
+import { canUploadEditionsEvidence, currentEditionsFeedbackTargets, deriveEditionsEntitlementAccess } from "./reward-editions-delivery.policy";
 import { RewardEditionsIndexerService } from "./reward-editions-indexer.service";
 import { RewardEditionsPublicationService } from "./reward-editions-publication.service";
 import { validateEditionsPdf } from "./reward-editions-pdf";
@@ -44,8 +45,8 @@ export class RewardEditionsDeliveryService {
     if (!chain.snapshot || chain.status !== "ON_CHAIN_CONFIRMED") throw new ConflictException("A canonical Editions campaign is required");
     return chain.snapshot;
   }
-  private uploadAllowed(state: schema.EditionsChainSnapshot, purpose: Evidence["purpose"]) {
-    if (state.state !== 1 || (purpose === "PRODUCTION_EVIDENCE" ? state.productionApproved || state.productionHash !== zeroHash : !state.productionApproved))
+  private assertUploadAllowed(state: schema.EditionsChainSnapshot, purpose: Evidence["purpose"]) {
+    if (!canUploadEditionsEvidence(state, purpose, zeroHash))
       throw new ConflictException("Evidence cannot change while its review is pending or accepted");
   }
 
@@ -56,7 +57,7 @@ export class RewardEditionsDeliveryService {
     if (!parsed.success) throw new BadRequestException("Use one digital evidence file, purpose and public summary only");
     const input = parsed.data;
     const state = await this.chain(id);
-    this.uploadAllowed(state, input.purpose);
+    this.assertUploadAllowed(state, input.purpose);
     const mediaType = await validateEvidenceFile(file);
     if (input.purpose === "FINAL_PDF") {
       if (mediaType !== "application/pdf") throw new BadRequestException("The final deliverable must be a PDF");
@@ -76,7 +77,7 @@ export class RewardEditionsDeliveryService {
         // Serialize uploads without blocking the indexer's FK key-share locks.
         await tx.select({ id: campaigns.id }).from(campaigns).where(eq(campaigns.id, id)).for("no key update");
         const current = await this.chain(id);
-        this.uploadAllowed(current, input.purpose);
+        this.assertUploadAllowed(current, input.purpose);
         if (input.purpose === "FINAL_PDF" && current.productionHash !== productionHash) throw new ConflictException("Production evidence changed; reload");
         const all = await tx.select({ id: evidence.id }).from(evidence).where(eq(evidence.campaignId, id));
         if (all.length >= 20) throw new ConflictException("At most 20 evidence files per campaign");
@@ -115,15 +116,17 @@ export class RewardEditionsDeliveryService {
   }
   async addFeedback(id: string, userId: string, body: unknown) {
     const campaign = await this.campaign(id);
-    if (!["UNDER_REVIEW", "APPROVED"].includes(campaign.status) || !campaign.frozenSnapshot) throw new ConflictException("Campaign is not open for community review");
+    if (!["COMMUNITY_REVIEW", "APPROVED"].includes(campaign.status) || !campaign.frozenSnapshot || !campaign.commitmentHash)
+      throw new ConflictException("Campaign is not open for feedback");
+    if (campaign.creatorUserId === userId) throw new ForbiddenException("Creator cannot send feedback on their own campaign");
     const parsed = feedbackSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException("Use a current target hash, COMMENT or ISSUE, and a bounded message");
     const input = parsed.data;
-    if (input.targetHash !== campaign.commitmentHash) {
-      const [items, chain] = await Promise.all([this.publicEvidence(id), this.publication.chainCampaign(id)]);
-      if (!items.some(item => item.evidenceHash === input.targetHash) && !chain.challenges.some(item => item.evidenceHash === input.targetHash))
-        throw new ConflictException("Feedback must identify the current reviewed terms, submitted evidence or canonical challenge");
-    }
+    const chain = campaign.status === "APPROVED" ? await this.publication.chainCampaign(id) : undefined;
+    if (campaign.status === "APPROVED" && (!chain?.snapshot || chain.status !== "ON_CHAIN_CONFIRMED"))
+      throw new ConflictException("A canonical Editions campaign is required for post-approval feedback");
+    if (!currentEditionsFeedbackTargets({ commitmentHash: campaign.commitmentHash, frozenSnapshot: campaign.frozenSnapshot, chain, zeroHash }).has(input.targetHash))
+      throw new ConflictException("Feedback must identify current reviewed terms, evidence or an on-chain challenge");
     return this.db.transaction(async tx => {
       await tx.select({ id: campaigns.id }).from(campaigns).where(eq(campaigns.id, id)).for("no key update");
       const items = await tx.select().from(feedback).where(and(eq(feedback.campaignId, id), eq(feedback.authorUserId, userId)));
@@ -138,22 +141,49 @@ export class RewardEditionsDeliveryService {
     const campaign = await this.campaign(id);
     const [role] = await this.db.select().from(platformRoles).where(eq(platformRoles.userId, userId));
     const canReview = campaign.creatorUserId === userId || role?.roles.includes("RESOLVER");
-    return this.db.select().from(feedback).where(and(eq(feedback.campaignId, id), canReview ? undefined : eq(feedback.authorUserId, userId)));
+    const items = await this.db.select().from(feedback).where(and(eq(feedback.campaignId, id), canReview ? undefined : eq(feedback.authorUserId, userId)));
+    const chain = campaign.status === "APPROVED" ? await this.publication.chainCampaign(id) : undefined;
+    const activeTargets = currentEditionsFeedbackTargets({ commitmentHash: campaign.commitmentHash, frozenSnapshot: campaign.frozenSnapshot, chain, zeroHash });
+    const activeItems = items.filter(item => item.kind === "FILE_UNAVAILABLE" || activeTargets.has(item.targetHash));
+    const responseRows = await this.db.select().from(creatorResponses).where(eq(creatorResponses.campaignId, id)).orderBy(desc(creatorResponses.createdAt));
+    const links = responseRows.length ? await this.db.select().from(responseFeedback)
+      .where(inArray(responseFeedback.responseId, responseRows.map(row => row.id))) : [];
+    const visibleFeedbackIds = new Set(items.map(item => item.id));
+    const responses = responseRows
+      .map(response => ({ ...response, relatedFeedbackIds: links.filter(link => link.responseId === response.id).map(link => link.feedbackId) }))
+      .filter(response => canReview || response.relatedFeedbackIds.some(feedbackId => visibleFeedbackIds.has(feedbackId)));
+    return { items: activeItems, history: canReview ? items : [], responses, canSubmit: campaign.creatorUserId !== userId };
   }
 
   async listEntitlements(userId: string) {
     await this.indexer.runOnce();
     const items = await this.db.select().from(entitlements).where(eq(entitlements.backerUserId, userId));
+    const campaignTitles = new Map<string, string>();
+    const currentStreamId = this.indexer.streamId();
+    let releaseFiles: Evidence[] = [];
+    if (items.length) {
+      const rows = await this.db.select({ id: campaigns.id, title: campaigns.title }).from(campaigns)
+        .where(inArray(campaigns.id, items.map(item => item.campaignId)));
+      rows.forEach(row => campaignTitles.set(row.id, row.title));
+      releaseFiles = await this.db.select().from(evidence).where(and(
+        inArray(evidence.campaignId, items.map(item => item.campaignId)),
+        eq(evidence.streamId, currentStreamId),
+        eq(evidence.purpose, "FINAL_PDF"),
+      ));
+    }
     return Promise.all(items.map(async item => {
-      let confirmedAt: Date | null = null;
-      let access: "DOWNLOAD_ELIGIBLE" | "PENDING_RELEASE" | "REFUND_ELIGIBLE" | "REFUNDED" | "ORPHANED" = item.refunded ? "REFUNDED" : !item.canonical || item.streamId !== this.indexer.streamId() ? "ORPHANED" : "PENDING_RELEASE";
-      if (item.canonical && !item.refunded && item.streamId === this.indexer.streamId()) {
-        const [binding] = await this.db.select().from(schema.editionsChainCampaigns).where(and(eq(schema.editionsChainCampaigns.campaignId, item.campaignId), eq(schema.editionsChainCampaigns.streamId, item.streamId), eq(schema.editionsChainCampaigns.canonical, true)));
-        if (binding?.snapshot.state === 4) access = "REFUND_ELIGIBLE";
-        else if ([3, 5].includes(binding?.snapshot.state)) access = "DOWNLOAD_ELIGIBLE";
-        if (access === "DOWNLOAD_ELIGIBLE" && binding?.snapshot.releaseEvidenceHash === item.confirmedEvidenceHash) confirmedAt = item.confirmedAt;
+      let binding: { snapshot: schema.EditionsChainSnapshot } | undefined;
+      if (item.canonical && !item.refunded && item.streamId === currentStreamId) {
+        const [currentBinding] = await this.db.select().from(schema.editionsChainCampaigns).where(and(eq(schema.editionsChainCampaigns.campaignId, item.campaignId), eq(schema.editionsChainCampaigns.streamId, item.streamId), eq(schema.editionsChainCampaigns.canonical, true)));
+        binding = currentBinding;
       }
-      return { id: item.id, campaignId: item.campaignId, backerWallet: item.backerWallet, transactionHash: item.transactionHash, amountPaid: item.amountPaid, access, confirmedAt };
+      const releaseAvailable = Boolean(binding && releaseFiles.some(file => file.campaignId === item.campaignId
+        && file.streamId === item.streamId && file.sha256 === binding!.snapshot.pdfHash
+        && file.evidenceHash === binding!.snapshot.releaseEvidenceHash && file.productionHash === binding!.snapshot.productionHash));
+      const derived = deriveEditionsEntitlementAccess({ canonical: item.canonical, refunded: item.refunded, streamId: item.streamId,
+        currentStreamId, binding, confirmedEvidenceHash: item.confirmedEvidenceHash, confirmedAt: item.confirmedAt, releaseAvailable });
+      return { id: item.id, campaignId: item.campaignId, campaignTitle: campaignTitles.get(item.campaignId) ?? "Campaign Editions", backerWallet: item.backerWallet,
+        transactionHash: item.transactionHash, amountPaid: item.amountPaid, access: derived.access, confirmedAt: derived.confirmedAt };
     }));
   }
 
