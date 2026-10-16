@@ -111,14 +111,15 @@ async function main() {
         { column_name: 'policy_hash', is_nullable: 'YES' },
       ]);
       const { rows: migrations } = await database.query('SELECT id FROM reward_schema_migrations ORDER BY id');
-      assert.deepEqual(migrations.map(row => row.id), ['0000_reward_baseline', '0001_reward_editions_drafts', '0002_reward_editions_review', '0003_reward_editions_chain', '0004_reward_editions_delivery', '0005_reward_physical_retirement']);
+      assert.deepEqual(migrations.map(row => row.id), ['0000_reward_baseline', '0001_reward_editions_drafts', '0002_reward_editions_review', '0003_reward_editions_chain', '0004_reward_editions_delivery', '0005_reward_physical_retirement', '0006_reward_editions_review_sla', '0007_reward_editions_review_sla_backfill', '0008_reward_editions_review_policy', '0009_editions_review_gating', '0010_editions_review_conversations']);
+      assert.equal((await database.query("SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='reward_campaigns' AND column_name='review_deadline_at'")).rows[0].count, '0');
       const required = [
         'users', 'wallet_links', 'auth_sessions', 'auth_challenges',
         'organizations', 'organization_members', 'platform_roles',
         'indexer_streams', 'chain_events', 'reward_schema_migrations',
         'reward_creator_profiles', 'reward_campaigns', 'reward_reviews',
         'reward_tiers', 'reward_entitlements',
-         'reward_disputes', 'reward_campaign_projection', 'reward_editions_samples', 'editions_chain_campaigns', 'editions_entitlements', 'editions_evidence', 'editions_feedback', 'editions_download_tickets',
+         'reward_disputes', 'reward_campaign_projection', 'reward_editions_samples', 'editions_chain_campaigns', 'editions_entitlements', 'editions_evidence', 'editions_feedback', 'editions_download_tickets', 'editions_creator_responses', 'editions_creator_response_feedback', 'editions_review_threads', 'editions_review_messages', 'editions_review_escalations',
       ];
       for (const name of required) assert.ok(names.has(name), `missing table ${name}`);
 
@@ -142,6 +143,10 @@ async function main() {
 
       assert.deepEqual(await foreignKey('reward_campaigns', 'creator_user_id'), ['users']);
       assert.deepEqual(await foreignKey('reward_campaign_projection', 'stream_id'), ['indexer_streams']);
+      assert.deepEqual(await foreignKey('editions_creator_response_feedback', 'feedback_id'), ['editions_feedback']);
+      assert.deepEqual(await foreignKey('editions_review_threads', 'entitlement_id'), ['editions_entitlements']);
+      assert.deepEqual(await foreignKey('editions_review_messages', 'thread_id'), ['editions_review_threads']);
+      assert.deepEqual(await foreignKey('editions_review_escalations', 'thread_id'), ['editions_review_threads']);
       assert.equal([...names].some((name) => /^(campaigns|milestones|campaign_chain_projection)$|disbursement|^hed_/i.test(name)), false);
     } finally {
       await database.end();

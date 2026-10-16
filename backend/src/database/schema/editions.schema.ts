@@ -1,4 +1,5 @@
-import { boolean, index, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, check, index, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { rewardCampaigns } from "./reward.schema";
 import { indexerStreams } from "./indexer.schema";
 import { users } from "./users.schema";
@@ -65,6 +66,82 @@ export const editionsFeedback = pgTable("editions_feedback", {
   bodyHash: varchar("body_hash", { length: 64 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex("editions_feedback_author_target_idx").on(table.campaignId, table.authorUserId, table.targetHash, table.kind, table.bodyHash)]);
+
+export const editionsCreatorResponses = pgTable("editions_creator_responses", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  campaignId: uuid("campaign_id").notNull().references(() => rewardCampaigns.id),
+  creatorUserId: uuid("creator_user_id").notNull().references(() => users.id),
+  submissionRevision: integer("submission_revision").notNull(),
+  commitmentHash: varchar("commitment_hash", { length: 66 }).notNull(),
+  responseBody: text("response_body").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  index("editions_creator_response_campaign_idx").on(table.campaignId, table.createdAt),
+  uniqueIndex("editions_creator_response_revision_idx").on(table.campaignId, table.submissionRevision),
+  check("editions_creator_response_revision_check", sql`${table.submissionRevision} >= 0`),
+  check("editions_creator_response_body_check", sql`char_length(btrim(${table.responseBody})) BETWEEN 10 AND 3000`),
+]);
+
+export const editionsCreatorResponseFeedback = pgTable("editions_creator_response_feedback", {
+  responseId: uuid("response_id").notNull().references(() => editionsCreatorResponses.id, { onDelete: "cascade" }),
+  feedbackId: uuid("feedback_id").notNull().references(() => editionsFeedback.id, { onDelete: "cascade" }),
+}, table => [
+  primaryKey({ columns: [table.responseId, table.feedbackId] }),
+  index("editions_creator_response_feedback_feedback_idx").on(table.feedbackId),
+]);
+
+export const editionsReviewThreads = pgTable("editions_review_threads", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  campaignId: uuid("campaign_id").notNull().references(() => rewardCampaigns.id),
+  entitlementId: uuid("entitlement_id").notNull().references(() => editionsEntitlements.id),
+  backerUserId: uuid("backer_user_id").notNull().references(() => users.id),
+  creatorUserId: uuid("creator_user_id").notNull().references(() => users.id),
+  targetHash: varchar("target_hash", { length: 66 }).notNull(),
+  commitmentHash: varchar("commitment_hash", { length: 66 }).notNull(),
+  status: text("status").$type<"OPEN" | "ESCALATED" | "RESOLVED" | "CLOSED">().notNull().default("OPEN"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  uniqueIndex("editions_review_thread_identity_idx").on(table.campaignId, table.entitlementId, table.targetHash),
+  index("editions_review_thread_campaign_idx").on(table.campaignId),
+  index("editions_review_thread_backer_idx").on(table.backerUserId),
+  index("editions_review_thread_status_idx").on(table.status),
+  check("editions_review_thread_status_check", sql`${table.status} IN ('OPEN', 'ESCALATED', 'RESOLVED', 'CLOSED')`),
+]);
+
+export const editionsReviewMessages = pgTable("editions_review_messages", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  threadId: uuid("thread_id").notNull().references(() => editionsReviewThreads.id),
+  authorUserId: uuid("author_user_id").notNull().references(() => users.id),
+  authorRole: text("author_role").$type<"BACKER" | "CREATOR" | "RESOLVER">().notNull(),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  index("editions_review_message_thread_idx").on(table.threadId, table.createdAt),
+  check("editions_review_message_author_role_check", sql`${table.authorRole} IN ('BACKER', 'CREATOR', 'RESOLVER')`),
+  check("editions_review_message_body_check", sql`char_length(btrim(${table.body})) BETWEEN 1 AND 3000`),
+]);
+
+export const editionsReviewEscalations = pgTable("editions_review_escalations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  threadId: uuid("thread_id").notNull().references(() => editionsReviewThreads.id),
+  openerUserId: uuid("opener_user_id").notNull().references(() => users.id),
+  reason: text("reason").notNull(),
+  status: text("status").$type<"OPEN" | "AWAITING_CREATOR_RESPONSE" | "RESOLVED" | "DISMISSED" | "FORMAL_DISPUTE">().notNull().default("OPEN"),
+  resolverUserId: uuid("resolver_user_id").references(() => users.id),
+  outcome: text("outcome").$type<"RESOLVED" | "DISMISSED" | "FORMAL_DISPUTE">(),
+  note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+}, table => [
+  uniqueIndex("editions_review_escalation_thread_idx").on(table.threadId),
+  index("editions_review_escalation_status_idx").on(table.status),
+  check("editions_review_escalation_status_check", sql`${table.status} IN ('OPEN', 'AWAITING_CREATOR_RESPONSE', 'RESOLVED', 'DISMISSED', 'FORMAL_DISPUTE')`),
+  check("editions_review_escalation_outcome_check", sql`${table.outcome} IS NULL OR ${table.outcome} IN ('RESOLVED', 'DISMISSED', 'FORMAL_DISPUTE')`),
+  check("editions_review_escalation_reason_check", sql`char_length(btrim(${table.reason})) BETWEEN 10 AND 3000`),
+  check("editions_review_escalation_note_check", sql`${table.note} IS NULL OR char_length(btrim(${table.note})) BETWEEN 10 AND 3000`),
+]);
 
 // Temporary access only. The entitlement itself has no expiry; these rows audit requests, not reading/acceptance.
 export const editionsDownloadTickets = pgTable("editions_download_tickets", {
