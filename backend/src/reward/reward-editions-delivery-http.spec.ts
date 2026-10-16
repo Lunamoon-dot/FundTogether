@@ -349,6 +349,7 @@ describe("Editions digital delivery: real HTTP, PostgreSQL, MinIO and Anvil", ()
     const fork = await client.request({ method: "evm_snapshot" as any });
     await send(accounts[3], "cancelCampaign", [0n]);
     expect((await api().get(before.body.url).set("x-test-user", backer)).status).toBe(409);
+    expect((await api().post(route("review-threads")).set("x-test-user", backer).send({ targetHash: commitment, body: "A refunding campaign must not open another review thread." })).status).toBe(409);
     await send(accounts[4], "claimRefund", [0n]);
     expect((await ticket()).status).toBe(409);
     expect((await api().get("/v1/reward/editions/entitlements").set("x-test-user", backer)).body[0]).toMatchObject({ access: "REFUNDED", campaignTitle: expect.any(String) });
@@ -374,5 +375,6 @@ describe("Editions digital delivery: real HTTP, PostgreSQL, MinIO and Anvil", ()
     expect((await api().get(issued.body.url).set("x-test-user", backer)).status).toBe(409);
     const rights = await api().get("/v1/reward/editions/entitlements").set("x-test-user", backer);
     expect(rights.body[0]).toMatchObject({ access: "ORPHANED", confirmedAt: null });
+    expect((await api().post(route("review-threads")).set("x-test-user", backer).send({ targetHash: commitment, body: "An orphaned entitlement must not open review." })).status).toBe(409);
   });
 });
