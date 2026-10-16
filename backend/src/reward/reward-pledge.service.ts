@@ -39,10 +39,10 @@ export class RewardPledgeService {
 
     // Query the canonical indexed entitlement
     const [entitlement] = await this.db.select().from(rewardEntitlements)
-      .where(eq(rewardEntitlements.txHash, txHash));
+      .where(and(eq(rewardEntitlements.txHash, txHash), eq(rewardEntitlements.backerUserId, userId)));
 
     if (!entitlement) {
-      throw new BadRequestException("No valid RewardPledged event found in transaction receipt");
+      throw new BadRequestException("No valid RewardPledged event found for this backer in transaction receipt");
     }
 
     const [tier] = await this.db.select().from(rewardTiers).where(eq(rewardTiers.id, entitlement.tierId));

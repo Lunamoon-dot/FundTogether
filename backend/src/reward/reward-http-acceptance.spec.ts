@@ -560,6 +560,18 @@ describe("Reward Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => {
       const r1 = await send(backerWallet, rewardArtifact.abi, rewardAddress, "pledge", [onchainCampaignId, 0n, 1n]);
       const r2 = await send(backerWallet, rewardArtifact.abi, rewardAddress, "pledge", [onchainCampaignId, 1n, 1n]);
 
+      const foreignNotify = await post("/v1/reward/backer/notify-pledge")
+        .set("Cookie", `ft_session=${intruderSessionToken}`)
+        .send({ txHash: r1.transactionHash });
+      expect(foreignNotify.status).not.toBe(201);
+      expect(foreignNotify.body.entitlement).toBeUndefined();
+      expect(foreignNotify.body.tier).toBeUndefined();
+      expect(foreignNotify.body.campaign).toBeUndefined();
+      expect(foreignNotify.body.backerUserId).toBeUndefined();
+      expect(foreignNotify.body.backerWallet).toBeUndefined();
+      expect(foreignNotify.body.amountPaid).toBeUndefined();
+      expect(await db.select().from(schema.rewardEntitlements).where(eq(schema.rewardEntitlements.campaignId, campaignId))).toHaveLength(1);
+
       const notify1 = await post("/v1/reward/backer/notify-pledge")
         .set("Cookie", `ft_session=${backerSessionToken}`)
         .send({ txHash: r1.transactionHash });
