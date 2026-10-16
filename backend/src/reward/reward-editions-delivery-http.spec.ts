@@ -359,8 +359,12 @@ describe("Editions digital delivery: real HTTP, PostgreSQL, MinIO and Anvil", ()
     await send(accounts[4], "claimRefund", [0n]);
     expect((await ticket()).status).toBe(409);
     expect((await api().get("/v1/reward/editions/entitlements").set("x-test-user", backer)).body[0]).toMatchObject({ access: "REFUNDED", campaignTitle: expect.any(String) });
-    expect((await api().get(`/v1/reward/editions/review-threads/${staleThreadId}`).set("x-test-user", backer)).status).toBe(200);
-    expect((await api().get(`/v1/reward/editions/review-threads/${staleThreadId}`).set("x-test-user", owner)).status).toBe(200);
+    const refundedThreadForBacker = await api().get(`/v1/reward/editions/review-threads/${staleThreadId}`).set("x-test-user", backer);
+    expect(refundedThreadForBacker.status).toBe(200);
+    expect(refundedThreadForBacker.body.permissions).toEqual({ canMessage: false, canEscalate: false, readOnlyReason: "REFUNDED" });
+    const refundedThreadForCreator = await api().get(`/v1/reward/editions/review-threads/${staleThreadId}`).set("x-test-user", owner);
+    expect(refundedThreadForCreator.status).toBe(200);
+    expect(refundedThreadForCreator.body.permissions).toEqual({ canMessage: false, canEscalate: false, readOnlyReason: "REFUNDED" });
     expect((await api().get(`/v1/reward/editions/review-threads/${staleThreadId}`).set("x-test-user", resolver)).status).toBe(200);
     expect((await api().post(`/v1/reward/editions/review-threads/${staleThreadId}/messages`).set("x-test-user", backer).send({ body: "A refunded thread must not accept new Backer messages." })).status).toBe(409);
     expect((await api().post(`/v1/reward/editions/review-threads/${staleThreadId}/messages`).set("x-test-user", owner).send({ body: "A refunded thread must not accept new Creator messages." })).status).toBe(409);
@@ -390,7 +394,9 @@ describe("Editions digital delivery: real HTTP, PostgreSQL, MinIO and Anvil", ()
     const rights = await api().get("/v1/reward/editions/entitlements").set("x-test-user", backer);
     expect(rights.body[0]).toMatchObject({ access: "ORPHANED", confirmedAt: null });
     expect((await api().post(route("review-threads")).set("x-test-user", backer).send({ targetHash: commitment, body: "An orphaned entitlement must not open review." })).status).toBe(409);
-    expect((await api().get(`/v1/reward/editions/review-threads/${staleThreadId}`).set("x-test-user", backer)).status).toBe(200);
+    const orphanedThread = await api().get(`/v1/reward/editions/review-threads/${staleThreadId}`).set("x-test-user", backer);
+    expect(orphanedThread.status).toBe(200);
+    expect(orphanedThread.body.permissions).toEqual({ canMessage: false, canEscalate: false, readOnlyReason: "ORPHANED" });
     expect((await api().post(`/v1/reward/editions/review-threads/${staleThreadId}/messages`).set("x-test-user", backer).send({ body: "An orphaned thread must not accept a new Backer message." })).status).toBe(409);
     expect((await api().post(`/v1/reward/editions/review-threads/${staleThreadId}/messages`).set("x-test-user", owner).send({ body: "An orphaned thread must not accept a new Creator message." })).status).toBe(409);
     expect((await api().post(`/v1/reward/editions/review-threads/${staleThreadId}/escalate`).set("x-test-user", backer).send({ reason: "An orphaned thread must not create a new Resolver case." })).status).toBe(409);

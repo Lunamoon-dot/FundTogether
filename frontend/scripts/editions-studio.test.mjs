@@ -112,7 +112,7 @@ test('Resolver console surfaces review cases separately from the funding queue',
     chain: { status: 'ON_CHAIN_CONFIRMED', onchainCampaignId: '0', snapshot: { state: 1 }, challenges: [] },
     entitlement: { id: 'entitlement-1', backerUserId: 'backer', backerWallet: '0xbacker', amountPaid: '10000000', canonical: true, refunded: false, streamId: 'editions:current', transactionHash: '0xtx', blockNumber: '10' },
     feedback: [],
-    thread: { id: 'thread-1', campaignId: 'edition', entitlementId: 'entitlement-1', backerUserId: 'backer', creatorUserId: 'owner', targetHash: '0xhash', commitmentHash: '0xhash', status: 'ESCALATED', createdAt: '2026-10-16T10:00:00.000Z', updatedAt: '2026-10-16T10:00:00.000Z', escalation: null, messages: [] },
+    thread: { id: 'thread-1', campaignId: 'edition', entitlementId: 'entitlement-1', backerUserId: 'backer', creatorUserId: 'owner', targetHash: '0xhash', commitmentHash: '0xhash', status: 'ESCALATED', createdAt: '2026-10-16T10:00:00.000Z', updatedAt: '2026-10-16T10:00:00.000Z', permissions: { canMessage: false, canEscalate: false, readOnlyReason: null }, escalation: null, messages: [] },
   }])
   assert.match(html, /Resolver cases/)
   assert.match(html, /Please clarify the production evidence\./)
@@ -434,7 +434,7 @@ test('Resolver case surface keeps conversation outcome separate from financial a
       chain: { status: 'ON_CHAIN_CONFIRMED', onchainCampaignId: '0', snapshot: { state: 1 }, challenges: [] },
       entitlement: { id: 'entitlement-1', backerUserId: 'backer', backerWallet: '0xbacker', amountPaid: '10000000', canonical: true, refunded: false, streamId: 'editions:current', transactionHash: '0xtx', blockNumber: '10' },
       feedback: [{ id: 'feedback-1', authorUserId: 'backer', targetHash: `0x${'1'.repeat(64)}`, kind: 'ISSUE', body: 'Please clarify the evidence timeline.', createdAt: '2026-10-16T10:00:00.000Z' }],
-      thread: { id: 'thread-1', campaignId: 'edition', entitlementId: 'entitlement-1', backerUserId: 'backer', creatorUserId: 'owner', targetHash: `0x${'1'.repeat(64)}`, commitmentHash: `0x${'1'.repeat(64)}`, status: 'ESCALATED', createdAt: '2026-10-16T10:00:00.000Z', updatedAt: '2026-10-16T10:00:00.000Z', escalation: null, messages: [{ id: 'message-1', threadId: 'thread-1', authorUserId: 'backer', authorRole: 'BACKER', body: 'Please clarify the evidence timeline.', createdAt: '2026-10-16T10:00:00.000Z' }] },
+      thread: { id: 'thread-1', campaignId: 'edition', entitlementId: 'entitlement-1', backerUserId: 'backer', creatorUserId: 'owner', targetHash: `0x${'1'.repeat(64)}`, commitmentHash: `0x${'1'.repeat(64)}`, status: 'ESCALATED', createdAt: '2026-10-16T10:00:00.000Z', updatedAt: '2026-10-16T10:00:00.000Z', permissions: { canMessage: false, canEscalate: false, readOnlyReason: null }, escalation: null, messages: [{ id: 'message-1', threadId: 'thread-1', authorUserId: 'backer', authorRole: 'BACKER', body: 'Please clarify the evidence timeline.', createdAt: '2026-10-16T10:00:00.000Z' }] },
     },
   }))
   assert.match(html, /Resolver case/)

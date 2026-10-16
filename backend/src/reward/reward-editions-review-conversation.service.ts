@@ -6,13 +6,19 @@ import * as schema from "../database/schema";
 import { editionsEntitlements, editionsFeedback, editionsReviewEscalations, editionsReviewMessages, editionsReviewThreads, platformRoles, rewardCampaigns } from "../database/schema";
 import { DRIZZLE_DB } from "../database/database.constants";
 import { currentEditionsFeedbackTargets } from "./reward-editions-delivery.policy";
-import { canOpenEditionsReviewThread, deriveEditionsReviewThreadWriteState } from "./reward-editions-review-conversation.policy";
+import { canOpenEditionsReviewThread, deriveEditionsReviewThreadWriteState, type EditionsReviewThreadWriteState } from "./reward-editions-review-conversation.policy";
 import { RewardEditionsIndexerService } from "./reward-editions-indexer.service";
 import { RewardEditionsPublicationService } from "./reward-editions-publication.service";
 import { editionsReviewEscalationOutcomeSchema, editionsReviewEscalationSchema, editionsReviewMessageSchema, editionsReviewMessageSchema as reviewMessageSchema, editionsReviewThreadOpenSchema } from "./reward-editions.schema";
 
 type Transaction = Parameters<Parameters<NodePgDatabase<typeof schema>["transaction"]>[0]>[0];
 const zeroHash = `0x${"0".repeat(64)}`;
+
+type EditionsReviewThreadPermissions = {
+  canMessage: boolean;
+  canEscalate: boolean;
+  readOnlyReason: "REFUNDED" | "ORPHANED" | "CLOSED" | "RESOLVED" | null;
+};
 
 function parse<T extends z.ZodType>(schemaType: T, body: unknown): z.output<T> {
   const result = schemaType.safeParse(body);
@@ -62,13 +68,41 @@ export class RewardEditionsReviewConversationService {
     return { campaign, chain, entitlement };
   }
 
-  private async detail(db: NodePgDatabase<typeof schema> | Transaction, threadId: string) {
+  private async threadWriteState(db: NodePgDatabase<typeof schema> | Transaction, thread: typeof editionsReviewThreads.$inferSelect): Promise<EditionsReviewThreadWriteState> {
+    const [entitlement] = await db.select({
+      canonical: editionsEntitlements.canonical,
+      refunded: editionsEntitlements.refunded,
+      streamId: editionsEntitlements.streamId,
+    }).from(editionsEntitlements).where(eq(editionsEntitlements.id, thread.entitlementId));
+    if (!entitlement) return "ORPHANED";
+    return deriveEditionsReviewThreadWriteState({
+      canonical: entitlement.canonical,
+      refunded: entitlement.refunded,
+      entitlementStreamId: entitlement.streamId,
+      currentStreamId: this.indexer.streamId(),
+    });
+  }
+
+  private async detail(db: NodePgDatabase<typeof schema> | Transaction, threadId: string, viewerUserId?: string) {
     const [thread] = await db.select().from(editionsReviewThreads).where(eq(editionsReviewThreads.id, threadId));
     if (!thread) throw new NotFoundException("Review thread not found");
     const messages = await db.select().from(editionsReviewMessages).where(eq(editionsReviewMessages.threadId, threadId))
       .orderBy(asc(editionsReviewMessages.createdAt), asc(editionsReviewMessages.id));
     const [escalation] = await db.select().from(editionsReviewEscalations).where(eq(editionsReviewEscalations.threadId, threadId));
-    return { ...thread, messages, escalation: escalation ?? null };
+    const participant = viewerUserId === thread.backerUserId || viewerUserId === thread.creatorUserId;
+    let canMessage = participant && thread.status !== "CLOSED";
+    let canEscalate = viewerUserId === thread.backerUserId && !["RESOLVED", "CLOSED"].includes(thread.status);
+    let readOnlyReason: EditionsReviewThreadPermissions["readOnlyReason"] = thread.status === "CLOSED" ? "CLOSED" : null;
+    if (canMessage || canEscalate) {
+      const state = await this.threadWriteState(db, thread);
+      if (state !== "ACTIVE") {
+        canMessage = false;
+        canEscalate = false;
+        readOnlyReason = state;
+      }
+    }
+    const permissions: EditionsReviewThreadPermissions = { canMessage, canEscalate, readOnlyReason };
+    return { ...thread, messages, escalation: escalation ?? null, permissions };
   }
 
   private async authorizedThread(db: NodePgDatabase<typeof schema> | Transaction, threadId: string, userId: string) {
@@ -85,14 +119,12 @@ export class RewardEditionsReviewConversationService {
       refunded: editionsEntitlements.refunded,
       streamId: editionsEntitlements.streamId,
     }).from(editionsEntitlements).where(eq(editionsEntitlements.id, thread.entitlementId));
-    if (!entitlement) throw new ConflictException("Review thread entitlement is no longer available");
-
-    const state = deriveEditionsReviewThreadWriteState({
+    const state = entitlement ? deriveEditionsReviewThreadWriteState({
       canonical: entitlement.canonical,
       refunded: entitlement.refunded,
       entitlementStreamId: entitlement.streamId,
       currentStreamId: this.indexer.streamId(),
-    });
+    }) : "ORPHANED";
     if (state !== "ACTIVE") throw new ConflictException(`Review thread is read-only because entitlement is ${state}`);
   }
 
@@ -118,12 +150,12 @@ export class RewardEditionsReviewConversationService {
       await tx.insert(editionsReviewMessages).values({ threadId: thread.id, authorUserId: userId, authorRole: "BACKER", body: input.body });
       threadId = thread.id;
     });
-    return this.detail(this.db, threadId!);
+    return this.detail(this.db, threadId!, userId);
   }
 
   async thread(threadId: string, userId: string) {
     await this.authorizedThread(this.db, threadId, userId);
-    return this.detail(this.db, threadId);
+    return this.detail(this.db, threadId, userId);
   }
 
   async listThreads(campaignId: string, userId: string) {
@@ -134,7 +166,7 @@ export class RewardEditionsReviewConversationService {
         ? eq(editionsReviewThreads.campaignId, campaignId)
         : and(eq(editionsReviewThreads.campaignId, campaignId), eq(editionsReviewThreads.backerUserId, userId)),
     );
-    return Promise.all(threads.map(thread => this.detail(this.db, thread.id)));
+    return Promise.all(threads.map(thread => this.detail(this.db, thread.id, userId)));
   }
 
   async message(threadId: string, userId: string, body: unknown) {

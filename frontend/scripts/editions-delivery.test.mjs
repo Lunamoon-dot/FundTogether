@@ -107,12 +107,23 @@ test('campaign creator receives feedback without a submission form', () => {
 })
 test('funded review uses an append-only Backer Creator thread with Resolver escalation, not a funding CTA', () => {
   const html = render(EditionsReviewThread, { campaignId: 'edition', userId: 'backer', viewerMode: 'backer', targetHash: hash }, [
-    [['reward-editions-review-threads', 'edition', 'backer'], [{ id: 'thread-1', campaignId: 'edition', entitlementId: 'right', backerUserId: 'backer', creatorUserId: 'owner', targetHash: hash, commitmentHash: hash, status: 'OPEN', createdAt: '2026-10-16T10:00:00.000Z', updatedAt: '2026-10-16T10:30:00.000Z', escalation: null, messages: [{ id: 'message-1', threadId: 'thread-1', authorUserId: 'backer', authorRole: 'BACKER', body: 'Please clarify the production timeline.', createdAt: '2026-10-16T10:30:00.000Z' }] }]],
+    [['reward-editions-review-threads', 'edition', 'backer'], [{ id: 'thread-1', campaignId: 'edition', entitlementId: 'right', backerUserId: 'backer', creatorUserId: 'owner', targetHash: hash, commitmentHash: hash, status: 'OPEN', createdAt: '2026-10-16T10:00:00.000Z', updatedAt: '2026-10-16T10:30:00.000Z', permissions: { canMessage: true, canEscalate: true, readOnlyReason: null }, escalation: null, messages: [{ id: 'message-1', threadId: 'thread-1', authorUserId: 'backer', authorRole: 'BACKER', body: 'Please clarify the production timeline.', createdAt: '2026-10-16T10:30:00.000Z' }] }]],
   ])
   assert.match(html, /Trao đổi thẩm định sau funding/)
   assert.match(html, /Please clarify the production timeline./)
   assert.match(html, /Gửi yêu cầu Resolver/)
   assert.doesNotMatch(html, /Xác nhận ủng hộ|Nhận hoàn tiền|Chuyển tiền/)
+})
+test('refunded and orphaned review threads remain readable but lose write actions', () => {
+  for (const readOnlyReason of ['REFUNDED', 'ORPHANED']) {
+    const html = render(EditionsReviewThread, { campaignId: 'edition', userId: 'backer', viewerMode: 'backer', targetHash: hash }, [
+      [['reward-editions-review-threads', 'edition', 'backer'], [{ id: 'thread-1', campaignId: 'edition', entitlementId: 'right', backerUserId: 'backer', creatorUserId: 'owner', targetHash: hash, commitmentHash: hash, status: 'OPEN', createdAt: '2026-10-16T10:00:00.000Z', updatedAt: '2026-10-16T10:30:00.000Z', permissions: { canMessage: false, canEscalate: false, readOnlyReason }, escalation: null, messages: [{ id: 'message-1', threadId: 'thread-1', authorUserId: 'backer', authorRole: 'BACKER', body: 'Historical review message remains visible.', createdAt: '2026-10-16T10:30:00.000Z' }] }]],
+    ])
+    assert.match(html, /Historical review message remains visible./)
+    assert.match(html, /Trao đổi này chỉ còn xem/)
+    assert.doesNotMatch(html, /Gửi phản hồi|Gửi yêu cầu Resolver/)
+    assert.doesNotMatch(html, /Xác nhận ủng hộ|Nhận hoàn tiền|Chuyển tiền/)
+  }
 })
 test('switching accounts cannot inherit the previous account library', () => {
   const html = render(EditionsLibrary, { userId: 'new-user' }, [

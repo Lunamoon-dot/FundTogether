@@ -107,14 +107,16 @@ export function EditionsReviewThread({ campaignId, userId, viewerMode, targetHas
         {selected.escalation && <div className="editions-review-thread__escalation"><strong>Resolver case · {selected.escalation.status}</strong><p>{selected.escalation.reason}</p>{selected.escalation.note && <p>{selected.escalation.note}</p>}</div>}
       </article>
 
-      {((viewerMode === 'backer') || (viewerMode === 'creator')) && selected.status !== 'CLOSED' && <form className="editions-review-thread__composer" onSubmit={sendMessage}>
+      {selected.permissions?.readOnlyReason && ['REFUNDED', 'ORPHANED'].includes(selected.permissions.readOnlyReason) && <p className="editions-review-thread__read-only" role="status">Trao đổi này chỉ còn xem vì quyền pledge đã bị hoàn lại hoặc không còn thuộc chain hiện tại.</p>}
+
+      {((viewerMode === 'backer') || (viewerMode === 'creator')) && selected.permissions?.canMessage === true && <form className="editions-review-thread__composer" onSubmit={sendMessage}>
         <label className="field">Phản hồi trong trao đổi
           <textarea required minLength={10} maxLength={3000} value={messageBody} onChange={event => setMessageBody(event.target.value)} />
         </label>
         <button type="submit" disabled={busy} className="button button--secondary">Gửi phản hồi</button>
       </form>}
 
-      {viewerMode === 'backer' && !selected.escalation && !['RESOLVED', 'CLOSED'].includes(selected.status) && <form className="editions-review-thread__composer editions-review-thread__composer--escalation" onSubmit={escalate}>
+      {viewerMode === 'backer' && !selected.escalation && selected.permissions?.canEscalate === true && <form className="editions-review-thread__composer editions-review-thread__composer--escalation" onSubmit={escalate}>
         <label className="field">Nếu chưa được làm rõ, gửi yêu cầu Resolver
           <textarea required minLength={10} maxLength={3000} value={escalationReason} onChange={event => setEscalationReason(event.target.value)} />
         </label>
