@@ -86,12 +86,12 @@ async function runBrowserScenario() {
     const login = await context.request.post(`${apiUrl}/auth/login`, { headers: { Origin: webOrigin }, data: { email: actor.email, password } }); assert.equal(login.status(), 200, await login.text());
     const page = await context.newPage(); page.setDefaultTimeout(20000); pages.push(page);
     await page.goto(`${webOrigin}/#/account`);
-    await page.getByRole('button', { name: 'Đăng xuất', exact: true }).waitFor();
+    await page.getByRole('button', { name: /Đăng xuất/ }).waitFor();
     if (index < 3) {
       await page.getByRole('button', { name: /Connect Wallet|Kết nối ví/ }).click();
       await page.getByRole('button', { name: /Editions Test Wallet/ }).click();
-      await page.getByRole('button', { name: 'Liên kết ví ngoài', exact: true }).click();
-      await page.getByRole('button', { name: 'Ví đã liên kết', exact: true }).waitFor();
+      await page.getByRole('button', { name: /Liên kết ví/ }).click();
+      await page.getByRole('heading', { name: /Ví đã liên kết với tài khoản/ }).waitFor();
     }
   }
   checked('Browser accounts link their exact discovered test wallet through real SIWE signatures');
@@ -107,6 +107,7 @@ async function runBrowserScenario() {
     contentOutline: 'A comic with twelve illustrated chapters.', budgetPlan: 'Self-funded drawing and editorial work.', evidencePlan: 'Page proof followed by the complete final PDF.',
     releaseWindow: { start: new Date(Number(now + 86400n) * 1000).toISOString(), end: new Date(Number(now + 20n * 86400n) * 1000).toISOString() } } });
   await editions.freeze(campaign.id, actors[0].id, { revision: 1 }); await editions.submit(campaign.id, actors[0].id, { revision: 2 });
+  await editions.openCommunityReview(campaign.id, actors[1].id);
   for (const page of [creator, backer]) {
     for (const route of [`creator/campaigns/${campaign.id}/batches`, `backer/entitlements/${campaign.id}/shipping`, `creator/entitlements/${campaign.id}/shipping`, `creator/entitlements/${campaign.id}/delivered`, `backer/entitlements/${campaign.id}/confirm`]) {
       const response = await page.request.post(`${apiUrl}/v1/reward/${route}`, { headers: { Origin: webOrigin }, data: { address: 'Rejected test address', tracking: 'Rejected test tracking' } });
@@ -116,63 +117,121 @@ async function runBrowserScenario() {
   const physicalColumns = await db.$client.query("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='reward_entitlements' AND column_name ~ 'shipping|tracking|delivered_at'");
   assert.equal(physicalColumns.rowCount, 0);
   checked('Authenticated browser requests cannot invoke retired physical APIs; active schema has no shipping or tracking columns');
-  const navigate = (page, suffix = '') => page.evaluate(hash => { location.hash = hash; }, `/reward/editions/${campaign.id}${suffix}`);
+  async function navigate(page, suffix = '') {
+    await page.evaluate(hash => { location.hash = hash; }, `/reward/editions/${campaign.id}${suffix}`);
+    try {
+      await page.getByRole('tab', { name: 'Tổng quan (Folio)', exact: true }).waitFor();
+    } catch (error) {
+      await page.screenshot({ path: path.join(output, 'navigation-failure.png'), fullPage: true });
+      fs.writeFileSync(path.join(output, 'navigation-failure.txt'), await page.locator('body').innerText());
+      throw error;
+    }
+  }
+  async function refreshPrivateCampaign(page, suffix = '') {
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.evaluate(() => { location.hash = '/account'; });
+    await page.getByText('Ví đã liên kết với tài khoản', { exact: true }).waitFor();
+    const connect = page.getByRole('button', { name: /Connect Wallet|Kết nối ví/ });
+    if (await connect.count() && await connect.first().isVisible()) {
+      await connect.click();
+      await page.getByRole('button', { name: /Editions Test Wallet/ }).click();
+    }
+    await page.getByText('Ví đã liên kết với tài khoản', { exact: true }).waitFor();
+    await navigate(page, suffix);
+    await page.getByRole('tab', { name: 'Tổng quan (Folio)', exact: true }).waitFor();
+  }
   async function transact(page, name) {
-    const previous = (await page.getByRole('status').allTextContents()).find(text => text.startsWith('ON_CHAIN_CONFIRMED'));
+    const previous = (await page.getByRole('status').allTextContents()).find(text => text.startsWith('Giao dịch đã được xác nhận và đồng bộ'));
     try {
       await page.getByRole('button', { name, exact: true }).click();
-      await page.waitForFunction(previous => [...document.querySelectorAll('[role=status]')].some(item => item.textContent.startsWith('ON_CHAIN_CONFIRMED') && item.textContent !== previous), previous, { timeout: 30000 });
+      await page.waitForFunction(previous => [...document.querySelectorAll('[role=status]')].some(item => item.textContent.startsWith('Giao dịch đã được xác nhận và đồng bộ') && item.textContent !== previous), previous, { timeout: 30000 });
     } catch (error) {
       await page.screenshot({ path: path.join(output, 'failure.png'), fullPage: true });
       fs.writeFileSync(path.join(output, 'failure.txt'), await page.locator('body').innerText());
       throw new Error(`${name}: ${await page.locator('[role=alert]').allTextContents()}`, { cause: error });
     }
   }
-  await navigate(community); await community.getByLabel('Chi tiết cần kiểm tra').fill('Please verify the promised twelve chapters.');
+  await navigate(community); await community.getByRole('tab', { name: 'Góp ý & Thẩm định', exact: true }).click();
+  await community.getByLabel('Chi tiết cần kiểm tra').fill('Please verify the promised twelve chapters.');
   await community.getByRole('button', { name: 'Gửi phản hồi có tài khoản' }).click(); await community.getByText('Please verify the promised twelve chapters.', { exact: true }).waitFor();
   await resolver.evaluate(() => { location.hash = '/reward/resolver'; });
+  await resolver.locator('summary').filter({ hasText: 'Phản hồi cộng đồng' }).click();
   await resolver.getByText('Please verify the promised twelve chapters.', { exact: true }).waitFor();
   await resolver.getByLabel(/Nhận xét thẩm định/).fill('Reviewed the frozen PDF terms, sample and community comment.');
   await resolver.getByRole('button', { name: 'Duyệt hồ sơ PDF', exact: true }).click();
-  await resolver.getByRole('link', { name: 'Mở duyệt hợp đồng, sản xuất & PDF local' }).click();
-  await transact(resolver, 'Ký duyệt cam kết local');
-  await navigate(creator, '/creator'); await transact(creator, 'Tạo campaign local từ cam kết');
+  await resolver.getByRole('link', { name: 'Mở trang xử lý on-chain →' }).click();
+  await transact(resolver, 'Ký duyệt đúng commitment trên chain');
+  await navigate(creator, '/creator'); await transact(creator, 'Tạo campaign Editions trên chain');
   checked('Community feedback is visible before Resolver approves exact terms and Creator publishes a separate local campaign');
   const mint = await wallet(accounts[0]).writeContract({ address: tokenAddress, abi: token.abi, functionName: 'mint', args: [accounts[4], 10000000n] }); await client.waitForTransactionReceipt({ hash: mint });
-  await navigate(backer); await transact(backer, 'Ủng hộ 10 MockUSDC · một PDF');
+  await navigate(backer); await transact(backer, 'Bắt đầu approve rồi pledge');
   assert.equal(await backer.getByRole('button', { name: 'Kiểm tra và tải PDF riêng tư' }).count(), 0);
   await client.request({ method: 'evm_increaseTime', params: [86401] }); await client.request({ method: 'evm_mine' });
-  await transact(backer, 'Chốt kết quả khi hết hạn gây quỹ');
+  await refreshPrivateCampaign(resolver, '/resolver'); await transact(resolver, 'Chốt kết quả khi hết hạn gây quỹ');
   checked('Browser token approval and fixed-price pledge produce canonical rights but no premature download');
-  await creator.getByRole('button', { name: 'Tải lại trạng thái canonical' }).click();
+  await refreshPrivateCampaign(creator, '/creator'); await creator.getByRole('tab', { name: 'Sản xuất & Bằng chứng', exact: true }).click();
   await creator.getByLabel(/Bằng chứng sản xuất riêng tư/).setInputFiles({ name: 'proof.png', mimeType: 'image/png', buffer: png });
   await creator.getByLabel(/Tóm tắt công khai/).fill('All twelve chapters are drawn and edited.');
   await creator.getByRole('button', { name: 'Lưu file và hash' }).click();
   await transact(creator, 'Gửi đúng hash này để Resolver duyệt');
-  await resolver.getByRole('button', { name: 'Tải lại trạng thái canonical' }).click();
+  await refreshPrivateCampaign(resolver, '/resolver'); await resolver.getByRole('tab', { name: 'Sản xuất & Bằng chứng', exact: true }).click();
   await transact(resolver, 'Duyệt bằng chứng sản xuất');
-  await creator.getByRole('button', { name: 'Tải lại trạng thái canonical' }).click();
+  await refreshPrivateCampaign(creator, '/creator'); await creator.getByRole('tab', { name: 'Sản xuất & Bằng chứng', exact: true }).click();
   const pdf = await PDFDocument.create(); pdf.addPage().drawText('Twelve-chapter local comic acceptance fixture'); const pdfBytes = Buffer.from(await pdf.save());
   await creator.getByLabel(/PDF cuối riêng tư/).setInputFiles({ name: 'comic.pdf', mimeType: 'application/pdf', buffer: pdfBytes });
   await creator.getByLabel(/Tóm tắt công khai/).fill('Final PDF includes the complete twelve-chapter comic.');
   await creator.getByRole('button', { name: 'Lưu file và hash' }).click();
   await transact(creator, 'Gửi đúng hash này để Resolver duyệt');
-  await resolver.getByRole('button', { name: 'Tải lại trạng thái canonical' }).click(); await transact(resolver, 'Duyệt PDF cuối');
-  await backer.getByRole('button', { name: 'Tải lại trạng thái canonical' }).click();
+  await refreshPrivateCampaign(resolver, '/resolver'); await resolver.getByRole('tab', { name: 'Sản xuất & Bằng chứng', exact: true }).click(); await transact(resolver, 'Duyệt PDF cuối');
+  await refreshPrivateCampaign(backer);
+  await backer.getByRole('tab', { name: 'Góp ý & Thẩm định', exact: true }).click();
+  await backer.getByText('Trao đổi thẩm định sau funding', { exact: true }).waitFor();
+  await backer.getByLabel('Nội dung cần Creator làm rõ').fill('Please clarify how the final delivery evidence maps to the promised chapter sequence.');
+  await backer.getByRole('button', { name: 'Mở trao đổi với Creator', exact: true }).click();
+  await backer.getByText('Please clarify how the final delivery evidence maps to the promised chapter sequence.', { exact: true }).waitFor();
+  await refreshPrivateCampaign(creator, '/creator'); await creator.getByRole('tab', { name: 'Góp ý & Thẩm định', exact: true }).click();
+  await creator.getByText('Trao đổi thẩm định sau funding', { exact: true }).waitFor();
+  await creator.getByLabel('Phản hồi trong trao đổi').fill('I have checked the final delivery evidence and will clarify the chapter mapping in the release notes.');
+  await creator.getByRole('button', { name: 'Gửi phản hồi', exact: true }).click();
+  await creator.getByText('I have checked the final delivery evidence and will clarify the chapter mapping in the release notes.', { exact: true }).waitFor();
+  await refreshPrivateCampaign(backer); await backer.getByRole('tab', { name: 'Góp ý & Thẩm định', exact: true }).click();
+  await backer.getByText('I have checked the final delivery evidence and will clarify the chapter mapping in the release notes.', { exact: true }).waitFor();
+  await backer.getByLabel('Nếu chưa được làm rõ, gửi yêu cầu Resolver').fill('The Creator response still needs an accountable Resolver review of the evidence mapping.');
+  await backer.getByRole('button', { name: 'Gửi yêu cầu Resolver', exact: true }).click();
+  await backer.getByText(/Resolver case · OPEN/).waitFor();
+  const beforeConversationEntitlement = (await db.select().from(schema.editionsEntitlements))[0];
+  const beforeConversationChain = (await db.select().from(schema.editionsChainCampaigns)).find(item => item.campaignId === campaign.id);
+  await resolver.evaluate(() => { location.hash = '/reward/resolver'; });
+  await resolver.getByRole('heading', { name: /Resolver cases/ }).waitFor();
+  await resolver.getByText('Yêu cầu của Backer: The Creator response still needs an accountable Resolver review of the evidence mapping.', { exact: true }).waitFor();
+  await resolver.getByLabel('Yêu cầu Creator làm rõ').fill('Creator, please provide one clear explanation of the evidence-to-chapter mapping.');
+  await resolver.getByRole('button', { name: 'Yêu cầu Creator làm rõ', exact: true }).click();
+  await resolver.getByText('Creator, please provide one clear explanation of the evidence-to-chapter mapping.', { exact: true }).waitFor();
+  await resolver.getByLabel('Ghi chú kết luận').fill('Resolver reviewed the thread context and recorded the outcome without changing financial eligibility.');
+  await resolver.getByRole('button', { name: 'Ghi outcome Resolver', exact: true }).click();
+  await resolver.getByText('RESOLVED', { exact: true }).waitFor();
+  const afterConversationEntitlement = (await db.select().from(schema.editionsEntitlements))[0];
+  const afterConversationChain = (await db.select().from(schema.editionsChainCampaigns)).find(item => item.campaignId === campaign.id);
+  assert.equal(afterConversationEntitlement.canonical, beforeConversationEntitlement.canonical);
+  assert.equal(afterConversationEntitlement.refunded, beforeConversationEntitlement.refunded);
+  assert.deepEqual(afterConversationChain.snapshot, beforeConversationChain.snapshot);
+  checked('Canonical funded Backer-Creator review, Resolver escalation and off-chain outcome preserve entitlement and chain state');
+  await refreshPrivateCampaign(backer);
   const downloadEvent = backer.waitForEvent('download'); await backer.getByRole('button', { name: 'Kiểm tra và tải PDF riêng tư' }).click();
   const download = await downloadEvent; const file = path.join(output, 'downloaded.pdf'); await download.saveAs(file); assert.deepEqual(fs.readFileSync(file), pdfBytes);
   assert.equal((await db.select().from(schema.editionsEntitlements))[0].confirmedAt, null);
   await navigate(community); assert.equal(await community.getByRole('button', { name: 'Kiểm tra và tải PDF riêng tư' }).count(), 0);
   checked('Separate production/PDF reviews enable exact-byte download only for Backer, without implied acceptance');
   await backer.screenshot({ path: path.join(output, 'backer-release.png'), fullPage: true });
+  await backer.getByRole('tab', { name: 'Góp ý & Thẩm định', exact: true }).click();
   await backer.getByLabel('Lý do / bằng chứng chi tiết gửi Resolver').fill('The last page is missing from the promised chapter sequence.');
   await transact(backer, 'Gửi báo cáo và challenge bằng ví đã pledge');
-  await resolver.getByRole('button', { name: 'Tải lại trạng thái canonical' }).click();
+  await refreshPrivateCampaign(resolver, '/resolver'); await resolver.getByRole('tab', { name: 'Góp ý & Thẩm định', exact: true }).click();
   await resolver.getByLabel('Lý do / bằng chứng chi tiết gửi Resolver').fill('The reported final page is missing; uphold the release challenge.');
   await transact(resolver, 'Chấp nhận: mở hoàn tiền toàn campaign');
-  await backer.getByRole('button', { name: 'Tải lại trạng thái canonical' }).click();
+  await refreshPrivateCampaign(backer);
   await transact(backer, 'Nhận hoàn tiền vào ví đã pledge');
-  await backer.getByText('REFUNDED', { exact: false }).waitFor();
+  await backer.getByText('Bạn đã nhận hoàn tiền', { exact: false }).waitFor();
   assert.equal(await backer.getByRole('button', { name: 'Kiểm tra và tải PDF riêng tư' }).count(), 0);
   checked('Browser challenge, Resolver decision and exact refund revoke download eligibility through canonical contract events');
   fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify({ status: 'PASS', databaseName, deployment: address, observations, wallet: 'Injected local Anvil test wallet; not manual MetaMask', creatorVerification: 'Fixture only' }, null, 2));

@@ -21,10 +21,15 @@
 - PASS: focused backend delivery HTTP suite `12/12`, backend TypeScript build,
   frontend delivery/public SSR suites `25/25`, frontend Studio SSR suite
   `33/33`, and frontend TypeScript/Vite production build.
-- Remaining verification is the full backend/frontend test and lint pass plus
-  manual browser acceptance with separate Backer, Creator, and Resolver
-  sessions. This entry is implementation evidence, not proof of human identity,
-  IP, or production-quality acceptance.
+- PASS: isolated local browser acceptance with separate Creator, Backer,
+  Community, and Resolver sessions covers pre-funding feedback, Creator
+  revision response, canonical pledge, Backer-Creator thread, Creator reply,
+  Resolver escalation/outcome, unchanged entitlement/chain snapshot, exact-byte
+  PDF download, challenge and refund. The script uses injected Anvil wallets;
+  this is not manual MetaMask or real-world identity/IP acceptance.
+- Remaining limitation is manual MetaMask and real-world Creator/IP/production
+  acceptance. This entry records executable local evidence, not a claim of
+  public production readiness.
 
 ## 2026-10-16 Editions workflow reconciliation and UX configuration
 
