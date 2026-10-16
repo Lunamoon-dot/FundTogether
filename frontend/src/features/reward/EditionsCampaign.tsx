@@ -3,15 +3,21 @@ import { useQuery } from '@tanstack/react-query';
 import { formatUnits, keccak256, toHex } from 'viem';
 import type { AccountSession } from '../../lib/api/auth';
 import { editionsApi } from '../../lib/api/editions';
-import type { EditionsEntitlement, EditionsEvidence, EditionsPreview } from '../../lib/api/editions';
+import type { EditionsEntitlement, EditionsEvidence, EditionsFeedback } from '../../lib/api/editions';
 import { getErrorMessage } from '../../lib/api/error';
 import { useEditionsTransaction } from './useEditionsTransaction';
 import { getCampaignUiState } from './ui/campaignState';
 import { EditionStatusBadge } from './ui/EditionStatusBadge';
-import { EditorialCampaignCard } from './ui/EditorialCampaignCard';
+import { fundingProgressPercent } from './ui/fundingProgress';
 import { EditionTimeline, type EditionTimelineEvent } from './ui/EditionTimeline';
+import { EditionsActivationPanel } from './ui/EditionsActivationPanel';
+import { EditionsPledgePreflight } from './ui/EditionsPledgePreflight';
+import { EditionsReviewThread } from './ui/EditionsReviewThread';
+import { ColophonRubric } from './ui/ColophonRubric';
 import './reward.css';
+export { EditionsCommunityReviewPage, EditionsFeed } from './EditionsFeed';
 const amount = (value: string) => `${formatUnits(BigInt(value), 6)} MockUSDC`;
+const zeroHash = `0x${'0'.repeat(64)}`;
 const date = (seconds: string) => new Date(Number(seconds) * 1000).toLocaleString('vi-VN');
 function userFacingError(message: string) {
   return message === 'Creator or Resolver required' ? 'Khu vực kiểm tra riêng tư chỉ dành cho Creator hoặc Resolver.' : message;
@@ -21,6 +27,7 @@ function entitlementPresentation(access: EditionsEntitlement['access']) {
     case 'REFUND_ELIGIBLE': return { label: 'Có thể nhận hoàn tiền', tone: 'warning' as const, description: 'Campaign không đạt mục tiêu. Khoản pledge của bạn đang chờ nhận lại.' };
     case 'REFUNDED': return { label: 'Đã hoàn tiền', tone: 'neutral' as const, description: 'Khoản pledge đã được trả lại về ví đã dùng để ủng hộ.' };
     case 'DOWNLOAD_ELIGIBLE': return { label: 'PDF đã sẵn sàng', tone: 'success' as const, description: 'Bạn có thể mở campaign để kiểm tra và tải PDF riêng tư.' };
+    case 'DELIVERY_UNAVAILABLE': return { label: 'PDF cần kiểm tra', tone: 'danger' as const, description: 'Resolver đã duyệt trên chain nhưng máy chủ chưa tìm thấy đúng file PDF đã cam kết.' };
     case 'PENDING_RELEASE': return { label: 'Đang chờ PDF', tone: 'info' as const, description: 'Pledge đã được ghi nhận; Resolver chưa duyệt bản PDF cuối.' };
     case 'ORPHANED': return { label: 'Không còn hợp lệ', tone: 'danger' as const, description: 'Giao dịch này không còn thuộc deployment canonical hiện tại.' };
   }
@@ -56,6 +63,9 @@ function EditionsEntitlementCard({ item }: { item: EditionsEntitlement }) {
       {item.access === 'PENDING_RELEASE' && (
         <a className="button button--secondary edition-entitlement-card__action" href={detailHref}>Theo dõi campaign →</a>
       )}
+      {item.access === 'DELIVERY_UNAVAILABLE' && (
+        <a className="button button--secondary edition-entitlement-card__action" href={detailHref}>Mở campaign để xem sự cố →</a>
+      )}
       <details className="edition-entitlement-details">
         <summary>Chi tiết giao dịch</summary>
         <p>
@@ -73,126 +83,32 @@ function saveBlob(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function EditionsPublicCard({ item }: { item: EditionsPreview }) {
-  const uiState = getCampaignUiState({
-    status: item.status,
-    chainState: item.surface === 'FUNDING' ? 0 : undefined,
-  });
-  return (
-    <EditorialCampaignCard
-      campaign={item}
-      state={uiState}
-      href={`#/reward/editions/${item.id}`}
-    />
-  );
-}
+type EditionsCampaignTab = 'overview' | 'production' | 'commitments' | 'activity';
 
-function EditionsPublicSurface({ title, description, items, empty }: { title: string; description: string; items: EditionsPreview[] | undefined; empty: string }) {
-  return (
-    <section className="editions-public-surface" aria-label={title}>
-      <div className="editions-public-surface__heading">
-        <div>
-          <h2>{title}</h2>
-          <p>{description}</p>
-        </div>
-        <span className="editions-public-surface__count">{items?.length ?? 0}</span>
-      </div>
-      {items?.length ? (
-        <div className="editions-shelf-grid">
-          {items.map(item => <EditionsPublicCard item={item} key={item.id} />)}
-        </div>
-      ) : (
-        <p className="muted">{empty}</p>
-      )}
-    </section>
-  );
-}
-
-export function EditionsFeed() {
-  const activation = useQuery({ queryKey: ['reward-editions-public', 'activation'], queryFn: ({ signal }) => editionsApi.activation(signal) });
-  const funding = useQuery({ queryKey: ['reward-editions-public', 'funding'], queryFn: ({ signal }) => editionsApi.funding(signal) });
-  const loading = activation.isPending || funding.isPending;
-  const error = activation.error || funding.error;
-
-  return (
-    <div className="reward-container">
-      {loading && <p role="status">Đang tải trạng thái Editions…</p>}
-      {error && <p role="alert">{getErrorMessage(error)}</p>}
-
-      {/* Shelf 1: Đang gây quỹ */}
-      <EditionsPublicSurface
-        title="Đang gây quỹ"
-        description="Campaign đã được indexer xác nhận trên contract; backer có thể pledge theo cam kết."
-        items={funding.data}
-        empty="Chưa có campaign đang nhận pledge."
-      />
-
-      {/* Shelf 2: Community Review Shelf */}
-      <section className="editions-feed-review-link" aria-label="Community Review">
-        <div>
-          <span className="editions-preparation-kicker">Trước khi pledge</span>
-          <h2>Community Review</h2>
-          <p>Đọc các hồ sơ đang được cộng đồng góp ý. Resolver vẫn là người ra quyết định; pledge chưa mở.</p>
-        </div>
-        <a className="button button--secondary" href="#/reward/review">Xem Community Review →</a>
-      </section>
-
-      {/* Shelf 3: Đã duyệt, chờ kích hoạt */}
-      <EditionsPublicSurface
-        title="Chờ Creator và Resolver kích hoạt"
-        description="Hồ sơ đã được duyệt, nhưng chưa có campaign on-chain canonical để nhận pledge."
-        items={activation.data}
-        empty="Không có hồ sơ đang chờ kích hoạt."
-      />
-
-      <div className="editions-feed-footer-link">
-        <a href="#/reward/history">Campaign Reward đã tồn tại</a>
-      </div>
-    </div>
-  );
-}
-
-export function EditionsCommunityReviewPage() {
-  const review = useQuery({ queryKey: ['reward-editions-public', 'review'], queryFn: ({ signal }) => editionsApi.review(signal) });
-
-  return (
-    <div className="reward-container editions-community-review-page">
-      <a className="public-back" href="#/reward">← Về trang Editions</a>
-      <header className="reward-hero">
-        <span className="reward-badge-category">FundTogether Editions · Community</span>
-        <h1 className="reward-hero-title">Community Review</h1>
-        <p className="reward-hero-pitch">Các hồ sơ đã được Resolver mở để cộng đồng góp ý trước khi có quyết định duyệt. Đây không phải trang pledge và phản hồi không phải phiếu biểu quyết.</p>
-      </header>
-      {review.isPending && <p role="status">Đang tải hồ sơ community review…</p>}
-      {review.error && <p role="alert">{getErrorMessage(review.error)}</p>}
-      <EditionsPublicSurface
-        title="Community review đang mở"
-        description="Hồ sơ đã được Resolver mở cho cộng đồng góp ý; chưa được duyệt và chưa mở pledge."
-        items={review.data}
-        empty="Chưa có hồ sơ nào đang mở community review."
-      />
-    </div>
-  );
-}
-
-export function EditionsCampaign({ id, session, mode = 'public' }: { id: string; session: AccountSession | null; mode?: 'public' | 'creator' | 'resolver' }) {
+export function EditionsCampaign({ id, session, mode = 'public', initialTab = 'overview' }: {
+  id: string;
+  session: AccountSession | null;
+  mode?: 'public' | 'creator' | 'resolver';
+  initialTab?: EditionsCampaignTab;
+}) {
   const userId = session?.userId;
   const preview = useQuery({ queryKey: ['reward-editions-public', id], queryFn: ({ signal }) => editionsApi.preview(id, signal) });
   const approved = preview.data?.status === 'APPROVED';
   const chain = useQuery({ queryKey: ['reward-editions-chain', id], queryFn: ({ signal }) => editionsApi.chain(id, signal), enabled: approved, refetchInterval: 10000 });
   const publicationTerms = useQuery({ queryKey: ['reward-editions-publication-terms', id, userId], queryFn: () => editionsApi.terms(id),
-    enabled: approved && Boolean(userId) && mode !== 'public' && chain.data?.status === 'NOT_PUBLISHED' });
+    enabled: approved && Boolean(userId) && mode !== 'public' && (chain.data?.status === 'NOT_PUBLISHED' || chain.data?.status === 'ORPHANED') });
   const privateView = Boolean(userId && mode !== 'public');
   const evidence = useQuery({ queryKey: ['reward-editions-evidence', id, privateView ? userId : 'public'], queryFn: ({ signal }) => editionsApi.evidence(id, privateView, signal), enabled: approved && (privateView || chain.data?.status === 'ON_CHAIN_CONFIRMED') });
   const entitlements = useQuery({ queryKey: ['reward-editions-entitlements', userId], queryFn: ({ signal }) => editionsApi.entitlements(signal), enabled: Boolean(userId) && approved });
   const [error, setError] = useState(''); const [notice, setNotice] = useState(''); const [working, setWorking] = useState(false);
   const [summary, setSummary] = useState(''); const [file, setFile] = useState<File | null>(null); const [reason, setReason] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'production' | 'commitments' | 'activity'>('overview');
+  const [activeTab, setActiveTab] = useState<EditionsCampaignTab>(initialTab);
   const refresh = () => { void chain.refetch(); void publicationTerms.refetch(); void evidence.refetch(); void entitlements.refetch(); };
-  const tx = useEditionsTransaction(refresh);
+  const tx = useEditionsTransaction(refresh, { userId, campaignId: id });
   const busy = working || tx.busy;
   const state = chain.data?.snapshot;
   const own = entitlements.data?.find(item => item.campaignId === id && item.access !== 'ORPHANED');
+  const orphanedEntitlement = entitlements.data?.find(item => item.campaignId === id && item.access === 'ORPHANED');
   const onchainId = chain.data?.onchainCampaignId;
   const activeId = onchainId == null ? null : BigInt(onchainId);
   const resolverWallet = chain.data?.deployment.resolver;
@@ -204,6 +120,10 @@ export function EditionsCampaign({ id, session, mode = 'public' }: { id: string;
   const disputeTimedOut = Boolean(state && chainNow !== null && state.state === 3 && BigInt(state.openDisputes) > 0n && chainNow >= BigInt(state.disputeDeadline));
   const showFinalizeFunding = Boolean(state && mode === 'resolver' && state.state === 0 && fundingExpired);
   const showStartRefunds = Boolean(state && mode === 'resolver' && state.state !== 0 && ![4, 5].includes(state.state) && (releasePolicyExpired || disputeTimedOut));
+  const postFundingState = Boolean(chain.data?.status === 'ON_CHAIN_CONFIRMED' && state && [1, 2, 3, 5].includes(state.state));
+  const fundedParticipant = Boolean(own && !['ORPHANED', 'REFUNDED'].includes(own.access));
+  const showPostFundingReview = Boolean(userId && postFundingState && (mode === 'creator' || mode === 'resolver' || fundedParticipant));
+  const postFundingTarget = state && state.productionHash !== zeroHash ? state.productionHash : (preview.data?.commitmentHash ?? '');
   const fundingAwaitingFinalization = Boolean(state && state.state === 0 && fundingExpired);
   const pendingProduction = state && !state.productionApproved && state.productionHash !== `0x${'0'.repeat(64)}`;
   const reviewEvidence = evidence.data?.find(item => item.evidenceHash === (state?.state === 2 ? state.releaseEvidenceHash : state?.productionHash));
@@ -217,7 +137,7 @@ export function EditionsCampaign({ id, session, mode = 'public' }: { id: string;
       const result = await publicationTerms.refetch();
       if (!result.data) throw new Error('Chưa đọc được cam kết phát hành; hãy tải lại trang.');
       const terms = result.data;
-      if (mode !== 'resolver' && !terms.onchainApproved) throw new Error('Primary Resolver chưa ký duyệt cam kết trên chain. Creator chưa thể tạo campaign.');
+      if (mode !== 'resolver' && !terms.onchainApproved) throw new Error('Primary Resolver chưa ký duyệt cam kết trên chain. Hãy chọn Kiểm tra lại chữ ký trước khi tạo campaign.');
       const values = [terms.commitmentHash, BigInt(terms.goal), BigInt(terms.price), BigInt(terms.fundingDuration), BigInt(terms.releaseDeadline)];
       await tx.send(mode === 'resolver' ? 'approveCampaign' : 'createCampaign', mode === 'resolver' ? [terms.creatorWallet, ...values] : values,
         { expectedWallet: mode === 'resolver' ? terms.deployment.resolver : terms.creatorWallet });
@@ -250,6 +170,7 @@ export function EditionsCampaign({ id, session, mode = 'public' }: { id: string;
   const uiState = getCampaignUiState({
     status: item.status,
     chainState: state?.state,
+    publicationStatus: chain.data?.status ?? null,
     role: mode,
   });
 
@@ -290,7 +211,7 @@ export function EditionsCampaign({ id, session, mode = 'public' }: { id: string;
     });
   }
 
-  const percent = state ? Math.min(100, Math.max(0, Math.round((Number(state.raised) / (Number(state.goal) || 1)) * 100))) : 0;
+  const percent = state ? fundingProgressPercent(state.raised, state.goal) : 0;
   const formatDate = (isoOrSeconds?: string) => {
     if (!isoOrSeconds) return 'Chưa xác định';
     try {
@@ -303,177 +224,215 @@ export function EditionsCampaign({ id, session, mode = 'public' }: { id: string;
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-neutral-100 p-4 sm:p-6 lg:p-8 font-sans">
+    <div className="reward-container monograph-container">
       {/* 1. Breadcrumbs */}
-      <div className="flex items-center justify-between text-xs text-neutral-400 mb-6">
+      <div className="monograph-nav">
         <div className="flex items-center gap-1.5">
-          <a href="#/reward" className="hover:text-white transition-colors">← Campaigns</a>
+          <a href="#/reward">← The Salon</a>
           <span>/</span>
-          <span className="truncate max-w-[120px]">{id}</span>
+          <span className="truncate max-w-[140px] font-mono">{id}</span>
           <span>/</span>
-          <span className="text-neutral-200">Editions</span>
+          <span className="font-semibold text-neutral-800">The Monograph</span>
         </div>
-        <div className="text-neutral-400 hover:text-white cursor-pointer px-1">···</div>
+        <div className="text-xs uppercase text-neutral-500 font-mono">
+          EDITIONS · COMICS &amp; ARTBOOKS
+        </div>
       </div>
 
-      {/* 2. Hero Header */}
-      <div className="flex items-start gap-4">
-        <div className="w-12 h-12 flex-shrink-0 flex items-center justify-center rounded-lg bg-neutral-900 border border-neutral-800 text-neutral-200" aria-hidden="true">
-          <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-          </svg>
-        </div>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold text-white leading-tight m-0">
+      {/* 2. Hero Header with Integrated Colophon Rubric */}
+      <div className="monograph-hero">
+        <div className="monograph-hero__content">
+          <div className="monograph-hero__kicker">
+            <span>ẤN BẢN ĐỘC QUYỀN</span>
+            <span>·</span>
+            <span>STANDARD PDF TIER</span>
+          </div>
+          <h1 className="monograph-hero__title">
             {item.config.title || 'Standard PDF'}
           </h1>
-          <p className="text-sm text-neutral-400 mt-1 mb-2">
-            Digital edition · {item.creatorDisplayName}
+          <p className="monograph-hero__author">
+            Auteur / Tác giả: <strong>{item.creatorDisplayName}</strong>
           </p>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="monograph-hero__pills">
+            <EditionStatusBadge state={uiState} />
             {approved && (
-              <span className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-neutral-800 text-neutral-300 border border-neutral-700/50">
-                Approved
+              <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-[#f0f4ee] text-[#2b5936] border border-[#d2e3d5]">
+                ✓ Resolver Verified
               </span>
             )}
-            {state?.state === 4 ? (
-              <span className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-amber-950/60 text-amber-400 border border-amber-800/50">
-                Campaign refunding
-              </span>
-            ) : state?.state === 0 ? (
-              <span className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-emerald-950/60 text-emerald-400 border border-emerald-800/50">
-                Active funding
-              </span>
-            ) : (
-              <span className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-neutral-800 text-neutral-400 border border-neutral-700/40">
-                {uiState.label}
+            {state?.state === 4 && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-[#faeceb] text-[#9e2a2b] border border-[#e8c4c3]">
+                ⚠ Đang hoàn tiền tự động
               </span>
             )}
           </div>
         </div>
+
+        <div className="monograph-hero__rubric">
+          <ColophonRubric
+            commitmentHash={item.commitmentHash}
+            collateralPercent={percent}
+            pledgedFormatted={state ? amount(state.raised) : undefined}
+            goalFormatted={amount(item.config.goal)}
+            resolverVerified={approved}
+            stateLabel={uiState.label}
+            creatorName={item.creatorDisplayName}
+          />
+        </div>
       </div>
 
       {/* 3. Navigation Tabs */}
-      <div className="flex items-center gap-6 border-b border-neutral-800 mt-6 text-sm font-medium">
+      <div className="monograph-tabs" role="tablist">
         {(['overview', 'production', 'commitments', 'activity'] as const).map(tab => (
           <button
             key={tab}
             type="button"
+            role="tab"
+            aria-selected={activeTab === tab}
             onClick={() => setActiveTab(tab)}
-            className={`pb-2.5 capitalize transition-colors ${
-              activeTab === tab
-                ? 'text-white border-b-2 border-white font-semibold'
-                : 'text-neutral-400 hover:text-neutral-200'
-            }`}
+            className={`monograph-tab-btn ${activeTab === tab ? 'monograph-tab-btn--active' : ''}`}
           >
-            {tab === 'overview' ? 'Overview' : tab === 'production' ? 'Production' : tab === 'commitments' ? 'Commitments' : 'Activity'}
+            {tab === 'overview' ? 'Tổng quan (Folio)' : tab === 'production' ? 'Sản xuất & Bằng chứng' : tab === 'commitments' ? 'Cam kết & Tiến trình' : 'Góp ý & Thẩm định'}
           </button>
         ))}
       </div>
 
       {/* 4. Alert / Notices */}
       {[error, tx.error, chain.error && getErrorMessage(chain.error), publicationTerms.error && getErrorMessage(publicationTerms.error), evidence.error && getErrorMessage(evidence.error), entitlements.error && getErrorMessage(entitlements.error)].filter(Boolean).map((message, index) => (
-        <div key={index} role="alert" className="mt-4 p-3 rounded-lg bg-red-950/40 border border-red-900/50 text-red-300 text-sm">
+        <div key={index} role="alert" className="monograph-alert monograph-alert--error mt-4">
           {userFacingError(String(message))}
         </div>
       ))}
-      {notice && <div role="status" className="mt-4 p-3 rounded-lg bg-emerald-950/40 border border-emerald-900/50 text-emerald-300 text-sm">{notice}</div>}
-      {tx.notice && <div role="status" className="mt-4 p-3 rounded-lg bg-emerald-950/40 border border-emerald-900/50 text-emerald-300 text-sm">{tx.notice}</div>}
+      {notice && <div role="status" className="monograph-alert monograph-alert--success mt-4">{notice}</div>}
+      {tx.notice && <div role="status" className="monograph-alert monograph-alert--success mt-4">{tx.notice}</div>}
       {!userId && (
-        <div className="mt-4 p-3 rounded-lg bg-neutral-900/50 border border-neutral-800 text-sm text-neutral-300">
-          <a href="#/account" className="text-white underline font-medium">Đăng nhập</a> để góp ý, liên kết ví và ủng hộ bằng MockUSDC local.
+        <div className="monograph-alert monograph-alert--info mt-4">
+          <a href="#/account" className="underline font-semibold">Đăng nhập</a> để góp ý, liên kết ví và ủng hộ bằng MockUSDC local.
         </div>
       )}
 
       {/* Refunding Banner */}
       {state?.state === 4 && (
-        <div className="mt-6 rounded-lg p-4 bg-amber-950/20 border border-amber-900/40 text-amber-200 space-y-1">
-          <div className="flex items-center gap-2 font-semibold text-amber-400">
+        <div className="monograph-alert monograph-alert--warning mt-6 space-y-1">
+          <div className="flex items-center gap-2 font-semibold">
             <span aria-hidden="true">⚠</span>
             <span>Campaign không đạt mục tiêu — đang hoàn tiền</span>
           </div>
-          <p className="text-sm text-neutral-300 m-0">
+          <p className="text-sm m-0">
             Chiến dịch đang trong trạng thái hoàn tiền. Backer tự thực hiện claim refund.
           </p>
         </div>
       )}
 
-      {/* 5. Main 2-Column Content Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-6">
-        {/* Left Column (Primary Content) */}
-        <div className="lg:col-span-2 space-y-6">
+      {/* 5. Main 2-Column Split-Volume Layout */}
+      <div className="monograph-split-layout mt-6">
+        {/* Left Column (The Auteur Folio) */}
+        <div className="monograph-folio">
           {activeTab === 'overview' && (
             <>
-              {/* Thông tin ấn phẩm */}
-              <div>
-                <h2 className="text-base font-semibold text-white mb-2">Thông tin ấn phẩm</h2>
-                <p className="text-sm text-neutral-300 leading-relaxed m-0">
+              {/* Thông tin ấn phẩm & Tier */}
+              <div className="monograph-card">
+                <span className="monograph-card__kicker">ẤN PHẨM &amp; PHẦN THƯỞNG TIÊU CHUẨN</span>
+                <h2 className="monograph-card__title">Thông tin ấn phẩm</h2>
+                <p className="monograph-card__pitch">
                   {item.config.tiers[0]?.rewardItems[0]?.description || item.config.pitch || 'Một file PDF hoàn chỉnh của truyện tranh hoặc artbook.'}
                 </p>
+
+                <div className="monograph-tier-spec">
+                  <div className="monograph-tier-spec__header">
+                    <span className="monograph-tier-spec__badge">STANDARD DIGITAL EDITION</span>
+                    <span className="monograph-tier-spec__price">{amount(item.config.tiers[0].price)}</span>
+                  </div>
+                  <div className="monograph-tier-spec__details">
+                    <div className="monograph-tier-spec__item">
+                      <svg className="monograph-tier-spec__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                      </svg>
+                      <div>
+                        <strong>Gói phần thưởng:</strong> {item.config.tiers[0]?.title || 'Standard Digital Edition'} (Ấn bản độc quyền dành cho backer)
+                      </div>
+                    </div>
+                    <div className="monograph-tier-spec__item">
+                      <svg className="monograph-tier-spec__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                      </svg>
+                      <div>
+                        <strong>Cơ chế phân phối:</strong> Tải xuống tệp PDF hoàn chỉnh qua vé xác thực ngắn hạn sau khi Resolver duyệt phát hành.
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Production documents */}
-              <div>
-                <h2 className="text-base font-semibold text-white mb-3">Production documents</h2>
-                <div className="space-y-2">
-                  <details className="group border border-neutral-800 rounded-lg bg-neutral-900/30 overflow-hidden">
-                    <summary className="flex items-center justify-between p-3.5 cursor-pointer select-none hover:bg-neutral-800/40 transition-colors">
-                      <div className="flex items-center gap-2.5">
-                        <svg className="w-4 h-4 text-neutral-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <div className="monograph-card">
+                <span className="monograph-card__kicker">HỒ SƠ THẨM ĐỊNH (EDITORIAL DOSSIER)</span>
+                <h2 className="monograph-card__title">Tài liệu sản xuất &amp; Kế hoạch cam kết</h2>
+                <p className="monograph-card__desc">
+                  Các tài liệu minh chứng do auteur cam kết và được Resolver thẩm định kỹ lưỡng trước khi mở gây quỹ.
+                </p>
+
+                <div className="monograph-dossier-stack">
+                  <details className="monograph-dossier">
+                    <summary className="monograph-dossier__summary">
+                      <div className="monograph-dossier__left">
+                        <span className="monograph-dossier__tag">01</span>
+                        <svg className="monograph-dossier__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                           <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
                           <line x1="9" y1="9" x2="15" y2="9" />
                           <line x1="9" y1="13" x2="15" y2="13" />
                           <line x1="9" y1="17" x2="13" y2="17" />
                         </svg>
-                        <span className="text-sm font-medium text-neutral-200">Đề cương nội dung</span>
+                        <span className="monograph-dossier__label">Đề cương nội dung</span>
                       </div>
-                      <svg className="w-4 h-4 text-neutral-400 transform group-open:rotate-90 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <polyline points="9 18 15 12 9 6" />
-                      </svg>
+                      <span className="monograph-dossier__chevron" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
+                      </span>
                     </summary>
-                    <div className="p-3.5 pt-0 text-sm text-neutral-300 whitespace-pre-wrap border-t border-neutral-800/60 mt-1">
-                      {item.contentOutline}
+                    <div className="monograph-dossier__content">
+                      {item.contentOutline || <span className="italic text-[var(--ink-subtle)]">Chưa có đề cương nội dung chi tiết.</span>}
                     </div>
                   </details>
 
-                  <details className="group border border-neutral-800 rounded-lg bg-neutral-900/30 overflow-hidden">
-                    <summary className="flex items-center justify-between p-3.5 cursor-pointer select-none hover:bg-neutral-800/40 transition-colors">
-                      <div className="flex items-center gap-2.5">
-                        <svg className="w-4 h-4 text-neutral-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                          <line x1="9" y1="9" x2="15" y2="9" />
-                          <line x1="9" y1="13" x2="15" y2="13" />
-                          <line x1="9" y1="17" x2="13" y2="17" />
+                  <details className="monograph-dossier">
+                    <summary className="monograph-dossier__summary">
+                      <div className="monograph-dossier__left">
+                        <span className="monograph-dossier__tag">02</span>
+                        <svg className="monograph-dossier__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                          <line x1="12" y1="1" x2="12" y2="23"></line>
+                          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
                         </svg>
-                        <span className="text-sm font-medium text-neutral-200">Kế hoạch ngân sách</span>
+                        <span className="monograph-dossier__label">Kế hoạch ngân sách</span>
                       </div>
-                      <svg className="w-4 h-4 text-neutral-400 transform group-open:rotate-90 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <polyline points="9 18 15 12 9 6" />
-                      </svg>
+                      <span className="monograph-dossier__chevron" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
+                      </span>
                     </summary>
-                    <div className="p-3.5 pt-0 text-sm text-neutral-300 whitespace-pre-wrap border-t border-neutral-800/60 mt-1">
-                      {item.budgetPlan}
+                    <div className="monograph-dossier__content">
+                      {item.budgetPlan || <span className="italic text-[var(--ink-subtle)]">Chưa có kế hoạch ngân sách chi tiết.</span>}
                     </div>
                   </details>
 
-                  <details className="group border border-neutral-800 rounded-lg bg-neutral-900/30 overflow-hidden">
-                    <summary className="flex items-center justify-between p-3.5 cursor-pointer select-none hover:bg-neutral-800/40 transition-colors">
-                      <div className="flex items-center gap-2.5">
-                        <svg className="w-4 h-4 text-neutral-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                          <line x1="9" y1="9" x2="15" y2="9" />
-                          <line x1="9" y1="13" x2="15" y2="13" />
-                          <line x1="9" y1="17" x2="13" y2="17" />
+                  <details className="monograph-dossier">
+                    <summary className="monograph-dossier__summary">
+                      <div className="monograph-dossier__left">
+                        <span className="monograph-dossier__tag">03</span>
+                        <svg className="monograph-dossier__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
                         </svg>
-                        <span className="text-sm font-medium text-neutral-200">Kế hoạch bằng chứng</span>
+                        <span className="monograph-dossier__label">Kế hoạch bằng chứng</span>
                       </div>
-                      <svg className="w-4 h-4 text-neutral-400 transform group-open:rotate-90 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <polyline points="9 18 15 12 9 6" />
-                      </svg>
+                      <span className="monograph-dossier__chevron" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
+                      </span>
                     </summary>
-                    <div className="p-3.5 pt-0 text-sm text-neutral-300 whitespace-pre-wrap border-t border-neutral-800/60 mt-1">
-                      {item.evidencePlan}
+                    <div className="monograph-dossier__content">
+                      {item.evidencePlan || <span className="italic text-[var(--ink-subtle)]">Chưa có kế hoạch bằng chứng sản xuất.</span>}
                     </div>
                   </details>
                 </div>
@@ -481,10 +440,11 @@ export function EditionsCampaign({ id, session, mode = 'public' }: { id: string;
 
               {/* Backer entitlement card when owned and not refunded */}
               {own && state && state.state !== 4 && (
-                <div className="border border-neutral-800 rounded-xl p-5 bg-neutral-900/40 space-y-3">
-                  <h2 className="text-base font-semibold text-white m-0">Quyền PDF của bạn</h2>
-                  <p className="text-sm text-neutral-300 m-0">
-                    {own.access === 'DOWNLOAD_ELIGIBLE' ? 'PDF đã sẵn sàng' : own.access === 'PENDING_RELEASE' ? 'Đang chờ PDF' : own.access === 'ORPHANED' ? 'Không còn hợp lệ' : own.access} · {amount(own.amountPaid)}
+                <div className="monograph-card space-y-3">
+                  <span className="monograph-card__kicker">QUYỀN LỢI ĐÃ MỞ (BACKER ENTITLEMENT)</span>
+                  <h2 className="monograph-card__title">Quyền PDF của bạn</h2>
+                  <p className="monograph-card__pitch">
+                    {own.access === 'DOWNLOAD_ELIGIBLE' ? 'PDF đã sẵn sàng' : own.access === 'DELIVERY_UNAVAILABLE' ? 'PDF cần Resolver kiểm tra' : own.access === 'PENDING_RELEASE' ? 'Đang chờ PDF' : own.access === 'ORPHANED' ? 'Không còn hợp lệ' : own.access} · <strong>{amount(own.amountPaid)}</strong>
                   </p>
                   {own.access === 'DOWNLOAD_ELIGIBLE' && (
                     <div className="flex flex-wrap gap-2.5 pt-1">
@@ -496,7 +456,7 @@ export function EditionsCampaign({ id, session, mode = 'public' }: { id: string;
                       </button>
                     </div>
                   )}
-                  <p className="text-xs text-neutral-400 m-0">
+                  <p className="text-xs text-[var(--ink-subtle)] m-0">
                     Lượt tải là nhật ký truy cập. Xác nhận của bạn là phản hồi riêng, không tự giải ngân.
                   </p>
                 </div>
@@ -504,44 +464,37 @@ export function EditionsCampaign({ id, session, mode = 'public' }: { id: string;
 
               {/* Verified evidence status label */}
               {state && state.productionApproved && (
-                <div className="rounded-lg border border-neutral-800 p-3 bg-neutral-900/40 text-xs text-neutral-300">
-                  EVIDENCE_REVIEWED · Bằng chứng sản xuất đã được duyệt.
+                <div className="rounded-lg border border-[var(--border-hairline)] p-3.5 bg-[#f0fdf4] text-xs text-[#166534] font-medium flex items-center gap-2">
+                  <span aria-hidden="true">✓</span>
+                  <span>EVIDENCE_REVIEWED · Bằng chứng sản xuất đã được duyệt.</span>
                 </div>
               )}
 
               {/* Community Review Notice if not approved */}
               {!approved && (
-                <div className="border border-neutral-800 rounded-xl p-5 bg-neutral-900/30 space-y-2">
-                  <h2 className="text-base font-semibold text-white m-0">Community review đang mở</h2>
-                  <p className="text-sm text-neutral-300 m-0">Community chỉ gửi phản hồi tham khảo; Resolver là người quyết định. Hồ sơ chưa mở pledge.</p>
-                  <p className="text-xs text-neutral-400 m-0">Hồ sơ chỉ xuất hiện ở đây sau khi Resolver chủ động mở community review.</p>
+                <div className="monograph-card space-y-2">
+                  <span className="monograph-card__kicker">GIAI ĐOẠN ĐÁNH GIÁ</span>
+                  <h2 className="monograph-card__title">Community review đang mở</h2>
+                  <p className="monograph-card__pitch">Community chỉ gửi phản hồi tham khảo; Resolver là người quyết định. Hồ sơ chưa mở pledge.</p>
+                  <p className="text-xs text-[var(--ink-subtle)] m-0">Hồ sơ chỉ xuất hiện ở đây sau khi Resolver chủ động mở community review.</p>
                 </div>
               )}
 
-              {/* On-chain publication pending status */}
-              {approved && chain.data && !state && (
-                <div className="border border-neutral-800 rounded-xl p-5 bg-neutral-900/30 space-y-3">
-                  <h2 className="text-base font-semibold text-white m-0">Chưa phát hành trên hợp đồng Editions</h2>
-                  <p className="text-sm text-neutral-300 m-0">Hồ sơ được duyệt và giao dịch phát hành là hai bước riêng. Primary Resolver ký đúng cam kết trước khi Creator tạo campaign.</p>
-                  {userId && mode !== 'public' && publicationTerms.isPending && <p role="status" className="text-xs text-neutral-400 m-0">Đang kiểm tra chữ ký cam kết trên chain…</p>}
-                  {userId && mode === 'creator' && publicationTerms.data && !publicationTerms.data.onchainApproved && (
-                    <>
-                      <p role="status" className="text-xs text-amber-400 m-0">Đang chờ Primary Resolver ký duyệt cam kết trên chain. Creator chưa thể tạo campaign.</p>
-                      <button className="button button--secondary" disabled={busy || publicationTerms.isFetching} onClick={() => void publicationTerms.refetch()}>Kiểm tra lại chữ ký</button>
-                    </>
-                  )}
-                  {userId && mode === 'creator' && publicationTerms.data?.onchainApproved && (
-                    <button className="button button--primary" disabled={busy} onClick={() => void publication()}>Tạo campaign local từ cam kết</button>
-                  )}
-                  {userId && mode === 'resolver' && (
-                    <>
-                      {publicationTerms.data?.onchainApproved && <p role="status" className="text-xs text-emerald-400 m-0">Primary Resolver đã ký duyệt cam kết trên chain.</p>}
-                      {!publicationTerms.data?.onchainApproved && (
-                        <button className="button button--primary" disabled={busy} onClick={() => void publication()}>Ký duyệt cam kết local</button>
-                      )}
-                    </>
-                  )}
-                </div>
+              {approved && chain.data && mode !== 'public' && (
+                <EditionsActivationPanel
+                  mode={mode}
+                  terms={publicationTerms.data}
+                  chain={chain.data}
+                  transaction={tx.transaction?.action === 'approveCampaign' || tx.transaction?.action === 'createCampaign' ? tx.transaction : null}
+                  busy={busy || publicationTerms.isFetching}
+                  onRefresh={() => { void chain.refetch(); void publicationTerms.refetch(); }}
+                  onActivate={() => void publication()}
+                  onReconcile={() => {
+                    if (tx.transaction?.txHash) void tx.reconcile();
+                    else if (chain.data?.bindingTransactionHash) void tx.reconcile('createCampaign', chain.data.bindingTransactionHash);
+                    else void chain.refetch();
+                  }}
+                />
               )}
             </>
           )}
@@ -550,29 +503,30 @@ export function EditionsCampaign({ id, session, mode = 'public' }: { id: string;
           {activeTab === 'production' && (
             <div className="space-y-6">
               {state && activeId !== null && state.state !== 4 && (
-                <div className="border border-neutral-800 rounded-xl p-5 bg-neutral-900/30 space-y-4">
-                  <h2 className="text-base font-semibold text-white m-0">Bằng chứng & bản PDF cuối</h2>
-                  <p className="text-sm text-neutral-300 m-0">
+                <div className="monograph-card space-y-4">
+                  <span className="monograph-card__kicker">QUY TRÌNH SẢN XUẤT</span>
+                  <h2 className="monograph-card__title">Bằng chứng &amp; bản PDF cuối</h2>
+                  <p className="monograph-card__pitch">
                     {state.productionApproved ? 'EVIDENCE_REVIEWED · Bằng chứng sản xuất đã được duyệt.' : 'Bằng chứng sản xuất chưa được duyệt.'} Việc duyệt sản xuất chưa mở quyền tải PDF.
                   </p>
                   {mode === 'creator' && userId && state.state === 1 && !pendingProduction && (
                     <form onSubmit={event => { event.preventDefault(); void upload(); }} className="space-y-3 pt-2">
-                      <label className="block text-xs font-medium text-neutral-400">
+                      <label className="block text-xs font-mono uppercase tracking-wider text-[var(--ink-lead)]">
                         {state.productionApproved ? 'PDF cuối riêng tư' : 'Bằng chứng sản xuất riêng tư'} · tối đa 10 MiB
-                        <input type="file" accept={state.productionApproved ? 'application/pdf' : 'application/pdf,image/png,image/jpeg'} required onChange={event => setFile(event.target.files?.[0] ?? null)} className="mt-1 block w-full text-xs text-neutral-400 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-neutral-800 file:text-neutral-200" />
+                        <input type="file" accept={state.productionApproved ? 'application/pdf' : 'application/pdf,image/png,image/jpeg'} required onChange={event => setFile(event.target.files?.[0] ?? null)} className="mt-1 block w-full text-xs text-[var(--ink-lead)] file:mr-3 file:py-1.5 file:px-3 file:rounded file:border file:border-[var(--border-hairline)] file:text-xs file:font-medium file:bg-[var(--paper-bone)] file:text-[var(--ink-carbon)]" />
                       </label>
-                      <label className="block text-xs font-medium text-neutral-400">
+                      <label className="block text-xs font-mono uppercase tracking-wider text-[var(--ink-lead)]">
                         Tóm tắt công khai, không ghi thông tin riêng tư
-                        <textarea required minLength={20} maxLength={5000} value={summary} onChange={event => setSummary(event.target.value)} className="mt-1 block w-full rounded border border-neutral-800 bg-neutral-950 p-2 text-sm text-white" />
+                        <textarea required minLength={20} maxLength={5000} value={summary} onChange={event => setSummary(event.target.value)} className="mt-1 block w-full rounded border border-[var(--border-hairline)] bg-white p-2.5 text-sm text-[var(--ink-carbon)] focus:outline-none focus:border-[var(--seal-vermilion)]" />
                       </label>
                       <button disabled={busy || !file} className="button button--primary">Lưu file và hash</button>
                     </form>
                   )}
                   {evidence.data?.map(proof => (
-                    <div key={proof.id} className="border-t border-neutral-800 pt-3 space-y-1.5">
-                      <h3 className="text-sm font-semibold text-neutral-200 m-0">{proof.purpose === 'FINAL_PDF' ? 'PDF cuối' : 'Bằng chứng sản xuất'}</h3>
-                      <p className="text-sm text-neutral-400 m-0">{proof.summary}</p>
-                      <p className="text-xs font-mono text-neutral-500 m-0 break-all">File: {proof.sha256}<br />Bằng chứng: {proof.evidenceHash}</p>
+                    <div key={proof.id} className="border-t border-[var(--border-hairline)] pt-3.5 space-y-1.5">
+                      <h3 className="text-sm font-semibold text-[var(--ink-carbon)] m-0">{proof.purpose === 'FINAL_PDF' ? 'PDF cuối' : 'Bằng chứng sản xuất'}</h3>
+                      <p className="text-sm text-[var(--ink-lead)] m-0">{proof.summary}</p>
+                      <p className="text-xs font-mono text-[var(--ink-subtle)] m-0 break-all bg-[var(--paper-bone)] p-2 rounded border border-[var(--border-hairline-subtle)]">File: {proof.sha256}<br />Bằng chứng: {proof.evidenceHash}</p>
                       {privateView && (
                         <button disabled={busy} className="button button--secondary" onClick={() => void work(async () => saveBlob(await editionsApi.evidenceFile(id, proof.id), proof.mediaType === 'application/pdf' ? 'review.pdf' : 'evidence.png'))}>Tải file để kiểm tra</button>
                       )}
@@ -581,10 +535,10 @@ export function EditionsCampaign({ id, session, mode = 'public' }: { id: string;
                       )}
                     </div>
                   ))}
-                  {mode === 'resolver' && <p className="text-xs text-neutral-400 m-0">Ký bằng ví Primary Resolver hoặc Backup sau 7 ngày chờ. Community chỉ gửi nhận xét; không có quyền duyệt tiền.</p>}
+                  {mode === 'resolver' && <p className="text-xs text-[var(--ink-subtle)] m-0">Ký bằng ví Primary Resolver hoặc Backup sau 7 ngày chờ. Community chỉ gửi nhận xét; không có quyền duyệt tiền.</p>}
                   {canReview && reviewEvidence && (state.state === 2 || pendingProduction) && (
-                    <div className="space-y-2 pt-2 border-t border-neutral-800">
-                      <p className="text-xs text-neutral-300 m-0">Kiểm tra file riêng tư và phản hồi community trước khi quyết định.</p>
+                    <div className="space-y-2 pt-3 border-t border-[var(--border-hairline)]">
+                      <p className="text-xs text-[var(--ink-lead)] m-0">Kiểm tra file riêng tư và phản hồi community trước khi quyết định.</p>
                       <div className="flex gap-2">
                         {[true, false].map(accepted => (
                           <button key={String(accepted)} disabled={busy} className="button button--secondary" onClick={() => void tx.send(state.state === 2 ? 'reviewRelease' : 'reviewProduction', state.state === 2 ? [activeId, state.pdfHash, state.releaseEvidenceHash, accepted] : [activeId, state.productionHash, accepted])}>
@@ -602,34 +556,37 @@ export function EditionsCampaign({ id, session, mode = 'public' }: { id: string;
           {/* Commitments Tab */}
           {activeTab === 'commitments' && (
             <div className="space-y-6">
-              <div className="border border-neutral-800 rounded-xl p-5 bg-neutral-900/30 space-y-4">
-                <h2 className="text-base font-semibold text-white m-0">Tiến trình vòng đời</h2>
+              <div className="monograph-card space-y-4">
+                <span className="monograph-card__kicker">VÒNG ĐỜI DỰ ÁN</span>
+                <h2 className="monograph-card__title">Tiến trình vòng đời</h2>
                 <EditionTimeline events={timelineEvents} />
               </div>
 
-              <div className="border border-neutral-800 rounded-xl p-5 bg-neutral-900/30 space-y-3">
-                <h2 className="text-base font-semibold text-white m-0">Cốt truyện & Tác phẩm</h2>
-                <p className="text-sm text-neutral-300 leading-relaxed whitespace-pre-wrap m-0">{item.config.story}</p>
+              <div className="monograph-card space-y-3">
+                <span className="monograph-card__kicker">NỘI DUNG TÁC PHẨM</span>
+                <h2 className="monograph-card__title">Cốt truyện &amp; Tác phẩm</h2>
+                <p className="text-[14.5px] text-[var(--ink-lead)] leading-relaxed whitespace-pre-wrap m-0 font-serif">{item.config.story}</p>
               </div>
 
-              <div className="border border-neutral-800 rounded-xl p-5 bg-neutral-900/30 space-y-3">
-                <h2 className="text-base font-semibold text-white m-0">Cam kết mã hóa</h2>
+              <div className="monograph-card space-y-3">
+                <span className="monograph-card__kicker">MINH BẠCH ON-CHAIN</span>
+                <h2 className="monograph-card__title">Cam kết mã hóa</h2>
                 <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="text-neutral-400 font-medium">Commitment Hash:</span>
-                  <code className="font-mono text-xs bg-neutral-950 text-neutral-300 px-2 py-0.5 rounded border border-neutral-800 break-all select-all">
+                  <span className="text-[var(--ink-subtle)] font-medium">Commitment Hash:</span>
+                  <code className="font-mono text-xs bg-[var(--paper-bone)] text-[var(--ink-carbon)] px-2.5 py-1 rounded border border-[var(--border-hairline)] break-all select-all">
                     {item.commitmentHash}
                   </code>
                 </div>
                 {item.decisions.length > 0 && (
                   <div className="pt-2 space-y-2">
-                    <span className="text-xs text-neutral-400 font-medium">Quyết định thẩm định:</span>
+                    <span className="text-xs text-[var(--ink-subtle)] font-medium">Quyết định thẩm định:</span>
                     <div className="flex flex-wrap gap-2">
                       {item.decisions.map((decision, index) => (
-                        <div key={index} className="inline-flex items-center gap-1.5 text-xs bg-neutral-950 text-neutral-300 px-2.5 py-1 rounded border border-neutral-800">
-                          <span className="font-semibold text-neutral-200">Resolver: {decision.outcome}</span>
-                          <span className="text-neutral-500">· {decision.reviewedAt}</span>
+                        <div key={index} className="inline-flex items-center gap-1.5 text-xs bg-[var(--paper-bone)] text-[var(--ink-carbon)] px-2.5 py-1 rounded border border-[var(--border-hairline)]">
+                          <span className="font-semibold">Resolver: {decision.outcome}</span>
+                          <span className="text-[var(--ink-subtle)]">· {decision.reviewedAt}</span>
                           {(decision as { decisionReason?: string }).decisionReason && (
-                            <span className="text-neutral-400">— {(decision as { decisionReason?: string }).decisionReason}</span>
+                            <span className="text-[var(--ink-lead)]">— {(decision as { decisionReason?: string }).decisionReason}</span>
                           )}
                         </div>
                       ))}
@@ -644,11 +601,12 @@ export function EditionsCampaign({ id, session, mode = 'public' }: { id: string;
           {activeTab === 'activity' && (
             <div className="space-y-6">
               {userId && state && state.state !== 4 && (state.state === 3 || chain.data!.challenges.length > 0) && (
-                <div className="border border-neutral-800 rounded-xl p-5 bg-neutral-900/30 space-y-3">
-                  <h2 className="text-base font-semibold text-white m-0">Challenge trước payout</h2>
-                  <label className="block text-xs font-medium text-neutral-400">
+                <div className="monograph-card space-y-3">
+                  <span className="monograph-card__kicker">TRANH CHẤP &amp; KHIẾU NẠI</span>
+                  <h2 className="monograph-card__title">Challenge trước payout</h2>
+                  <label className="block text-xs font-mono uppercase tracking-wider text-[var(--ink-lead)]">
                     Lý do / bằng chứng chi tiết gửi Resolver
-                    <textarea minLength={10} maxLength={2500} value={reason} onChange={event => setReason(event.target.value)} className="mt-1 block w-full rounded border border-neutral-800 bg-neutral-950 p-2 text-sm text-white" />
+                    <textarea minLength={10} maxLength={2500} value={reason} onChange={event => setReason(event.target.value)} className="mt-1 block w-full rounded border border-[var(--border-hairline)] bg-white p-2.5 text-sm text-[var(--ink-carbon)] focus:outline-none focus:border-[var(--seal-vermilion)]" />
                   </label>
                   {own && state.state === 3 && (
                     <button disabled={busy || reason.trim().length < 10} className="button button--secondary" onClick={() => void work(async () => {
@@ -657,8 +615,8 @@ export function EditionsCampaign({ id, session, mode = 'public' }: { id: string;
                     })}>Gửi báo cáo và challenge bằng ví đã pledge</button>
                   )}
                   {chain.data!.challenges.map(challenge => (
-                    <div key={challenge.backer} className="border-t border-neutral-800 pt-3 space-y-1">
-                      <p className="text-xs text-neutral-300 m-0 break-all">{challenge.backer} · {challenge.resolved ? challenge.upheld ? 'Chấp nhận khiếu nại' : 'Bác khiếu nại' : 'Đang chờ Resolver'}<br />Bằng chứng: {challenge.evidenceHash}</p>
+                    <div key={challenge.backer} className="border-t border-[var(--border-hairline)] pt-3 space-y-1">
+                      <p className="text-xs text-[var(--ink-lead)] m-0 break-all">{challenge.backer} · {challenge.resolved ? challenge.upheld ? 'Chấp nhận khiếu nại' : 'Bác khiếu nại' : 'Đang chờ Resolver'}<br />Bằng chứng: {challenge.evidenceHash}</p>
                       {canReview && !challenge.resolved && state.state === 3 && [true, false].map(upheld => (
                         <button disabled={busy || reason.trim().length < 10} key={String(upheld)} className="button button--secondary" onClick={() => void work(async () => {
                           const body = `${upheld ? 'UPHELD' : 'DISMISSED'}: ${reason}`;
@@ -670,11 +628,18 @@ export function EditionsCampaign({ id, session, mode = 'public' }: { id: string;
                       ))}
                     </div>
                   ))}
-                  <p className="text-xs text-neutral-400 m-0">Hết hạn challenge hoặc đã payout: báo sự cố qua phản hồi bên dưới; không có hoàn tiền hợp đồng tự động sau payout.</p>
+                  <p className="text-xs text-[var(--ink-subtle)] m-0">Hết hạn challenge hoặc đã payout: báo sự cố qua phản hồi bên dưới; không có hoàn tiền hợp đồng tự động sau payout.</p>
                 </div>
               )}
 
-              {userId && state?.state !== 4 && (
+              {userId && state?.state !== 4 && (showPostFundingReview ? (
+                <EditionsReviewThread
+                  campaignId={id}
+                  userId={userId}
+                  viewerMode={mode === 'creator' ? 'creator' : mode === 'resolver' ? 'resolver' : 'backer'}
+                  targetHash={postFundingTarget}
+                />
+              ) : (
                 <EditionsCommunity
                   id={id}
                   userId={userId}
@@ -682,71 +647,68 @@ export function EditionsCampaign({ id, session, mode = 'public' }: { id: string;
                   commitmentHash={item.commitmentHash}
                   evidence={evidence.data ?? []}
                 />
-              )}
+              ))}
             </div>
           )}
 
           {/* Technical Details (Always available) */}
-          <details className="technical-details text-xs text-neutral-500 pt-2">
-            <summary className="cursor-pointer hover:text-neutral-400">Chi tiết kỹ thuật & hợp đồng</summary>
-            <p className="mt-2 m-0">
+          <details className="monograph-technical-details">
+            <summary>Chi tiết kỹ thuật &amp; hợp đồng</summary>
+            <div className="monograph-technical-details__body">
               Commitment Hash: <code className="reward-hash">{item.commitmentHash}</code><br />
-              {onchainId && <>ID on-chain: <code>#{onchainId}</code><br /></>}
-              Trạng thái UI: <code>{uiState.technicalCode}</code>
-            </p>
+              {onchainId && <>ID on-chain: <code>#{onchainId}</code></>}
+            </div>
           </details>
         </div>
 
-        {/* Right Column (Sidebar: Funding summary) */}
-        <aside className="border border-neutral-800 rounded-xl p-5 bg-neutral-900/30 space-y-5 h-fit">
-          <h2 className="text-base font-semibold text-white m-0">Funding summary</h2>
-
-          {/* Raised & Progress */}
-          <div>
-            <span className="text-xs uppercase text-neutral-400 font-medium">Raised</span>
-            <div className="text-2xl font-bold text-white mt-1">
-              {state ? `${amount(state.raised)} USDC` : '0 USDC'}
+        {/* Right Column (Sidebar: The Notarial Ledger) */}
+        <aside className="monograph-ledger" aria-label="Sổ công chứng ký quỹ">
+          <div className="monograph-ledger__header">
+            <span className="monograph-ledger__kicker">NOTARIAL ESCROW LEDGER</span>
+            <h2 className="monograph-ledger__title">Funding summary</h2>
+            <div className="monograph-ledger__amount">
+              {state ? amount(state.raised) : '0 MockUSDC'}
             </div>
-            <div className="w-full bg-neutral-800 h-1.5 rounded-full overflow-hidden mt-3">
+            <div className="monograph-ledger__meter" aria-hidden="true">
               <div
-                className="bg-emerald-500 h-full rounded-full transition-all"
+                className="monograph-ledger__meter-bar"
                 style={{ width: `${percent}%` }}
               />
             </div>
-            <div className="text-xs text-neutral-400 mt-1.5">
-              {percent}% of {amount(item.config.goal)} USDC
+            <div className="monograph-ledger__ratio">
+              {percent}% of {amount(item.config.goal)}
             </div>
           </div>
 
           {/* Deadlines */}
-          <div className="pt-3 border-t border-neutral-800/60 space-y-3">
-            <div>
-              <span className="text-xs uppercase text-neutral-400 font-medium">Funding deadline</span>
-              <div className="text-sm font-semibold text-white mt-0.5">
+          <div className="monograph-ledger__dates">
+            <div className="monograph-ledger__date-row">
+              <span className="monograph-ledger__date-label">Funding deadline</span>
+              <span className="monograph-ledger__date-val">
                 {state ? formatDate(String(Number(state.fundingDeadline) * 1000)) : `${item.config.fundingDuration / 86400} ngày`}
-              </div>
+              </span>
             </div>
-            <div>
-              <span className="text-xs uppercase text-neutral-400 font-medium">Delivery deadline</span>
-              <div className="text-sm font-semibold text-white mt-0.5">
+            <div className="monograph-ledger__date-row">
+              <span className="monograph-ledger__date-label">Delivery deadline</span>
+              <span className="monograph-ledger__date-val">
                 {state ? formatDate(String(Number(state.releaseDeadline) * 1000)) : formatDate(item.releaseWindow.end)}
-              </div>
+              </span>
             </div>
           </div>
 
           {/* Actions & Lifecycle triggers */}
           {state && activeId !== null && (
-            <div className="pt-3 border-t border-neutral-800/60 space-y-3">
+            <div className="monograph-ledger__actions">
               {state.state === 4 ? (
                 <div className="space-y-2">
-                  <div className="text-xs font-semibold text-amber-400">
+                  <div className="text-xs font-semibold text-[#b45309]">
                     {own?.access === 'REFUNDED'
                       ? 'Bạn đã nhận hoàn tiền'
                       : own?.access === 'REFUND_ELIGIBLE'
                       ? 'Khoản pledge của bạn đã đủ điều kiện hoàn tiền'
                       : 'Backer tự nhận hoàn tiền'}
                   </div>
-                  <p className="text-xs text-neutral-400 m-0">
+                  <p className="text-xs text-[var(--ink-lead)] m-0">
                     {own?.access === 'REFUNDED'
                       ? 'Giao dịch hoàn tiền đã được ghi nhận. Bạn không cần thực hiện thêm bước nào.'
                       : own?.access === 'REFUND_ELIGIBLE'
@@ -762,26 +724,36 @@ export function EditionsCampaign({ id, session, mode = 'public' }: { id: string;
               ) : (
                 <>
                   {fundingAwaitingFinalization && (
-                    <p role="status" className="text-xs text-amber-400 m-0">
+                    <p role="status" className="text-xs text-[#b45309] m-0">
                       Đã hết hạn gây quỹ · chờ chốt kết quả. Deadline đã qua nhưng contract chỉ chuyển sang hoàn tiền sau khi có giao dịch chốt kết quả. Resolver cần kết nối đúng ví Primary hoặc Backup để thực hiện bước này.
                     </p>
                   )}
                   {state.state === 3 && (
-                    <p className="text-xs text-neutral-400 m-0">
+                    <p className="text-xs text-[var(--ink-subtle)] m-0">
                       Challenge đến {date(state.challengeDeadline)} · {state.openDisputes} tranh chấp mở. Payout chỉ sau hạn và không còn tranh chấp.
                     </p>
+                  )}
+                  {state.state === 0 && mode === 'public' && !own && (
+                    <EditionsPledgePreflight
+                      campaignId={id}
+                      userId={userId}
+                      activeId={activeId}
+                      price={state.price}
+                      chain={chain.data!}
+                      deployment={chain.data!.deployment}
+                      entitlement={own ?? orphanedEntitlement ?? null}
+                      transaction={tx.transaction?.action === 'pledge' ? tx.transaction : null}
+                      busy={busy}
+                      onPledge={() => void tx.send('pledge', [activeId], { pledgePrice: state.price })}
+                      onReconcile={() => void tx.reconcile()}
+                    />
                   )}
                   {userId && (
                     <div className="space-y-2">
                       {fundingAwaitingFinalization && mode === 'resolver' && !canReview && (
-                        <p role="alert" className="text-xs text-red-400 m-0">
+                        <p role="alert" className="text-xs text-[#dc2626] m-0">
                           Chưa thấy ví Resolver hợp lệ. Hãy chuyển MetaMask sang ví Primary hoặc Backup Resolver rồi refresh trang.
                         </p>
-                      )}
-                      {state.state === 0 && !own && (
-                        <button disabled={busy} className="button button--primary w-full" onClick={() => void tx.send('pledge', [activeId], { pledgePrice: state.price })}>
-                          Ủng hộ {amount(state.price)} · một PDF
-                        </button>
                       )}
                       {showFinalizeFunding && (
                         <button disabled={busy || !canReview} className="button button--secondary" onClick={() => void tx.send('finalizeFunding', [activeId])}>
@@ -811,10 +783,15 @@ export function EditionsCampaign({ id, session, mode = 'public' }: { id: string;
           )}
 
           {!state && (
-            <div className="pt-3 border-t border-neutral-800/60 space-y-2">
-              <span className="text-xs uppercase text-neutral-400 font-medium">Tóm tắt tier</span>
-              <p className="text-sm text-neutral-300 m-0">Giá 1 PDF: {amount(item.config.tiers[0].price)}</p>
-              <EditionStatusBadge state={uiState} />
+            <div className="monograph-ledger__tier">
+              <span className="monograph-ledger__date-label">Tóm tắt tier</span>
+              <div className="monograph-ledger__tier-price">
+                <span>Giá 1 PDF:</span>
+                <strong>{amount(item.config.tiers[0].price)}</strong>
+              </div>
+              <div className="mt-1">
+                <EditionStatusBadge state={uiState} />
+              </div>
             </div>
           )}
         </aside>
@@ -823,19 +800,55 @@ export function EditionsCampaign({ id, session, mode = 'public' }: { id: string;
   );
 }
 
+function feedbackKindLabel(kind: EditionsFeedback['kind']) {
+  if (kind === 'ISSUE') return 'Báo sự cố';
+  if (kind === 'FILE_UNAVAILABLE') return 'Không mở được file';
+  return 'Nhận xét';
+}
+
+function feedbackTargetLabel(targetHash: string, commitmentHash: string, evidence: EditionsEvidence[]) {
+  if (targetHash === commitmentHash) return 'Cam kết campaign';
+  const item = evidence.find(entry => entry.evidenceHash === targetHash);
+  if (item?.purpose === 'FINAL_PDF') return 'Bản PDF cuối';
+  if (item?.purpose === 'PRODUCTION_EVIDENCE') return 'Bằng chứng sản xuất';
+  return 'Mốc thẩm định hiện tại';
+}
+
+function feedbackAuthorLabel(authorUserId: string) {
+  if (authorUserId.length <= 16) return `Tài khoản ${authorUserId}`;
+  return `Tài khoản ${authorUserId.slice(0, 8)}…${authorUserId.slice(-6)}`;
+}
+
+function feedbackDateLabel(createdAt: string) {
+  const date = new Date(createdAt);
+  return Number.isNaN(date.getTime()) ? createdAt : date.toLocaleString('vi-VN');
+}
+
 export function EditionsCommunity({ id, userId, viewerMode = 'community', commitmentHash, evidence = [] }: { id: string; userId: string; viewerMode?: 'community' | 'creator' | 'resolver'; commitmentHash: string; evidence?: EditionsEvidence[] }) {
   const query = useQuery({ queryKey: ['reward-editions-feedback', id, userId], queryFn: ({ signal }) => editionsApi.feedback(id, signal) });
   const [body, setBody] = useState(''); const [kind, setKind] = useState<'COMMENT' | 'ISSUE'>('COMMENT'); const [target, setTarget] = useState(commitmentHash);
   const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+  const creatorView = viewerMode === 'creator';
+  const canSubmit = !creatorView && query.data?.canSubmit === true;
+  const feedbackItems = query.data?.items ?? [];
 
   return (
-    <section className="panel">
-      <h2>Community kiểm tra cùng Resolver</h2>
-      <p>Nội dung gửi tới Creator và Resolver; thành viên khác chỉ thấy số lượng phản hồi. Phản hồi không là phiếu biểu quyết và không tự khóa hay chuyển tiền.</p>
-      {viewerMode === 'creator' ? (
-        <p className="muted">Creator chỉ đọc phản hồi; không thể gửi phản hồi từ chính campaign này.</p>
-      ) : (
-        <form onSubmit={event => { event.preventDefault(); setBusy(true); setError(''); void editionsApi.comment(id, { targetHash: target, kind, body }).then(async () => { setBody(''); await query.refetch(); }).catch(err => setError(getErrorMessage(err))).finally(() => setBusy(false)); }}>
+    <section className={`panel editions-feedback editions-feedback--${viewerMode}`} aria-labelledby={`editions-feedback-title-${id}`}>
+      <div className="editions-feedback__header">
+        <div>
+          <span className="editions-feedback__eyebrow">{creatorView ? 'CREATOR · CHỈ ĐỌC' : 'COMMUNITY REVIEW'}</span>
+          <h2 id={`editions-feedback-title-${id}`}>{creatorView ? 'Phản hồi cộng đồng' : 'Community kiểm tra cùng Resolver'}</h2>
+          <p>{creatorView
+            ? 'Các phản hồi dưới đây thuộc vòng thẩm định hiện tại và được gửi để Creator cùng Resolver theo dõi.'
+            : 'Nội dung gửi tới Creator và Resolver; thành viên khác chỉ thấy số lượng phản hồi. Phản hồi không là phiếu biểu quyết và không tự khóa hay chuyển tiền.'}</p>
+        </div>
+        <span className="editions-feedback__count">{feedbackItems.length} phản hồi</span>
+      </div>
+
+      {query.isPending ? (
+        <p role="status" className="muted">Đang tải phản hồi…</p>
+      ) : canSubmit ? (
+        <form className="editions-feedback__form" onSubmit={event => { event.preventDefault(); setBusy(true); setError(''); void editionsApi.comment(id, { targetHash: target, kind, body }).then(async () => { setBody(''); await query.refetch(); }).catch(err => setError(getErrorMessage(err))).finally(() => setBusy(false)); }}>
           <label className="field">
             Nội dung đang kiểm tra
             <select value={target} onChange={event => setTarget(event.target.value)}>
@@ -856,44 +869,75 @@ export function EditionsCommunity({ id, userId, viewerMode = 'community', commit
           </label>
           <button disabled={busy} className="button button--primary">Gửi phản hồi có tài khoản</button>
         </form>
+      ) : creatorView || query.data?.canSubmit === false ? (
+        <p className="editions-feedback__read-only">Creator chỉ đọc phản hồi; không thể gửi phản hồi từ chính campaign này.</p>
+      ) : (
+        <p className="muted">Đang kiểm tra quyền gửi phản hồi…</p>
       )}
       {(error || query.error) && <p role="alert">{error || getErrorMessage(query.error)}</p>}
-      {query.data?.map(item => (
-        <div key={item.id}>
-          <p>{item.kind} · {item.createdAt} · tài khoản {item.authorUserId}</p>
-          <p>{item.body}</p>
-          <p style={{ overflowWrap: 'anywhere' }}>Đối tượng: {item.targetHash}</p>
+
+      {feedbackItems.length === 0 ? (
+        <div className="editions-feedback__empty">
+          <strong>Chưa có phản hồi cho vòng thẩm định này.</strong>
+          <p>{creatorView ? 'Khi community gửi góp ý, nội dung sẽ xuất hiện tại đây để bạn theo dõi.' : 'Góp ý cần gắn với một cam kết hoặc bằng chứng cụ thể.'}</p>
         </div>
-      ))}
+      ) : (
+        <div className="editions-feedback__list" aria-label="Danh sách phản hồi">
+          {feedbackItems.map(item => (
+            <article key={item.id} className="editions-feedback-item">
+              <div className="editions-feedback-item__header">
+                <div className="editions-feedback-item__labels">
+                  <span className={`editions-feedback-item__kind editions-feedback-item__kind--${item.kind.toLowerCase()}`}>
+                    {feedbackKindLabel(item.kind)}
+                  </span>
+                  <span className="editions-feedback-item__target">
+                    {feedbackTargetLabel(item.targetHash, commitmentHash, evidence)}
+                  </span>
+                </div>
+                <time dateTime={item.createdAt}>{feedbackDateLabel(item.createdAt)}</time>
+              </div>
+              <p className="editions-feedback-item__body">{item.body}</p>
+              <p className="editions-feedback-item__author">{feedbackAuthorLabel(item.authorUserId)}</p>
+            </article>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
 
 export function EditionsLibrary({ userId }: { userId: string }) {
   const query = useQuery({ queryKey: ['reward-editions-entitlements', userId], queryFn: ({ signal }) => editionsApi.entitlements(signal) });
+  const entitlements = query.data ?? [];
 
   return (
     <section className="reward-container editions-library-page">
-      <header className="edition-page-heading">
-        <div>
-          <span className="edition-eyebrow">Backer</span>
-          <h1>Phần thưởng của tôi</h1>
-          <p>Theo dõi khoản hỗ trợ, hoàn tiền và quyền tải PDF của bạn.</p>
-        </div>
-      </header>
-      {query.isPending && <p role="status">Đang kiểm tra quyền canonical…</p>}
-      {query.error && <p role="alert">{userFacingError(getErrorMessage(query.error))}</p>}
+      <h1 className="sr-only">Thư viện của tôi</h1>
+      {query.isPending && <p role="status" className="muted">Đang kiểm tra quyền lợi của bạn…</p>}
+      {query.error && <p role="alert" className="toast toast--error">{userFacingError(getErrorMessage(query.error))}</p>}
       {query.data?.length === 0 && (
         <div className="edition-empty-state">
-          <strong>Chưa có khoản hỗ trợ nào</strong>
-          <p>Campaign bạn pledge sẽ xuất hiện ở đây sau khi giao dịch được indexer xác nhận.</p>
-          <a className="button button--secondary" href="#/reward">Khám phá Editions →</a>
+          <span className="edition-eyebrow">Thư viện đang trống</span>
+          <h2>Chưa có ấn phẩm nào trong thư viện</h2>
+          <p>Các campaign bạn đã hỗ trợ sẽ xuất hiện tại đây để bạn theo dõi tiến độ và nhận bản PDF khi phát hành.</p>
+          <div className="edition-empty-state__actions">
+            <a className="button button--primary" href="#/reward">Khám phá chiến dịch</a>
+            <a className="edition-secondary-link" href="#/reward/history/my-rewards">Xem quyền lợi Reward lịch sử</a>
+          </div>
+          <p className="edition-empty-state__note">Giao dịch mới có thể cần một khoảng ngắn để được xác nhận và đồng bộ vào thư viện.</p>
         </div>
       )}
-      <div className="editions-library-shelf">
-        {query.data?.map(item => <EditionsEntitlementCard item={item} key={item.id} />)}
-      </div>
-      <a className="edition-secondary-link" href="#/reward/history/my-rewards">Xem quyền lợi Reward lịch sử →</a>
+      {entitlements.length > 0 && (
+        <>
+          <div className="editions-library-shelf">
+            {entitlements.map(item => <EditionsEntitlementCard item={item} key={item.id} />)}
+          </div>
+          <div className="editions-library-history">
+            <span>Bạn từng sử dụng Reward phiên bản trước?</span>
+            <a className="edition-secondary-link" href="#/reward/history/my-rewards">Xem quyền lợi Reward lịch sử</a>
+          </div>
+        </>
+      )}
     </section>
   );
 }

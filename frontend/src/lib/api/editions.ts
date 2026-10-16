@@ -49,6 +49,16 @@ export interface EditionsEvidence {
 export interface EditionsFeedback { id: string; authorUserId: string; targetHash: string; kind: 'COMMENT' | 'ISSUE' | 'FILE_UNAVAILABLE'; body: string; createdAt: string }
 export interface EditionsCreatorResponse { id: string; campaignId: string; creatorUserId: string; submissionRevision: number; commitmentHash: string; responseBody: string; createdAt: string; relatedFeedbackIds: string[] }
 export interface EditionsFeedbackResponse { items: EditionsFeedback[]; history?: EditionsFeedback[]; responses?: EditionsCreatorResponse[]; canSubmit: boolean }
+export interface EditionsReviewMessage { id: string; threadId: string; authorUserId: string; authorRole: 'BACKER' | 'CREATOR' | 'RESOLVER'; body: string; createdAt: string }
+export interface EditionsReviewEscalation { id: string; threadId: string; openerUserId: string; reason: string; status: 'OPEN' | 'AWAITING_CREATOR_RESPONSE' | 'RESOLVED' | 'DISMISSED' | 'FORMAL_DISPUTE'; resolverUserId: string | null; outcome: 'RESOLVED' | 'DISMISSED' | 'FORMAL_DISPUTE' | null; note: string | null; createdAt: string; updatedAt: string; resolvedAt: string | null }
+export interface EditionsReviewThread { id: string; campaignId: string; entitlementId: string; backerUserId: string; creatorUserId: string; targetHash: string; commitmentHash: string; status: 'OPEN' | 'ESCALATED' | 'RESOLVED' | 'CLOSED'; createdAt: string; updatedAt: string; messages: EditionsReviewMessage[]; escalation: EditionsReviewEscalation | null }
+export interface EditionsResolverCase {
+  id: string; status: EditionsReviewEscalation['status']; escalation: EditionsReviewEscalation; thread: EditionsReviewThread;
+  campaign: { id: string; title: string; pitch: string; commitmentHash: string | null; frozenSnapshot: unknown };
+  chain: { status: EditionsChain['status']; onchainCampaignId: string | null; snapshot: EditionsChain['snapshot']; challenges: EditionsChain['challenges'] };
+  entitlement: { id: string; backerUserId: string | null; backerWallet: string; amountPaid: string; canonical: boolean; refunded: boolean; streamId: string; transactionHash: string; blockNumber: string } | null;
+  feedback: EditionsFeedback[];
+}
 export interface EditionsEntitlement { id: string; campaignId: string; campaignTitle: string; backerWallet: string; transactionHash: string; amountPaid: string;
   access: 'DOWNLOAD_ELIGIBLE' | 'DELIVERY_UNAVAILABLE' | 'PENDING_RELEASE' | 'REFUND_ELIGIBLE' | 'REFUNDED' | 'ORPHANED'; confirmedAt: string | null }
 
@@ -74,6 +84,15 @@ export const editionsApi = {
   evidenceFile: async (id: string, fileId: string) => (await http.get<Blob>(`${base}/campaigns/${id}/evidence/${fileId}/file`, { responseType: 'blob' })).data,
   feedback: async (id: string, signal?: AbortSignal) => (await http.get<EditionsFeedbackResponse>(`${base}/campaigns/${id}/feedback`, { signal })).data,
   comment: async (id: string, data: { targetHash: string; kind: 'COMMENT' | 'ISSUE'; body: string }) => (await http.post<EditionsFeedback>(`${base}/campaigns/${id}/feedback`, data)).data,
+  reviewThreads: async (id: string, signal?: AbortSignal) => (await http.get<EditionsReviewThread[]>(`${base}/campaigns/${id}/review-threads`, { signal })).data,
+  reviewThread: async (threadId: string, signal?: AbortSignal) => (await http.get<EditionsReviewThread>(`${base}/review-threads/${threadId}`, { signal })).data,
+  openReviewThread: async (id: string, data: { targetHash: string; body: string }) => (await http.post<EditionsReviewThread>(`${base}/campaigns/${id}/review-threads`, data)).data,
+  messageReviewThread: async (threadId: string, body: string) => (await http.post<EditionsReviewMessage>(`${base}/review-threads/${threadId}/messages`, { body })).data,
+  escalateReviewThread: async (threadId: string, reason: string) => (await http.post<EditionsReviewEscalation>(`${base}/review-threads/${threadId}/escalate`, { reason })).data,
+  resolverCases: async (signal?: AbortSignal) => (await http.get<EditionsResolverCase[]>(`${base}/resolver/review-cases`, { signal })).data,
+  resolverCase: async (escalationId: string, signal?: AbortSignal) => (await http.get<EditionsResolverCase>(`${base}/resolver/review-cases/${escalationId}`, { signal })).data,
+  requestCreatorResponse: async (escalationId: string, body: string) => (await http.post<EditionsReviewMessage>(`${base}/review-escalations/${escalationId}/request-creator-response`, { body })).data,
+  resolveReviewEscalation: async (escalationId: string, outcome: 'RESOLVED' | 'DISMISSED' | 'FORMAL_DISPUTE', note: string) => (await http.post<EditionsReviewEscalation>(`${base}/review-escalations/${escalationId}/resolve`, { outcome, note })).data,
   entitlements: async (signal?: AbortSignal) => (await http.get<EditionsEntitlement[]>(`${base}/entitlements`, { signal })).data,
   ticket: async (id: string) => (await http.post<{ state: 'DOWNLOAD_AVAILABLE'; url: string; expiresAt: string; sha256: string }>(`${base}/entitlements/${id}/download`, {})).data,
   download: async (url: string) => {

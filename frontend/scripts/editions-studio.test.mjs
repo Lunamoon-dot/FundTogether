@@ -19,6 +19,7 @@ const { ReviewQueue } = await server.ssrLoadModule('/src/features/reward/ui/Revi
 const { ReviewHistoryDisclosure } = await server.ssrLoadModule('/src/features/reward/ui/ReviewHistoryDisclosure.tsx')
 const { TransactionLifecycle } = await server.ssrLoadModule('/src/features/reward/ui/TransactionLifecycle.tsx')
 const { RewardResolverConsole } = await server.ssrLoadModule('/src/features/reward/RewardResolverConsole.tsx')
+const { EditionsResolverCase } = await server.ssrLoadModule('/src/features/reward/ui/EditionsResolverCase.tsx')
 const { default: deployment, activeChain } = await server.ssrLoadModule('/src/lib/web3/deployment-context.ts')
 const config = createConfig({ chains: [activeChain], transports: { [activeChain.id]: http(deployment.rpcUrl) }, ssr: true })
 
@@ -59,10 +60,11 @@ function renderNewPreparation() {
   return html
 }
 
-function renderResolver(campaigns = [], disputes = []) {
+function renderResolver(campaigns = [], disputes = [], cases = []) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   client.setQueryData(['reward-resolver-campaigns', 'resolver'], campaigns)
   client.setQueryData(['reward-resolver-disputes', 'resolver'], disputes)
+  client.setQueryData(['reward-editions-resolver-cases', 'resolver'], cases)
   const html = renderToStaticMarkup(createElement(WagmiProvider, { config },
     createElement(QueryClientProvider, { client }, createElement(RewardResolverConsole, { userId: 'resolver' }))))
   client.clear()
@@ -99,6 +101,21 @@ test('approved Editions expose the on-chain action directly in the Resolver queu
   const html = renderResolver([campaign])
   assert.match(html, /Mở trang xử lý on-chain →/)
   assert.match(html, /href="#\/reward\/editions\/edition\/resolver"/)
+})
+
+test('Resolver console surfaces review cases separately from the funding queue', () => {
+  const html = renderResolver([], [], [{
+    id: 'case-1',
+    status: 'OPEN',
+    escalation: { id: 'case-1', threadId: 'thread-1', openerUserId: 'backer', reason: 'Please clarify the production evidence.', status: 'OPEN', resolverUserId: null, outcome: null, note: null, createdAt: '2026-10-16T10:00:00.000Z', updatedAt: '2026-10-16T10:00:00.000Z', resolvedAt: null },
+    campaign: { id: 'edition', title: 'Saigon comic', pitch: 'A city story', commitmentHash: '0xhash', frozenSnapshot: null },
+    chain: { status: 'ON_CHAIN_CONFIRMED', onchainCampaignId: '0', snapshot: { state: 1 }, challenges: [] },
+    entitlement: { id: 'entitlement-1', backerUserId: 'backer', backerWallet: '0xbacker', amountPaid: '10000000', canonical: true, refunded: false, streamId: 'editions:current', transactionHash: '0xtx', blockNumber: '10' },
+    feedback: [],
+    thread: { id: 'thread-1', campaignId: 'edition', entitlementId: 'entitlement-1', backerUserId: 'backer', creatorUserId: 'owner', targetHash: '0xhash', commitmentHash: '0xhash', status: 'ESCALATED', createdAt: '2026-10-16T10:00:00.000Z', updatedAt: '2026-10-16T10:00:00.000Z', escalation: null, messages: [] },
+  }])
+  assert.match(html, /Resolver cases/)
+  assert.match(html, /Please clarify the production evidence\./)
 })
 
 test('new creator flow opens the single Editions preparation wizard instead of a duplicate campaign form', () => {
@@ -392,6 +409,26 @@ test('Creator can open community feedback as a read-only task', () => {
   const html = render([campaign], 'owner')
   assert.match(html, /Xem phản hồi cộng đồng/)
   assert.match(html, /#\/reward\/editions\/community-feedback\/creator\/feedback/)
+})
+
+test('Resolver case surface keeps conversation outcome separate from financial actions', () => {
+  const html = renderToStaticMarkup(createElement(EditionsResolverCase, {
+    userId: 'resolver',
+    onChanged() {},
+    caseItem: {
+      id: 'case-1', status: 'OPEN',
+      escalation: { id: 'case-1', threadId: 'thread-1', openerUserId: 'backer', reason: 'The Creator has not clarified the production timeline.', status: 'OPEN', resolverUserId: null, outcome: null, note: null, createdAt: '2026-10-16T10:00:00.000Z', updatedAt: '2026-10-16T10:00:00.000Z', resolvedAt: null },
+      campaign: { id: 'edition', title: 'Saigon comic', pitch: 'A city story', commitmentHash: `0x${'1'.repeat(64)}`, frozenSnapshot: null },
+      chain: { status: 'ON_CHAIN_CONFIRMED', onchainCampaignId: '0', snapshot: { state: 1 }, challenges: [] },
+      entitlement: { id: 'entitlement-1', backerUserId: 'backer', backerWallet: '0xbacker', amountPaid: '10000000', canonical: true, refunded: false, streamId: 'editions:current', transactionHash: '0xtx', blockNumber: '10' },
+      feedback: [{ id: 'feedback-1', authorUserId: 'backer', targetHash: `0x${'1'.repeat(64)}`, kind: 'ISSUE', body: 'Please clarify the evidence timeline.', createdAt: '2026-10-16T10:00:00.000Z' }],
+      thread: { id: 'thread-1', campaignId: 'edition', entitlementId: 'entitlement-1', backerUserId: 'backer', creatorUserId: 'owner', targetHash: `0x${'1'.repeat(64)}`, commitmentHash: `0x${'1'.repeat(64)}`, status: 'ESCALATED', createdAt: '2026-10-16T10:00:00.000Z', updatedAt: '2026-10-16T10:00:00.000Z', escalation: null, messages: [{ id: 'message-1', threadId: 'thread-1', authorUserId: 'backer', authorRole: 'BACKER', body: 'Please clarify the evidence timeline.', createdAt: '2026-10-16T10:00:00.000Z' }] },
+    },
+  }))
+  assert.match(html, /Resolver case/)
+  assert.match(html, /Please clarify the evidence timeline./)
+  assert.match(html, /Ghi outcome Resolver/)
+  assert.doesNotMatch(html, /Payout|Hoàn tiền|Giải ngân/)
 })
 
 test('CreatorTaskCard renders single primary action, revision, and collapses history', () => {

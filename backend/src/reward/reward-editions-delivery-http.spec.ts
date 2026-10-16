@@ -218,6 +218,8 @@ describe("Editions digital delivery: real HTTP, PostgreSQL, MinIO and Anvil", ()
     const opened = await api().post(route("review-threads")).set("x-test-user", backer).send({ targetHash: commitment, body: "Please clarify the production evidence timeline." });
     expect(opened.status).toBe(201);
     threadId = opened.body.id;
+    expect((await api().get(route("review-threads")).set("x-test-user", owner)).body).toEqual([expect.objectContaining({ id: threadId })]);
+    expect((await api().get(route("review-threads")).set("x-test-user", backer)).body).toEqual([expect.objectContaining({ id: threadId })]);
     const duplicate = await api().post(route("review-threads")).set("x-test-user", backer).send({ targetHash: commitment, body: "Please clarify the production evidence timeline." });
     expect(duplicate.status).toBe(201);
     expect(duplicate.body.id).toBe(threadId);

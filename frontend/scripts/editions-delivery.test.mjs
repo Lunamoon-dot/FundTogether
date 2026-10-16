@@ -9,6 +9,7 @@ import { createServer } from 'vite'
 const server = await createServer({ mode: 'reward', server: { middlewareMode: true, ws: false }, logLevel: 'error' })
 after(() => server.close())
 const { EditionsCampaign, EditionsCommunity, EditionsLibrary } = await server.ssrLoadModule('/src/features/reward/EditionsCampaign.tsx')
+const { EditionsReviewThread } = await server.ssrLoadModule('/src/features/reward/ui/EditionsReviewThread.tsx')
 const { RewardPublicCampaign } = await server.ssrLoadModule('/src/features/reward/RewardPublicCampaign.tsx')
 const { default: deployment, activeChain } = await server.ssrLoadModule('/src/lib/web3/deployment-context.ts')
 const config = createConfig({ chains: [activeChain], transports: { [activeChain.id]: http(deployment.rpcUrl) }, ssr: true })
@@ -27,7 +28,7 @@ function campaign(access, state = 3, mode = 'public', snapshotOverrides = {}) {
     [['reward-editions-chain', 'edition'], { status: 'ON_CHAIN_CONFIRMED', onchainCampaignId: '0', deployment: {}, challenges: [], snapshot: { state, raised: '10000001', escrowed: '10000001', fundingDeadline: '1791900000', releaseDeadline: '1794900000', challengeDeadline: '1795000000', openDisputes: '0', productionApproved: true, productionHash: hash, ...snapshotOverrides } }],
     [['reward-editions-evidence', 'edition', 'public'], []],
     [['reward-editions-entitlements', 'owner'], [{ id: 'right', campaignId: 'edition', amountPaid: '10000001', access, confirmedAt: null }]],
-    [['reward-editions-feedback', 'edition', 'owner'], []],
+    [['reward-editions-feedback', 'edition', 'owner'], { items: [], canSubmit: true }],
   ])
 }
 test('canonical payment and reviewed production do not render a PDF download before accepted release', () => {
@@ -47,9 +48,10 @@ test('refunded and orphaned entitlements never render a download control', () =>
   for (const access of ['REFUNDED', 'ORPHANED']) assert.doesNotMatch(campaign(access, 4), /Kiểm tra và tải PDF riêng tư/)
 })
 test('refund campaign detail shows one clear backer action and hides delivery workflow', () => {
-  const eligible = campaign('REFUND_ELIGIBLE', 4)
+  const eligible = campaign('REFUND_ELIGIBLE', 4, 'public', { productionApproved: false })
   assert.match(eligible, /Campaign không đạt mục tiêu — đang hoàn tiền/)
   assert.match(eligible, /Nhận hoàn tiền vào ví đã pledge/)
+  assert.doesNotMatch(eligible, /Chờ hoàn tất gây quỹ/)
   assert.doesNotMatch(eligible, /Bằng chứng &amp; bản PDF cuối|Community kiểm tra cùng Resolver|REFUND_ELIGIBLE/)
 
   const refunded = campaign('REFUNDED', 4)
@@ -70,12 +72,47 @@ test('my rewards explains refund entitlement instead of exposing internal access
   assert.match(refunded, /Đã hoàn tiền/)
   assert.doesNotMatch(refunded, /REFUNDED|Chưa xác nhận PDF|Nhận hoàn tiền/)
 })
+
+test('empty Editions library keeps actions grouped in a compact hierarchy', () => {
+  const html = render(EditionsLibrary, { userId: 'owner' }, [
+    [['reward-editions-entitlements', 'owner'], []],
+  ])
+
+  assert.match(html, /Thư viện của tôi/)
+  assert.match(html, /Chưa có ấn phẩm nào trong thư viện/)
+  assert.match(html, /edition-empty-state__actions/)
+  assert.match(html, /href="#\/reward"[^>]*>Khám phá chiến dịch/)
+  assert.match(html, /href="#\/reward\/history\/my-rewards"[^>]*>Xem quyền lợi Reward lịch sử/)
+  assert.doesNotMatch(html, /Campaign bạn pledge sẽ xuất hiện ở đây sau khi giao dịch được indexer xác nhận/)
+})
 test('community feedback is account-scoped and clearly advisory', () => {
   const html = render(EditionsCommunity, { id: 'edition', userId: 'new-user', commitmentHash: hash }, [
-    [['reward-editions-feedback', 'edition', 'old-user'], [{ id: 'private', body: 'PRIVATE OLD REPORT' }]],
+    [['reward-editions-feedback', 'edition', 'new-user'], { items: [], canSubmit: true }],
   ])
   assert.doesNotMatch(html, /PRIVATE OLD REPORT/)
   assert.match(html, /không tự khóa hay chuyển tiền/)
+})
+
+test('campaign creator receives feedback without a submission form', () => {
+  const html = render(EditionsCommunity, { id: 'edition', userId: 'owner', viewerMode: 'creator', commitmentHash: hash }, [
+    [['reward-editions-feedback', 'edition', 'owner'], { items: [{ id: 'feedback', authorUserId: 'reader', targetHash: hash, kind: 'COMMENT', body: 'Please inspect the chapter count.', createdAt: '2026-10-16T10:30:00.000Z' }], canSubmit: false }],
+  ])
+  assert.match(html, /editions-feedback/)
+  assert.match(html, /Phản hồi cộng đồng/)
+  assert.match(html, /Nhận xét/)
+  assert.match(html, /Cam kết campaign/)
+  assert.match(html, /Creator chỉ đọc phản hồi/)
+  assert.match(html, /Please inspect the chapter count/)
+  assert.doesNotMatch(html, /Gửi phản hồi có tài khoản|<form/)
+})
+test('funded review uses an append-only Backer Creator thread with Resolver escalation, not a funding CTA', () => {
+  const html = render(EditionsReviewThread, { campaignId: 'edition', userId: 'backer', viewerMode: 'backer', targetHash: hash }, [
+    [['reward-editions-review-threads', 'edition', 'backer'], [{ id: 'thread-1', campaignId: 'edition', entitlementId: 'right', backerUserId: 'backer', creatorUserId: 'owner', targetHash: hash, commitmentHash: hash, status: 'OPEN', createdAt: '2026-10-16T10:00:00.000Z', updatedAt: '2026-10-16T10:30:00.000Z', escalation: null, messages: [{ id: 'message-1', threadId: 'thread-1', authorUserId: 'backer', authorRole: 'BACKER', body: 'Please clarify the production timeline.', createdAt: '2026-10-16T10:30:00.000Z' }] }]],
+  ])
+  assert.match(html, /Trao đổi thẩm định sau funding/)
+  assert.match(html, /Please clarify the production timeline./)
+  assert.match(html, /Gửi yêu cầu Resolver/)
+  assert.doesNotMatch(html, /Xác nhận ủng hộ|Nhận hoàn tiền|Chuyển tiền/)
 })
 test('switching accounts cannot inherit the previous account library', () => {
   const html = render(EditionsLibrary, { userId: 'new-user' }, [
@@ -110,4 +147,9 @@ test('funding card keeps creator cancellation for now but hides the technical ca
   const source = await (await import('node:fs/promises')).readFile(new URL('../src/features/reward/EditionsCampaign.tsx', import.meta.url), 'utf8')
   assert.match(source, /cancelCampaign/)
   assert.doesNotMatch(source, /Tải lại trạng thái canonical/)
+  assert.doesNotMatch(source, /Trạng thái UI:/)
+  assert.doesNotMatch(source, /Number\(state\.(raised|goal)\)/)
+
+  const transactionSource = await (await import('node:fs/promises')).readFile(new URL('../src/features/reward/useEditionsTransaction.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(transactionSource, /setNotice\(`ON_CHAIN_CONFIRMED/)
 })

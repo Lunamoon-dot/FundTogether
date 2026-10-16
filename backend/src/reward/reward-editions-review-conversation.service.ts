@@ -109,6 +109,17 @@ export class RewardEditionsReviewConversationService {
     return this.detail(this.db, threadId);
   }
 
+  async listThreads(campaignId: string, userId: string) {
+    const campaign = await this.campaign(this.db, campaignId);
+    const resolver = await this.resolver(this.db, userId);
+    const threads = await this.db.select({ id: editionsReviewThreads.id }).from(editionsReviewThreads).where(
+      resolver || campaign.creatorUserId === userId
+        ? eq(editionsReviewThreads.campaignId, campaignId)
+        : and(eq(editionsReviewThreads.campaignId, campaignId), eq(editionsReviewThreads.backerUserId, userId)),
+    );
+    return Promise.all(threads.map(thread => this.detail(this.db, thread.id)));
+  }
+
   async message(threadId: string, userId: string, body: unknown) {
     const input = parse(editionsReviewMessageSchema, body);
     let messageId: string;

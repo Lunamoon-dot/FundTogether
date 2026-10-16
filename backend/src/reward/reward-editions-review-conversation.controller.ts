@@ -18,6 +18,11 @@ export class RewardEditionsReviewConversationController {
     return this.conversations.thread(threadId, req.account!.userId);
   }
 
+  @Get("campaigns/:id/review-threads")
+  list(@Param("id", new ParseUUIDPipe()) id: string, @Req() req: Request) {
+    return this.conversations.listThreads(id, req.account!.userId);
+  }
+
   @Post("review-threads/:threadId/messages")
   message(@Param("threadId", new ParseUUIDPipe()) threadId: string, @Req() req: Request, @Body() body: unknown) {
     return this.conversations.message(threadId, req.account!.userId, body);
