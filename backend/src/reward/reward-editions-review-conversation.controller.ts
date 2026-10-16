@@ -22,4 +22,27 @@ export class RewardEditionsReviewConversationController {
   message(@Param("threadId", new ParseUUIDPipe()) threadId: string, @Req() req: Request, @Body() body: unknown) {
     return this.conversations.message(threadId, req.account!.userId, body);
   }
+
+  @Post("review-threads/:threadId/escalate")
+  escalate(@Param("threadId", new ParseUUIDPipe()) threadId: string, @Req() req: Request, @Body() body: unknown) {
+    return this.conversations.escalate(threadId, req.account!.userId, body);
+  }
+
+  @Get("resolver/review-cases")
+  resolverCases(@Req() req: Request) { return this.conversations.listResolverCases(req.account!.userId); }
+
+  @Get("resolver/review-cases/:escalationId")
+  resolverCase(@Param("escalationId", new ParseUUIDPipe()) escalationId: string, @Req() req: Request) {
+    return this.conversations.resolverCase(escalationId, req.account!.userId);
+  }
+
+  @Post("review-escalations/:escalationId/request-creator-response")
+  requestCreatorResponse(@Param("escalationId", new ParseUUIDPipe()) escalationId: string, @Req() req: Request, @Body() body: unknown) {
+    return this.conversations.requestCreatorResponse(escalationId, req.account!.userId, body);
+  }
+
+  @Post("review-escalations/:escalationId/resolve")
+  resolve(@Param("escalationId", new ParseUUIDPipe()) escalationId: string, @Req() req: Request, @Body() body: unknown) {
+    return this.conversations.resolveEscalation(escalationId, req.account!.userId, body);
+  }
 }

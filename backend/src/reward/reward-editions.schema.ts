@@ -33,6 +33,11 @@ export const editionsReviewThreadOpenSchema = z.strictObject({
   body: z.string().trim().min(10).max(3000),
 });
 export const editionsReviewMessageSchema = z.strictObject({ body: z.string().trim().min(10).max(3000) });
+export const editionsReviewEscalationSchema = z.strictObject({ reason: z.string().trim().min(10).max(3000) });
+export const editionsReviewEscalationOutcomeSchema = z.strictObject({
+  outcome: z.enum(["RESOLVED", "DISMISSED", "FORMAL_DISPUTE"]),
+  note: z.string().trim().min(10).max(3000),
+});
 export const editionsReviewSchema = resolverReviewCampaignSchema.extend({
   commitmentHash: z.string().regex(/^0x[0-9a-f]{64}$/),
 });
