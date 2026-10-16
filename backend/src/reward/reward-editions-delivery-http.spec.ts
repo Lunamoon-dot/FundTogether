@@ -20,6 +20,8 @@ import { RewardEditionsPublicationService } from "./reward-editions-publication.
 import { RewardEditionsChainController } from "./reward-editions-chain.controller";
 import { RewardEditionsDeliveryService } from "./reward-editions-delivery.service";
 import { RewardEditionsDeliveryController, RewardEditionsPublicEvidenceController } from "./reward-editions-delivery.controller";
+import { RewardEditionsReviewConversationController } from "./reward-editions-review-conversation.controller";
+import { RewardEditionsReviewConversationService } from "./reward-editions-review-conversation.service";
 import { RewardEditionsPreviewController } from "./reward-editions.controller";
 import { RewardEditionsService } from "./reward-editions.service";
 import { editionsCommitment, EditionsSnapshot } from "./reward-editions-commitment";
@@ -37,7 +39,7 @@ describe("Editions digital delivery: real HTTP, PostgreSQL, MinIO and Anvil", ()
   let app: INestApplication, pool: Pool, admin: Client, db: ReturnType<typeof drizzle<typeof schema>>, storage: EvidenceStorageService;
   let indexer: RewardEditionsIndexerService;
   let accounts: `0x${string}`[], address: `0x${string}`, tokenAddress: `0x${string}`;
-  let owner: string, backer: string, resolver: string, stranger: string, id: string, commitment: string;
+  let owner: string, backer: string, resolver: string, stranger: string, id: string, commitment: string, threadId: string;
   let deadline: bigint, entitlementId: string, production: any, finalPdf: any, pdf: Buffer;
   let beforePledge: string;
   let approvalHash: `0x${string}`, creationHash: `0x${string}`, pledgeHash: `0x${string}`;
@@ -90,8 +92,8 @@ describe("Editions digital delivery: real HTTP, PostgreSQL, MinIO and Anvil", ()
     const reviewStartedAt = new Date();
     const [campaign] = await db.insert(schema.rewardCampaigns).values({ creatorUserId: owner, title: config.title, pitch: config.pitch, story: config.story, category: config.category,
       goal: config.goal, fundingDuration: config.fundingDuration, draftConfig: config, frozenSnapshot: frozen, commitmentHash: commitment, status: "COMMUNITY_REVIEW", frozenAt: new Date(), reviewStartedAt, payoutWalletLinkId: link.id }).returning(); id = campaign.id;
-    const module = await Test.createTestingModule({ controllers: [RewardEditionsDeliveryController, RewardEditionsPublicEvidenceController, RewardEditionsPreviewController, RewardEditionsChainController],
-      providers: [RewardEditionsService, RewardEditionsDeliveryService, RewardEditionsPublicationService, RewardEditionsIndexerService, EvidenceStorageService,
+    const module = await Test.createTestingModule({ controllers: [RewardEditionsDeliveryController, RewardEditionsPublicEvidenceController, RewardEditionsPreviewController, RewardEditionsChainController, RewardEditionsReviewConversationController],
+      providers: [RewardEditionsService, RewardEditionsDeliveryService, RewardEditionsReviewConversationService, RewardEditionsPublicationService, RewardEditionsIndexerService, EvidenceStorageService,
         { provide: DRIZZLE_DB, useValue: db }, { provide: EDITIONS_CONNECTION, useValue: { client: client as PublicClient, manifest } },
         { provide: ConfigService, useValue: new ConfigService({ s3Endpoint: env.S3_ENDPOINT, s3Region: env.S3_REGION || "us-east-1", s3Bucket: `${env.S3_BUCKET}-delivery-test-${process.pid}`, s3AccessKeyId: env.S3_ACCESS_KEY_ID, s3SecretAccessKey: env.S3_SECRET_ACCESS_KEY }) }],
     }).overrideGuard(AuthGuard).useValue({ canActivate(context: any) { const req = context.switchToHttp().getRequest(); req.account = { userId: req.headers["x-test-user"], roles: [] }; return Boolean(req.account.userId); } }).compile();
@@ -106,6 +108,7 @@ describe("Editions digital delivery: real HTTP, PostgreSQL, MinIO and Anvil", ()
     expect((await api().get("/v1/reward/public/editions/review")).body).toEqual([]);
     expect((await api().get(`/v1/reward/public/editions/${id}`)).status).toBe(404);
     expect((await api().post(route("feedback")).set("x-test-user", stranger).send({ targetHash: commitment, kind: "COMMENT", body: "Private review is not public yet." })).status).toBe(409);
+    expect((await api().post(route("review-threads")).set("x-test-user", backer).send({ targetHash: commitment, body: "A backer question before funding." })).status).toBe(409);
     await db.update(schema.rewardCampaigns).set({ status: "COMMUNITY_REVIEW" }).where(eq(schema.rewardCampaigns.id, id));
     const review = await api().get("/v1/reward/public/editions/review");
     expect(review.status).toBe(200);
@@ -211,6 +214,24 @@ describe("Editions digital delivery: real HTTP, PostgreSQL, MinIO and Anvil", ()
     expect((await upload("PRODUCTION_EVIDENCE")).status).toBe(409);
     await client.request({ method: "evm_increaseTime" as any, params: [86401] } as any);
     await send(accounts[0], "finalizeFunding", [0n]);
+    expect((await api().post(route("review-threads")).set("x-test-user", backer).send({ targetHash: `0x${"3".repeat(64)}`, body: "This target is not part of the current review." })).status).toBe(409);
+    const opened = await api().post(route("review-threads")).set("x-test-user", backer).send({ targetHash: commitment, body: "Please clarify the production evidence timeline." });
+    expect(opened.status).toBe(201);
+    threadId = opened.body.id;
+    const duplicate = await api().post(route("review-threads")).set("x-test-user", backer).send({ targetHash: commitment, body: "Please clarify the production evidence timeline." });
+    expect(duplicate.status).toBe(201);
+    expect(duplicate.body.id).toBe(threadId);
+    expect((await api().get(`/v1/reward/editions/review-threads/${threadId}`).set("x-test-user", owner)).status).toBe(200);
+    expect((await api().get(`/v1/reward/editions/review-threads/${threadId}`).set("x-test-user", stranger)).status).toBe(403);
+    const creatorMessage = await api().post(`/v1/reward/editions/review-threads/${threadId}/messages`).set("x-test-user", owner).send({ body: "Tôi sẽ bổ sung mốc kiểm tra trong hồ sơ sản xuất." });
+    expect(creatorMessage.status).toBe(201);
+    const backerMessage = await api().post(`/v1/reward/editions/review-threads/${threadId}/messages`).set("x-test-user", backer).send({ body: "Cảm ơn, tôi sẽ theo dõi mốc cập nhật này." });
+    expect(backerMessage.status).toBe(201);
+    const detail = await api().get(`/v1/reward/editions/review-threads/${threadId}`).set("x-test-user", backer);
+    expect(detail.status).toBe(200);
+    expect(detail.body.messages).toHaveLength(3);
+    expect(detail.body.messages.map((message: any) => message.authorRole)).toEqual(["BACKER", "CREATOR", "BACKER"]);
+    expect((await api().post(`/v1/reward/editions/review-threads/${threadId}/messages`).set("x-test-user", stranger).send({ body: "Unauthorized message attempt." })).status).toBe(403);
     expect((await upload("PRODUCTION_EVIDENCE", png, "image/png", stranger)).status).toBe(403);
     expect((await upload("FINAL_PDF", pdf, "application/pdf")).status).toBe(409);
     const result = await upload("PRODUCTION_EVIDENCE"); expect(result.status).toBe(201); production = result.body;

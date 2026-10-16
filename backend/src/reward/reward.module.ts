@@ -19,6 +19,8 @@ import { RewardEditionsPublicationService } from "./reward-editions-publication.
 import { RewardEditionsChainController } from "./reward-editions-chain.controller";
 import { RewardEditionsDeliveryService } from "./reward-editions-delivery.service";
 import { RewardEditionsDeliveryController, RewardEditionsPublicEvidenceController } from "./reward-editions-delivery.controller";
+import { RewardEditionsReviewConversationController } from "./reward-editions-review-conversation.controller";
+import { RewardEditionsReviewConversationService } from "./reward-editions-review-conversation.service";
 
 @Module({
   imports: [DatabaseModule, AuthModule, EvidenceStorageModule],
@@ -28,6 +30,7 @@ import { RewardEditionsDeliveryController, RewardEditionsPublicEvidenceControlle
     RewardEditionsChainController,
     RewardEditionsController,
     RewardEditionsPreviewController,
+    RewardEditionsReviewConversationController,
     RewardPublicController,
     RewardCreatorController,
     RewardBackerController,
@@ -37,6 +40,7 @@ import { RewardEditionsDeliveryController, RewardEditionsPublicEvidenceControlle
   ],
   providers: [
     RewardEditionsDeliveryService,
+    RewardEditionsReviewConversationService,
     RewardEditionsPublicationService,
     { provide: EDITIONS_CONNECTION, useFactory: loadEditionsConnection },
     RewardEditionsIndexerService,

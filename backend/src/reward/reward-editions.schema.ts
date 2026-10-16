@@ -28,6 +28,11 @@ export const editionsSubmitReviewSchema = editionsRevisionSchema.extend({
     .refine(ids => new Set(ids).size === ids.length, "Duplicate feedback reference")
     .default([]),
 }).refine(input => !input.relatedFeedbackIds.length || Boolean(input.responseBody), "Feedback links require a Creator response");
+export const editionsReviewThreadOpenSchema = z.strictObject({
+  targetHash: z.string().regex(/^0x[0-9a-f]{64}$/),
+  body: z.string().trim().min(10).max(3000),
+});
+export const editionsReviewMessageSchema = z.strictObject({ body: z.string().trim().min(10).max(3000) });
 export const editionsReviewSchema = resolverReviewCampaignSchema.extend({
   commitmentHash: z.string().regex(/^0x[0-9a-f]{64}$/),
 });
