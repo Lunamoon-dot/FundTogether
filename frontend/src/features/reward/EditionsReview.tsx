@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatUnits } from 'viem';
 import { createRewardCampaignDraft, freezeEditions, getEditionsSample, listEditionsSamples, listEditionsWallets, openEditionsCommunityReview, reviewEditions, submitEditionsReview, updateEditionsPreparation, uploadEditionsSample } from '../../lib/api/reward';
 import type { EditionsSample, RewardCampaign } from '../../lib/api/reward';
+import { editionsApi } from '../../lib/api/editions';
 import { getErrorMessage } from '../../lib/api/error';
 import { buildEditionsDraft, validateEditionsDraft, type EditionsDraftErrors, type EditionsDraftFields, type EditionsDraftField } from './editions-draft';
 import { getDefaultPayoutWalletLinkId, getEditionsPreparationFieldError, getEditionsPreparationRequiredFieldError, getPreparationAction, validateEditionsPreparation } from './editions-preparation-validation';
@@ -71,7 +72,7 @@ export function EditionsPreparationPanel({ campaign, onChange, initialStep }: { 
   const defaultStep: 0 | 1 | 2 = initialStep !== undefined
     ? initialStep
     : (campaign.status === 'CHANGES_REQUESTED' ? 2 : 0);
-  const [open, setOpen] = useState(campaign.status === 'DRAFT' || campaign.status === 'CHANGES_REQUESTED');
+  const [open, setOpen] = useState(campaign.status === 'DRAFT' || campaign.status === 'CHANGES_REQUESTED' || campaign.status === 'FROZEN');
   return <div>
     <button type="button" className="button button--secondary" onClick={() => setOpen(value => !value)}>{open ? 'Đóng hồ sơ' : 'Hồ sơ thẩm định PDF'}</button>
     {open && campaign.draftConfig && <PreparationForm key={campaign.id} campaign={campaign} onChange={onChange} initialStep={defaultStep} />}
@@ -98,6 +99,16 @@ function PreparationForm({ campaign, onChange, initialStep }: { campaign: Reward
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const feedbackQuery = useQuery({
+    queryKey: ['reward-editions-feedback', campaign.id, campaign.creatorUserId],
+    queryFn: ({ signal }) => editionsApi.feedback(campaign.id, signal),
+    enabled: campaign.status === 'FROZEN',
+  });
+  const feedbackHistory = feedbackQuery.data?.history ?? feedbackQuery.data?.items ?? [];
+  const priorCorrection = campaign.reviews?.some(review => review.outcome === 'CHANGES_REQUESTED') === true;
+  const needsCreatorResponse = campaign.status === 'FROZEN' && (feedbackHistory.length > 0 || priorCorrection);
+  const [responseBody, setResponseBody] = useState('');
+  const [relatedFeedbackIds, setRelatedFeedbackIds] = useState<string[]>([]);
   const [uploadingSample, setUploadingSample] = useState('');
   const [dirty, setDirty] = useState(false);
   const [blurred, setBlurred] = useState<Record<string, boolean>>({});
@@ -251,7 +262,37 @@ function PreparationForm({ campaign, onChange, initialStep }: { campaign: Reward
         </div>
       </fieldset>
     </form> : <EditionsFrozenTerms campaign={campaign} />}
-    {campaign.status === 'FROZEN' && <><p>Gửi hồ sơ riêng cho Resolver. Hồ sơ chưa xuất hiện với backer; chỉ Resolver mới có thể mở community review sau khi kiểm tra bước đầu.</p><button className="button button--primary" disabled={busy} onClick={() => void run(() => submitEditionsReview(campaign.id, campaign.revision ?? 0), 'Đã gửi hồ sơ riêng cho Resolver.')}>Gửi Resolver thẩm định</button></>}
+    {campaign.status === 'FROZEN' && <>
+      <p>Gửi hồ sơ riêng cho Resolver. Hồ sơ chưa xuất hiện với backer; chỉ Resolver mới có thể mở community review sau khi kiểm tra bước đầu.</p>
+      {needsCreatorResponse && <section className="editions-creator-response" aria-labelledby={`editions-creator-response-title-${campaign.id}`}>
+        <div>
+          <span className="editions-creator-response__eyebrow">REVISION RESPONSE</span>
+          <h4 id={`editions-creator-response-title-${campaign.id}`}>Phản hồi chung của Creator</h4>
+          <p className="editions-preparation-help">Cảm ơn và giải thích ngắn gọn bạn đã điều chỉnh hồ sơ ra sao. Không cần trả lời từng góp ý.</p>
+        </div>
+        <label className="field">Phản hồi chung
+          <textarea value={responseBody} minLength={10} maxLength={3000} required onChange={event => setResponseBody(event.target.value)} />
+        </label>
+        {feedbackQuery.isPending ? <p className="editions-preparation-help" role="status">Đang tải góp ý để gắn vào revision…</p> : feedbackHistory.length > 0 && <fieldset className="editions-creator-response__links">
+          <legend>Gắn với góp ý cụ thể · tùy chọn</legend>
+          {feedbackHistory.map(item => <label key={item.id} className="editions-creator-response__chip">
+            <input type="checkbox" checked={relatedFeedbackIds.includes(item.id)} onChange={event => setRelatedFeedbackIds(ids => event.target.checked ? [...ids, item.id] : ids.filter(id => id !== item.id))} />
+            <span><strong>{item.kind === 'ISSUE' ? 'Báo sự cố' : 'Nhận xét'}</strong> · {item.body}</span>
+          </label>)}
+        </fieldset>}
+        {(feedbackQuery.data?.responses?.length ?? 0) > 0 && <div className="editions-creator-response__history" aria-label="Lịch sử phản hồi Creator">
+          {feedbackQuery.data!.responses!.map(response => <p key={response.id}><strong>Revision {response.submissionRevision}:</strong> {response.responseBody}</p>)}
+        </div>}
+      </section>}
+      <button className="button button--primary" disabled={busy} onClick={() => {
+        const response = responseBody.trim();
+        if (needsCreatorResponse && response.length < 10) { setError('Hãy viết phản hồi chung tối thiểu 10 ký tự trước khi gửi lại Resolver.'); return; }
+        void run(() => submitEditionsReview(campaign.id, campaign.revision ?? 0, {
+          ...(response ? { responseBody: response } : {}),
+          ...(relatedFeedbackIds.length ? { relatedFeedbackIds } : {}),
+        }), 'Đã gửi hồ sơ riêng cho Resolver.')
+      }}>Gửi Resolver thẩm định</button>
+    </>}
     {campaign.status === 'UNDER_REVIEW_PRIVATE' && <p>Hồ sơ đã gửi riêng cho Resolver. Campaign chưa xuất hiện với backer và chưa nhận phản hồi cộng đồng.</p>}
     {campaign.status === 'APPROVED' && <p>Hồ sơ đã được duyệt. Publish và nhận pledge chưa mở.</p>}
   </div>;

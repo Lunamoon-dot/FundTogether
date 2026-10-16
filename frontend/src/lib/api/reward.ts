@@ -169,8 +169,8 @@ export async function updateEditionsPreparation(id: string, data: { revision: nu
 export async function freezeEditions(id: string, revision: number) {
   return (await http.post<RewardCampaign>(`${editionsPath(id)}/freeze`, { revision })).data;
 }
-export async function submitEditionsReview(id: string, revision: number) {
-  return (await http.post<RewardCampaign>(`${editionsPath(id)}/submit-review`, { revision })).data;
+export async function submitEditionsReview(id: string, revision: number, input: { responseBody?: string; relatedFeedbackIds?: string[] } = {}) {
+  return (await http.post<RewardCampaign>(`${editionsPath(id)}/submit-review`, { revision, ...input })).data;
 }
 export async function openEditionsCommunityReview(id: string) {
   return (await http.post<RewardCampaign>(`${editionsPath(id)}/open-community-review`, {})).data;

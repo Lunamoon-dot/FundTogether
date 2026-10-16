@@ -10,8 +10,10 @@ import { createServer } from 'vite'
 const server = await createServer({ mode: 'reward', server: { middlewareMode: true, ws: false }, logLevel: 'error' })
 after(() => server.close())
 const { RewardCreatorStudio } = await server.ssrLoadModule('/src/features/reward/RewardCreatorStudio.tsx')
+const { RewardCreatorProfile } = await server.ssrLoadModule('/src/features/reward/RewardCreatorProfile.tsx')
 const { EditionsPreparationPanel, NewEditionsPreparationPanel, EditionsResolverReview } = await server.ssrLoadModule('/src/features/reward/EditionsReview.tsx')
 const { CreatorPipeline } = await server.ssrLoadModule('/src/features/reward/ui/CreatorPipeline.tsx')
+const { isCreatorActionable } = await server.ssrLoadModule('/src/features/reward/ui/creatorTaskUtils.ts')
 const { CreatorTaskCard } = await server.ssrLoadModule('/src/features/reward/ui/CreatorTaskCard.tsx')
 const { ReviewQueue } = await server.ssrLoadModule('/src/features/reward/ui/ReviewQueue.tsx')
 const { ReviewHistoryDisclosure } = await server.ssrLoadModule('/src/features/reward/ui/ReviewHistoryDisclosure.tsx')
@@ -20,20 +22,31 @@ const { RewardResolverConsole } = await server.ssrLoadModule('/src/features/rewa
 const { default: deployment, activeChain } = await server.ssrLoadModule('/src/lib/web3/deployment-context.ts')
 const config = createConfig({ chains: [activeChain], transports: { [activeChain.id]: http(deployment.rpcUrl) }, ssr: true })
 
-function render(campaigns = [], actor = 'owner', path) {
+function render(campaigns = [], actor = 'owner', path, operations = []) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   client.setQueryData(['my-reward-creator-profile', 'owner'], { status: 'VERIFIED', displayName: 'Comic artist' })
   client.setQueryData(['my-reward-campaigns', 'owner'], campaigns)
+  client.setQueryData(['reward-editions-operations', 'creator', actor], operations)
   const html = renderToStaticMarkup(createElement(WagmiProvider, { config },
     createElement(QueryClientProvider, { client }, createElement(RewardCreatorStudio, { userId: actor, path }))))
   client.clear()
   return html
 }
 
-function renderPreparation(campaign) {
+function renderPreparation(campaign, feedback) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  if (feedback) client.setQueryData(['reward-editions-feedback', campaign.id, campaign.creatorUserId], feedback)
   const html = renderToStaticMarkup(createElement(QueryClientProvider, { client },
     createElement(EditionsPreparationPanel, { campaign, onChange() {} })))
+  client.clear()
+  return html
+}
+
+function renderProfile(profile) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  client.setQueryData(['my-reward-creator-profile', 'owner'], profile)
+  const html = renderToStaticMarkup(createElement(QueryClientProvider, { client },
+    createElement(RewardCreatorProfile, { userId: 'owner' })))
   client.clear()
   return html
 }
@@ -60,10 +73,16 @@ test('Resolver console uses compact, role-aware empty states', () => {
   const html = renderResolver()
   assert.match(html, /Chiến dịch cần xử lý <span[^>]*>0<\/span>/)
   assert.match(html, /Không có chiến dịch nào cần thẩm định lúc này\./)
-  assert.match(html, /Khiếu nại cần phân xử <span[^>]*>0<\/span>/)
-  assert.match(html, /Không có khiếu nại nào cần xử lý\./)
+  assert.doesNotMatch(html, /Khiếu nại cần phân xử/)
   assert.doesNotMatch(html, /Flow V2 – V4/)
   assert.doesNotMatch(html, /tài khoản hiện tại không có quyền RESOLVER/)
+})
+
+test('Resolver console contains only the active Editions review flow', async () => {
+  const source = await readFile(new URL('../src/features/reward/RewardResolverConsole.tsx', import.meta.url), 'utf8')
+  assert.doesNotMatch(source, /approveAndDisburse|candidateExpenditure|finalizeExpenditure|recordProductionVerified|startWindDown/)
+  assert.doesNotMatch(source, /listResolverRewardDisputes|rewardAbi|rewardContractAddress/)
+  assert.doesNotMatch(source, /cọc in|nhà in|vận chuyển|giao hàng/i)
 })
 
 test('Resolver console makes the decision panel primary and community feedback secondary', () => {
@@ -87,6 +106,25 @@ test('new creator flow opens the single Editions preparation wizard instead of a
   assert.match(html, /Bước 1 trên 3/)
   assert.match(html, /Thông tin ấn phẩm/)
   assert.doesNotMatch(html, /Tạo bản thảo FundTogether Editions/)
+})
+
+test('Creator entry defaults to Studio without a tab switcher', () => {
+  const html = render([], 'owner', '/reward/creator')
+
+  assert.match(html, /Xưởng ấn phẩm/)
+  assert.doesNotMatch(html, /reward-tabs|Studio của tôi|Danh tính xuất bản &amp; bản quyền IP/)
+})
+
+test('Studio profile is isolated from the project workspace', () => {
+  const html = renderProfile({
+    id: 'profile', userId: 'owner', displayName: 'Comic artist', bio: 'Independent comic artist.',
+    ipDeclaration: 'I own the publication rights.', status: 'VERIFIED', rejectionReason: null,
+    verifiedBy: 'admin', verifiedAt: '2026-10-16T00:00:00.000Z', createdAt: '2026-10-15T00:00:00.000Z', updatedAt: '2026-10-16T00:00:00.000Z',
+  })
+
+  assert.match(html, /Hồ sơ Studio/)
+  assert.match(html, /Comic artist|Independent comic artist|I own the publication rights/)
+  assert.doesNotMatch(html, /creator-pipeline|Dự án của bạn|Tạo bản thảo mới/)
 })
 
 test('saving a new draft keeps the creator in the step-three editor', async () => {
@@ -152,6 +190,25 @@ test('Editions preparation wizard shows one group with forward navigation at a t
   assert.doesNotMatch(html, /Lưu bản thảo để tiếp tục/)
 })
 
+test('frozen Creator submission can link a general response to selected feedback without adding it to draft save', () => {
+  const feedback = {
+    items: [],
+    history: [{ id: 'feedback-1', authorUserId: 'backer', targetHash: `0x${'1'.repeat(64)}`, kind: 'ISSUE', body: 'Please clarify the promised editing scope.', createdAt: '2026-10-16T10:30:00.000Z' }],
+    responses: [],
+    canSubmit: false,
+  }
+  const frozenCampaign = reviewCampaign('FROZEN')
+  const frozen = renderPreparation({ ...frozenCampaign, creatorUserId: 'owner', revision: 6, draftConfig: frozenCampaign.frozenSnapshot.config }, feedback)
+  assert.match(frozen, /Phản hồi chung của Creator/)
+  assert.match(frozen, /Gắn với góp ý cụ thể/)
+  assert.match(frozen, /Please clarify the promised editing scope./)
+  assert.match(frozen, /Không cần trả lời từng góp ý/)
+  assert.match(frozen, /responseBody|Phản hồi chung/) 
+
+  const draft = renderPreparation({ ...reviewCampaign('DRAFT'), creatorUserId: 'owner', revision: 1, draftConfig: null }, feedback)
+  assert.doesNotMatch(draft, /Phản hồi chung của Creator|Gắn với góp ý cụ thể/)
+})
+
 test('Editions cards cannot offer legacy publish or physical actions even with advanced statuses', () => {
   for (const status of ['DRAFT', 'FROZEN', 'APPROVED', 'ACTIVE', 'PRODUCTION_VERIFIED', 'FULFILLMENT_COMPLETE']) {
     const html = render([{ id: 'edition', category: 'COMICS_ARTBOOK', title: 'An Editions draft', goal: '10000000', status, tiers: [] }])
@@ -161,6 +218,13 @@ test('Editions cards cannot offer legacy publish or physical actions even with a
   const legacy = render([{ id: 'existing', category: 'COMICS', draftConfig: null, title: 'An existing campaign', goal: '10000000', status: 'PRODUCTION_VERIFIED', tiers: [] }])
   assert.doesNotMatch(legacy, /Quản lý Giao hàng/)
 });
+
+test('Creator Studio contains only the active Editions creation and production flow', async () => {
+  const source = await readFile(new URL('../src/features/reward/RewardCreatorStudio.tsx', import.meta.url), 'utf8')
+  assert.doesNotMatch(source, /submitDisbursementRequest|completeCampaign|registerRewardOnchain|syncRewardReceipt/)
+  assert.doesNotMatch(source, /rewardAbi|rewardContractAddress|parseEventLogs/)
+  assert.doesNotMatch(source, /cọc in|giao hàng|vận chuyển/i)
+})
 
 test('saved Editions card shows the promised PDF and exact proposed price and goal', () => {
   const html = render([{ id: 'edition', category: 'COMICS_ARTBOOK', title: 'Saigon story', goal: '9007199254740993', status: 'DRAFT', tiers: [],
@@ -241,6 +305,93 @@ test('Creator workspace renders pipeline stages and Cần bạn làm task cards'
   assert.match(html, /Revision #2/)
   assert.match(html, /Cần bổ sung/)
   assert.doesNotMatch(html, /Duyệt hồ sơ PDF|Yêu cầu sửa/)
+})
+
+test('failed on-chain campaign leaves the approval pipeline and creator task queue', () => {
+  const campaign = {
+    id: 'failed-campaign',
+    category: 'COMICS_ARTBOOK',
+    title: 'Failed Comic',
+    goal: '1000000000',
+    status: 'APPROVED',
+    revision: 4,
+    tiers: [],
+  }
+  const operations = [{ campaignId: campaign.id, publicationStatus: 'ON_CHAIN_CONFIRMED', contractState: 4 }]
+
+  const pipelineHtml = renderToStaticMarkup(createElement(CreatorPipeline, { campaigns: [campaign], operations }))
+  const html = render([campaign], 'owner', '/reward/creator', operations)
+
+  assert.match(pipelineHtml, /Thất bại · hoàn tiền/)
+  assert.match(pipelineHtml, /creator-pipeline__branches/)
+  assert.doesNotMatch(pipelineHtml, /Được duyệt: 1/)
+  assert.doesNotMatch(pipelineHtml, /Thất bại · hoàn tiền[^<]*<[^>]*>→/)
+  assert.match(html, /Campaign thất bại và đang hoàn tiền/)
+  assert.doesNotMatch(html, /Cần bạn làm \(1\)|Mở trang kích hoạt on-chain/)
+  assert.doesNotMatch(html, />APPROVED<|Hồ sơ thẩm định PDF/)
+})
+
+test('Creator pipeline assigns every on-chain campaign to exactly one lifecycle stage', () => {
+  const campaigns = [
+    { id: 'approved', status: 'APPROVED' },
+    { id: 'funding', status: 'APPROVED' },
+    { id: 'active', status: 'APPROVED' },
+    { id: 'release-review', status: 'APPROVED' },
+    { id: 'released', status: 'APPROVED' },
+    { id: 'refunding', status: 'APPROVED' },
+    { id: 'completed', status: 'APPROVED' },
+  ]
+  const operations = [
+    { campaignId: 'approved', publicationStatus: 'NOT_PUBLISHED', contractState: null },
+    ...campaigns.slice(1).map((campaign, index) => ({ campaignId: campaign.id, publicationStatus: 'ON_CHAIN_CONFIRMED', contractState: index })),
+  ]
+
+  const html = renderToStaticMarkup(createElement(CreatorPipeline, { campaigns, operations }))
+
+  assert.match(html, /Được duyệt: 1/)
+  assert.match(html, /Đang gây quỹ: 1/)
+  assert.match(html, /Thất bại · hoàn tiền: 1/)
+  assert.match(html, /Sản xuất: 2/)
+  assert.match(html, /Đã phát hành: 2/)
+})
+
+test('Creator pipeline renders rejected campaigns as a terminal branch', () => {
+  const campaign = { id: 'rejected', status: 'STOPPED' }
+  const html = renderToStaticMarkup(createElement(CreatorPipeline, { campaigns: [campaign], operations: [] }))
+
+  assert.match(html, /Bị từ chối: 1/)
+  assert.match(html, /creator-pipeline__branch--rejected creator-pipeline__branch--has-items/)
+})
+
+test('creator tasks use the Editions operation state instead of legacy campaign projection', () => {
+  const campaign = { status: 'APPROVED' }
+  const operation = state => ({ publicationStatus: 'ON_CHAIN_CONFIRMED', contractState: state })
+
+  assert.equal(isCreatorActionable(campaign, operation(0)), false)
+  assert.equal(isCreatorActionable(campaign, operation(1)), true)
+  assert.equal(isCreatorActionable(campaign, operation(2)), false)
+  assert.equal(isCreatorActionable(campaign, operation(3)), false)
+  assert.equal(isCreatorActionable(campaign, operation(4)), false)
+  assert.equal(isCreatorActionable(campaign, operation(5)), false)
+  assert.equal(isCreatorActionable(campaign, operation(99)), false)
+})
+
+test('Creator can open community feedback as a read-only task', () => {
+  const campaign = {
+    id: 'community-feedback',
+    category: 'COMICS_ARTBOOK',
+    title: 'Comic With Community Review',
+    goal: '10000000',
+    status: 'COMMUNITY_REVIEW',
+    draftConfig: null,
+    tiers: [],
+    projection: null,
+  }
+
+  assert.equal(isCreatorActionable(campaign), true)
+  const html = render([campaign], 'owner')
+  assert.match(html, /Xem phản hồi cộng đồng/)
+  assert.match(html, /#\/reward\/editions\/community-feedback\/creator\/feedback/)
 })
 
 test('CreatorTaskCard renders single primary action, revision, and collapses history', () => {
