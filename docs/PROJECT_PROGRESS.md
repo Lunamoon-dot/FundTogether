@@ -1,26 +1,137 @@
 # Project progress
 
-## 2026-10-15 Editions Resolver review SLA and public surfaces
+## 2026-10-16 Editions review conversations and Resolver escalation
 
-- Added additive migrations `0006_reward_editions_review_sla` and
-  `0007_reward_editions_review_sla_backfill`. `submit-review` records a 24-hour
-  Resolver SLA; an overdue row remains `UNDER_REVIEW` and does not auto-approve,
-  reject, open pledge or move funds. `CHANGES_REQUESTED` clears the active
-  window and returns the Creator to `DRAFT` while preserving review history.
+- Added append-only Creator revision responses for frozen corrections. A Creator
+  cannot submit ordinary community feedback to the Creator's own campaign, but
+  can submit one general response with optional links to several Backer feedback
+  records when resubmitting a corrected revision.
+- Added a server-authorized Backer–Creator review thread for canonical funded
+  campaigns. The gate requires an `ON_CHAIN_CONFIRMED` publication, an active
+  post-funding contract state, and the current non-refunded entitlement; public
+  or pre-funding users continue to use advisory Community Review.
+- Added idempotent Backer escalation and Resolver case surfaces. Resolver can
+  read the campaign snapshot, chain/indexer snapshot, entitlement identity,
+  linked feedback, and append-only messages, request Creator clarification, and
+  record `RESOLVED`, `DISMISSED`, or `FORMAL_DISPUTE` as an off-chain outcome.
+- Review messages, response links, escalation status, and Resolver outcomes do
+  not call the contract, change entitlement canonical/refunded fields, or move
+  escrow. Contract state remains the financial authority; PostgreSQL is the
+  indexed/application projection and conversation record.
+- PASS: focused backend delivery HTTP suite `12/12`, backend TypeScript build,
+  frontend delivery/public SSR suites `25/25`, frontend Studio SSR suite
+  `33/33`, and frontend TypeScript/Vite production build.
+- Remaining verification is the full backend/frontend test and lint pass plus
+  manual browser acceptance with separate Backer, Creator, and Resolver
+  sessions. This entry is implementation evidence, not proof of human identity,
+  IP, or production-quality acceptance.
+
+## 2026-10-16 Editions workflow reconciliation and UX configuration
+
+- Moved successful legacy Reward campaigns from a dedicated sidebar entry into
+  the public feed's `Đã gây quỹ` filter. Legacy contract states use their own
+  enum mapping (`1..4` successful, `5` stopped/refund), remain read-only, and
+  never enter the active Editions pledge filter. `/reward/history` remains a
+  compatibility alias for the funded filter.
+- Simplified the public Editions feed without changing campaign selection:
+  kept compact status filters and a neutral flat empty state, while removing
+  the redundant page promo header, duplicate Community Review action, and the
+  Creator-only draft CTA from the Backer discovery surface.
+- Redesigned the empty Backer library state without changing entitlement
+  behavior: the page now has a clear library heading, a bounded empty-state
+  panel, one primary discovery CTA, grouped legacy-history access, and
+  responsive mobile actions. Raw indexer terminology was moved out of the
+  primary explanation.
+- Split the Creator area into two authenticated destinations. `/reward/creator`
+  is now the default project workspace for draft, review, activation,
+  production, and release work; `/reward/creator/profile` owns Studio identity,
+  biography, IP declaration, and Admin verification. Unverified creators are
+  directed to the profile route instead of receiving the profile form inside
+  the project dashboard.
+- Fixed the remaining Editions projection guard in
+  `RewardCampaignService`: canonical `editions_chain_campaigns` snapshots are
+  now read by campaign ID even when the legacy `reward_campaigns.onchain_campaign_id`
+  field is null. The creator pipeline also fails closed while its operational
+  summary is unavailable and renders refund/rejection as separate terminal
+  branches instead of placing refund inside the release path.
+- Added one authenticated Editions operational summary for Creator, Resolver,
+  and Admin. It derives application, publication, canonical contract snapshot,
+  on-chain ID, and binding transaction hash from the active Editions stream;
+  it does not read or write legacy `reward_campaigns.onchain_campaign_id` as an
+  Editions publication source.
+- Creator Studio, Resolver Queue, and Admin Console now use that summary.
+  `APPROVED + NOT_PUBLISHED`, `ORPHANED`, canonical funding, production/release,
+  refunding, and settled states have separate Vietnamese labels and actions.
+  Admin remains observational for contract money movement.
+- Hardened authenticated receipt reconciliation with campaign and action
+  context. Sync now checks deployment, canonical successful receipt, decoded
+  function, expected event, exact frozen terms, linked actor, and the expected
+  binding or entitlement before returning `ON_CHAIN_CONFIRMED`. Pending,
+  reverted, unrelated, and indexing states remain explicit.
+- Transaction recovery now clears only the confirmed action. Orphaned
+  activation can recover from the server-side `CampaignCreated` hash when
+  browser storage is empty. Pledge preflight fails closed on wallet/balance/
+  allowance read errors and presents MockUSDC approval as step 1/2 followed by
+  pledge as step 2/2.
+- Review, delivery, challenge, refund, and payout policies were not changed.
+  Local migrations `0008_reward_editions_review_policy` and
+  `0009_editions_review_gating` were applied and confirmed in
+  `reward_schema_migrations`. No contract, ABI, deployment, migration SQL, or
+  financial policy was changed by this reconciliation pass.
+- PASS: backend TypeScript build; Editions Jest `9 suites / 88 tests`; focused
+  real HTTP/PostgreSQL/MinIO/Anvil delivery and exact-sync suite `12/12`.
+- PASS: frontend `108/108` tests, `oxlint`, and production build. The existing
+  large-chunk warning remains.
+- PASS: browser E2E six checkpoints with real auth/SIWE/API/storage/Anvil and
+  injected local wallets: private review gate, exact activation, approve +
+  pledge, production/PDF review, byte-verified private download, challenge,
+  and canonical refund. This is automated local evidence, not human MetaMask
+  or real-world identity/IP acceptance.
+- LIMITATION: the backend `lint` script cannot currently run because the
+  backend has no ESLint flat config (ESLint 9 reports that
+  `eslint.config.js|mjs|cjs` is missing). Build and all scoped backend tests
+  pass; no unrelated lint tooling was invented in this workflow change.
+- Existing unrelated dirty contract, migration, and documentation changes were
+  preserved and remain uncommitted.
+
+## 2026-10-15 Editions activation, pledge preflight, and transaction recovery
+
+- Implemented a durable browser-local Editions transaction record for public transaction hashes and lifecycle stages: preflight, wallet signature, submitted, receipt, indexing, canonical, and failed. Reloading the same campaign restores the record; reconciliation checks the receipt and canonical sync before clearing it. No private key, signature, or financial contract behavior changed.
+- Replaced the raw pledge button with a preflight surface that checks signed-in account, linked wallet, local chain `31339`, canonical `FUNDING (0)`, existing entitlement, and MockUSDC balance/allowance. It exposes one pledge action only when the canonical prerequisites are met.
+- Added the Creator/Resolver activation surface for `NOT_PUBLISHED`, `ORPHANED`, and `ON_CHAIN_CONFIRMED`, plus UI-state labels and Admin/Resolver exception copy that distinguish application approval, publication binding, indexer projection, and contract lifecycle.
+- PASS: frontend TypeScript production build and `oxlint`. The existing large-chunk warning remains. Focused test suites were not added in this pass per the current execution scope.
+
+## 2026-10-15 Editions private Resolver gate and public surfaces
+
+- Added migration `0008_reward_editions_review_policy` to remove the fixed
+  review deadline and migration `0009_editions_review_gating` to add
+  `UNDER_REVIEW_PRIVATE` and `COMMUNITY_REVIEW`. Existing Editions rows that
+  were already public under the old `UNDER_REVIEW` behavior were migrated to
+  `COMMUNITY_REVIEW`; legacy Reward rows keep `UNDER_REVIEW`.
+- `submit-review` now records the review start in the private state. A Resolver
+  must explicitly call `open-community-review` before public feedback or a
+  public preview exists. Resolver decisions are accepted only in
+  `COMMUNITY_REVIEW`; `CHANGES_REQUESTED` returns the same canonical campaign
+  row to editable `DRAFT` while preserving review history.
 - Public Editions is now separated into `/review`, `/activation`, and `/funding`.
+  `/review` contains only `COMMUNITY_REVIEW`; private submissions never leak to
+  Backers. Feedback and public counts are scoped to the current commitment and
+  sample snapshot; audit-only delivery issues remain visible to Resolver.
   Funding visibility requires an intact approved commitment plus a canonical
   indexer binding in contract state `FUNDING (0)`; approved-but-unpublished rows
   remain activation-pending.
-- Creator/public UX now labels the three surfaces and shows the 24-hour/overdue
-  review meaning. No public feedback or deadline timer can change review or
-  financial state; Resolver remains the sole campaign reviewer.
-- PASS: full Editions backend suite `7 suites / 78 tests`, including delivery
-  surface `10/10` and review HTTP `14/14`; frontend tests `40/40`, backend build,
-  and frontend production build. The frontend build
-  retains the existing large-chunk warning.
-- Current local Reward DB was migrated in place without reset. Existing
-  `UNDER_REVIEW` rows were backfilled with a 24-hour read-model window; no chain,
-  indexer, pledge, refund, entitlement or token balance was reset.
+- Creator/Resolver/Backer UX now distinguishes private submission from an open
+  community review, shows one Resolver card per campaign, and collapses prior
+  decision history. The preparation form no longer remounts to step 1 after a
+  save. No public feedback or timer can change review or financial state;
+  Resolver remains the sole campaign reviewer.
+- PASS: full backend Jest `20 suites / 197 tests`; Editions backend
+  `7 suites / 78 tests`; frontend tests `46/46`; backend build and frontend
+  production build. The frontend build retains the existing large-chunk warning.
+- PASS: local runtime migration and reload without reset; API health `ok`, chain
+  `31339`, public review route returns the migrated campaign as `COMMUNITY_REVIEW`.
+- Current local Reward DB is migrated in place without reset. No chain, indexer,
+  pledge, refund, entitlement or token balance is reset.
 
 ## 2026-10-14 scope cleanup verification
 

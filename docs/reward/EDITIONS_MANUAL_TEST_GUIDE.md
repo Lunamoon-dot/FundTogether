@@ -58,7 +58,7 @@ Hash ràng buộc đúng nội dung đã nộp; hash không chứng minh tác ph
 
 ```text
 Hồ sơ trong DB:
-DRAFT → FROZEN → UNDER_REVIEW → APPROVED → ACTIVATION_PENDING → FUNDING
+DRAFT → FROZEN → UNDER_REVIEW_PRIVATE → COMMUNITY_REVIEW → APPROVED → ACTIVATION_PENDING → FUNDING
                        ├─ Yêu cầu sửa → DRAFT, giữ lịch sử review
                        └─ Từ chối → STOPPED
 
@@ -78,8 +78,8 @@ Primary ký approveCampaign → Creator ký createCampaign
 Hủy trước payout / quá hạn release theo policy → REFUNDING (4)
 ```
 
-`submit-review` ghi thời điểm bắt đầu và hạn SLA **24 giờ** cho Resolver. Quá hạn
-chỉ hiển thị `OVERDUE`; không tự duyệt, từ chối, mở pledge hay chuyển tiền.
+`submit-review` ghi thời điểm bắt đầu để audit. Không có hạn SLA cố định, không có
+timer tự động và không tự duyệt, từ chối, mở pledge hay chuyển tiền.
 `CHANGES_REQUESTED` xóa cửa sổ review hiện tại và trả Creator về `DRAFT`; Creator
 có thể sửa, khóa và gửi lại không giới hạn. `APPROVED` chưa có nghĩa đã phát hành
 on-chain; chỉ binding canonical có state `FUNDING` mới xuất hiện ở surface nhận pledge.
@@ -110,6 +110,40 @@ Ví dụ goal 20, giá 10 MockUSDC: A và B pledge → `raised=20`, `escrowed=20
 - Backer phải ký `challengeRelease` trước deadline để chặn payout. Mỗi ví một challenge/campaign. Resolver bác challenge thì giữ deadline cũ; chấp nhận thì mở refund toàn campaign. Backup chờ 7 ngày từ challenge tương ứng.
 - Thiếu/sai file trả lỗi và tạo `FILE_UNAVAILABLE`; không giả vờ đã giao, không tự refund. Sau payout vẫn có báo sự cố nhưng không có cơ chế hoàn tiền tự động.
 - Có challenge mở nhưng campaign vẫn `RELEASED` thì Backer đủ quyền vẫn có thể tải; khi chuyển `REFUNDING` thì quyền tải bị chặn ngay, kể cả chưa claim.
+
+### 2.6. Góp ý trước funding và review sau funding
+
+Hai luồng này cùng nằm trong campaign nhưng có mục đích và quyền khác nhau:
+
+| Giai đoạn | Người dùng | Hành động | Dữ liệu/quyền cần kiểm |
+| --- | --- | --- | --- |
+| `COMMUNITY_REVIEW` trước funding | Community/Backer chưa có entitlement | Gửi góp ý advisory theo commitment/evidence; Creator và Resolver đọc được | Feedback lưu theo campaign và revision; không mở pledge, không đổi review decision |
+| Correction trước funding | Creator | Khi gửi lại revision đã sửa, gửi một phản hồi chung; có thể link nhiều feedback cụ thể bằng tag/ID | Chỉ gửi cùng `submit-review`; không phải form tự góp ý và không trả lời từng item bắt buộc |
+| Contract state `ACTIVE`, `RELEASE_REVIEW`, `RELEASED`, `COMPLETED` | Backer có entitlement canonical, chưa refund | Mở một thread với Creator theo commitment/production target; Backer và Creator nối tiếp message append-only | Backend kiểm tra publication canonical, chain state và entitlement hiện tại; không tin số tiền do frontend gửi |
+| Thread chưa được làm rõ | Backer | Gửi escalation tới Resolver, tối đa một case cho mỗi thread | Tạo case off-chain; không tự mở refund/dispute trên contract |
+| Resolver case | Resolver | Đọc full context, yêu cầu Creator làm rõ, ghi outcome | `RESOLVED`, `DISMISSED`, hoặc `FORMAL_DISPUTE` chỉ là outcome conversation; bước tài chính khác phải theo workflow/contract riêng |
+
+Creator không gửi “feedback cho chính mình”. Creator chỉ gửi **phản hồi chung
+cho revision correction** và có thể gắn các feedback của Backer làm ngữ cảnh.
+Sau khi campaign đã funded, Creator là một bên tham gia thread và có thể trả lời
+Backer; Resolver chỉ xuất hiện khi Backer escalation hoặc trong console được cấp
+quyền.
+
+Luồng nghiệm thu tối thiểu:
+
+1. U hoặc B1 gửi góp ý ở `COMMUNITY_REVIEW`; kiểm tra Creator thấy nội dung nhưng
+   không có form gửi feedback thông thường.
+2. R yêu cầu sửa; C sửa hồ sơ, chọn vài feedback liên quan và gửi một response
+   chung khi `submit-review`; kiểm tra lịch sử response không làm thay đổi draft
+   ngoài revision mới.
+3. Sau khi campaign canonical đạt `ACTIVE`, B1 mở thread với target hiện tại;
+   C trả lời; cả hai thấy cùng message theo thứ tự append-only.
+4. B1 escalation; kiểm tra Resolver Console có case với commitment, chain/indexer
+   snapshot, entitlement, feedback liên kết và toàn bộ thread.
+5. R yêu cầu C làm rõ rồi ghi outcome; kiểm tra thread/case đổi trạng thái nhưng
+   `canonical`, `refunded`, escrow và contract state không đổi.
+6. Lặp lại với entitlement `ORPHANED` hoặc `REFUNDED`; API phải từ chối mở thread
+   và giao diện không hiện CTA review sau funding.
 
 ## 3. Chuẩn bị môi trường và tài khoản
 
@@ -213,12 +247,11 @@ Làm lần lượt; với mỗi giao dịch phải thấy **`ON_CHAIN_CONFIRMED`
 | H02 — A | `#/reward/resolver` → **Flow V1: Duyệt Hồ Sơ Tác Giả** → đọc hồ sơ → **Phê duyệt (VERIFIED)** | C tải lại thấy `VERIFIED`. Đây là quyết định người test; không phải hệ thống tự chứng minh bản quyền |
 | H03 — C | Tạo campaign bằng bộ dữ liệu mục 3.4 → **Lưu Bản thảo Chiến dịch** | `DRAFT`; chỉ COMICS_ARTBOOK, một standard PDF; không kho/địa chỉ/tracking |
 | H04 — C | **Hồ sơ thẩm định PDF** → chọn ví đã liên kết, điền đề cương/ngân sách/evidence plan, hai ngày theo chain; upload và tick chọn mẫu → **Lưu hồ sơ thẩm định** | Lưu được revision mới; mẫu tải lại đúng file. Mẫu phải được gắn vào hồ sơ, không chỉ upload |
-| H05 — C | Kiểm nội dung → **Khóa cam kết PDF đã lưu** → **Gửi Resolver thẩm định** | `FROZEN` rồi `UNDER_REVIEW`; có commitment hash; các terms không còn sửa tự do |
-| H05a — U | Mở feed/chi tiết khi `UNDER_REVIEW` | Thấy surface `Đang chờ Resolver thẩm định`, community chỉ góp ý, chưa mở pledge; SLA tham khảo là 24 giờ |
-| H06 — U | Mở `#/reward`, vào campaign → chọn cam kết → nhập nhận xét → **Gửi phản hồi có tài khoản** | Gửi được trước khi approved; C/R đọc được chi tiết; người khác không đọc được nội dung U. Chưa có pledge |
+| H05 — C | Kiểm nội dung → **Khóa cam kết PDF đã lưu** → **Gửi Resolver thẩm định** | `FROZEN` rồi `UNDER_REVIEW_PRIVATE`; có commitment hash; terms chưa public và không sửa tự do |
+| H05a — R | Resolver Console → đọc snapshot riêng tư, tải trang mẫu → **Mở community review** | `COMMUNITY_REVIEW`; hồ sơ mới xuất hiện ở `/review`, chưa mở pledge |
+| H06 — U | Mở `#/reward`, vào campaign → chọn cam kết → nhập nhận xét → **Gửi phản hồi có tài khoản** | Chỉ gửi được khi `COMMUNITY_REVIEW`; C/R đọc được chi tiết; người khác không đọc được nội dung U. Chưa có pledge |
 | H07 — R | Console → đọc snapshot, tải trang mẫu, xem phản hồi → nhập lý do → **Duyệt hồ sơ PDF** | `APPROVED`. Chưa có campaign on-chain, chưa chuyển tiền |
-| H07a — R | Gửi `CHANGES_REQUESTED` | Trạng thái về `DRAFT`, lịch sử review còn; snapshot/hash active và cửa sổ SLA được xóa |
-| H07c — U/R | Với một hồ sơ khác, kiểm tra sau hạn 24 giờ | Hiện `OVERDUE`; trạng thái vẫn `UNDER_REVIEW`, không tự duyệt/từ chối hay mở pledge |
+| H07a — R | Gửi `CHANGES_REQUESTED` | Trạng thái về `DRAFT`, lịch sử review còn; snapshot/hash active và thời điểm review hiện tại được xóa |
 | H07b — C | Sửa hồ sơ → **Lưu bản nháp** → **Khóa cam kết** → **Gửi Resolver thẩm định** lần hai | Vòng correction lặp được; tạo commitment mới và không dùng commitment cũ để review |
 | H08 — R | **Mở duyệt hợp đồng, sản xuất & PDF local** → **Ký duyệt cam kết local** bằng ví Primary | Receipt và sync thành công. Đây là `approveCampaign`, không phải ERC20 approve; public surface vẫn là `ACTIVATION_PENDING` |
 | H09 — C | Studio → **Mở community & phát hành PDF local** → **Tạo campaign local từ cam kết** bằng ví C đã khóa | `ON_CHAIN_CONFIRMED`, ID on-chain, public surface chuyển **Đang gây quỹ**, raised/escrow 0; hạn funding đúng 1 ngày từ block tạo |
@@ -340,7 +373,7 @@ Sao chép bảng này vào ghi chú riêng. Dùng `PASS`, `FAIL`, `BLOCKED`, `NO
 
 | Dấu hiệu | Kiểm tra trước |
 | --- | --- |
-| Không thấy campaign ở feed | Kiểm tra đúng surface: `/review` cho UNDER_REVIEW, `/activation` cho APPROVED chưa có binding canonical, `/funding` chỉ cho binding canonical state FUNDING. Draft nằm trong Studio; reload trang sau khi đổi trạng thái |
+| Không thấy campaign ở feed | Kiểm tra đúng surface: `/review` chỉ cho `COMMUNITY_REVIEW`, `/activation` cho `APPROVED` chưa có binding canonical, `/funding` chỉ cho binding canonical state FUNDING. `UNDER_REVIEW_PRIVATE` chỉ nằm trong Resolver Console; draft nằm trong Studio; reload trang sau khi đổi trạng thái |
 | Hồ sơ ghi “Publish và nhận pledge chưa mở” | Đây là chữ cũ trong panel chuẩn bị. Với hồ sơ APPROVED, mở link Editions `/creator` hoặc `/resolver` để chạy H08–H09; chỉ `ON_CHAIN_CONFIRMED` mới là phát hành xong |
 | Console có “V1–V4”, cọc/in ấn hoặc nút hợp đồng cũ | Đó là nhãn/phần lịch sử; dùng đúng card COMICS_ARTBOOK và link quản lý Editions. Không dùng thao tác advance của campaign lịch sử để test policy mới |
 | Không thấy hồ sơ chờ / không duyệt được | Kiểm role ADMIN/RESOLVER của **tài khoản**, rồi ví ký theo manifest; không suy ra từ tên account |
