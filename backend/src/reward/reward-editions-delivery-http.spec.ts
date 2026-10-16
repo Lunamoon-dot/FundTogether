@@ -39,7 +39,7 @@ describe("Editions digital delivery: real HTTP, PostgreSQL, MinIO and Anvil", ()
   let app: INestApplication, pool: Pool, admin: Client, db: ReturnType<typeof drizzle<typeof schema>>, storage: EvidenceStorageService;
   let indexer: RewardEditionsIndexerService;
   let accounts: `0x${string}`[], address: `0x${string}`, tokenAddress: `0x${string}`;
-  let owner: string, backer: string, resolver: string, stranger: string, id: string, commitment: string, threadId: string, escalationId: string;
+  let owner: string, backer: string, resolver: string, stranger: string, id: string, commitment: string, threadId: string, staleThreadId: string, escalationId: string;
   let deadline: bigint, entitlementId: string, production: any, finalPdf: any, pdf: Buffer;
   let beforePledge: string;
   let approvalHash: `0x${string}`, creationHash: `0x${string}`, pledgeHash: `0x${string}`;
@@ -346,6 +346,12 @@ describe("Editions digital delivery: real HTTP, PostgreSQL, MinIO and Anvil", ()
 
   it("invalidates an issued link after refund, and restores rights only after canonical replay", async () => {
     const before = await ticket(); expect(before.status).toBe(201);
+    const staleThread = await api().post(route("review-threads")).set("x-test-user", backer).send({ targetHash: production.evidenceHash, body: "Please keep this production concern visible in the review history." });
+    expect(staleThread.status).toBe(201);
+    staleThreadId = staleThread.body.id;
+    expect((await api().post(`/v1/reward/editions/review-threads/${staleThreadId}/messages`).set("x-test-user", owner).send({ body: "I will keep the production evidence available for audit." })).status).toBe(201);
+    const beforeInvalidatedMessages = await db.select().from(schema.editionsReviewMessages).where(eq(schema.editionsReviewMessages.threadId, staleThreadId));
+    const beforeInvalidatedEscalations = await db.select().from(schema.editionsReviewEscalations).where(eq(schema.editionsReviewEscalations.threadId, staleThreadId));
     const fork = await client.request({ method: "evm_snapshot" as any });
     await send(accounts[3], "cancelCampaign", [0n]);
     expect((await api().get(before.body.url).set("x-test-user", backer)).status).toBe(409);
@@ -353,6 +359,14 @@ describe("Editions digital delivery: real HTTP, PostgreSQL, MinIO and Anvil", ()
     await send(accounts[4], "claimRefund", [0n]);
     expect((await ticket()).status).toBe(409);
     expect((await api().get("/v1/reward/editions/entitlements").set("x-test-user", backer)).body[0]).toMatchObject({ access: "REFUNDED", campaignTitle: expect.any(String) });
+    expect((await api().get(`/v1/reward/editions/review-threads/${staleThreadId}`).set("x-test-user", backer)).status).toBe(200);
+    expect((await api().get(`/v1/reward/editions/review-threads/${staleThreadId}`).set("x-test-user", owner)).status).toBe(200);
+    expect((await api().get(`/v1/reward/editions/review-threads/${staleThreadId}`).set("x-test-user", resolver)).status).toBe(200);
+    expect((await api().post(`/v1/reward/editions/review-threads/${staleThreadId}/messages`).set("x-test-user", backer).send({ body: "A refunded thread must not accept new Backer messages." })).status).toBe(409);
+    expect((await api().post(`/v1/reward/editions/review-threads/${staleThreadId}/messages`).set("x-test-user", owner).send({ body: "A refunded thread must not accept new Creator messages." })).status).toBe(409);
+    expect((await api().post(`/v1/reward/editions/review-threads/${staleThreadId}/escalate`).set("x-test-user", backer).send({ reason: "A refunded thread must not create a new Resolver case." })).status).toBe(409);
+    expect(await db.select().from(schema.editionsReviewMessages).where(eq(schema.editionsReviewMessages.threadId, staleThreadId))).toHaveLength(beforeInvalidatedMessages.length);
+    expect(await db.select().from(schema.editionsReviewEscalations).where(eq(schema.editionsReviewEscalations.threadId, staleThreadId))).toHaveLength(beforeInvalidatedEscalations.length);
     expect(await client.request({ method: "evm_revert" as any, params: [fork] } as any)).toBe(true);
     await client.request({ method: "evm_mine" as any }); await sync();
     expect((await ticket()).status).toBe(201);
@@ -376,5 +390,9 @@ describe("Editions digital delivery: real HTTP, PostgreSQL, MinIO and Anvil", ()
     const rights = await api().get("/v1/reward/editions/entitlements").set("x-test-user", backer);
     expect(rights.body[0]).toMatchObject({ access: "ORPHANED", confirmedAt: null });
     expect((await api().post(route("review-threads")).set("x-test-user", backer).send({ targetHash: commitment, body: "An orphaned entitlement must not open review." })).status).toBe(409);
+    expect((await api().get(`/v1/reward/editions/review-threads/${staleThreadId}`).set("x-test-user", backer)).status).toBe(200);
+    expect((await api().post(`/v1/reward/editions/review-threads/${staleThreadId}/messages`).set("x-test-user", backer).send({ body: "An orphaned thread must not accept a new Backer message." })).status).toBe(409);
+    expect((await api().post(`/v1/reward/editions/review-threads/${staleThreadId}/messages`).set("x-test-user", owner).send({ body: "An orphaned thread must not accept a new Creator message." })).status).toBe(409);
+    expect((await api().post(`/v1/reward/editions/review-threads/${staleThreadId}/escalate`).set("x-test-user", backer).send({ reason: "An orphaned thread must not create a new Resolver case." })).status).toBe(409);
   });
 });

@@ -6,7 +6,7 @@ import * as schema from "../database/schema";
 import { editionsEntitlements, editionsFeedback, editionsReviewEscalations, editionsReviewMessages, editionsReviewThreads, platformRoles, rewardCampaigns } from "../database/schema";
 import { DRIZZLE_DB } from "../database/database.constants";
 import { currentEditionsFeedbackTargets } from "./reward-editions-delivery.policy";
-import { canOpenEditionsReviewThread } from "./reward-editions-review-conversation.policy";
+import { canOpenEditionsReviewThread, deriveEditionsReviewThreadWriteState } from "./reward-editions-review-conversation.policy";
 import { RewardEditionsIndexerService } from "./reward-editions-indexer.service";
 import { RewardEditionsPublicationService } from "./reward-editions-publication.service";
 import { editionsReviewEscalationOutcomeSchema, editionsReviewEscalationSchema, editionsReviewMessageSchema, editionsReviewMessageSchema as reviewMessageSchema, editionsReviewThreadOpenSchema } from "./reward-editions.schema";
@@ -79,6 +79,23 @@ export class RewardEditionsReviewConversationService {
     return { thread, participant };
   }
 
+  private async assertActiveThreadEntitlement(db: NodePgDatabase<typeof schema> | Transaction, thread: typeof editionsReviewThreads.$inferSelect) {
+    const [entitlement] = await db.select({
+      canonical: editionsEntitlements.canonical,
+      refunded: editionsEntitlements.refunded,
+      streamId: editionsEntitlements.streamId,
+    }).from(editionsEntitlements).where(eq(editionsEntitlements.id, thread.entitlementId));
+    if (!entitlement) throw new ConflictException("Review thread entitlement is no longer available");
+
+    const state = deriveEditionsReviewThreadWriteState({
+      canonical: entitlement.canonical,
+      refunded: entitlement.refunded,
+      entitlementStreamId: entitlement.streamId,
+      currentStreamId: this.indexer.streamId(),
+    });
+    if (state !== "ACTIVE") throw new ConflictException(`Review thread is read-only because entitlement is ${state}`);
+  }
+
   async openThread(campaignId: string, userId: string, body: unknown) {
     const input = parse(editionsReviewThreadOpenSchema, body);
     const { campaign, chain, entitlement } = await this.canonicalBacker(campaignId, userId);
@@ -128,6 +145,7 @@ export class RewardEditionsReviewConversationService {
       if (thread.status === "CLOSED") throw new ConflictException("Closed review threads cannot receive messages");
       const authorRole = thread.backerUserId === userId ? "BACKER" : thread.creatorUserId === userId ? "CREATOR" : null;
       if (!authorRole) throw new ForbiddenException("Only the Backer and Creator can message this thread");
+      await this.assertActiveThreadEntitlement(tx, thread);
       const [message] = await tx.insert(editionsReviewMessages).values({ threadId, authorUserId: userId, authorRole, body: input.body }).returning({ id: editionsReviewMessages.id });
       await tx.update(editionsReviewThreads).set({ updatedAt: new Date() }).where(eq(editionsReviewThreads.id, threadId));
       messageId = message.id;
@@ -143,6 +161,7 @@ export class RewardEditionsReviewConversationService {
       const { thread } = await this.authorizedThread(tx, threadId, userId);
       if (thread.backerUserId !== userId) throw new ForbiddenException("Only the Backer can escalate a review thread");
       if (["RESOLVED", "CLOSED"].includes(thread.status)) throw new ConflictException("This review thread is already closed");
+      await this.assertActiveThreadEntitlement(tx, thread);
       const [existing] = await tx.select().from(editionsReviewEscalations).where(eq(editionsReviewEscalations.threadId, threadId));
       if (existing) { escalationId = existing.id; return; }
       const [saved] = await tx.insert(editionsReviewEscalations).values({ threadId, openerUserId: userId, reason: input.reason, status: "OPEN" }).returning({ id: editionsReviewEscalations.id });

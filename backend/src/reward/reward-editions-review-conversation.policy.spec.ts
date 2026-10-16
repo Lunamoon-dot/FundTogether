@@ -1,5 +1,6 @@
 import {
   canOpenEditionsReviewThread,
+  deriveEditionsReviewThreadWriteState,
   isEditionsPostFundingState,
 } from "./reward-editions-review-conversation.policy";
 
@@ -44,5 +45,15 @@ describe("Editions review conversation policies", () => {
       entitlement: { ...valid.entitlement, backerUserId: "other-backer" },
     })).toBe(false);
     expect(canOpenEditionsReviewThread({ ...valid, userId: "creator-1" })).toBe(false);
+  });
+
+  it("classifies existing thread write access from current entitlement state", () => {
+    const active = { canonical: true, refunded: false, entitlementStreamId: "editions:current", currentStreamId: "editions:current" };
+
+    expect(deriveEditionsReviewThreadWriteState(active)).toBe("ACTIVE");
+    expect(deriveEditionsReviewThreadWriteState({ ...active, refunded: true })).toBe("REFUNDED");
+    expect(deriveEditionsReviewThreadWriteState({ ...active, canonical: false })).toBe("ORPHANED");
+    expect(deriveEditionsReviewThreadWriteState({ ...active, entitlementStreamId: "editions:old" })).toBe("ORPHANED");
+    expect(deriveEditionsReviewThreadWriteState({ ...active, refunded: true, entitlementStreamId: "editions:old" })).toBe("REFUNDED");
   });
 });

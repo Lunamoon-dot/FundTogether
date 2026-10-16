@@ -1,5 +1,7 @@
 const EDITIONS_POST_FUNDING_STATES = new Set([1, 2, 3, 5]);
 
+export type EditionsReviewThreadWriteState = "ACTIVE" | "REFUNDED" | "ORPHANED";
+
 export type EditionsReviewPublicationStatus =
   | "ON_CHAIN_CONFIRMED"
   | "NOT_PUBLISHED"
@@ -35,4 +37,15 @@ export function canOpenEditionsReviewThread(
       entitlement.canonical &&
       !entitlement.refunded,
   );
+}
+
+export function deriveEditionsReviewThreadWriteState(input: {
+  canonical: boolean;
+  refunded: boolean;
+  entitlementStreamId: string;
+  currentStreamId: string;
+}): EditionsReviewThreadWriteState {
+  if (input.refunded) return "REFUNDED";
+  if (!input.canonical || input.entitlementStreamId !== input.currentStreamId) return "ORPHANED";
+  return "ACTIVE";
 }
