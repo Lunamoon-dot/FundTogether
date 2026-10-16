@@ -43,6 +43,29 @@ For V2, distinguish:
 
 > **Proposed V2 choice requiring user approval before money-related implementation:** activate *only after* `COMPLETED` to avoid an activation immediately preceding a refundable failed-release state. This intentionally differs from Editions V1, which currently grants PDF download in `RELEASED` and `COMPLETED`. Do not remove/retcon V1 access; create a new versioned V2 policy. If early content access during `RELEASED` is mandatory, explicitly design refundable activation and the consequences; do not silently treat it as equivalent.
 
+### 2.1.1 Flexible Delivery Commitment (proposed V2 policy)
+
+Delivery communication must distinguish the creator's estimate from the deadline that protects backer rights. The following policy is **PROPOSED / REQUIRES POLICY APPROVAL** and is not implemented by Editions V1 or by the Reward Pass contract yet.
+
+| Field / concept | Meaning | Financial effect |
+|---|---|---|
+| `fundingPeriod` | Fixed period in which pledges are accepted | Controls funding finalization only |
+| `estimatedDeliveryAt` | Creator's public best estimate; may move as production learns more | Never starts, extends or cancels a refund/challenge clock |
+| `committedDeliveryDeadline` | Frozen, backer-visible deadline agreed before pledges | Source for the versioned late-delivery/refund policy |
+| `extensionRequest` | A reasoned request to change the committed deadline | Requires the approved review/notification path; no silent database edit |
+| `activation` | Explicit Reward Pass action after the financial finality gate | Separate from delivery and claim; no activation expiry in the pilot |
+
+Required behavior for a V2 implementation:
+
+- Show both the estimated date and committed deadline before a backer pledges. Explain that the estimate is informational while the deadline is the rights-protection boundary.
+- Allow an ETA update to create an append-only public history entry with the previous value, new value, actor, timestamp and reason. An ETA update must not rewrite the frozen deadline or erase an earlier disclosure.
+- A deadline change must be an explicit `ExtensionRequest` with a versioned reason, Resolver decision, backer notification and an effective deadline. The implementation must preserve any refund, challenge or claim rights already earned under the prior deadline; it must not shorten a deadline retroactively.
+- Do not silently finalize a numeric extension limit such as “one extension up to 30 days”. That limit remains an open policy decision until separately approved and encoded in the contract/indexer tests.
+- Tell backers about the ETA before pledge, show ETA history and any pending/approved extension during production, and show claim/activation availability only when the corresponding canonical gate is satisfied.
+- `estimatedDeliveryAt` does not activate an NFT, grant a download, prove delivery or make a backer accept the work. Claim, delivery release and Reward Pass activation remain separate state transitions.
+
+The V1 bridge is deliberately narrow: existing Editions keeps its frozen `releaseWindow.end` as the on-chain `releaseDeadline` used by the current refund policy. V1 may display an advisory ETA, but it must not acquire V2 NFT activation or mutable post-pledge deadline extensions. A V2 campaign/deployment must introduce the delivery commitment and extension history as a new versioned policy rather than changing historical V1 snapshots.
+
 ### 2.2 Individual pass state machine
 
 ```text

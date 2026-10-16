@@ -1,15 +1,19 @@
-import { AccountAccess } from '../auth/AccountAccess';
-import { OrganizationsPage } from '../organizations/OrganizationsPage';
-import { OrganizationProfile } from '../organizations/OrganizationProfile';
-import { RewardPublicFeed } from '../reward/RewardPublicFeed';
-import { RewardPublicCampaign } from '../reward/RewardPublicCampaign';
-import { RewardCreatorStudio } from '../reward/RewardCreatorStudio';
-import { RewardBackerEntitlements } from '../reward/RewardBackerEntitlements';
-import { RewardResolverConsole } from '../reward/RewardResolverConsole';
-import { RewardAdminConsole } from '../reward/RewardAdminConsole';
-import { EditionsCampaign, EditionsCommunityReviewPage, EditionsFeed, EditionsLibrary } from '../reward/EditionsCampaign';
+import { lazy, Suspense } from 'react';
+import { EditionsCommunityReviewPage, EditionsFeed } from '../reward/EditionsFeed';
 import { EditionAppShell, type PublicAreaProps } from './EditionAppShell';
 import './PublicArea.css';
+
+const AccountAccess = lazy(() => import('../auth/AccountAccess').then(module => ({ default: module.AccountAccess })));
+const EditionsCampaign = lazy(() => import('../reward/EditionsCampaign').then(module => ({ default: module.EditionsCampaign })));
+const EditionsLibrary = lazy(() => import('../reward/EditionsCampaign').then(module => ({ default: module.EditionsLibrary })));
+const OrganizationsPage = lazy(() => import('../organizations/OrganizationsPage').then(module => ({ default: module.OrganizationsPage })));
+const OrganizationProfile = lazy(() => import('../organizations/OrganizationProfile').then(module => ({ default: module.OrganizationProfile })));
+const RewardPublicCampaign = lazy(() => import('../reward/RewardPublicCampaign').then(module => ({ default: module.RewardPublicCampaign })));
+const RewardCreatorStudio = lazy(() => import('../reward/RewardCreatorStudio').then(module => ({ default: module.RewardCreatorStudio })));
+const RewardCreatorProfile = lazy(() => import('../reward/RewardCreatorProfile').then(module => ({ default: module.RewardCreatorProfile })));
+const RewardBackerEntitlements = lazy(() => import('../reward/RewardBackerEntitlements').then(module => ({ default: module.RewardBackerEntitlements })));
+const RewardResolverConsole = lazy(() => import('../reward/RewardResolverConsole').then(module => ({ default: module.RewardResolverConsole })));
+const RewardAdminConsole = lazy(() => import('../reward/RewardAdminConsole').then(module => ({ default: module.RewardAdminConsole })));
 
 export type { PublicAreaProps };
 
@@ -21,11 +25,12 @@ export function PublicArea(props: PublicAreaProps) {
   const rewardDetail = /^\/reward\/campaigns\/([^/]+)$/.exec(path);
   const isRewardCreatorStudio = path === '/reward/creator';
   const isRewardCreatorDraft = path === '/reward/creator/draft' || path === '/reward/creator/new';
-  const isRewardCreator = isRewardCreatorStudio || isRewardCreatorDraft;
+  const isRewardCreatorProfile = path === '/reward/creator/profile';
+  const isRewardCreator = isRewardCreatorStudio || isRewardCreatorDraft || isRewardCreatorProfile;
   const isRewardMyRewards = path === '/reward/my-rewards';
   const isAdmin = path === '/admin' || path === '/reward/admin';
   const isRewardResolver = path === '/reward/resolver';
-  const edition = /^\/reward\/editions\/([^/]+)(?:\/(creator|resolver))?$/.exec(path);
+  const edition = /^\/reward\/editions\/([^/]+)(?:\/(creator|resolver)(?:\/(feedback))?)?$/.exec(path);
   const history = path === '/reward/history';
   const historicalRewards = path === '/reward/history/my-rewards';
 
@@ -37,6 +42,7 @@ export function PublicArea(props: PublicAreaProps) {
 
   return (
     <EditionAppShell {...props}>
+      <Suspense fallback={<p role="status" className="muted">Đang mở không gian làm việc…</p>}>
       {organizations && (
         <a className="public-back" href={organizationProfile ? '#/organizations' : '#/'}>
           {organizationProfile ? '← Tổ chức của tôi' : '← Về khu vực người dùng'}
@@ -44,20 +50,23 @@ export function PublicArea(props: PublicAreaProps) {
       )}
 
       {/* Reward Crowdfunding Views */}
-      {isRewardFeed && <EditionsFeed />}
+      {(isRewardFeed || history) && (
+        <EditionsFeed key={history ? 'funded' : 'feed'} initialFilter={history ? 'funded' : 'all'} />
+      )}
       {isRewardCommunityReview && <EditionsCommunityReviewPage />}
-      {history && <RewardPublicFeed />}
       {edition && (
         <EditionsCampaign
-          key={`${edition[1]}:${session?.userId ?? 'public'}:${edition[2] ?? 'public'}`}
+          key={`${edition[1]}:${session?.userId ?? 'public'}:${edition[2] ?? 'public'}:${edition[3] ?? 'overview'}`}
           id={edition[1]}
           session={session}
           mode={(edition[2] as 'creator' | 'resolver') || 'public'}
+          initialTab={edition[3] === 'feedback' ? 'activity' : 'overview'}
         />
       )}
       {historicalRewards && session && <RewardBackerEntitlements key={session.userId} />}
       {rewardDetail && <RewardPublicCampaign key={rewardDetail[1]} campaignId={rewardDetail[1]} />}
-      {isRewardCreator && session && <RewardCreatorStudio key={session.userId} userId={session.userId} path={path} />}
+      {(isRewardCreatorStudio || isRewardCreatorDraft) && session && <RewardCreatorStudio key={session.userId} userId={session.userId} path={path} />}
+      {isRewardCreatorProfile && session && <RewardCreatorProfile key={session.userId} userId={session.userId} />}
       {isRewardMyRewards && (
         session ? (
           <EditionsLibrary key={session.userId} userId={session.userId} />
@@ -154,6 +163,7 @@ export function PublicArea(props: PublicAreaProps) {
             </a>
           </section>
         )}
+      </Suspense>
     </EditionAppShell>
   );
 }

@@ -44,6 +44,11 @@ export class RewardEditionsController {
   @Post("campaigns/:id/submit-review")
   submit(@Param("id", new ParseUUIDPipe()) id: string, @Req() req: Request, @Body() body: unknown) { return this.editions.submit(id, req.account!.userId, body); }
 
+  @Post("campaigns/:id/open-community-review")
+  openCommunityReview(@Param("id", new ParseUUIDPipe()) id: string, @Req() req: Request) {
+    return this.editions.openCommunityReview(id, req.account!.userId);
+  }
+
   @Post("campaigns/:id/review")
   review(@Param("id", new ParseUUIDPipe()) id: string, @Req() req: Request, @Body() body: unknown) { return this.editions.review(id, req.account!.userId, body); }
 }
@@ -54,7 +59,7 @@ export class RewardEditionsPreviewController {
 
   private async withSurface(id: string) {
     const item = await this.editions.publicPreview(id);
-    if (item.status === "UNDER_REVIEW") return { ...item, surface: "REVIEW" as const };
+    if (item.status === "COMMUNITY_REVIEW") return { ...item, surface: "REVIEW" as const };
     const states = await this.publication.canonicalCampaignStates();
     return { ...item, surface: states.get(id) === 0 ? "FUNDING" as const : "ACTIVATION_PENDING" as const };
   }
@@ -64,7 +69,7 @@ export class RewardEditionsPreviewController {
 
   @Get("review")
   async review() {
-    return (await this.editions.publicList("UNDER_REVIEW")).map(item => ({ ...item, surface: "REVIEW" as const }));
+    return (await this.editions.publicList("COMMUNITY_REVIEW")).map(item => ({ ...item, surface: "REVIEW" as const }));
   }
 
   @Get("activation")

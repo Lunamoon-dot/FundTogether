@@ -39,36 +39,7 @@ export function RewardPublicFeed() {
 
   return (
     <div className="reward-container">
-      <header className="reward-hero">
-        <span className="reward-badge-category">Reward · Hồ sơ lịch sử</span>
-        <h1 className="reward-hero-title">Campaign Reward đã tồn tại</h1>
-        <p className="reward-hero-pitch">
-          Khu vực hỗ trợ campaign và quyền lợi từ hợp đồng Reward cũ. Các quy tắc dưới đây thuộc phiên bản lịch sử; Editions mới dùng một PDF và chính sách escrow riêng.
-        </p>
-        <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
-          <a className="button button--primary" href="#/reward">Về FundTogether Editions</a>
-          <a className="button button--secondary" style={{ color: '#fff', borderColor: '#475569' }} href="#/reward/history/my-rewards">Quyền lợi lịch sử của tôi</a>
-        </div>
-      </header>
-
-      {/* Security explanation */}
-      <section className="reward-security-banner">
-        <strong>Cơ chế bảo vệ Backer & Tác giả (Dual-Exposure Guard):</strong>
-        <div className="reward-security-grid">
-          <div className="reward-security-item">
-            <strong>1. Trần cọc in ấn 50%</strong>
-            <p>Escrow chỉ giải ngân tối đa 50% mục tiêu cho đợt in ấn đầu tiên, tránh thất thoát vốn.</p>
-          </div>
-          <div className="reward-security-item">
-            <strong>2. Nghiệm thu sản xuất độc lập</strong>
-            <p>Quà tặng vật lý và mã đọc số chỉ mở sau khi Resolver xác thực mẫu in thực tế đạt chuẩn.</p>
-          </div>
-          <div className="reward-security-item">
-            <strong>3. Hoàn tiền minh bạch</strong>
-            <p>100% hoàn tiền nếu không đạt goal; hoàn tiền theo tỷ lệ phần dư Escrow nếu dừng sản xuất.</p>
-          </div>
-        </div>
-      </section>
+      <a className="public-back" href="#/reward" style={{ margin: '16px 0 24px', display: 'inline-block' }}>← Về trang Editions</a>
 
       {/* Category filters */}
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>

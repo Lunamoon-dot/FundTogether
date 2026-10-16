@@ -30,3 +30,12 @@ test('preserves technical duration bounds without fractional days', () => {
   assert.equal(buildEditionsDraft({ ...fields, durationDays: 1 }).fundingDuration, 86400)
   assert.equal(buildEditionsDraft({ ...fields, durationDays: 60 }).fundingDuration, 5184000)
 })
+
+test('rejects draft text that is shorter than the server contract before submit', () => {
+  assert.throws(() => buildEditionsDraft({ ...fields, story: 'Too short' }), /Cốt truyện.*20 ký tự/)
+})
+
+test('keeps an advisory estimated delivery date in the draft when provided', () => {
+  const draft = buildEditionsDraft({ ...fields, estimatedDeliveryAt: '2026-12-01T00:00:00.000Z' })
+  assert.equal(draft.tiers[0].estimatedDeliveryAt, '2026-12-01T00:00:00.000Z')
+})

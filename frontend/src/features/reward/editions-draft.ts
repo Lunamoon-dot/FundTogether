@@ -1,6 +1,6 @@
 import type { CreateRewardCampaignInput } from '../../lib/api/reward';
 
-interface EditionsDraftFields {
+export interface EditionsDraftFields {
   title: string;
   pitch: string;
   story: string;
@@ -9,6 +9,23 @@ interface EditionsDraftFields {
   price: string;
   rewardTitle: string;
   rewardDescription: string;
+  estimatedDeliveryAt?: string;
+}
+
+export type EditionsDraftField = 'title' | 'pitch' | 'story' | 'rewardTitle' | 'rewardDescription' | 'durationDays';
+export type EditionsDraftErrors = Partial<Record<EditionsDraftField, string>>;
+
+export function validateEditionsDraft(fields: EditionsDraftFields): EditionsDraftErrors {
+  const errors: EditionsDraftErrors = {};
+  if (fields.title.trim().length < 5) errors.title = 'Tên dự án phải có ít nhất 5 ký tự.';
+  if (fields.pitch.trim().length < 10) errors.pitch = 'Lời giới thiệu phải có ít nhất 10 ký tự.';
+  if (fields.story.trim().length < 20) errors.story = 'Cốt truyện & kế hoạch sản xuất phải có ít nhất 20 ký tự.';
+  if (fields.rewardTitle.trim().length < 3) errors.rewardTitle = 'Tên ấn phẩm phải có ít nhất 3 ký tự.';
+  if (fields.rewardDescription.trim().length < 5) errors.rewardDescription = 'Nội dung PDF phải có ít nhất 5 ký tự.';
+  if (!Number.isInteger(fields.durationDays) || fields.durationDays < 1 || fields.durationDays > 60) {
+    errors.durationDays = 'Thời hạn phải là số nguyên từ 1 đến 60 ngày.';
+  }
+  return errors;
 }
 
 function mockUsdcUnits(value: string): string {
@@ -22,9 +39,8 @@ function mockUsdcUnits(value: string): string {
 }
 
 export function buildEditionsDraft(fields: EditionsDraftFields): CreateRewardCampaignInput {
-  if (!Number.isInteger(fields.durationDays) || fields.durationDays < 1 || fields.durationDays > 60) {
-    throw new Error('Thời hạn phải là số nguyên từ 1 đến 60 ngày.');
-  }
+  const firstError = Object.values(validateEditionsDraft(fields))[0];
+  if (firstError) throw new Error(firstError);
   return {
     mode: 'REWARD_V1',
     policyVersion: 'reward-comic-download-mvp-v1',
@@ -43,6 +59,7 @@ export function buildEditionsDraft(fields: EditionsDraftFields): CreateRewardCam
         type: 'DIGITAL_DOWNLOAD', format: 'PDF',
         title: fields.rewardTitle, description: fields.rewardDescription,
       }],
+      ...(fields.estimatedDeliveryAt ? { estimatedDeliveryAt: fields.estimatedDeliveryAt } : {}),
     }],
   };
 }

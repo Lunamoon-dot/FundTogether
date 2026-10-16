@@ -45,7 +45,6 @@ export const rewardCampaigns = pgTable("reward_campaigns", {
   status: varchar("status", { length: 32 }).notNull().default("DRAFT"),
   frozenAt: timestamp("frozen_at", { withTimezone: true }),
   reviewStartedAt: timestamp("review_started_at", { withTimezone: true }),
-  reviewDeadlineAt: timestamp("review_deadline_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, table => [
@@ -54,7 +53,7 @@ export const rewardCampaigns = pgTable("reward_campaigns", {
   check("reward_campaign_goal_check", sql`${table.goal} > 0`),
   check("reward_campaign_revision_check", sql`${table.revision} >= 0`),
   check("reward_campaign_policy_check", sql`${table.policyHash} IS NOT NULL OR (${table.draftConfig} IS NOT NULL AND ${table.category} = 'COMICS_ARTBOOK')`),
-  check("reward_campaign_status_check", sql`${table.status} IN ('DRAFT', 'FROZEN', 'UNDER_REVIEW', 'APPROVED', 'PUBLISHED', 'ACTIVE', 'PRODUCTION_VERIFIED', 'FULFILLMENT_COMPLETE', 'COMPLETED', 'STOPPED')`),
+  check("reward_campaign_status_check", sql`${table.status} IN ('DRAFT', 'FROZEN', 'UNDER_REVIEW', 'UNDER_REVIEW_PRIVATE', 'COMMUNITY_REVIEW', 'APPROVED', 'PUBLISHED', 'ACTIVE', 'PRODUCTION_VERIFIED', 'FULFILLMENT_COMPLETE', 'COMPLETED', 'STOPPED')`),
 ]);
 
 export const rewardReviews = pgTable("reward_reviews", {

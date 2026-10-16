@@ -1,11 +1,25 @@
 import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { DRIZZLE_DB } from "../database/database.constants";
 import * as schema from "../database/schema";
 import { chainEvents, editionsChainCampaigns, platformRoles, rewardCampaigns, rewardCreatorProfiles, rewardReviews, walletLinks } from "../database/schema";
 import { editionsCommitment } from "./reward-editions-commitment";
 import { RewardEditionsIndexerService } from "./reward-editions-indexer.service";
+
+export function deriveEditionsPublication<TBinding extends { onchainCampaignId: string; canonical: boolean; snapshot: { state: number } },
+  TEvent extends { transactionHash: string; args: Record<string, unknown>; canonical: boolean }>(bindings: TBinding[], createdEvents: TEvent[]) {
+  const canonicalBindings = bindings.filter(binding => binding.canonical);
+  const binding = canonicalBindings.length === 1 ? canonicalBindings[0] : undefined;
+  const event = binding
+    ? createdEvents.find(item => item.canonical && String(item.args.campaignId) === binding.onchainCampaignId)
+    : createdEvents.find(item => bindings.some(candidate => String(item.args.campaignId) === candidate.onchainCampaignId));
+  return {
+    binding,
+    publicationStatus: binding ? "ON_CHAIN_CONFIRMED" as const : bindings.length ? "ORPHANED" as const : "NOT_PUBLISHED" as const,
+    bindingTransactionHash: event?.transactionHash ?? null,
+  };
+}
 
 @Injectable()
 export class RewardEditionsPublicationService {
@@ -17,6 +31,48 @@ export class RewardEditionsPublicationService {
       .from(editionsChainCampaigns)
       .where(and(eq(editionsChainCampaigns.streamId, this.indexer.streamId()), eq(editionsChainCampaigns.canonical, true)));
     return new Map(bindings.map(item => [item.campaignId, item.snapshot.state]));
+  }
+
+  async operations(scope: "creator" | "resolver" | "admin", userId: string) {
+    if (scope !== "creator") {
+      const [role] = await this.db.select().from(platformRoles).where(eq(platformRoles.userId, userId));
+      const requiredRole = scope === "admin" ? "ADMIN" : "RESOLVER";
+      if (!role?.roles.includes(requiredRole)) throw new ForbiddenException(`${requiredRole} required`);
+    }
+
+    await this.indexer.runOnce();
+    const campaigns = await this.db.select({
+      id: rewardCampaigns.id,
+      title: rewardCampaigns.title,
+      creatorUserId: rewardCampaigns.creatorUserId,
+      applicationStatus: rewardCampaigns.status,
+    }).from(rewardCampaigns).where(scope === "creator"
+      ? and(eq(rewardCampaigns.category, "COMICS_ARTBOOK"), eq(rewardCampaigns.creatorUserId, userId))
+      : eq(rewardCampaigns.category, "COMICS_ARTBOOK"));
+    if (campaigns.length === 0) return [];
+
+    const streamId = this.indexer.streamId();
+    const [bindings, createdEvents] = await Promise.all([
+      this.db.select().from(editionsChainCampaigns).where(eq(editionsChainCampaigns.streamId, streamId)),
+      this.db.select().from(chainEvents).where(and(eq(chainEvents.streamId, streamId), eq(chainEvents.eventName, "CampaignCreated")))
+        .orderBy(desc(chainEvents.blockNumber), desc(chainEvents.logIndex)),
+    ]);
+
+    return campaigns.map(campaign => {
+      const campaignBindings = bindings.filter(binding => binding.campaignId === campaign.id);
+      const publication = deriveEditionsPublication(campaignBindings, createdEvents);
+      return {
+        campaignId: campaign.id,
+        title: campaign.title,
+        creatorUserId: campaign.creatorUserId,
+        applicationStatus: campaign.applicationStatus,
+        publicationStatus: publication.publicationStatus,
+        onchainCampaignId: publication.binding?.onchainCampaignId ?? null,
+        contractState: publication.binding?.snapshot.state ?? null,
+        snapshot: publication.binding?.snapshot ?? null,
+        bindingTransactionHash: publication.bindingTransactionHash,
+      };
+    });
   }
 
   async terms(id: string, userId: string) {
@@ -43,9 +99,11 @@ export class RewardEditionsPublicationService {
     if (!Number.isSafeInteger(releaseAt) || releaseAt % 1000 !== 0 || BigInt(releaseAt / 1000) <= now + BigInt(frozen.config.fundingDuration))
       throw new ConflictException("Release deadline must be after the funding period on the current local chain clock");
     if (BigInt(frozen.config.tiers[0].price) > BigInt(frozen.config.goal)) throw new ConflictException("Standard price cannot exceed goal under the approved local policy");
+    const onchainApproval = await this.indexer.isTermsApproved(frozen.payoutWallet.address, campaign.commitmentHash,
+      BigInt(frozen.config.goal), BigInt(frozen.config.tiers[0].price), BigInt(frozen.config.fundingDuration), BigInt(releaseAt / 1000));
     return { deployment, creatorWallet: frozen.payoutWallet.address, commitmentHash: campaign.commitmentHash,
       goal: frozen.config.goal, price: frozen.config.tiers[0].price, fundingDuration: frozen.config.fundingDuration,
-      releaseDeadline: String(releaseAt / 1000), chainTimestamp: now.toString() };
+      releaseDeadline: String(releaseAt / 1000), chainTimestamp: now.toString(), onchainApproved: onchainApproval.approved };
   }
 
   async chainCampaign(id: string) {
@@ -53,8 +111,13 @@ export class RewardEditionsPublicationService {
     if (!campaign?.frozenSnapshot || campaign.category !== "COMICS_ARTBOOK") throw new NotFoundException("Approved Editions campaign not found");
     const deployment = await this.indexer.deployment();
     await this.indexer.runOnce();
+    const chainTimestamp = await this.indexer.chainTime();
     const bindings = await this.db.select().from(editionsChainCampaigns).where(and(eq(editionsChainCampaigns.campaignId, id), eq(editionsChainCampaigns.streamId, this.indexer.streamId())));
-    const binding = bindings.find(item => item.canonical);
+    const createdEvents = await this.db.select({ transactionHash: chainEvents.transactionHash, args: chainEvents.args, canonical: chainEvents.canonical })
+      .from(chainEvents).where(and(eq(chainEvents.streamId, this.indexer.streamId()), eq(chainEvents.eventName, "CampaignCreated")))
+      .orderBy(desc(chainEvents.blockNumber), desc(chainEvents.logIndex));
+    const publication = deriveEditionsPublication(bindings, createdEvents);
+    const binding = publication.binding;
     const challenges: { backer: string; evidenceHash: string; resolved: boolean; upheld: boolean | null; decisionHash: string | null }[] = [];
     if (binding) {
       const events = await this.db.select().from(chainEvents).where(and(eq(chainEvents.streamId, this.indexer.streamId()), eq(chainEvents.canonical, true)))
@@ -69,7 +132,8 @@ export class RewardEditionsPublicationService {
         }
       }
     }
-    return { deployment, status: binding ? "ON_CHAIN_CONFIRMED" : bindings.length ? "ORPHANED" : "NOT_PUBLISHED",
-      onchainCampaignId: binding?.onchainCampaignId ?? null, snapshot: binding?.snapshot ?? null, challenges };
+    return { deployment, chainTimestamp: chainTimestamp.toString(), status: publication.publicationStatus,
+      onchainCampaignId: binding?.onchainCampaignId ?? null, snapshot: binding?.snapshot ?? null,
+      bindingTransactionHash: publication.bindingTransactionHash, challenges };
   }
 }

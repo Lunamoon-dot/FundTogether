@@ -1,332 +1,213 @@
-# Core V2 — H1 Technical Architecture Blueprint, Interface Specification & Invariant Test Plan (Revised)
+# FundTogether Editions — H1 Technical Blueprint (Corrected)
 
-> **File:** `docs/reward/CORE_V2_H1_TECHNICAL_BLUEPRINT.md`  
-> **Date:** 2026-10-14  
-> **Status:** `REVISED_DRAFT` — Đã sửa đổi toàn bộ các lỗi logic, bảo toàn vốn, và mở rộng quy mô theo phản hồi chi tiết của người dùng.  
-> **Phạm vi H1:** Blueprint kiến trúc, Interface Solidity chuẩn mực, Ma trận trạng thái, và Kế hoạch kiểm thử Invariant.  
-> **Nguyên tắc an toàn:**  
-> - KHÔNG sửa đổi `FundTogetherEditions.sol` và các nghĩa vụ V1 hiện hành.  
-> - KHÔNG tự ý hardcode hoặc coi các tỷ lệ 25% per-request cap hay 24h pre-disbursement wait là chính sách mặc định.  
-> - CHƯA triển khai các hàm chuyển token thực tế khi các tham số FGATE bắt buộc chưa được ký duyệt.
+> **Legacy filename:** `CORE_V2_H1_TECHNICAL_BLUEPRINT.md` is retained so existing links do not break.
+>
+> **Status:** `ACTIVE_EDITIONS_DIRECTION`
+>
+> **Source of truth:** [research-direction.md](../research-direction.md), [PROJECT_OVERVIEW.md](../PROJECT_OVERVIEW.md), and [EDITIONS_LOCAL_FINANCIAL_POLICY_V1.md](./EDITIONS_LOCAL_FINANCIAL_POLICY_V1.md).
 
----
+## 1. Correction to the previous proposal
 
-## 1. Sửa đổi trọng yếu theo phản hồi của Người dùng (Changelog)
+The previous version described a progressive-advance crowdfunding system. That is
+not the current FundTogether product direction. It introduced `FundingRequest`,
+creator advances, expense reconciliation, outcome-exposure caps, continuous
+spending challenges, and a shared refund vault. Those features are deferred and
+must not be treated as approved Editions behavior.
 
-| Hạng mục | Lỗi ở bản thảo trước | Thiết kế đã sửa đổi chuẩn xác |
-|---|---|---|
-| **Phương trình bảo toàn vốn (Conservation)** | $R + U = P + F_{\text{main}} + E + V$ (sai khi có người rút tiền từ Vault vì $V$ giảm mà không có biến ghi nhận tiền đã ra khỏi Vault). | **$\mathbf{R} + \mathbf{U} = \mathbf{P} + \mathbf{F}_{\text{main}} + \mathbf{F}_{\text{vault}} + \mathbf{E} + \mathbf{V}_{\text{vault}}$**<br>Bảo toàn chính xác tuyệt đối ở mọi thời điểm, trước và sau khi Backer rút tiền từ Vault. |
-| **Thời gian giải ngân (FGATE-4)** | Tự ý thêm `PRE_DISBURSEMENT_WAIT_SECONDS = 86400` (chặn giải ngân 24h). | **BỎ HOÀN TOÀN rào cản 24h.**<br>Challenge hoạt động liên tục; 12h là Review Window sau khi nộp reconciliation. Giải ngân được phép thực hiện ngay khi được duyệt và không có challenge ở trạng thái `ADMITTED`. |
-| **Khả năng mở rộng của Refund Vault** | `sweepFromEscrow` nhận mảng `address[]` và `uint256[]`, có nguy cơ vượt gas limit khi hàng nghìn backer. | **Chuyển số dư O(1) Gas Scaling.**<br>Main Escrow chuyển số dư 1 lần kèm snapshot; Backer tự claim (pull-based) theo công thức tỷ lệ xác định mà không cần duyệt mảng trên chain. |
-| **Kiểm soát Outcome Exposure trước giải ngân** | Chỉ kiểm tra chi phí đã đối chiếu $AcceptedExpense \le 50\% \times R$. Nguy cơ Creator rút vốn mới rồi mới đối chiếu, làm tổng rủi ro vượt trần. | **Kiểm soát rủi ro kết hợp trước giải ngân:**<br>$RiskExposure = Unreconciled + UnverifiedExpense$<br>Điều kiện giải ngân khoản mới $\Delta P$:<br>**$RiskExposure + \Delta P \le 50\% \times R$** |
-| **Xử lý đồng thời nhiều Challenge** | Dùng cờ đơn `bool isChallenged` (không thể quản lý nhiều case cho 1 request). | **Scoped Freeze Registry:**<br>Lưu trữ `admittedCount` theo từng `targetKey = keccak256(campaignId, targetType, targetId)`. Chỉ freeze mục tiêu khi `admittedCount > 0`. |
-| **Định danh trong Shared Vault** | Chỉ dùng `campaignId` đơn lẻ (nguy cơ va chạm giữa các deployment/escrow/token). | **Composite Key định danh duy nhất:**<br>`campaignKey = keccak256(abi.encode(sourceEscrow, token, campaignId, roundId))`. Chỉ cho phép `sourceEscrow` đã đăng ký được sweep. |
-| **Trạng thái `FINANCIALLY_COMPLETE`** | Định nghĩa ledger bằng 0 (gây nhầm lẫn với số dư trong Vault). | **Phân biệt rõ ràng:**<br>Main Escrow đạt `FINANCIALLY_COMPLETE` khi mọi request/refund/challenge obligation tại Escrow đã xử lý xong và chỉ còn creator remainder đủ điều kiện payout. `claimFinalPayout()` chuyển sang `COMPLETED` và đưa $E$ về 0. Nghĩa vụ tại Vault ($V_{\text{vault}} > 0$) vẫn tồn tại độc lập cho Backer claim. |
+H1 remains the narrow FundTogether Editions pilot:
 
----
+- one `COMICS_ARTBOOK` campaign;
+- one `STANDARD` tier;
+- one fixed-price `DIGITAL_DOWNLOAD` PDF entitlement;
+- local MockUSDC on chain `31339`;
+- full pledge custody until payout or refund;
+- no creator advance, partial disbursement, inventory, shipping, or NFT flow.
 
-## 2. Kiến trúc hai Hợp đồng V2
+`FundTogetherEditions.sol` remains the financial contract for this scope. H1 does
+not add `FundTogetherProgressiveEscrow.sol` or
+`FundTogetherRefundVault.sol`, and does not modify existing V1 obligations.
 
-```
-                       +---------------------------------------+
-                       |        MockUSDC (ERC-20, 6 dec)       |
-                       +---------------------------------------+
-                                   ^               ^
-                         transfers |               | transfers
-                                   v               v
- +------------------------------------+         +------------------------------------+
- | FundTogetherProgressiveEscrow.sol  |         |    FundTogetherRefundVault.sol     |
- | (Main Campaign & Request Escrow)   |         |      (Shared Multi-Campaign)       |
- |                                    |  sweep  |                                    |
- | - Chu kỳ gọi vốn (ACTIVE)          | tokens  | - Isolated ledgers theo            |
- | - Pipeline 1-slot FundingRequest   |-------->|   (sourceEscrow, token, id, round) |
- | - Giải phóng slot tại DISBURSED    |         | - Chuyển vốn O(1) gas              |
- | - Continuous Challenge Engine      |         | - Pull-based pro-rata claims       |
- | - Scoped Freeze (ADMITTED state)   |         | - Quyền claim vĩnh viễn            |
- | - Bắt buộc: RiskExposure+dP <= 50% |         | - Hạch toán tách biệt Dust         |
- +------------------------------------+         +------------------------------------+
-                   |                                               |
-                   +-----------------------+-----------------------+
-                                           | Canonical Events
-                                           v
-                          +---------------------------------+
-                          |    Idempotent Event Indexer     |
-                          |    (txHash, logIndex dedup)     |
-                          +---------------------------------+
-                                           |
-                                           v
-                          +---------------------------------+
-                          |     PostgreSQL Projections      |
-                          |   (Audit Dashboard công khai)   |
-                          +---------------------------------+
+## 2. Current architecture
+
+```text
+React Editions UI
+    -> NestJS Reward API
+        -> PostgreSQL metadata and indexed projections
+        -> MinIO private evidence and final PDF
+        -> FundTogetherEditions.sol on local Anvil
+            -> canonical events
+                -> idempotent indexer
+                    -> PostgreSQL projection and public audit views
 ```
 
----
+Blockchain is the source of truth for pledge, refund, dispute, and payout
+transitions. A wallet-submitted transaction is not treated as complete until the
+canonical receipt and idempotent indexer projection exist.
 
-## 3. Toán học Bảo toàn Vốn và Các Invariants
+### Publication authorization: current H1 flow and deferred EIP-712 option
 
-### 3.1 Phương trình Bảo toàn Tuyệt đối (Conservation Invariant)
+The current H1 deployment separates Resolver authorization from Creator campaign
+creation:
 
-Tại mọi block snapshot và sau bất kỳ giao dịch nào trên toàn hệ thống:
-
-$$\mathbf{R} + \mathbf{U} = \mathbf{P} + \mathbf{F}_{\text{main}} + \mathbf{F}_{\text{vault}} + \mathbf{E} + \mathbf{V}_{\text{vault}}$$
-
-Trong đó:
-- $\mathbf{R}$: Tổng vốn huy động được xác nhận tại thời điểm kết thúc funding (`FundingFinalized`).
-- $\mathbf{U}$: Tổng số token thực tế Creator đã hoàn trả về Main Escrow hoặc nộp bổ sung vào Vault (`returnUnused` / `receiveSupplement`).
-- $\mathbf{P}$: Tổng số token thực tế đã giải ngân chuyển ra ví Creator (`disburseFunds`).
-- $\mathbf{F}_{\text{main}}$: Tổng số token Backer đã rút trong Main Refund Round 7 ngày tại Main Escrow (`claimRefund`).
-- $\mathbf{F}_{\text{vault}}$: Tổng số token Backer đã rút từ Shared Refund Vault (`claimFromVault`).
-- $\mathbf{E}$: Số dư token thuộc campaign đang nằm trong Main Escrow (ledger phân vùng, không lấy raw `balanceOf` nếu nhiều campaign dùng chung contract).
-- $\mathbf{V}_{\text{vault}}$: Số dư token thuộc campaign đang nằm trong Shared Refund Vault theo isolated ledger, gồm unclaimed allocations và dust; không phải tổng raw `balanceOf(vault)`.
-
-#### Bảng ma trận biến thiên trạng thái (Conservation Delta Matrix):
-
-| Giao dịch | $\Delta R$ | $\Delta U$ | $\Delta P$ | $\Delta F_{\text{main}}$ | $\Delta F_{\text{vault}}$ | $\Delta E$ | $\Delta V_{\text{vault}}$ | $\Delta \text{Left} - \Delta \text{Right}$ |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **Pledge** (giai đoạn funding) | $+c_i$ | $0$ | $0$ | $0$ | $0$ | $+c_i$ | $0$ | $c_i - c_i = 0$ ✅ |
-| **Disburse** (giải ngân cho Creator) | $0$ | $0$ | $+d$ | $0$ | $0$ | $-d$ | $0$ | $0 - (d - d) = 0$ ✅ |
-| **Return Unused** (trả về Escrow) | $0$ | $+u$ | $0$ | $0$ | $0$ | $+u$ | $0$ | $u - u = 0$ ✅ |
-| **Claim Main Refund** | $0$ | $0$ | $0$ | $+f_m$ | $0$ | $-f_m$ | $0$ | $0 - (f_m - f_m) = 0$ ✅ |
-| **Sweep to Vault** (sau 7 ngày) | $0$ | $0$ | $0$ | $0$ | $0$ | $-s$ | $+s$ | $0 - (-s + s) = 0$ ✅ |
-| **Claim from Vault** | $0$ | $0$ | $0$ | $0$ | $+f_v$ | $0$ | $-f_v$ | $0 - (f_v - f_v) = 0$ ✅ |
-| **Late Return to Vault** | $0$ | $+u_l$ | $0$ | $0$ | $0$ | $0$ | $+u_l$ | $u_l - u_l = 0$ ✅ |
-
----
-
-### 3.2 Phân vùng Vốn (Custody Partitions)
-
-1. **Tại Main Escrow:**
-   $$\mathbf{E} = \text{availableForNewPayout} + \mathbf{Q} + \mathbf{L}$$
-   - $\mathbf{Q} \ge 0$: Tổng vốn đã phê duyệt và đặt trước (`RESERVED`), sẵn sàng giải ngân.
-   - $\mathbf{L} \ge 0$: Quỹ refund vòng chính được snapshot tại thời điểm `WIND_DOWN` trước khi sweep.
-   - $\text{availableForNewPayout} \ge 0$: Vốn tự do khả dụng.
-
-2. **Tại Shared Refund Vault:**
-   $$\mathbf{V}_{\text{vault}} = \text{totalSwept} + \text{totalSupplements} - \text{totalClaimed}$$
-   - `getIsolatedBalance(campaignKey)` là custody source of truth; tổng raw `balanceOf(vault)` chỉ là tổng của các isolated ledgers.
-   - Quyền claim của từng backer được tính lazy bằng `floor()`. Phần dư làm tròn không được giả định là đã phân bổ và không được dùng để giảm $\mathbf{V}_{\text{vault}}$.
-   - `dustBalance` chỉ là nhãn kế toán khi contract có cơ chế bounded chứng minh được; với quyền claim vô thời hạn, dust không được sweep, redirect hoặc tự động cấp cho bất kỳ ai.
-
----
-
-### 3.3 Công thức Kiểm soát Rủi ro 50% Outcome Exposure Trước Giải Ngân
-
-Để ngăn chặn kịch bản Creator rút vốn mới rồi mới đối chiếu làm thất thoát vốn Backer:
-
-1. **Biến số rủi ro:**
-   - $Unreconciled$: Vốn đã giải ngân nhưng chưa có chứng từ được Resolver chấp nhận:
-     $$Unreconciled = \sum_{req} \left( \text{disbursed}(req) - \text{returned}(req) - \text{acceptedExpense}(req) \right)$$
-   - $UnverifiedExpense$: Chi phí đã được Resolver chấp nhận nhưng deliverable tương ứng chưa được nghiệm thu:
-     $$UnverifiedExpense = \sum_{req} \text{acceptedExpense}(req) \quad [\text{deliverable chưa VERIFIED}]$$
-
-2. **Tổng vốn đang chịu rủi ro không có kết quả nghiệm thu (Risk Exposure):**
-   $$RiskExposure = Unreconciled + UnverifiedExpense$$
-
-3. **Điều kiện tiên quyết để giải ngân khoản mới $\Delta P$:**
-   $$\boxed{RiskExposure + \Delta P \le \text{OUTCOME\_CAP\_BPS} \times R / 10\,000}$$
-   *(Với $\text{OUTCOME\_CAP\_BPS} = 5000$, tương đương 50% của $R$).*
-
----
-
-## 4. Đặc tả Cơ chế Giám sát Liên tục (Continuous Challenge) & Scoped Freeze
-
-### 4.1 Bốn trạng thái của Challenge
-
-```
-[Backer gửi đơn + hash bằng chứng]
-              │
-              v
-        [ SUBMITTED ]  <─── KHÔNG freeze bất kỳ hoạt động nào; chỉ ghi nhận hồ sơ
-              │
-    ┌─────────┴─────────┐
-    │ (Resolver duyệt)  │ (Resolver từ chối thụ lý)
-    v                   v
-[ ADMITTED ]      [ DISMISSED ]  <─── Không freeze; đóng case
-    │
-    ├───> KÍCH HOẠT SCOPED FREEZE TRÊN MỤC TIÊU CỤ THỂ
-    │     (Ví dụ: Request #1 bị freeze; Request #2 vẫn xử lý bình thường nếu đủ hạn mức)
-    │
-    ├─── [Creator nộp giải trình / khắc phục]
-    │
-    ┌───┴───┐
-    v       v
-[ UPHELD ] [ DISMISSED ]
-    │            │
-    │            └─── Dỡ bỏ Scoped Freeze; phục hồi trạng thái bình thường
-    v
-Chế tài: Điều chỉnh giảm chi phí, yêu cầu nộp trả vốn, hoặc kích hoạt Wind-Down nếu nghiêm trọng.
+```text
+Primary Resolver → approveCampaign(exact terms)
+  → approvedTerms[termsHash] = true
+Creator → createCampaign(exact terms)
+  → consumes the approval and emits CampaignCreated
 ```
 
-### 4.2 Cơ chế Scoped Freeze Registry đa nhiệm (Challenge Concurrency)
+The database `APPROVED` status is an off-chain review decision. It is not proof
+that the contract has an approved terms hash. The Creator transaction is allowed
+only after the Primary Resolver approval is mined and the UI/backend has read the
+canonical `approvedTerms` value. The backend must not custody or use the
+Resolver's private key to automate this signature.
 
-Không dùng biến cờ boolean đơn giản `bool isChallenged`. Hợp đồng sử dụng registry theo dõi số lượng case đang thụ lý:
+As a post-MVP UX improvement, a separately versioned contract may support an
+EIP-712 typed-data Resolver signature submitted by the Creator through a
+`createCampaignWithApproval` function. The signed payload must bind the Creator,
+commitment, all campaign terms, `chainId`, `verifyingContract`, nonce and expiry;
+the contract must recover the configured Resolver and reject replayed or expired
+signatures. This option is documentation-only and is not part of the current H1
+ABI, deployment, or acceptance criteria.
 
-```solidity
-// Hash định danh mục tiêu: campaign phải nằm trong domain để tránh cross-campaign freeze.
-mapping(bytes32 => uint256) public admittedChallengesCount;
+## 3. Financial state machine
 
-function getTargetKey(uint256 campaignId, ChallengeTargetType targetType, uint256 targetId) public pure returns (bytes32) {
-    return keccak256(abi.encode(campaignId, targetType, targetId));
-}
+```text
+FUNDING
+   | funding deadline reached and raised >= goal
+   v
+ACTIVE
+   | production evidence accepted
+   v
+RELEASE_REVIEW
+   | final PDF and release evidence accepted
+   v
+RELEASED
+   | 7-day challenge window expires with no open dispute
+   v
+COMPLETED
+   | payout of the remaining escrow to the frozen creator wallet
 
-function isTargetFrozen(uint256 campaignId, ChallengeTargetType targetType, uint256 targetId) public view returns (bool) {
-    bytes32 targetKey = getTargetKey(campaignId, targetType, targetId);
-    return admittedChallengesCount[targetKey] > 0;
-}
+Any eligible failure, cancellation, or upheld release challenge
+   -> REFUNDING
 ```
 
-- Chỉ `SUBMITTED -> ADMITTED` mới được tăng count; chỉ `ADMITTED -> UPHELD/DISMISSED` mới được giảm count. Mọi transition lặp hoặc resolve case chưa admitted phải revert.
-- Khi một challenge chuyển sang `ADMITTED`: `admittedChallengesCount[targetKey]++`. Mục tiêu bị đóng băng ngay lập tức.
-- Khi challenge được giải quyết (`UPHELD` hoặc `DISMISSED`): `admittedChallengesCount[targetKey]--`. Mục tiêu chỉ được rã đông khi không còn case nào ở trạng thái `ADMITTED` nhắm vào nó.
+Required money-flow rules:
 
-### 4.3 Phân định Review Window 12 giờ
+1. Each backer may make one fixed-price pledge per campaign.
+2. The contract holds the full pledge. No funds are sent to the creator before
+   the accepted PDF release reaches the payout condition.
+3. Refund claims are full fixed-price claims from the intact campaign escrow.
+4. Payout and refund claims update state before the guarded token transfer; a
+   failed transfer reverts and a successful claim cannot repeat.
+5. Download access and optional backer confirmation are separate from payout and
+   do not manufacture financial state.
 
-- **Ý nghĩa thực tế:** Khi Creator nộp hồ sơ reconciliation kèm chứng từ, mở ra một khoảng thời gian 12 giờ gọi là **Review Window**.
-- **Tính chất:**
-  1. Trong 12h này, cộng đồng Backer và Resolver có thời gian đối chiếu công khai các chứng từ.
-  2. Hết 12h **KHÔNG ĐỒNG NGHĨA** với việc chứng từ tự động được coi là hợp lệ (không auto-settle).
-  3. Hết 12h **KHÔNG PHẢI** là hạn chót của quyền challenge. Backer vẫn có quyền nộp challenge sau 12h tại bất kỳ thời điểm nào suốt campaign.
-  4. Sau khi request đã ở trạng thái `DISBURSED`, slot pipeline của Creator đã trống. Creator hoàn toàn có quyền soạn và nộp Funding Request mới mà không bị chặn bởi việc reconciliation của request trước đang trong 12h Review Window (miễn là thỏa mãn điều kiện $RiskExposure + \Delta P \le 50\% \times R$).
+## 4. Review and challenge policy
 
----
+Challenge is **not continuous across spending**, because Editions has no spending
+pipeline. The current release challenge flow is:
 
-## 5. Đặc tả Shared Refund Vault có Khả năng Mở rộng Cao (O(1) Gas Scaling)
+- Resolver reviews the frozen campaign terms, production evidence, and final PDF.
+- A backer may challenge an accepted release during the 7-day challenge window.
+- An open challenge blocks payout.
+- Resolver or the eligible backup resolves the challenge with a decision hash.
+- An upheld release challenge opens refunds for the unpaid escrow.
+- A dismissed challenge leaves the release window and payout guards intact.
+- An unresolved challenge reaches the permissionless dispute timeout after 30
+  days and can make the campaign refund-eligible.
+- Backup review becomes available after 7 days of primary inactivity.
 
-### 5.1 Định danh Duy nhất (Composite Key)
+The creator cannot review their own campaign or release. A PDF hash accepted for
+release is immutable; download availability is not evidence that the backer
+accepted the product.
 
-Để đảm bảo không bao giờ xảy ra va chạm hoặc dùng chéo vốn giữa các campaign, deployment hoặc token khác nhau:
+## 5. Approved local parameters
 
-```solidity
-bytes32 public constant VAULT_DOMAIN = keccak256("FUNDTOGETHER_REFUND_VAULT_V2");
+These values are the current local contract/policy parameters, not progressive
+funding gates:
 
-function getCampaignKey(
-    address sourceEscrow,
-    address paymentToken,
-    uint256 campaignId,
-    uint256 roundId
-) public pure returns (bytes32) {
-    return keccak256(abi.encode(VAULT_DOMAIN, sourceEscrow, paymentToken, campaignId, roundId));
-}
+| Parameter | Value | Meaning |
+|---|---:|---|
+| `chainId` | `31339` | Local Anvil only |
+| `supportedToken` | MockUSDC | Exact-transfer local token |
+| `REVIEW_TAKEOVER` | 7 days | Backup review after primary inactivity |
+| `CHALLENGE_WINDOW` | 7 days | Release challenge window |
+| `RELEASE_GRACE` | 7 days | Missing-release refund grace period |
+| `DISPUTE_TIMEOUT` | 30 days | Permissionless exit for unresolved dispute |
+| campaign duration | 1–60 days | Existing local term validation |
+| creator advance | none | Full pledge remains in escrow until payout/refund |
+| outcome exposure cap | not applicable | No progressive disbursement exists |
+| per-request cap | not applicable | No `FundingRequest` exists |
+| refund vault | none | Refunds remain campaign-scoped in the Editions escrow |
+
+## 6. Conservation invariant
+
+For each campaign, accepted pledge accounting is:
+
+```text
+raised = escrowed + refunded + payout
 ```
 
-### 5.2 Cơ chế Sweep O(1) Không Dùng Mảng Unbounded
+The equation is evaluated using canonical contract state. Unsolicited token
+transfers do not create backer claims, and a database record or uploaded file does
+not create a payment, refund, or payout.
 
-1. **Giao dịch Sweep từ Main Escrow:**
-   - Sau khi kết thúc vòng chính 7 ngày, bất kỳ ai (permissionless) hoặc Main Escrow gọi:
-     ```solidity
-     function sweepFromEscrow(
-         uint256 campaignId,
-         uint256 roundId,
-         uint256 amountToSweep,
-         uint256 totalRaisedSnapshot
-     ) external;
-     ```
-   - **Bảo mật:** `msg.sender` bắt buộc phải là địa chỉ Main Escrow hợp lệ đã được đăng ký.
-   - Hợp đồng Escrow chuyển đúng `amountToSweep` ERC-20 token sang Vault bằng `safeTransfer`.
-   - Vault chỉ cập nhật một struct duy nhất cho campaign:
-     ```solidity
-     struct CampaignVaultRecord {
-         address sourceEscrow;
-         address paymentToken;
-         uint256 totalSwept;
-         uint256 totalSupplements;
-         uint256 totalClaimed;
-         uint256 totalRaisedSnapshot;
-         uint256 sweepTimestamp;
-         bool isSwept;
-     }
-     ```
-   - **Chi phí Gas:** Cố định ($O(1)$), độc lập hoàn toàn với số lượng Backer (dù là 10 người hay 100.000 người, phí gas đều như nhau và không bao giờ bị vượt block gas limit).
+## 7. Canonical events and indexer requirements
 
-### 5.3 Cơ chế Rút Tiền Kéo (Pull-Based Pro-Rata Claim)
+The indexer must consume the contract events using an idempotent identity such as
+`chainId + transactionHash + logIndex`:
 
-Khi Backer gọi `claimFromVault(bytes32 campaignKey)`:
-- Vault xác minh số tiền đóng góp ban đầu của Backer $c_i$ và snapshot tổng số tiền đã claim ở Main Round $F_{\text{main}}$ (thông qua interface đọc an toàn từ registered `sourceEscrow`):
-  $$TotalEntitlement_i = \text{floor}\left( \frac{(totalSwept + totalSupplements + mainRoundClaimedSnapshot) \times c_i}{totalRaisedSnapshot} \right)$$
-  $$Claimable_i = TotalEntitlement_i - F_{\text{main}, i} - claimedFromVault_i$$
-- Nếu $Claimable_i > 0$, Vault chuyển token cho Backer và cập nhật $claimedFromVault_i += Claimable_i$.
-- **Bảo toàn quyền lợi:** Quyền rút này **không có thời hạn hết hạn 90 ngày**. Backer có thể rút bất kỳ lúc nào.
+- `CampaignApproved`
+- `CampaignCreated`
+- `Pledged`
+- `FundingFinalized`
+- `ProductionSubmitted`
+- `ProductionReviewed`
+- `ReleaseSubmitted`
+- `ReleaseReviewed`
+- `ReleaseChallenged`
+- `ChallengeResolved`
+- `RefundsOpened`
+- `Refunded`
+- `PaidOut`
 
-### 5.4 Trust boundary và canonical sweep proof
+The UI may display submitted, mined, indexed, and available states separately.
+It must not label a pledge, refund, or payout as recorded from a wallet request
+alone.
 
-- `registerSourceEscrow(sourceEscrow, paymentToken)` là thao tác owner/admin của Vault; mỗi escrow chỉ được bind với đúng một payment token.
-- `sweepFromEscrow()` chỉ chấp nhận `msg.sender` là registered source escrow. Vault phải đọc `getRefundSweepData(campaignId)` từ escrow và reject nếu `amountToSweep`, `roundId`, `totalRaisedSnapshot` hoặc `mainRoundClaimedSnapshot` lệch canonical state.
-- `receiveSupplement()` phải xác thực sender theo policy của campaign và phải exact-transfer đúng payment token đã bind; không ghi tăng ledger chỉ từ tham số caller.
-- `campaignKey` phải bao gồm domain, `sourceEscrow`, `paymentToken`, `campaignId` và `roundId`; không tái sử dụng record đã `isSwept`.
-- Mọi claim phải thỏa `totalClaimed <= totalSwept + totalSupplements`; tổng `getIsolatedBalance()` của mọi campaign không được vượt raw token balance của Vault. Không có phép tính tổng entitlement bằng vòng lặp unbounded.
+## 8. H1 verification scope
 
----
+The relevant executable verification is the Editions suite, including:
 
-## 6. Kế hoạch Kiểm thử Invariant Toàn diện trên Foundry
+- one fixed-price pledge and duplicate-pledge rejection;
+- funding success and failure transitions;
+- production and final PDF review guards;
+- release challenge boundary and open-dispute payout blocking;
+- resolver backup takeover and dispute timeout;
+- full refund claim and duplicate-claim rejection;
+- payout only after the release challenge window;
+- exact conservation of escrow, refunds, and payout;
+- unchanged V1 deployment/ABI/indexer obligations.
 
-Được thiết kế để chạy trực tiếp trên Foundry (`forge test` trong WSL / Linux runtime):
+The previously created progressive-interface scaffold and its test have been
+removed. No progressive contract, ABI, or test is part of the active Editions
+runtime or H1 acceptance.
 
-### 6.1 `InvariantTokenConservation.t.sol`
+## 9. Explicitly deferred
 
-- **Mục tiêu:** Chứng minh bất biến bảo toàn vốn tuyệt đối.
-- **Handler Actions:** Sinh ngẫu nhiên các chuỗi giao dịch:
-  1. `pledge()` với các ví Backer khác nhau.
-  2. `finalizeFunding()` khi đến hạn.
-  3. `submitFundingRequest()`, `reserveFunds()`, `disburseFunds()`.
-  4. `returnUnused()` trả tiền về Escrow.
-  5. `submitChallenge()`, `admitChallenge()`, `resolveChallenge()`.
-  6. `startWindDown()` và `claimRefund()` (Main Round).
-  7. `sweepToVault()` sau 7 ngày.
-  8. `claimFromVault()` từ các Backer ngẫu nhiên.
-  9. `receiveSupplement()` (hoàn trả muộn vào Vault).
-- **Assertion kiểm tra tại mỗi lần gọi hàm:**
-  ```solidity
-   assertEq(
-       R + U,
-       P + F_main + F_vault + E + V_vault,
-       "Conservation invariant violated: R + U != P + F_main + F_vault + E + V_vault"
-   );
-  ```
+The following require a new product decision and a separately versioned policy
+before any implementation:
 
-### 6.2 `InvariantOutcomeExposurePreDisburse.t.sol`
+- creator advances and progressive disbursement;
+- funding requests and expense reconciliation;
+- 50% outcome-exposure accounting;
+- continuous challenge across expenses or milestones;
+- proportional or supplemental refund rounds;
+- shared refund-vault custody;
+- physical fulfilment, NFT, marketplace, mainnet, and real-asset support.
+- EIP-712 off-chain Resolver approval and `createCampaignWithApproval`; this
+  requires a new contract version, replay-protection tests, and a migration plan.
 
-- **Mục tiêu:** Đảm bảo không bao giờ có giao dịch giải ngân nào làm tổng vốn chịu rủi ro vượt quá 50% vốn huy động.
-- **Assertion:**
-  ```solidity
-  uint256 riskBefore = escrow.getRiskExposure(campaignId);
-  uint256 newDisbursement = handler.nextDisbursementAmount();
-  uint256 riskExposure = escrow.getRiskExposure(campaignId);
-  assertLe(
-      riskBefore + newDisbursement,
-      (R * OUTCOME_EXPOSURE_CAP_BPS) / 10_000,
-      "pre-disbursement risk gate exceeded"
-  );
-  assertTrue(
-      riskExposure <= (R * OUTCOME_EXPOSURE_CAP_BPS) / 10_000,
-      "Risk exposure exceeded 50% cap"
-  );
-  ```
-
-### 6.3 `InvariantVaultIsolation.t.sol`
-
-- **Mục tiêu:** Chứng minh việc Backer của Campaign A rút tiền từ Shared Vault không bao giờ làm giảm hoặc ảnh hưởng tới số dư của Campaign B.
-- **Assertion:**
-  ```solidity
-  uint256 balanceB_before = vault.getCampaignBalance(campaignKeyB);
-  // Thực hiện claim trên Campaign A
-  vault.claimFromVault(campaignKeyA);
-  uint256 balanceB_after = vault.getCampaignBalance(campaignKeyB);
-  assertEq(balanceB_before, balanceB_after, "Cross-campaign fund leakage in Vault");
-  ```
-
----
-
-## 7. Bảng Tham số Cấu hình FGATE (Configurable Parameters)
-
-Tất cả các tham số sau đây **KHÔNG ĐƯỢC HARDCODE** mà sẽ được truyền vào qua Constructor / Campaign Initializer dưới dạng tham số cấu hình:
-
-| Mã FGATE | Tham số | Giá trị Đề xuất (Chờ duyệt) | Mô tả |
-|---|---|:---:|---|
-| **FGATE-1** | `perRequestCapBps` | `2500` (25%, đề xuất) | Giới hạn tối đa một lần giải ngân; chưa được dùng trước khi duyệt. |
-| **FGATE-2** | `unreconciledCapBps` | `5000` (50%, đề xuất) | Giới hạn tổng vốn chưa đối chiếu; chưa được dùng trước khi duyệt. |
-| **FGATE-3** | `outcomeExposureCapBps` | `5000` (50%, đề xuất) | Trần tổng rủi ro vốn chưa có nghiệm thu; cần user sign-off. |
-| **FGATE-4** | `preDisbursementWait` | `0` (đề xuất, không chờ) | Không áp đặt 24h chờ; giá trị thực thi phải được policy phê duyệt. |
-| **FGATE-5** | `reviewWindowDuration` | `43200` (12 giờ, đề xuất) | Khoảng thời gian cộng đồng xem xét chứng từ reconciliation. |
-| **FGATE-6** | `mainRefundRoundDuration` | `604800` (7 ngày, đề xuất) | Thời hạn rút tiền vòng chính tại Main Escrow trước khi sweep sang Vault. |
-| **FGATE-7** | `vaultClaimExpiry` | `0` (vô thời hạn, đề xuất) | Không tự tước quyền claim; cần ghi vào policy được duyệt. |
+Until that decision exists, these items are documentation-only history and are
+not part of H1 acceptance.

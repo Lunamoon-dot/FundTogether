@@ -72,6 +72,9 @@ export function EditionsCommitmentCard({
         <p className="text-xs text-neutral-500 mt-1">
           Hồ sơ điều khoản kỹ thuật số đã được đóng băng và thẩm định trước khi mở gây quỹ.
         </p>
+        <p className="text-xs text-neutral-500 mt-1">
+          Pledge chỉ mở khi binding đã canonical và contract đang ở FUNDING; approval hoặc receipt riêng lẻ chưa tạo entitlement.
+        </p>
       </div>
 
       {/* 2. Story / Narrative */}

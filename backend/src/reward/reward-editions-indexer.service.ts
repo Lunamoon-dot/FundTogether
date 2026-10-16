@@ -3,11 +3,11 @@ import { and, eq, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { parseEventLogs } from "viem";
+import { decodeFunctionData, parseEventLogs } from "viem";
 import type { Log, PublicClient, TransactionReceipt } from "viem";
 import { DRIZZLE_DB } from "../database/database.constants";
 import * as schema from "../database/schema";
-import { chainEvents, editionsChainCampaigns, editionsEntitlements, indexerStreams, rewardCampaigns, rewardReviews, walletLinks } from "../database/schema";
+import { chainEvents, editionsChainCampaigns, editionsEntitlements, indexerStreams, platformRoles, rewardCampaigns, rewardReviews, walletLinks } from "../database/schema";
 import type { EditionsChainSnapshot } from "../database/schema";
 import { editionsAbi, editionsClient, EditionsDeployment, parseEditionsDeployment, verifyEditionsDeployment } from "../blockchain/editions-deployment";
 import { editionsCommitment } from "./reward-editions-commitment";
@@ -22,6 +22,28 @@ export function loadEditionsConnection(): EditionsConnection | null {
   return { manifest, client: editionsClient(manifest) as PublicClient };
 }
 const jsonSafe = <T>(value: unknown): T => JSON.parse(JSON.stringify(value, (_, item) => typeof item === "bigint" ? item.toString() : item));
+
+export type EditionsTransactionAction =
+  | "approveCampaign" | "createCampaign" | "pledge" | "submitProduction" | "submitRelease"
+  | "reviewProduction" | "reviewRelease" | "challengeRelease" | "resolveChallenge"
+  | "finalizeFunding" | "startRefunds" | "claimRefund" | "payout" | "cancelCampaign";
+
+const expectedEvent: Record<EditionsTransactionAction, string> = {
+  approveCampaign: "CampaignApproved",
+  createCampaign: "CampaignCreated",
+  pledge: "Pledged",
+  submitProduction: "ProductionSubmitted",
+  submitRelease: "ReleaseSubmitted",
+  reviewProduction: "ProductionReviewed",
+  reviewRelease: "ReleaseReviewed",
+  challengeRelease: "ReleaseChallenged",
+  resolveChallenge: "ChallengeResolved",
+  finalizeFunding: "FundingFinalized",
+  startRefunds: "RefundsOpened",
+  claimRefund: "Refunded",
+  payout: "PaidOut",
+  cancelCampaign: "RefundsOpened",
+};
 
 @Injectable()
 export class RewardEditionsIndexerService implements OnModuleInit, OnModuleDestroy {
@@ -52,6 +74,14 @@ export class RewardEditionsIndexerService implements OnModuleInit, OnModuleDestr
     return manifest;
   }
   async chainTime() { return (await this.connected().client.getBlock({ blockTag: "latest" })).timestamp; }
+  async isTermsApproved(creator: string, commitment: string, goal: bigint, price: bigint, duration: bigint, releaseDeadline: bigint) {
+    const { client, manifest } = this.connected();
+    await verifyEditionsDeployment(client, manifest);
+    const termsHash = await client.readContract({ address: manifest.contractAddress, abi: editionsAbi, functionName: "termsHash",
+      args: [creator as `0x${string}`, commitment as `0x${string}`, goal, price, duration, releaseDeadline] }) as `0x${string}`;
+    const approved = await client.readContract({ address: manifest.contractAddress, abi: editionsAbi, functionName: "approvedTerms", args: [termsHash] });
+    return { termsHash, approved: approved === true };
+  }
   async processReceipt(txHash: string) {
     if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) throw new BadRequestException("Invalid transaction hash");
     const { client, manifest } = this.connected();
@@ -67,6 +97,120 @@ export class RewardEditionsIndexerService implements OnModuleInit, OnModuleDestr
     if ((await client.getBlock({ blockNumber: receipt.blockNumber })).hash !== receipt.blockHash)
       throw new BadRequestException("Receipt was reorganized during synchronization");
     return { ...result, txHash, state: "ON_CHAIN_CONFIRMED" };
+  }
+
+  async processExpectedReceipt(input: { txHash: string; campaignId: string; action: EditionsTransactionAction; userId: string }) {
+    const { client, manifest } = this.connected();
+    await verifyEditionsDeployment(client, manifest);
+    const hash = input.txHash as `0x${string}`;
+    let receipt: TransactionReceipt | null;
+    try {
+      receipt = await client.getTransactionReceipt({ hash });
+    } catch (error) {
+      if ((error as { name?: string }).name?.includes("TransactionReceiptNotFound")) {
+        return { txHash: input.txHash, state: "PENDING" as const };
+      }
+      throw error;
+    }
+    if (receipt.status !== "success") return { txHash: input.txHash, state: "REVERTED" as const };
+    const transaction = await client.getTransaction({ hash });
+    if (transaction.to?.toLowerCase() !== manifest.contractAddress) return { txHash: input.txHash, state: "UNRELATED" as const };
+
+    let decoded: { functionName: string; args?: readonly unknown[] };
+    try {
+      decoded = decodeFunctionData({ abi: editionsAbi, data: transaction.input });
+    } catch {
+      return { txHash: input.txHash, state: "UNRELATED" as const };
+    }
+    if (decoded.functionName !== input.action) return { txHash: input.txHash, state: "UNRELATED" as const };
+
+    const [campaign] = await this.db.select().from(rewardCampaigns).where(eq(rewardCampaigns.id, input.campaignId));
+    if (!campaign?.frozenSnapshot || campaign.category !== "COMICS_ARTBOOK" || !campaign.commitmentHash) {
+      return { txHash: input.txHash, state: "UNRELATED" as const };
+    }
+    const [actor] = await this.db.select().from(walletLinks).where(and(
+      eq(walletLinks.userId, input.userId), eq(walletLinks.chainId, String(manifest.chainId)), eq(walletLinks.address, transaction.from.toLowerCase()),
+    ));
+    if (!actor) return { txHash: input.txHash, state: "UNRELATED" as const };
+    if (input.action === "approveCampaign") {
+      const [role] = await this.db.select().from(platformRoles).where(eq(platformRoles.userId, input.userId));
+      if (!role?.roles.includes("RESOLVER") || transaction.from.toLowerCase() !== manifest.resolver) {
+        return { txHash: input.txHash, state: "UNRELATED" as const };
+      }
+    }
+
+    const args = [...(decoded.args ?? [])] as unknown[];
+    const releaseAt = new Date(campaign.frozenSnapshot.preparation.releaseWindow.end).getTime();
+    const expectedTerms = [
+      campaign.commitmentHash.toLowerCase(),
+      campaign.frozenSnapshot.config.goal,
+      campaign.frozenSnapshot.config.tiers[0].price,
+      String(campaign.frozenSnapshot.config.fundingDuration),
+      Number.isSafeInteger(releaseAt) && releaseAt % 1000 === 0 ? String(releaseAt / 1000) : "",
+    ];
+    const streamId = this.streamId();
+    const [binding] = await this.db.select().from(editionsChainCampaigns).where(and(
+      eq(editionsChainCampaigns.streamId, streamId), eq(editionsChainCampaigns.campaignId, input.campaignId), eq(editionsChainCampaigns.canonical, true),
+    ));
+    if (input.action === "approveCampaign") {
+      if (String(args[0]).toLowerCase() !== campaign.frozenSnapshot.payoutWallet.address ||
+        expectedTerms.some((value, index) => String(args[index + 1]).toLowerCase() !== value)) {
+        return { txHash: input.txHash, state: "UNRELATED" as const };
+      }
+    } else if (input.action === "createCampaign") {
+      if (transaction.from.toLowerCase() !== campaign.frozenSnapshot.payoutWallet.address ||
+        expectedTerms.some((value, index) => String(args[index]).toLowerCase() !== value)) {
+        return { txHash: input.txHash, state: "UNRELATED" as const };
+      }
+    } else if (!binding || String(args[0]) !== binding.onchainCampaignId) {
+      return { txHash: input.txHash, state: "UNRELATED" as const };
+    }
+
+    const contractLogs = receipt.logs.filter(log => log.address.toLowerCase() === manifest.contractAddress);
+    const events = parseEventLogs({ abi: editionsAbi, logs: contractLogs, strict: true });
+    const matchingEvent = events.find(event => {
+      if (event.eventName !== expectedEvent[input.action]) return false;
+      const eventArgs = event.args as Record<string, unknown>;
+      if (input.action === "approveCampaign") {
+        return String(eventArgs.creator).toLowerCase() === campaign.frozenSnapshot!.payoutWallet.address &&
+          String(eventArgs.commitmentHash).toLowerCase() === campaign.commitmentHash!.toLowerCase();
+      }
+      if (input.action === "createCampaign") {
+        return String(eventArgs.creator).toLowerCase() === campaign.frozenSnapshot!.payoutWallet.address &&
+          String(eventArgs.commitmentHash).toLowerCase() === campaign.commitmentHash!.toLowerCase();
+      }
+      if (input.action === "pledge") {
+        return String(eventArgs.campaignId) === binding!.onchainCampaignId &&
+          String(eventArgs.backer).toLowerCase() === transaction.from.toLowerCase() &&
+          String(eventArgs.amount) === campaign.frozenSnapshot!.config.tiers[0].price;
+      }
+      return String(eventArgs.campaignId) === binding!.onchainCampaignId;
+    });
+    if (!matchingEvent) return { txHash: input.txHash, state: "UNRELATED" as const };
+
+    await this.processReceipt(input.txHash);
+    if (input.action === "approveCampaign") {
+      const [approvalEvent] = await this.db.select({ transactionHash: chainEvents.transactionHash }).from(chainEvents).where(and(
+        eq(chainEvents.streamId, streamId), eq(chainEvents.transactionHash, input.txHash),
+        eq(chainEvents.eventName, "CampaignApproved"), eq(chainEvents.canonical, true),
+      ));
+      return { txHash: input.txHash, state: approvalEvent ? "ON_CHAIN_CONFIRMED" as const : "INDEXING" as const };
+    }
+    const [canonicalBinding] = await this.db.select().from(editionsChainCampaigns).where(and(
+      eq(editionsChainCampaigns.streamId, streamId), eq(editionsChainCampaigns.campaignId, input.campaignId), eq(editionsChainCampaigns.canonical, true),
+    ));
+    if (!canonicalBinding) return { txHash: input.txHash, state: "INDEXING" as const };
+    if (input.action === "createCampaign" && String((matchingEvent.args as Record<string, unknown>).campaignId) !== canonicalBinding.onchainCampaignId) {
+      return { txHash: input.txHash, state: "UNRELATED" as const };
+    }
+    if (input.action === "pledge") {
+      const [entitlement] = await this.db.select({ id: editionsEntitlements.id }).from(editionsEntitlements).where(and(
+        eq(editionsEntitlements.campaignId, input.campaignId), eq(editionsEntitlements.transactionHash, input.txHash),
+        eq(editionsEntitlements.backerUserId, input.userId), eq(editionsEntitlements.canonical, true),
+      ));
+      if (!entitlement) return { txHash: input.txHash, state: "INDEXING" as const };
+    }
+    return { txHash: input.txHash, state: "ON_CHAIN_CONFIRMED" as const };
   }
 
   runOnce() {

@@ -13,6 +13,8 @@ const { LifecycleDistributionChart } = await server.ssrLoadModule('/src/features
 const { ExceptionList } = await server.ssrLoadModule('/src/features/reward/ui/ExceptionList.tsx')
 const { RewardAdminConsole } = await server.ssrLoadModule('/src/features/reward/RewardAdminConsole.tsx')
 const { classifyAccountError } = await server.ssrLoadModule('/src/features/auth/account-error.ts')
+const { AccountAccess } = await server.ssrLoadModule('/src/features/auth/AccountAccess.tsx')
+const { AppProviders } = await server.ssrLoadModule('/src/app/providers/AppProviders.tsx')
 
 test('LifecycleDistributionChart renders distribution segments and accessible text summary', () => {
   const counts = {
@@ -129,6 +131,22 @@ test('classifyAccountError identifies failed layer for provider, rpc, and api se
   const sessionErr = classifyAccountError(new Error('Invalid credentials or session expired'))
   assert.equal(sessionErr.layer, 'session')
   assert.match(sessionErr.layerLabel, /Phiên đăng nhập|API Session/i)
+})
+
+test('AccountAccess presents password login, secondary signup, and linked-wallet login as separate surfaces', () => {
+  const html = renderToStaticMarkup(
+    createElement(AppProviders, null,
+      createElement(AccountAccess, { session: null, onSession: () => undefined })
+    )
+  )
+
+  assert.match(html, /account-login/)
+  assert.match(html, /account-login__form/)
+  assert.match(html, /account-login__submit/)
+  assert.match(html, /account-login__switch/)
+  assert.match(html, /account-login__wallet/)
+  assert.match(html, /account-login__wallet-summary/)
+  assert.match(html, /Đăng nhập bằng ví đã liên kết/)
 })
 
 

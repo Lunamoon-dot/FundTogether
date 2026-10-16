@@ -23,12 +23,22 @@ const preview = (id, title, surface, status = 'APPROVED') => ({
   feedbackCount: 0, decisions: [], releaseWindow: { start: '2026-10-15T00:00:00.000Z', end: '2026-11-15T00:00:00.000Z' }, evidenceHashes: [],
 })
 
-function renderFeed() {
+const legacyCampaign = (id, title, state, status) => ({
+  id, creatorUserId: 'legacy-creator', organizationId: null, title, pitch: `${title} pitch`, story: `${title} story`, category: 'COMICS',
+  draftConfig: null, commitmentHash: `0x${'2'.repeat(64)}`, goal: '10000000', fundingDuration: 86400, policyHash: null,
+  onchainCampaignId: id, status, frozenAt: null, createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-15T00:00:00.000Z',
+  tiers: [{ id: `${id}-tier`, campaignId: id, tierIndex: 0, title: 'Legacy PDF', description: 'Historical reward', price: '1000000', maxQuantity: 100,
+    pledgedQuantity: 10, isDigital: true, rewardItems: [], estimatedDeliveryAt: null, createdAt: '2026-10-01T00:00:00.000Z' }],
+  projection: { state, raised: '10000000', goal: '10000000' },
+})
+
+function renderFeed(legacyItems = [], initialFilter = 'all') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   client.setQueryData(['reward-editions-public', 'review'], [preview('review', 'Review comic', 'REVIEW', 'COMMUNITY_REVIEW')])
   client.setQueryData(['reward-editions-public', 'activation'], [preview('activation', 'Activation comic', 'ACTIVATION_PENDING')])
   client.setQueryData(['reward-editions-public', 'funding'], [preview('funding', 'Funding comic', 'FUNDING')])
-  const html = renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(EditionsFeed)))
+  client.setQueryData(['reward-public-campaigns'], legacyItems)
+  const html = renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(EditionsFeed, { initialFilter })))
   client.clear()
   return html
 }
@@ -41,17 +51,56 @@ function renderReviewPage(items = [preview('review', 'Review comic', 'REVIEW', '
   return html
 }
 
-test('public Editions feed keeps activation and funding separate from community review', () => {
+test('public Editions feed keeps activation and funding campaigns in separate filters', () => {
   const html = renderFeed()
-  assert.match(html, /Chờ Creator và Resolver kích hoạt/)
+  assert.match(html, /Chờ kích hoạt/)
+  assert.match(html, /aria-label="Chờ Creator và Resolver kích hoạt: 1"/)
   assert.match(html, /Đang gây quỹ/)
   assert.match(html, /Activation comic/)
   assert.match(html, /Funding comic/)
-  assert.match(html, /Community Review/)
-  assert.match(html, /#\/reward\/review/)
   assert.doesNotMatch(html, /Review comic/)
   assert.doesNotMatch(html, /Community review đang mở/)
   assert.doesNotMatch(html, /Hồ sơ đã duyệt; xem trạng thái hợp đồng trong chi tiết\.<\/p>/)
+})
+
+test('funded filter uses the legacy contract enum and excludes stopped refund campaigns', () => {
+  const html = renderFeed([
+    legacyCampaign('legacy-complete', 'Legacy completed comic', 4, 'COMPLETED'),
+    legacyCampaign('legacy-stopped', 'Legacy stopped comic', 5, 'STOPPED'),
+  ], 'funded')
+
+  assert.match(html, /aria-label="Campaign đã gây quỹ thành công: 1"/)
+  assert.match(html, /Legacy completed comic/)
+  assert.match(html, /Đã hoàn tất/)
+  assert.doesNotMatch(html, /Legacy stopped comic|Thất bại · hoàn tiền/)
+})
+
+test('legacy history route opens the funded category inside the Editions feed', () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  client.setQueryData(['reward-editions-public', 'activation'], [])
+  client.setQueryData(['reward-editions-public', 'funding'], [])
+  client.setQueryData(['reward-public-campaigns'], [legacyCampaign('legacy-complete', 'Legacy completed comic', 4, 'COMPLETED')])
+  const html = renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(PublicArea, {
+    path: '/reward/history', session: null, sessionLoading: false, error: '', onSession: () => {},
+  })))
+  client.clear()
+
+  assert.match(html, /aria-pressed="true"[^>]*>Đã gây quỹ/)
+  assert.match(html, /Legacy completed comic/)
+  assert.doesNotMatch(html, /Campaign Reward đã tồn tại/)
+})
+
+test('public Editions feed renders a neutral empty state without a creator action', () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  client.setQueryData(['reward-editions-public', 'activation'], [])
+  client.setQueryData(['reward-editions-public', 'funding'], [])
+  client.setQueryData(['reward-public-campaigns'], [])
+  const html = renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(EditionsFeed)))
+  client.clear()
+
+  assert.match(html, /editions-feed-empty/)
+  assert.match(html, /Chưa có ấn phẩm nào/)
+  assert.doesNotMatch(html, /edition-empty-state|Tạo bản thảo|Bắt đầu xuất bản tác phẩm|#\/reward\/creator/)
 })
 
 test('public Editions feed does not render the obsolete pilot policy banner', () => {
@@ -62,6 +111,7 @@ test('public Editions feed does not render the obsolete pilot policy banner', ()
 test('community review has its own page and preserves the public review explanation', () => {
   const html = renderReviewPage()
   assert.match(html, /Community Review/)
+  assert.doesNotMatch(html, /reward-hero|FundTogether Editions · Community/)
   assert.match(html, /Review comic/)
   assert.match(html, /Đang lấy ý kiến cộng đồng — chưa được Resolver duyệt/)
   assert.match(html, /chưa được duyệt và chưa mở pledge/)
@@ -87,6 +137,7 @@ test('public router exposes community review as a standalone page', () => {
 test('Creator feedback view is read-only while community and Resolver retain the advisory form', () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const props = { id: 'edition', userId: 'user', commitmentHash: `0x${'1'.repeat(64)}` }
+  client.setQueryData(['reward-editions-feedback', 'edition', 'user'], { items: [], canSubmit: true })
   const creator = renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(EditionsCommunity, { ...props, viewerMode: 'creator' })))
   const community = renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(EditionsCommunity, { ...props, viewerMode: 'community' })))
   const resolver = renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(EditionsCommunity, { ...props, viewerMode: 'resolver' })))

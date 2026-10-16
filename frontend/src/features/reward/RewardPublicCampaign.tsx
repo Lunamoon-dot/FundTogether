@@ -9,7 +9,7 @@ export function RewardPublicCampaign({ campaignId }: { campaignId: string }) {
     queryFn: ({ signal }) => getRewardPublicCampaign(campaignId, signal) });
   if (isPending) return <p role="status">Đang tải lịch sử campaign…</p>;
   if (error || !campaign) return <p role="alert">{getErrorMessage(error || 'Không tìm thấy campaign')}</p>;
-  return <div className="reward-container"><a href="#/reward/history">Hồ sơ lịch sử</a>
+  return <div className="reward-container"><a href="#/reward/history">← Về mục Đã gây quỹ</a>
     <h1>{campaign.title}</h1><p>{campaign.pitch}</p>
     <section className="panel"><h2>Cam kết đã lưu</h2><p>{campaign.story}</p>
       <p>{campaign.status} · Mục tiêu {formatUnits(BigInt(campaign.goal), 6)} MockUSDC</p>

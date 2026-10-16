@@ -22,6 +22,15 @@ authorized. Financial policy version: `editions-local-escrow-v1`.
 | D11 | Existing technical duration 1–60 days and positive uint256 base-unit amounts; fixed price cannot exceed goal. Release window must end after funding deadline. No additional business price/goal cap. |
 | D12 | Frozen terms cannot change. Creator may cancel before payout, opening full refunds. Material revision requires a new campaign. An accepted PDF is immutable; resolving a broken file cannot silently replace its hash. |
 
+### Delivery dates in the V1 interface
+
+Editions V1 now distinguishes an optional `estimatedDeliveryAt` from the hard release deadline:
+
+- `estimatedDeliveryAt` is an advisory creator estimate shown to backers for planning. It may be before the legacy window start and is accepted as long as it is on or before the committed release deadline.
+- `releaseWindow.end` remains the frozen, on-chain `releaseDeadline`. The current refund rule still uses that deadline plus the 7-day grace period; changing the estimate never changes refund eligibility.
+- The legacy `releaseWindow.start` remains in V1 snapshots for compatibility, but it is not presented as a second creator promise in the new form. V1 does not support post-pledge ETA edits or deadline extensions; a material change requires a new campaign.
+- NFT claiming/activation and mutable extension history belong to the separate Reward Pass V2 policy and are not introduced into V1.
+
 ## Custody and migration consequence
 
 Backers own refundable claims while funds are in escrow. Only contract transitions

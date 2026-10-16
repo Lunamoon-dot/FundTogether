@@ -16,7 +16,9 @@ contract RewardFundingAndFulfillmentTest is Test {
 
     function setUp() public {
         token = new MockUSDC();
-        rewardEscrow = new FundTogetherReward(address(token), resolver, backupResolver, keccak256("reward-pivot-v1"));
+        rewardEscrow = new FundTogetherReward(
+            address(token), resolver, backupResolver, keccak256("reward-pivot-v1")
+        );
         token.mint(backer1, 10_000e6);
         token.mint(backer2, 10_000e6);
         vm.prank(backer1);
@@ -28,7 +30,8 @@ contract RewardFundingAndFulfillmentTest is Test {
     function _createSampleCampaign(uint256 goal) internal returns (uint256 id) {
         T.TierView[] memory tiers = new T.TierView[](2);
         tiers[0] = T.TierView({ price: 50e6, maxQuantity: 40, pledgedQuantity: 0, isDigital: true }); // Digital Tier
-        tiers[1] = T.TierView({ price: 100e6, maxQuantity: 30, pledgedQuantity: 0, isDigital: false }); // Book Tier
+        tiers[1] =
+            T.TierView({ price: 100e6, maxQuantity: 30, pledgedQuantity: 0, isDigital: false }); // Book Tier
         vm.prank(creator);
         id = rewardEscrow.createCampaign(keccak256("comic-campaign"), goal, 30 days, tiers);
     }
@@ -107,7 +110,11 @@ contract RewardFundingAndFulfillmentTest is Test {
         rewardEscrow.claimRefund(id);
         uint256 balanceAfter = token.balanceOf(backer1);
 
-        assertEq(balanceAfter - balanceBefore, 500e6, "Backer must receive 100% refund on underfunded campaign");
+        assertEq(
+            balanceAfter - balanceBefore,
+            500e6,
+            "Backer must receive 100% refund on underfunded campaign"
+        );
     }
 
     function test_happyPathFromPledgeToProductionAndCompletion() public {
@@ -212,7 +219,9 @@ contract RewardFundingAndFulfillmentTest is Test {
 
         // Now finalize succeeds
         rewardEscrow.finalizeExpenditure(id, reqId);
-        assertEq(uint8(rewardEscrow.request(id, reqId).state), uint8(T.RequestState.FINANCIALLY_SETTLED));
+        assertEq(
+            uint8(rewardEscrow.request(id, reqId).state), uint8(T.RequestState.FINANCIALLY_SETTLED)
+        );
     }
 
     function test_surplusReturnFundsIncreasesCustody() public {
@@ -304,13 +313,21 @@ contract RewardFundingAndFulfillmentTest is Test {
         rewardEscrow.activateCampaign(id, keccak256("eligibility"));
 
         vm.prank(creator);
-        uint256 reqId = rewardEscrow.submitDisbursementRequest(id, keccak256("fuzz-req"), creator, requestAmount);
+        uint256 reqId = rewardEscrow.submitDisbursementRequest(
+            id, keccak256("fuzz-req"), creator, requestAmount
+        );
 
         vm.prank(resolver);
         rewardEscrow.approveAndDisburse(id, reqId, keccak256("fuzz-req"));
 
         T.CampaignView memory c = rewardEscrow.campaign(id);
-        assertEq(token.balanceOf(address(rewardEscrow)), c.available, "Escrow token balance must match available pool");
-        assertEq(c.available + c.grossPaid, c.contributed, "Contributed must equal available + grossPaid");
+        assertEq(
+            token.balanceOf(address(rewardEscrow)),
+            c.available,
+            "Escrow token balance must match available pool"
+        );
+        assertEq(
+            c.available + c.grossPaid, c.contributed, "Contributed must equal available + grossPaid"
+        );
     }
 }

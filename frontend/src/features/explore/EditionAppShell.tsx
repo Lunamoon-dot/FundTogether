@@ -19,11 +19,12 @@ export function EditionAppShell({
   session,
   children,
 }: EditionAppShellProps) {
-  const isRewardFeed = path === '/' || path === '/reward';
+  const isRewardFeed = path === '/' || path === '/reward' || path === '/reward/history';
   const isRewardCommunityReview = path === '/reward/review';
   const isRewardCreatorStudio = path === '/reward/creator';
   const isRewardCreatorDraft = path === '/reward/creator/draft' || path === '/reward/creator/new';
-  const isRewardCreator = isRewardCreatorStudio || isRewardCreatorDraft;
+  const isRewardCreatorProfile = path === '/reward/creator/profile';
+  const isRewardCreatorWorkspace = isRewardCreatorStudio || isRewardCreatorDraft;
   const isRewardMyRewards = path === '/reward/my-rewards';
   const isAdmin = path === '/admin' || path === '/reward/admin';
   const isRewardResolver = path === '/reward/resolver';
@@ -37,8 +38,11 @@ export function EditionAppShell({
       <aside className="public-sidebar edition-shell__sidebar" aria-label="Khu vực người dùng">
         <div className="edition-shell__brand-block">
           <a className="brand" href="#/" aria-label="FundTogether — Khám phá">
-            <span className="brand-mark">F</span>
-            <span className="brand-text">FundTogether</span>
+            <img
+              className="brand-lockup"
+              src="/fundtogether-lockup-condensed.png"
+              alt="FundTogether"
+            />
           </a>
           <span className="edition-shell__tagline">Editions · Comics & Artbooks</span>
         </div>
@@ -62,17 +66,20 @@ export function EditionAppShell({
           {session && (
             <div className="edition-shell__nav-group">
               <span className="edition-shell__nav-heading">Không gian làm việc</span>
-              <a href="#/reward/creator" aria-current={isRewardCreator ? 'page' : undefined}>
-                🎨 Creator Studio
+              <a href="#/reward/creator" aria-current={isRewardCreatorWorkspace ? 'page' : undefined}>
+                Xưởng ấn phẩm
+              </a>
+              <a href="#/reward/creator/profile" aria-current={isRewardCreatorProfile ? 'page' : undefined}>
+                Hồ sơ Studio
               </a>
               {hasResolverRole && (
                 <a href="#/reward/resolver" aria-current={isRewardResolver ? 'page' : undefined}>
-                  ⚖️ Thẩm định Resolver
+                  Thẩm định Resolver
                 </a>
               )}
               {hasAdminRole && (
                 <a href="#/admin" aria-current={isAdmin ? 'page' : undefined}>
-                  🛡️ Quản trị Admin
+                  Quản trị Admin
                 </a>
               )}
             </div>

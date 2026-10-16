@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   listAdminCreatorProfiles,
-  listRewardPublicCampaigns,
   reviewAdminCreatorProfile,
 } from '../../lib/api/reward';
 import type { RewardCreatorProfile } from '../../lib/api/reward';
 import { getErrorMessage } from '../../lib/api/error';
 import { LifecycleDistributionChart } from './ui/LifecycleDistributionChart';
 import { ExceptionList, type ExceptionItem } from './ui/ExceptionList';
+import { editionsApi } from '../../lib/api/editions';
 
 export function RewardAdminConsole({ userId }: { userId: string }) {
   const [busy, setBusy] = useState(false);
@@ -28,9 +28,10 @@ export function RewardAdminConsole({ userId }: { userId: string }) {
     queryFn: ({ signal }) => listAdminCreatorProfiles(signal),
   });
 
-  const { data: campaigns } = useQuery({
-    queryKey: ['reward-admin-campaigns', userId],
-    queryFn: ({ signal }) => listRewardPublicCampaigns(signal),
+  const operations = useQuery({
+    queryKey: ['reward-editions-operations', 'admin', userId],
+    queryFn: ({ signal }) => editionsApi.operations('admin', signal),
+    refetchInterval: 10_000,
   });
 
   async function executeReview(profile: RewardCreatorProfile, outcome: 'VERIFIED' | 'REJECTED', reason?: string) {
@@ -57,24 +58,25 @@ export function RewardAdminConsole({ userId }: { userId: string }) {
   }
 
   const allProfiles = profiles || [];
-  const allCampaigns = campaigns || [];
+  const allCampaigns = operations.data || [];
 
   const pendingProfilesCount = allProfiles.filter(p => p.status === 'PENDING').length;
   const verifiedProfilesCount = allProfiles.filter(p => p.status === 'VERIFIED').length;
   const rejectedProfilesCount = allProfiles.filter(p => p.status === 'REJECTED').length;
 
   const pendingCampaignsCount = allCampaigns.filter(
-    c => c.status === 'FROZEN' || c.status === 'UNDER_REVIEW' || c.status === 'UNDER_REVIEW_PRIVATE'
+    c => ['FROZEN', 'UNDER_REVIEW', 'UNDER_REVIEW_PRIVATE', 'COMMUNITY_REVIEW'].includes(c.applicationStatus)
   ).length;
-  const fundingCampaignsCount = allCampaigns.filter(
-    c => c.status === 'PUBLISHED' || c.status === 'ACTIVE'
-  ).length;
-  const pendingActivationCount = allCampaigns.filter(c => c.status === 'APPROVED').length;
-  const stoppedCampaignsCount = allCampaigns.filter(c => c.status === 'STOPPED').length;
+  const approvedWithoutBinding = allCampaigns.filter(c => c.applicationStatus === 'APPROVED' && c.publicationStatus === 'NOT_PUBLISHED');
+  const orphanedBindings = allCampaigns.filter(c => c.publicationStatus === 'ORPHANED');
+  const indexerPendingBindings = allCampaigns.filter(c => c.publicationStatus === 'ON_CHAIN_CONFIRMED' && c.contractState === null);
+  const fundingCampaignsCount = allCampaigns.filter(c => c.contractState === 0).length;
+  const pendingActivationCount = approvedWithoutBinding.length;
+  const refundingCampaignsCount = allCampaigns.filter(c => c.contractState === 4).length;
 
   // 4 KPI Metrics
   const reviewQueueTotal = pendingProfilesCount + pendingCampaignsCount;
-  const exceptionsTotal = rejectedProfilesCount + stoppedCampaignsCount;
+  const exceptionsTotal = rejectedProfilesCount + orphanedBindings.length + approvedWithoutBinding.length + indexerPendingBindings.length;
 
   // Lifecycle Distribution Counts (from loaded data)
   const lifecycleCounts: Record<string, number> = {
@@ -82,7 +84,7 @@ export function RewardAdminConsole({ userId }: { userId: string }) {
     'Đã xác minh IP': verifiedProfilesCount,
     'Đang gây quỹ': fundingCampaignsCount,
     'Chờ kích hoạt': pendingActivationCount,
-    'Bị từ chối / dừng': exceptionsTotal,
+    'Ngoại lệ / hoàn tiền': exceptionsTotal + refundingCampaignsCount,
   };
 
   // Operational Exceptions list
@@ -100,12 +102,33 @@ export function RewardAdminConsole({ userId }: { userId: string }) {
       severity: 'info' as const,
       owner: p.displayName,
     })),
-    ...allCampaigns.filter(c => c.status === 'STOPPED').map(c => ({
-      id: `stopped-camp-${c.id}`,
-      label: `Chiến dịch "${c.title}" đã dừng (STOPPED) - Độc giả có quyền hoàn tiền`,
+    ...allCampaigns.filter(c => c.contractState === 4).map(c => ({
+      id: `refunding-camp-${c.campaignId}`,
+      label: `Chiến dịch "${c.title}" đang ở contract state REFUNDING; Backer tự claim hoàn tiền`,
+      severity: 'warning' as const,
+      owner: c.title,
+      actionHref: `#/reward/editions/${c.campaignId}`,
+    })),
+    ...approvedWithoutBinding.map(c => ({
+      id: `approved-unbound-${c.campaignId}`,
+      label: `Chiến dịch "${c.title}" đã APPROVED nhưng publication vẫn NOT_PUBLISHED; chưa mở pledge`,
+      severity: 'warning' as const,
+      owner: c.title,
+      actionHref: `#/reward/editions/${c.campaignId}/resolver`,
+    })),
+    ...orphanedBindings.map(c => ({
+      id: `orphaned-binding-${c.campaignId}`,
+      label: `Chiến dịch "${c.title}" có publication ORPHANED; đối chiếu tx ${c.bindingTransactionHash ?? 'chưa xác định'}, không tạo campaign mới`,
       severity: 'danger' as const,
       owner: c.title,
-      actionHref: `#/reward/editions/${c.id}`,
+      actionHref: `#/reward/editions/${c.campaignId}/resolver`,
+    })),
+    ...indexerPendingBindings.map(c => ({
+      id: `indexer-pending-${c.campaignId}`,
+      label: `Chiến dịch "${c.title}" có binding canonical nhưng contract snapshot đang chờ indexer; pledge vẫn bị khóa`,
+      severity: 'warning' as const,
+      owner: c.title,
+      actionHref: `#/reward/editions/${c.campaignId}/resolver`,
     })),
   ];
 
@@ -116,7 +139,7 @@ export function RewardAdminConsole({ userId }: { userId: string }) {
   return (
     <div className="reward-container admin-console">
       <header className="reward-hero">
-        <span className="reward-badge-category">🛡️ Quản trị Nền tảng · Admin Console</span>
+        <span className="reward-badge-category">Quản trị Nền tảng · Admin Console</span>
         <h1 className="reward-hero-title">Quản Trị Vận Hành & Hồ Sơ Bản Quyền IP</h1>
         <p className="reward-hero-pitch">
           Kiểm tra cam kết sở hữu trí tuệ tác giả, theo dõi vòng đời phát hành và xử lý ngoại lệ vận hành hệ thống Editions.
@@ -124,6 +147,7 @@ export function RewardAdminConsole({ userId }: { userId: string }) {
       </header>
 
       {errorMsg && <p className="toast toast--error" role="alert">{errorMsg}</p>}
+      {operations.error && <p className="toast toast--error" role="alert">{getErrorMessage(operations.error)}</p>}
       {notice && <p className="toast toast--success" role="status">{notice}</p>}
 
       {/* Confirmation Modal / Bar */}
@@ -165,27 +189,27 @@ export function RewardAdminConsole({ userId }: { userId: string }) {
       {/* 4 Operational KPI Tiles */}
       <section className="kpi-grid admin-kpis" aria-label="Chỉ số vận hành hệ thống">
         <div className="panel kpi-tile">
-          <span className="kpi-tile__kicker">⏳ Hàng đợi thẩm định</span>
+          <span className="kpi-tile__kicker">Hàng đợi thẩm định</span>
           <strong className="kpi-tile__value">{reviewQueueTotal}</strong>
           <span className="kpi-tile__note">{pendingProfilesCount} hồ sơ IP · {pendingCampaignsCount} chiến dịch</span>
         </div>
 
         <div className="panel kpi-tile">
-          <span className="kpi-tile__kicker">🚀 Chiến dịch đang gây quỹ</span>
+          <span className="kpi-tile__kicker">Chiến dịch đang gây quỹ</span>
           <strong className="kpi-tile__value">{fundingCampaignsCount}</strong>
-          <span className="kpi-tile__note">Đang tiếp nhận độc giả ủng hộ</span>
+          <span className="kpi-tile__note">Binding canonical · contract state FUNDING</span>
         </div>
 
         <div className="panel kpi-tile">
-          <span className="kpi-tile__kicker">⛓️ Chờ đồng bộ / giao dịch</span>
+          <span className="kpi-tile__kicker">Chờ đồng bộ / giao dịch</span>
           <strong className="kpi-tile__value">{pendingActivationCount}</strong>
           <span className="kpi-tile__note">Đã duyệt, chờ kích hoạt onchain</span>
         </div>
 
         <div className="panel kpi-tile">
-          <span className="kpi-tile__kicker">⚠️ Ngoại lệ vận hành</span>
+          <span className="kpi-tile__kicker">Ngoại lệ vận hành</span>
           <strong className="kpi-tile__value">{exceptionsTotal}</strong>
-          <span className="kpi-tile__note">{rejectedProfilesCount} từ chối · {stoppedCampaignsCount} dừng</span>
+          <span className="kpi-tile__note">{rejectedProfilesCount} từ chối · {orphanedBindings.length} binding orphaned</span>
         </div>
       </section>
 
@@ -267,7 +291,7 @@ export function RewardAdminConsole({ userId }: { userId: string }) {
                           : 'status-under-review'
                       }`}
                     >
-                      {p.status === 'PENDING' ? '⏳ CHỜ DUYỆT' : p.status === 'VERIFIED' ? '✓ ĐÃ PHÊ DUYỆT' : '✕ BỊ TỪ CHỐI'}
+                      {p.status === 'PENDING' ? 'CHỜ DUYỆT' : p.status === 'VERIFIED' ? 'ĐÃ PHÊ DUYỆT' : 'BỊ TỪ CHỐI'}
                     </span>
                   </div>
                   <span className="admin-profile-card__date">
@@ -300,7 +324,7 @@ export function RewardAdminConsole({ userId }: { userId: string }) {
                       disabled={busy}
                       onClick={() => setPendingConfirm({ profile: p, outcome: 'VERIFIED' })}
                     >
-                      ✓ Phê duyệt (VERIFIED)
+                      Phê duyệt (VERIFIED)
                     </button>
 
                     {rejectingId !== p.id ? (
@@ -313,7 +337,7 @@ export function RewardAdminConsole({ userId }: { userId: string }) {
                           setRejectReason('');
                         }}
                       >
-                        ✕ Từ chối hồ sơ
+                        Từ chối hồ sơ
                       </button>
                     ) : (
                       <div className="admin-profile-card__reject-form">
@@ -367,10 +391,11 @@ export function RewardAdminConsole({ userId }: { userId: string }) {
               disabled={busy}
               onClick={() => {
                 void refetchProfiles();
+                void operations.refetch();
                 setNotice('Đã gửi yêu cầu làm mới dữ liệu quản trị.');
               }}
             >
-              🔄 Làm mới dữ liệu quản trị
+              Làm mới dữ liệu quản trị
             </button>
           </div>
 

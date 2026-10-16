@@ -22,11 +22,10 @@ either: it means the reviewed commitment can be activated. The canonical
 chain snapshot is the source for whether an approved campaign is actually
 open for pledge.
 
-The Resolver review SLA is temporarily **24 hours** from the successful
-`submit-review` transition. The system stores the start and deadline on the
-campaign row. After the deadline, the campaign remains `UNDER_REVIEW` and is
-marked overdue; the Resolver can still decide it. There is no automatic
-approval, rejection, rollback, or pledge opening.
+Resolver review has no fixed deadline. The system stores when the successful
+`submit-review` transition started for audit, and Resolver closes the review
+according to the agreed policy. There is no automatic approval, rejection,
+rollback, or pledge opening.
 
 ## Public surfaces
 
@@ -85,8 +84,8 @@ preserved; the new endpoints are read-model queries only.
   links, IP declarations, and Resolver decision reasons are not exposed.
 - A stale or missing indexer binding is not funding-visible.
 - Feedback is still rejected outside `UNDER_REVIEW`/`APPROVED`.
-- The 24-hour review SLA is informational/enforced as an overdue marker only;
-  it never performs a financial or approval transition.
+- Review timing is informational only; it never performs a financial or
+  approval transition.
 - No contract, token, pledge, refund, or entitlement state is changed by this
   UX split.
 
@@ -94,9 +93,9 @@ preserved; the new endpoints are read-model queries only.
 
 - Backend HTTP tests prove each list surface contains only its intended
   campaigns and that an unbound `APPROVED` campaign is not funding-visible.
-- Review tests prove `submit-review` records a 24-hour deadline, overdue
-  review remains actionable, and `CHANGES_REQUESTED` clears the active review
-  window for the next Creator submission.
+- Review tests prove `submit-review` records the review start without a fixed
+  deadline, Resolver can decide later, and `CHANGES_REQUESTED` clears the
+  active review marker for the next Creator submission.
 - Frontend tests prove section labels and viewer-specific feedback controls.
 - Existing review, delivery, indexer, frontend test, build, and lint suites
   remain green.

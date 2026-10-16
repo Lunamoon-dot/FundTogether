@@ -31,7 +31,7 @@ export function ExceptionList({ items, className = '' }: ExceptionListProps) {
   }
 
   return (
-    <div className={`exception-list ${className}`}>
+    <div className={`exception-list ${className}`} aria-label="Ngoại lệ vận hành">
       <ul className="exception-list__items">
         {items.map(item => {
           const config = SEVERITY_CONFIG[item.severity];

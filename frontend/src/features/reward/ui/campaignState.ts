@@ -13,12 +13,20 @@ export interface CampaignUiState {
 export interface CampaignUiStateInput {
   status?: string | null;
   chainState?: number | null;
+  publicationStatus?: 'NOT_PUBLISHED' | 'ORPHANED' | 'ON_CHAIN_CONFIRMED' | null;
   access?: string | null;
   role?: 'public' | 'creator' | 'resolver' | 'backer';
 }
 
+export function getProjectedChainState(projection?: Record<string, unknown> | null): number | null {
+  const value = projection?.state;
+  if (typeof value === 'number' && Number.isInteger(value)) return value;
+  if (typeof value === 'string' && /^\d+$/.test(value)) return Number(value);
+  return null;
+}
+
 export function getCampaignUiState(input: CampaignUiStateInput): CampaignUiState {
-  const { status, chainState, access, role } = input;
+  const { status, chainState, publicationStatus, access, role } = input;
 
   // 1. Personal Backer entitlement access takes precedence if provided
   if (access) {
@@ -49,6 +57,15 @@ export function getCampaignUiState(input: CampaignUiStateInput): CampaignUiState
           nextAction: 'Tải PDF riêng tư',
           technicalCode: 'DOWNLOAD_ELIGIBLE',
         };
+      case 'DELIVERY_UNAVAILABLE':
+        return {
+          label: 'PDF cần kiểm tra',
+          tone: 'danger',
+          summary: 'Contract đã duyệt bản phát hành nhưng máy chủ chưa có đúng PDF đã cam kết',
+          actor: 'resolver',
+          nextAction: 'Kiểm tra file phát hành',
+          technicalCode: 'DELIVERY_UNAVAILABLE',
+        };
       case 'PENDING_RELEASE':
         return {
           label: 'Đang chờ PDF',
@@ -69,7 +86,39 @@ export function getCampaignUiState(input: CampaignUiStateInput): CampaignUiState
     }
   }
 
-  // 2. Canonical on-chain state if available
+  // 2. Publication status is distinct from the contract lifecycle.
+  if (status === 'APPROVED' && publicationStatus === 'ORPHANED') {
+    return {
+      label: 'Cần đối chiếu giao dịch',
+      tone: 'danger',
+      summary: 'Có dấu vết phát hành nhưng chưa có binding canonical hợp lệ · Chưa mở pledge',
+      actor: role === 'resolver' ? 'resolver' : 'system',
+      nextAction: role === 'resolver' ? 'Đối chiếu receipt và indexer' : 'Chờ hệ thống đối chiếu',
+      technicalCode: 'ORPHANED',
+    };
+  }
+  if (status === 'APPROVED' && publicationStatus === 'NOT_PUBLISHED') {
+    return {
+      label: 'Chờ kích hoạt',
+      tone: 'warning',
+      summary: 'Hồ sơ đã duyệt · Chưa có campaign canonical trên contract · Chưa mở pledge',
+      actor: role === 'resolver' ? 'resolver' : 'creator',
+      nextAction: role === 'resolver' ? 'Ký commitment' : 'Chờ Resolver ký hoặc tạo campaign',
+      technicalCode: 'NOT_PUBLISHED',
+    };
+  }
+  if (status === 'APPROVED' && publicationStatus === 'ON_CHAIN_CONFIRMED' && chainState == null) {
+    return {
+      label: 'Đang đồng bộ campaign',
+      tone: 'info',
+      summary: 'Binding đã canonical nhưng chưa đọc được trạng thái contract · Chưa mở pledge',
+      actor: 'system',
+      nextAction: 'Kiểm tra lại trạng thái',
+      technicalCode: 'ON_CHAIN_CONFIRMED',
+    };
+  }
+
+  // 3. Canonical on-chain state if available
   if (chainState !== undefined && chainState !== null) {
     switch (chainState) {
       case 0: // FUNDING
@@ -110,11 +159,13 @@ export function getCampaignUiState(input: CampaignUiStateInput): CampaignUiState
         };
       case 4: // REFUNDING
         return {
-          label: 'Mở hoàn tiền',
-          tone: 'danger',
-          summary: 'Campaign mở hoàn tiền · Backer có thể claim lại khoản pledge',
+          label: 'Thất bại · hoàn tiền',
+          tone: 'warning',
+          summary: role === 'creator'
+            ? 'Campaign không đạt mục tiêu · Backer tự claim hoàn tiền, Creator không cần thao tác'
+            : 'Campaign không đạt mục tiêu · Backer có thể claim lại khoản pledge',
           actor: 'backer',
-          nextAction: 'Nhận hoàn tiền',
+          nextAction: role === 'creator' ? undefined : 'Nhận hoàn tiền',
           technicalCode: 'REFUNDING',
         };
       case 5: // SETTLED

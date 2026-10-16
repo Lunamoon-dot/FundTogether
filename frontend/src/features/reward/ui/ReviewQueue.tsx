@@ -1,9 +1,11 @@
 import type { RewardCampaign } from '../../../lib/api/reward';
+import type { EditionsOperationSummary } from '../../../lib/api/editions';
 import { getCampaignUiState } from './campaignState';
 import { EditionStatusBadge } from './EditionStatusBadge';
 
 interface ReviewQueueProps {
   campaigns: RewardCampaign[];
+  operations?: EditionsOperationSummary[];
   selectedId?: string;
   onSelect: (id: string) => void;
   onRefresh?: () => void;
@@ -12,6 +14,7 @@ interface ReviewQueueProps {
 
 export function ReviewQueue({
   campaigns = [],
+  operations = [],
   selectedId,
   onSelect,
   onRefresh,
@@ -48,11 +51,35 @@ export function ReviewQueue({
     },
     {
       title: 'Chờ kích hoạt',
-      items: campaigns.filter(c => c.status === 'APPROVED'),
+      items: campaigns.filter(c => c.status === 'APPROVED' &&
+        (operations.find(item => item.campaignId === c.id)?.publicationStatus ?? 'NOT_PUBLISHED') === 'NOT_PUBLISHED'),
     },
     {
-      title: 'Cần xử lý sau deadline',
-      items: campaigns.filter(c => ['ACTIVE', 'PRODUCTION_VERIFIED', 'STOPPED', 'COMPLETED'].includes(c.status)),
+      title: 'Cần đối chiếu giao dịch',
+      items: campaigns.filter(c => operations.find(item => item.campaignId === c.id)?.publicationStatus === 'ORPHANED'),
+    },
+    {
+      title: 'Đang gây quỹ',
+      items: campaigns.filter(c => operations.find(item => item.campaignId === c.id)?.contractState === 0),
+    },
+    {
+      title: 'Sản xuất / duyệt phát hành',
+      items: campaigns.filter(c => [1, 2, 3].includes(operations.find(item => item.campaignId === c.id)?.contractState ?? -1)),
+    },
+    {
+      title: 'Đang hoàn tiền',
+      items: campaigns.filter(c => operations.find(item => item.campaignId === c.id)?.contractState === 4),
+    },
+    {
+      title: 'Đã quyết toán',
+      items: campaigns.filter(c => operations.find(item => item.campaignId === c.id)?.contractState === 5),
+    },
+    {
+      title: 'Đang đồng bộ canonical',
+      items: campaigns.filter(c => {
+        const operation = operations.find(item => item.campaignId === c.id);
+        return operation?.publicationStatus === 'ON_CHAIN_CONFIRMED' && operation.contractState === null;
+      }),
     },
   ];
 
@@ -69,7 +96,9 @@ export function ReviewQueue({
             <div className="review-queue__list" role="listbox">
               {group.items.map(c => {
                 const isSelected = selectedId === c.id;
-                const uiState = getCampaignUiState({ status: c.status, role: 'resolver' });
+                const operation = operations.find(item => item.campaignId === c.id);
+                const uiState = getCampaignUiState({ status: c.status, chainState: operation?.contractState,
+                  publicationStatus: operation?.publicationStatus, role: 'resolver' });
                 return (
                   <button
                     key={c.id}
@@ -83,8 +112,8 @@ export function ReviewQueue({
                       <span className="review-queue__item-title">{c.title || 'Editions Campaign'}</span>
                       <EditionStatusBadge state={uiState} />
                     </div>
-                    {c.onchainCampaignId && (
-                      <span className="review-queue__item-meta">On-chain #{c.onchainCampaignId}</span>
+                    {operation?.onchainCampaignId && (
+                      <span className="review-queue__item-meta">On-chain #{operation.onchainCampaignId}</span>
                     )}
                   </button>
                 );

@@ -4,6 +4,8 @@ import type { RewardCampaign } from '../../../lib/api/reward';
 import type { CampaignUiState } from './campaignState';
 import { EditionStatusBadge } from './EditionStatusBadge';
 import { EditionProgressChart } from './EditionProgressChart';
+import { fundingProgressPercent } from './fundingProgress';
+import { ColophonRubric } from './ColophonRubric';
 
 type CampaignData = EditionsPreview | RewardCampaign | (Record<string, unknown> & {
   id?: string;
@@ -44,11 +46,15 @@ export function EditorialCampaignCard({
     ? campaign.config
     : ('draftConfig' in campaign ? campaign.draftConfig : undefined);
 
-  const title = config?.title || 'Editions Digital Comic';
-  const pitch = config?.pitch || '';
-  const tier = config?.tiers?.[0];
+  const directTitle = 'title' in campaign && typeof campaign.title === 'string' ? campaign.title : undefined;
+  const directPitch = 'pitch' in campaign && typeof campaign.pitch === 'string' ? campaign.pitch : undefined;
+  const directGoal = 'goal' in campaign && typeof campaign.goal === 'string' ? campaign.goal : undefined;
+  const directTier = 'tiers' in campaign && Array.isArray(campaign.tiers) ? campaign.tiers[0] : undefined;
+  const title = config?.title || directTitle || 'Editions Digital Comic';
+  const pitch = config?.pitch || directPitch || '';
+  const tier = config?.tiers?.[0] || directTier;
   const priceFormatted = safePrice(tier?.price);
-  const goal = config?.goal || '0';
+  const goal = config?.goal || directGoal || '0';
   const creator = ('creatorDisplayName' in campaign && campaign.creatorDisplayName)
     ? campaign.creatorDisplayName
     : ('creator' in campaign && typeof campaign.creator === 'string' ? campaign.creator : 'Creator');
@@ -62,6 +68,7 @@ export function EditorialCampaignCard({
     : undefined;
 
   const isFunding = state.technicalCode === 'FUNDING' || surface === 'FUNDING';
+  const collateralPct = fundingProgressPercent(raised, goal);
 
   return (
     <article className={`panel editorial-campaign-card ${className}`.trim()}>
@@ -88,6 +95,19 @@ export function EditorialCampaignCard({
           </p>
         )}
 
+        <div className="editorial-campaign-card__rubric-wrap">
+          <ColophonRubric
+            compact
+            commitmentHash={commitmentHash}
+            collateralPercent={collateralPct}
+            pledgedFormatted={isFunding ? safePrice(raised) : undefined}
+            goalFormatted={safePrice(goal)}
+            resolverVerified={state.technicalCode === 'FUNDING' || state.technicalCode === 'APPROVED'}
+            stateLabel={state.label}
+            creatorName={creator}
+          />
+        </div>
+
         <div className="editorial-campaign-card__tier">
           <span className="editorial-campaign-card__tier-item">1 bản số PDF độc quyền</span>
           <span className="editorial-campaign-card__tier-price">{priceFormatted}</span>
@@ -110,12 +130,6 @@ export function EditorialCampaignCard({
             <summary>Chi tiết kỹ thuật</summary>
             <p>
               Commitment: <code className="reward-hash">{commitmentHash}</code>
-              {state.technicalCode && (
-                <>
-                  <br />
-                  Mã hệ thống: <code>code:{state.technicalCode}</code>
-                </>
-              )}
             </p>
           </details>
         )}

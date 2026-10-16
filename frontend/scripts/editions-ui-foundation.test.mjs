@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { after, test } from 'node:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { readFile } from 'node:fs/promises'
 import { createServer } from 'vite'
 
 const server = await createServer({ mode: 'reward', server: { middlewareMode: true, ws: false }, logLevel: 'error' })
@@ -10,6 +11,8 @@ after(() => server.close())
 const { getCampaignUiState } = await server.ssrLoadModule('/src/features/reward/ui/campaignState.ts')
 const { EditionStatusBadge } = await server.ssrLoadModule('/src/features/reward/ui/EditionStatusBadge.tsx')
 const { NextActionCard } = await server.ssrLoadModule('/src/features/reward/ui/NextActionCard.tsx')
+const { EditorialCampaignCard } = await server.ssrLoadModule('/src/features/reward/ui/EditorialCampaignCard.tsx')
+const { fundingProgressPercent } = await server.ssrLoadModule('/src/features/reward/ui/fundingProgress.ts')
 const { EditionAppShell } = await server.ssrLoadModule('/src/features/explore/EditionAppShell.tsx')
 
 test('getCampaignUiState maps states to friendly Vietnamese labels, actors, and next actions', () => {
@@ -55,6 +58,32 @@ test('EditionStatusBadge renders friendly label and tone without exposing raw te
   assert.match(html, /edition-status-badge/)
 })
 
+test('campaign cards keep implementation codes out of user-facing details', () => {
+  const state = getCampaignUiState({ status: 'APPROVED', chainState: 0 })
+  const html = renderToStaticMarkup(createElement(EditorialCampaignCard, {
+    campaign: {
+      commitmentHash: `0x${'1'.repeat(64)}`,
+      config: { title: 'Comic', pitch: 'A story', goal: '10000000', tiers: [{ price: '10000000', rewardItems: [] }] },
+    },
+    state,
+    href: '#/reward/editions/comic',
+  }))
+
+  assert.doesNotMatch(html, /Mã hệ thống|code:FUNDING/)
+  assert.match(html, /Commitment/)
+})
+
+test('reward interactions transition only intended visual properties', async () => {
+  const css = await readFile(new URL('../src/features/reward/reward.css', import.meta.url), 'utf8')
+  assert.doesNotMatch(css, /transition:\s*all\b/)
+})
+
+test('funding progress stays integer-safe above the JavaScript safe-integer range', () => {
+  assert.equal(fundingProgressPercent('900719925474099300000000', '900719925474099300000001'), 99)
+  assert.equal(fundingProgressPercent('115792089237316195423570985008687907853269984665640564039457584007913129639935', '1'), 100)
+  assert.equal(fundingProgressPercent('invalid', '1000000'), 0)
+})
+
 test('NextActionCard renders next action, summary, and action link', () => {
   const state = getCampaignUiState({ access: 'REFUND_ELIGIBLE' })
   const html = renderToStaticMarkup(createElement(NextActionCard, { state, href: '#/reward/editions/comic-1' }))
@@ -86,10 +115,12 @@ test('EditionAppShell renders active navigation, role-gated navigation, environm
   // Navigation & active state
   assert.match(html, /href="#\/reward"[^>]*aria-current="page"/)
   assert.match(html, /href="#\/reward\/review"/)
+  assert.doesNotMatch(html, /Campaign Reward đã tồn tại|href="#\/reward\/history"/)
   assert.match(html, /Child Content/)
 
   // Role-gated links
   assert.match(html, /href="#\/reward\/creator"/)
+  assert.match(html, /href="#\/reward\/creator\/profile"/)
   assert.match(html, /href="#\/reward\/my-rewards"/)
   assert.match(html, /href="#\/admin"/)
   assert.match(html, /href="#\/reward\/resolver"/)

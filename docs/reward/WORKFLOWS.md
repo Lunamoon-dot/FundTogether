@@ -10,32 +10,39 @@ Chỉ Anvil chain 31339 và MockUSDC; không public chain hoặc tài sản th�
 Creator khai báo danh tính/IP → Admin độc lập xác minh
   → draft PDF + ví đã liên kết bằng SIWE + trang mẫu riêng tư
   → đề cương, ngân sách tự sản xuất, evidence plan, cửa sổ phát hành
-  → khóa snapshot/hash → gửi thẩm định
+  → khóa snapshot/hash → gửi thẩm định riêng cho Resolver
+  → Resolver kiểm tra hồ sơ riêng và chủ động mở community review
   → community kiểm tra nội dung công khai và gửi phản hồi
   → Resolver duyệt / yêu cầu sửa / từ chối đúng hash
 ```
 
 Creator không tự xác minh hay tự duyệt. Yêu cầu sửa giữ lịch sử snapshot/quyết định.
-Khi gửi thẩm định, terms, đề cương, budget/evidence plan và hashes được công khai.
+Sau `submit-review`, hồ sơ ở `UNDER_REVIEW_PRIVATE`; terms, đề cương, budget/evidence
+plan, hashes và file mẫu chỉ Resolver được xem. Resolver gọi `open-community-review`
+để chuyển đúng snapshot hiện tại sang `COMMUNITY_REVIEW`; từ thời điểm đó terms,
+đề cương, budget/evidence plan và hashes mới xuất hiện ở public review.
 Identity/IP declaration, object keys và file mẫu vẫn riêng tư. Phản hồi có tài khoản
 được gửi tới Creator/Resolver; người khác chỉ thấy số lượng. Phản hồi không là bỏ
 phiếu, quyền tải hoặc phê duyệt tiền. Retry cùng nội dung không tạo bản trùng;
 góp ý bổ sung là bản ghi mới, không sửa nội dung cũ.
 
-### SLA và vòng sửa hồ sơ
+### Quy trình thẩm định và vòng sửa hồ sơ
 
-Sau `submit-review`, hồ sơ vào `UNDER_REVIEW` và ghi `review_started_at` cùng
-`review_deadline_at = review_started_at + 24 giờ`. Đây là SLA tham khảo để Resolver
-ưu tiên xử lý, không phải timer tự động: quá hạn chỉ hiện `OVERDUE`; hồ sơ vẫn ở
-`UNDER_REVIEW`, không tự `APPROVED`, `STOPPED`, mở pledge hoặc chuyển tiền.
+Sau `submit-review`, hồ sơ vào `UNDER_REVIEW_PRIVATE` và ghi `review_started_at` để audit.
+Không có deadline cố định, timer hoặc chuyển trạng thái tự động; Resolver đóng hồ
+sơ theo checklist và hiệp ước/policy đã thống nhất.
+
+Khi Resolver mở cộng đồng, hồ sơ chuyển sang `COMMUNITY_REVIEW`. Chỉ trạng thái này
+mới nhận feedback public và xuất hiện ở `/review`; `UNDER_REVIEW_PRIVATE` không có
+public preview, không nhận feedback và không mở pledge.
 
 Resolver là người duy nhất quyết định. Nếu `CHANGES_REQUESTED`, hồ sơ trở lại
-`DRAFT`, snapshot/hash đang review và cửa sổ SLA được xóa, còn lịch sử quyết định
-được giữ lại. Creator có thể sửa → freeze → submit lại không giới hạn cho tới khi
-Resolver duyệt hoặc từ chối.
+`DRAFT`, snapshot/hash đang review và thời điểm review hiện tại được xóa, còn lịch
+sử quyết định được giữ lại. Creator có thể sửa → freeze → submit lại không giới hạn
+cho tới khi Resolver duyệt hoặc từ chối.
 
 Feed công khai tách ba surface, không trộn trạng thái: `/review` chỉ hiển thị hồ sơ
-`UNDER_REVIEW`; `/activation` hiển thị `APPROVED` nhưng chưa có binding on-chain
+`COMMUNITY_REVIEW`; `/activation` hiển thị `APPROVED` nhưng chưa có binding on-chain
 canonical; `/funding` chỉ hiển thị binding canonical có state `FUNDING (0)`. `APPROVED`
 không đồng nghĩa đang nhận pledge.
 
@@ -56,6 +63,33 @@ APPROVED → public surface ACTIVATION_PENDING
 Một pledge/ví/campaign; không quantity, inventory cap hoặc tier phụ. Được vượt goal
 đến deadline. Tiền nằm trong escrow, không ứng trước và phí 0. DB review status và
 trạng thái hợp đồng riêng biệt: APPROVED không đồng nghĩa đã phát hành/nhận tiền.
+
+### Quyền ký phát hành on-chain và hướng EIP-712
+
+MVP hiện tại cố ý dùng hai giao dịch on-chain riêng để tách quyền phê duyệt và
+quyền tạo campaign:
+
+```text
+Primary Resolver → approveCampaign(exact terms)
+  → contract ghi approvedTerms[termsHash]
+Creator → createCampaign(exact terms)
+  → contract kiểm tra và tiêu thụ approval → CampaignCreated
+```
+
+`APPROVED` trong PostgreSQL chỉ là quyết định thẩm định off-chain; nó không đồng
+nghĩa `approvedTerms` trên contract đã là `true`. Primary Resolver phải ký đúng
+commitment, creator wallet, goal, price, duration và release deadline. Creator chỉ
+được tạo campaign sau khi receipt của `approveCampaign` thành công; UI phải đọc
+trạng thái approval từ contract và không cho gửi giao dịch sớm. Backend không giữ
+private key của Resolver và không tự ký thay Resolver.
+
+**Định hướng post-MVP — chưa triển khai:** có thể thay giao dịch approval riêng
+bằng EIP-712 typed-data signature. Resolver vẫn ký bằng ví, nhưng không gửi
+transaction; Creator gửi chữ ký cùng một transaction `createCampaignWithApproval`.
+Contract sẽ recover chữ ký và kiểm tra đúng Resolver, campaign terms, `chainId`,
+`verifyingContract`, nonce và expiry để chống replay. Cơ chế này chỉ là định hướng
+giảm ma sát UX, không thay đổi quyền quyết định của Resolver và không được coi là
+flow đang chạy của deployment hiện tại.
 
 ## 3. Sản xuất và PDF cuối
 
@@ -125,9 +159,10 @@ chạy. Tua giờ thủ công vẫn là thao tác toàn chain và không đượ
 
 ## 7. R5 và quyền lợi lịch sử
 
-Trang chính/thư viện mới dùng Editions. Các trang /reward/history và
-/reward/history/my-rewards giữ lịch sử với đúng deployment. Trang campaign cũ không
-nhận pledge mới. Đường nhập/đọc địa chỉ, batch, tracking và xác nhận giao hàng đã
+Trang chính/thư viện mới dùng Editions. Campaign Reward cũ đã gây quỹ thành công
+được hiển thị dạng chỉ đọc trong filter `Đã gây quỹ`; `/reward/history` được giữ
+làm alias tương thích cho filter này, còn `/reward/history/my-rewards` giữ quyền lợi
+lịch sử theo đúng deployment. Trang campaign cũ không nhận pledge mới. Đường nhập/đọc địa chỉ, batch, tracking và xác nhận giao hàng đã
 bị gỡ khỏi mã API/UI. Contract/ABI/indexer/refund lịch sử vẫn được giữ; hash cam kết
 cũ không bị đổi cấu trúc.
 

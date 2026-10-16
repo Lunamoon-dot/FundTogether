@@ -125,6 +125,32 @@ describe("Editions real HTTP + PostgreSQL draft boundary", () => {
     expect((await request(app.getHttpServer()).get("/v1/reward/public/campaigns")).body).toEqual([]);
   });
 
+  it("returns the canonical Editions chain state when the legacy on-chain ID is null", async () => {
+    const projectionCampaign = await app.get(RewardCampaignService).createDraft(owner, editionsDraft());
+    const streamId = `editions:test:${process.pid}`;
+    await db.insert(schema.indexerStreams).values({ streamId, status: "ready" });
+    await db.update(schema.rewardCampaigns).set({ status: "APPROVED", onchainCampaignId: null }).where(eq(schema.rewardCampaigns.id, projectionCampaign.id));
+    await db.insert(schema.editionsChainCampaigns).values({
+      streamId,
+      onchainCampaignId: "7",
+      campaignId: projectionCampaign.id,
+      canonical: true,
+      snapshot: {
+        creator: `0x${"1".repeat(40)}`, commitmentHash: hash, goal: "1000000000", price: "10000000",
+        fundingDeadline: "1791900000", releaseDeadline: "1794900000", raised: "10000000", escrowed: "10000000",
+        state: 4, productionHash: `0x${"0".repeat(64)}`, productionApproved: false, pdfHash: `0x${"0".repeat(64)}`,
+        releaseEvidenceHash: `0x${"0".repeat(64)}`, reviewRequestedAt: "0", challengeDeadline: "0", disputeDeadline: "0", openDisputes: "0",
+      },
+    });
+
+    const response = await request(app.getHttpServer()).get("/v1/reward/creator/campaigns/mine").set("x-test-user", owner);
+    expect(response.status).toBe(200);
+    expect(response.body.find((campaign: any) => campaign.id === projectionCampaign.id)).toMatchObject({
+      onchainCampaignId: null,
+      projection: { state: 4 },
+    });
+  });
+
   it.each(["freeze", "submit-review", "onchain"])("blocks Editions %s before writes or receipt processing", async action => {
     const body = action === "onchain" ? { onchainCampaignId: "0", txHash: hash } : {};
     expect((await post(`/v1/reward/creator/campaigns/${id}/${action}`).send(body)).status).toBe(409);

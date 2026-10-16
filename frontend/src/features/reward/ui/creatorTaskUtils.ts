@@ -1,8 +1,8 @@
 import type { RewardCampaign } from '../../../lib/api/reward';
-import { getProjectedChainState } from './campaignState';
+import type { EditionsOperationSummary } from '../../../lib/api/editions';
 
-export function isCreatorActionable(campaign: RewardCampaign): boolean {
-  const chainState = getProjectedChainState(campaign.projection);
-  if ([0, 2, 3, 4, 5].includes(chainState ?? -1)) return chainState === 1;
-  return ['DRAFT', 'FROZEN', 'CHANGES_REQUESTED', 'APPROVED'].includes(campaign.status);
+export function isCreatorActionable(campaign: RewardCampaign, operation?: EditionsOperationSummary): boolean {
+  if (operation?.contractState !== null && operation?.contractState !== undefined) return operation.contractState === 1;
+  if (campaign.status === 'APPROVED' && operation?.publicationStatus === 'ON_CHAIN_CONFIRMED') return false;
+  return ['DRAFT', 'FROZEN', 'CHANGES_REQUESTED', 'COMMUNITY_REVIEW', 'APPROVED'].includes(campaign.status);
 }

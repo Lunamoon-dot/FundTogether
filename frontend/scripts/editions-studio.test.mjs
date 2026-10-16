@@ -144,6 +144,18 @@ test('Studio profile is isolated from the project workspace', () => {
   assert.doesNotMatch(html, /creator-pipeline|Dự án của bạn|Tạo bản thảo mới/)
 })
 
+test('Studio profile renders Create Studio onboarding landing when unregistered', () => {
+  const html = renderProfile(null)
+
+  assert.match(html, /Khởi tạo Không gian Xuất bản Studio/)
+  assert.match(html, /Khởi tạo Studio \(Create Studio\)/)
+  assert.match(html, /Danh tính &amp; Bút danh Xuất bản/)
+  assert.match(html, /Cam kết Bản quyền IP 100%/)
+  assert.doesNotMatch(html, /Tác giả \/ Studio chưa đặt tên/)
+  assert.doesNotMatch(html, /Vào Xưởng sáng tác →/)
+})
+
+
 test('saving a new draft keeps the creator in the step-three editor', async () => {
   const source = await readFile(new URL('../src/features/reward/RewardCreatorStudio.tsx', import.meta.url), 'utf8')
   assert.match(source, /initialStep=\{2\}/)

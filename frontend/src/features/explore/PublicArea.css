@@ -13,8 +13,8 @@
   flex-direction: column;
   gap: 32px;
   padding: 28px 18px 20px;
-  background: #fff;
-  border-right: 1px solid #e2e8e2;
+  background: var(--paper-bone-light, #fcfbf9);
+  border-right: 1px solid var(--border-hairline, rgba(24, 23, 22, 0.12));
 }
 .public-nav {
   display: flex;
@@ -26,41 +26,51 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #65736b;
-  font-size: 14px;
+  color: var(--ink-lead, #524f4b);
+  font-family: var(--font-sans, "Inter", -apple-system, sans-serif);
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
   text-decoration: none;
-  padding: 12px;
-  border-radius: 8px;
+  padding: 9px 12px;
+  border-radius: 6px;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 .public-nav a[aria-current='page'],
 .public-sidebar-action[aria-current='page'] {
-  color: #267450;
-  background: #eaf1e9;
-  font-weight: 650;
+  color: var(--ink-carbon, #181716);
+  background: var(--paper-bone-dark, #ede9e1);
+  font-weight: 600;
+  position: relative;
+  box-shadow: inset 3.5px 0 0 var(--seal-vermilion, #9e2a2b);
 }
 .public-nav a:hover,
 .public-sidebar-action:hover {
-  background: #f2f6f0;
+  background: rgba(24, 23, 22, 0.04);
+  color: var(--ink-carbon, #181716);
 }
 .public-nav a:focus-visible,
 .public-sidebar-action:focus-visible {
-  outline: 2px solid #267450;
+  outline: 2px solid var(--seal-vermilion, #9e2a2b);
   outline-offset: 2px;
 }
 .public-sidebar-account {
   margin-top: auto;
   padding-top: 12px;
-  border-top: 1px solid #e2e8e2;
+  border-top: 1px solid var(--border-hairline, rgba(24, 23, 22, 0.12));
 }
 .public-avatar {
   display: grid;
   place-items: center;
   width: 30px;
   height: 30px;
-  background: #eaf1e9;
-  color: #267450;
-  border-radius: 50%;
-  font-weight: 650;
+  background: var(--seal-vermilion, #9e2a2b);
+  color: #ffffff;
+  border-radius: 4px;
+  font-family: var(--font-serif, "Newsreader", serif);
+  font-weight: 700;
+  font-size: 14px;
 }
 .public-content {
   width: min(100% - 48px, 1180px);
@@ -252,7 +262,7 @@
 .campaign-action-row { margin: 18px 0; }
 .refund-wallet-rights li { margin: 12px 0; overflow-wrap: anywhere; }
 .public-area { min-height: 100vh; display: grid; grid-template-columns: 240px minmax(0, 1fr); grid-template-rows: 1fr auto; background: #f5f7f4; }
-.network-pill, .status-pill { display: inline-flex; align-items: center; width: fit-content; padding: 6px 10px; color: #276344; background: #e9f3ea; border-radius: 999px; font-size: 12px; font-weight: 650; white-space: nowrap; }
+.network-pill, .status-pill { display: inline-flex; align-items: center; width: fit-content; padding: 4px 8px; color: var(--escrow-bronze, #4a4e41); background: var(--escrow-bronze-light, #f0f2ed); border: 1px solid rgba(74, 78, 65, 0.22); border-radius: 3px; font-family: var(--font-sans, "Inter", sans-serif); font-size: 11px; font-weight: 600; white-space: nowrap; }
 .public-content { width: min(calc(100% - 48px), 1180px); padding: 32px 0 56px; }
 .public-footer { width: 100%; box-sizing: border-box; background: white; }
 .eyebrow { color: #687d70; font-size: 11px; font-weight: 700; letter-spacing: .09em; }
@@ -428,23 +438,26 @@
    Edition App Shell & Navigation
    ========================================================================== */
 .edition-shell {
-  background: #f7f9f6;
-  color: #1e2924;
+  background: var(--paper-bone, #f7f5f0);
+  color: var(--ink-carbon, #181716);
 }
 
 .edition-shell__brand-block {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 7px;
 }
 
 .edition-shell__tagline {
-  font-size: 11px;
+  align-self: stretch;
+  font-family: var(--font-sans, "Inter", sans-serif);
+  font-size: 10px;
   font-weight: 600;
-  color: #65776d;
-  letter-spacing: 0.04em;
+  color: var(--ink-subtle, #78716c);
+  letter-spacing: 0.05em;
+  line-height: 1.3;
+  text-align: center;
   text-transform: uppercase;
-  padding-left: 2px;
 }
 
 .edition-shell__nav-group {
@@ -455,12 +468,13 @@
 }
 
 .edition-shell__nav-heading {
+  font-family: var(--font-sans, "Inter", sans-serif);
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #7d8e83;
-  padding: 6px 12px 2px;
+  letter-spacing: 0.06em;
+  color: var(--ink-subtle, #78716c);
+  padding: 8px 12px 4px;
 }
 
 .edition-shell__account {
@@ -477,24 +491,27 @@
 }
 
 .edition-shell__account-name {
+  font-family: var(--font-serif, "Newsreader", serif);
   font-weight: 600;
-  color: #243a2c;
-  font-size: 13px;
+  color: var(--ink-carbon, #181716);
+  font-size: 14px;
 }
 
 .edition-shell__account-role {
-  font-size: 11px;
-  color: #6a7b70;
+  font-family: var(--font-mono, "IBM Plex Mono", monospace);
+  font-size: 10.5px;
+  color: var(--ink-subtle, #7d7973);
 }
 
 .edition-shell__footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 12px;
-  color: #6a7c71;
-  background: #ffffff;
-  border-top: 1px solid #dce4dd;
+  font-family: var(--font-mono, "IBM Plex Mono", monospace);
+  font-size: 11px;
+  color: var(--ink-subtle, #7d7973);
+  background: var(--paper-bone-light, #fcfbf9);
+  border-top: 1px solid var(--border-hairline, rgba(24, 23, 22, 0.12));
   padding: 16px 24px;
 }
 

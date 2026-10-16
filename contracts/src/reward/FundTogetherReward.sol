@@ -47,31 +47,96 @@ contract FundTogetherReward is ReentrancyGuard {
     mapping(uint256 => mapping(uint256 => uint256)) public disputeCaseOpenedAt;
     mapping(uint256 => mapping(uint256 => bool)) public disputeCaseTakenOver;
 
-    event CampaignCreated(uint256 indexed campaignId, address indexed creator, bytes32 commitmentHash, uint256 goal, uint256 fundingEnd, uint256 tierCount);
-    event RewardPledged(uint256 indexed campaignId, address indexed backer, uint256 indexed tierId, uint256 quantity, uint256 amount);
+    event CampaignCreated(
+        uint256 indexed campaignId,
+        address indexed creator,
+        bytes32 commitmentHash,
+        uint256 goal,
+        uint256 fundingEnd,
+        uint256 tierCount
+    );
+    event RewardPledged(
+        uint256 indexed campaignId,
+        address indexed backer,
+        uint256 indexed tierId,
+        uint256 quantity,
+        uint256 amount
+    );
     event CampaignActivated(uint256 indexed campaignId, bytes32 eligibilityHash);
     event EligibilityTakenOver(uint256 indexed campaignId, bytes32 reasonHash);
     event FundingFailed(uint256 indexed campaignId, uint256 basePool);
-    event DisbursementRequestSubmitted(uint256 indexed campaignId, uint256 indexed requestId, bytes32 requestHash, address indexed recipient, uint256 amount);
-    event RequestApprovedAndDisbursed(uint256 indexed campaignId, uint256 indexed requestId, address indexed recipient, uint256 amount, uint256 remainingAvailable);
-    event RequestApprovalTakenOver(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
-    event RequestCancelled(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
-    event ExpenditureCandidate(uint256 indexed campaignId, uint256 indexed requestId, uint256 acceptedSpent, bytes32 reportHash);
-    event ExpenditureReviewTakenOver(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
-    event ExpenditureSettled(uint256 indexed campaignId, uint256 indexed requestId, uint256 acceptedExpenditure);
-    event DisputeCaseOpened(uint256 indexed campaignId, uint256 indexed requestId, address indexed backer, bytes32 reasonHash);
-    event DisputeCaseUpheld(uint256 indexed campaignId, uint256 indexed requestId, bytes32 decisionHash, uint256 challengeEnd);
-    event DisputeCaseTakenOver(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
+    event DisbursementRequestSubmitted(
+        uint256 indexed campaignId,
+        uint256 indexed requestId,
+        bytes32 requestHash,
+        address indexed recipient,
+        uint256 amount
+    );
+    event RequestApprovedAndDisbursed(
+        uint256 indexed campaignId,
+        uint256 indexed requestId,
+        address indexed recipient,
+        uint256 amount,
+        uint256 remainingAvailable
+    );
+    event RequestApprovalTakenOver(
+        uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash
+    );
+    event RequestCancelled(
+        uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash
+    );
+    event ExpenditureCandidate(
+        uint256 indexed campaignId,
+        uint256 indexed requestId,
+        uint256 acceptedSpent,
+        bytes32 reportHash
+    );
+    event ExpenditureReviewTakenOver(
+        uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash
+    );
+    event ExpenditureSettled(
+        uint256 indexed campaignId, uint256 indexed requestId, uint256 acceptedExpenditure
+    );
+    event DisputeCaseOpened(
+        uint256 indexed campaignId,
+        uint256 indexed requestId,
+        address indexed backer,
+        bytes32 reasonHash
+    );
+    event DisputeCaseUpheld(
+        uint256 indexed campaignId,
+        uint256 indexed requestId,
+        bytes32 decisionHash,
+        uint256 challengeEnd
+    );
+    event DisputeCaseTakenOver(
+        uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash
+    );
     event ProductionVerified(uint256 indexed campaignId, bytes32 reportHash);
     event FulfillmentComplete(uint256 indexed campaignId, bytes32 fulfillmentReportHash);
     event CampaignCompleted(uint256 indexed campaignId);
     event WindDownStarted(uint256 indexed campaignId, uint256 basePool);
-    event RefundClaimed(uint256 indexed campaignId, address indexed backer, uint256 baseAmount, uint256 supplementAmount);
-    event FundsReturned(uint256 indexed campaignId, uint256 indexed requestId, address indexed sender, uint256 amount);
-    event ExpenditureAuthorizationInvalidated(uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash);
+    event RefundClaimed(
+        uint256 indexed campaignId,
+        address indexed backer,
+        uint256 baseAmount,
+        uint256 supplementAmount
+    );
+    event FundsReturned(
+        uint256 indexed campaignId,
+        uint256 indexed requestId,
+        address indexed sender,
+        uint256 amount
+    );
+    event ExpenditureAuthorizationInvalidated(
+        uint256 indexed campaignId, uint256 indexed requestId, bytes32 reasonHash
+    );
 
     constructor(address token, address resolver_, address backupResolver_, bytes32 policyHash_) {
-        if (token == address(0) || resolver_ == address(0) || backupResolver_ == address(0) || resolver_ == backupResolver_ || policyHash_ == bytes32(0)) {
+        if (
+            token == address(0) || resolver_ == address(0) || backupResolver_ == address(0)
+                || resolver_ == backupResolver_ || policyHash_ == bytes32(0)
+        ) {
             revert InvalidInput();
         }
         supportedToken = IERC20(token);
@@ -89,7 +154,11 @@ contract FundTogetherReward is ReentrancyGuard {
         return _tiers[campaignId][tierId];
     }
 
-    function request(uint256 campaignId, uint256 requestId) external view returns (T.RequestView memory) {
+    function request(uint256 campaignId, uint256 requestId)
+        external
+        view
+        returns (T.RequestView memory)
+    {
         if (requestId >= requestCount[campaignId]) revert InvalidReference();
         return _requests[campaignId][requestId];
     }
@@ -100,7 +169,10 @@ contract FundTogetherReward is ReentrancyGuard {
         uint256 fundingDuration,
         T.TierView[] calldata tiers_
     ) external returns (uint256 id) {
-        if (commitmentHash == bytes32(0) || goal == 0 || fundingDuration < 1 days || fundingDuration > 60 days || tiers_.length == 0) {
+        if (
+            commitmentHash == bytes32(0) || goal == 0 || fundingDuration < 1 days
+                || fundingDuration > 60 days || tiers_.length == 0
+        ) {
             revert InvalidInput();
         }
         id = nextCampaignId++;
@@ -150,7 +222,10 @@ contract FundTogetherReward is ReentrancyGuard {
 
     function activateCampaign(uint256 id, bytes32 eligibilityHash) external {
         T.CampaignView storage c = _campaign(id);
-        if ((msg.sender != resolver || eligibilityTakenOver[id]) && (msg.sender != backupResolver || !eligibilityTakenOver[id])) {
+        if (
+            (msg.sender != resolver || eligibilityTakenOver[id])
+                && (msg.sender != backupResolver || !eligibilityTakenOver[id])
+        ) {
             revert WrongCaller();
         }
         if (c.state != T.CampaignState.FUNDING || c.contributed < c.goal) revert WrongState();
@@ -165,8 +240,11 @@ contract FundTogetherReward is ReentrancyGuard {
     function takeOverEligibility(uint256 id, bytes32 reasonHash) external {
         T.CampaignView storage c = _campaign(id);
         if (msg.sender != backupResolver) revert WrongCaller();
-        if (c.state != T.CampaignState.FUNDING || c.contributed < c.goal || eligibilityTakenOver[id]
-            || block.timestamp < c.fullyFundedAt + PRIMARY_REVIEW_WINDOW || reasonHash == bytes32(0)) {
+        if (
+            c.state != T.CampaignState.FUNDING || c.contributed < c.goal || eligibilityTakenOver[id]
+                || block.timestamp < c.fullyFundedAt + PRIMARY_REVIEW_WINDOW
+                || reasonHash == bytes32(0)
+        ) {
             revert WrongState();
         }
         eligibilityTakenOver[id] = true;
@@ -175,7 +253,10 @@ contract FundTogetherReward is ReentrancyGuard {
 
     function finalizeFundingFailure(uint256 id) external {
         T.CampaignView storage c = _campaign(id);
-        if (c.state != T.CampaignState.FUNDING || block.timestamp < c.fundingEnd || c.contributed >= c.goal) {
+        if (
+            c.state != T.CampaignState.FUNDING || block.timestamp < c.fundingEnd
+                || c.contributed >= c.goal
+        ) {
             revert WrongState();
         }
         c.state = T.CampaignState.STOPPED;
@@ -194,7 +275,10 @@ contract FundTogetherReward is ReentrancyGuard {
         T.CampaignView storage c = _campaign(campaignId);
         if (msg.sender != c.creator) revert WrongCaller();
         if (recipient == address(0) || recipient != c.creator) revert InvalidInput();
-        if (c.state != T.CampaignState.ACTIVE || requestHash == bytes32(0) || amount == 0 || amount > c.goal / 2) {
+        if (
+            c.state != T.CampaignState.ACTIVE || requestHash == bytes32(0) || amount == 0
+                || amount > c.goal / 2
+        ) {
             revert InvalidInput();
         }
         if (hasOpenRequest[campaignId]) revert WrongState();
@@ -217,15 +301,26 @@ contract FundTogetherReward is ReentrancyGuard {
         emit DisbursementRequestSubmitted(campaignId, requestId, requestHash, recipient, amount);
     }
 
-    function approveAndDisburse(uint256 campaignId, uint256 requestId, bytes32 expectedRequestHash) external nonReentrant {
+    function approveAndDisburse(uint256 campaignId, uint256 requestId, bytes32 expectedRequestHash)
+        external
+        nonReentrant
+    {
         T.CampaignView storage c = _campaign(campaignId);
-        if (c.state != T.CampaignState.ACTIVE || requestId >= requestCount[campaignId]) revert WrongState();
+        if (c.state != T.CampaignState.ACTIVE || requestId >= requestCount[campaignId]) {
+            revert WrongState();
+        }
         T.RequestView storage r = _requests[campaignId][requestId];
-        if ((msg.sender != resolver || requestApprovalTakenOver[campaignId][requestId])
-            && (msg.sender != backupResolver || !requestApprovalTakenOver[campaignId][requestId])) {
+        if (
+            (msg.sender != resolver || requestApprovalTakenOver[campaignId][requestId])
+                && (msg.sender != backupResolver
+                    || !requestApprovalTakenOver[campaignId][requestId])
+        ) {
             revert WrongCaller();
         }
-        if (r.state != T.RequestState.SUBMITTED || r.requestHash != expectedRequestHash || r.approvedAmount > c.available) {
+        if (
+            r.state != T.RequestState.SUBMITTED || r.requestHash != expectedRequestHash
+                || r.approvedAmount > c.available
+        ) {
             revert InvalidInput();
         }
 
@@ -235,7 +330,9 @@ contract FundTogetherReward is ReentrancyGuard {
         r.approvedAt = block.timestamp;
         r.state = T.RequestState.APPROVED_DISBURSED;
 
-        emit RequestApprovedAndDisbursed(campaignId, requestId, r.recipient, r.approvedAmount, c.available);
+        emit RequestApprovedAndDisbursed(
+            campaignId, requestId, r.recipient, r.approvedAmount, c.available
+        );
         _sendExact(r.recipient, r.approvedAmount);
     }
 
@@ -247,11 +344,17 @@ contract FundTogetherReward is ReentrancyGuard {
     ) external {
         if (requestId >= requestCount[campaignId]) revert InvalidReference();
         T.RequestView storage r = _requests[campaignId][requestId];
-        if ((msg.sender != resolver || expenditureReviewTakenOver[campaignId][requestId])
-            && (msg.sender != backupResolver || !expenditureReviewTakenOver[campaignId][requestId])) {
+        if (
+            (msg.sender != resolver || expenditureReviewTakenOver[campaignId][requestId])
+                && (msg.sender != backupResolver
+                    || !expenditureReviewTakenOver[campaignId][requestId])
+        ) {
             revert WrongCaller();
         }
-        if (r.state != T.RequestState.APPROVED_DISBURSED || acceptedSpent > r.approvedAmount || reportHash == bytes32(0)) {
+        if (
+            r.state != T.RequestState.APPROVED_DISBURSED || acceptedSpent > r.approvedAmount
+                || reportHash == bytes32(0)
+        ) {
             revert InvalidInput();
         }
 
@@ -265,7 +368,10 @@ contract FundTogetherReward is ReentrancyGuard {
     function finalizeExpenditure(uint256 campaignId, uint256 requestId) external {
         if (requestId >= requestCount[campaignId]) revert InvalidReference();
         T.RequestView storage r = _requests[campaignId][requestId];
-        if (r.state != T.RequestState.EXPENDITURE_CANDIDATE || block.timestamp < r.challengeEnd || disputeCaseOpen[campaignId][requestId]) {
+        if (
+            r.state != T.RequestState.EXPENDITURE_CANDIDATE || block.timestamp < r.challengeEnd
+                || disputeCaseOpen[campaignId][requestId]
+        ) {
             revert WrongState();
         }
         r.state = T.RequestState.FINANCIALLY_SETTLED;
@@ -273,13 +379,19 @@ contract FundTogetherReward is ReentrancyGuard {
         emit ExpenditureSettled(campaignId, requestId, r.acceptedExpenditure);
     }
 
-    function returnFunds(uint256 campaignId, uint256 requestId, uint256 amount) external nonReentrant {
+    function returnFunds(uint256 campaignId, uint256 requestId, uint256 amount)
+        external
+        nonReentrant
+    {
         T.CampaignView storage c = _campaign(campaignId);
         if (requestId >= requestCount[campaignId]) revert InvalidReference();
         T.RequestView storage r = _requests[campaignId][requestId];
         if (msg.sender != r.recipient) revert WrongCaller();
         if (amount == 0 || amount > r.grossPaid - r.returned) revert InvalidInput();
-        if (r.state == T.RequestState.EXPENDITURE_CANDIDATE && disputeCaseOpen[campaignId][requestId]) revert WrongState();
+        if (
+            r.state == T.RequestState.EXPENDITURE_CANDIDATE
+                && disputeCaseOpen[campaignId][requestId]
+        ) revert WrongState();
 
         r.returned += amount;
         if (c.refundSnapshotted) c.supplementPool += amount;
@@ -290,7 +402,9 @@ contract FundTogetherReward is ReentrancyGuard {
             r.acceptedExpenditure = 0;
             r.challengeEnd = 0;
             r.state = T.RequestState.APPROVED_DISBURSED;
-            emit ExpenditureAuthorizationInvalidated(campaignId, requestId, keccak256("RETURN_AFTER_CANDIDATE"));
+            emit ExpenditureAuthorizationInvalidated(
+                campaignId, requestId, keccak256("RETURN_AFTER_CANDIDATE")
+            );
         }
         _receiveExact(msg.sender, amount);
     }
@@ -298,8 +412,11 @@ contract FundTogetherReward is ReentrancyGuard {
     function openDisputeCase(uint256 campaignId, uint256 requestId, bytes32 reasonHash) external {
         if (requestId >= requestCount[campaignId]) revert InvalidReference();
         T.RequestView storage r = _requests[campaignId][requestId];
-        if (r.state != T.RequestState.EXPENDITURE_CANDIDATE || block.timestamp >= r.challengeEnd || contributions[campaignId][msg.sender] == 0
-            || reasonHash == bytes32(0) || disputeCaseOpen[campaignId][requestId] || disputeCaseUsed[campaignId][requestId]) {
+        if (
+            r.state != T.RequestState.EXPENDITURE_CANDIDATE || block.timestamp >= r.challengeEnd
+                || contributions[campaignId][msg.sender] == 0 || reasonHash == bytes32(0)
+                || disputeCaseOpen[campaignId][requestId] || disputeCaseUsed[campaignId][requestId]
+        ) {
             revert WrongState();
         }
         disputeCaseOpen[campaignId][requestId] = true;
@@ -308,14 +425,21 @@ contract FundTogetherReward is ReentrancyGuard {
         emit DisputeCaseOpened(campaignId, requestId, msg.sender, reasonHash);
     }
 
-    function upholdDisputeCase(uint256 campaignId, uint256 requestId, bytes32 decisionHash) external {
+    function upholdDisputeCase(uint256 campaignId, uint256 requestId, bytes32 decisionHash)
+        external
+    {
         if (requestId >= requestCount[campaignId]) revert InvalidReference();
         T.RequestView storage r = _requests[campaignId][requestId];
-        if ((msg.sender != resolver || disputeCaseTakenOver[campaignId][requestId])
-            && (msg.sender != backupResolver || !disputeCaseTakenOver[campaignId][requestId])) {
+        if (
+            (msg.sender != resolver || disputeCaseTakenOver[campaignId][requestId])
+                && (msg.sender != backupResolver || !disputeCaseTakenOver[campaignId][requestId])
+        ) {
             revert WrongCaller();
         }
-        if (r.state != T.RequestState.EXPENDITURE_CANDIDATE || !disputeCaseOpen[campaignId][requestId] || decisionHash == bytes32(0)) {
+        if (
+            r.state != T.RequestState.EXPENDITURE_CANDIDATE
+                || !disputeCaseOpen[campaignId][requestId] || decisionHash == bytes32(0)
+        ) {
             revert WrongState();
         }
         disputeCaseOpen[campaignId][requestId] = false;
@@ -326,7 +450,10 @@ contract FundTogetherReward is ReentrancyGuard {
     function recordProductionVerified(uint256 campaignId, bytes32 reportHash) external {
         T.CampaignView storage c = _campaign(campaignId);
         if (msg.sender != resolver) revert WrongCaller();
-        if (c.state != T.CampaignState.ACTIVE || hasOpenRequest[campaignId] || reportHash == bytes32(0)) {
+        if (
+            c.state != T.CampaignState.ACTIVE || hasOpenRequest[campaignId]
+                || reportHash == bytes32(0)
+        ) {
             revert WrongState();
         }
         c.state = T.CampaignState.PRODUCTION_VERIFIED;
@@ -337,7 +464,10 @@ contract FundTogetherReward is ReentrancyGuard {
     function recordFulfillmentComplete(uint256 campaignId, bytes32 fulfillmentReportHash) external {
         T.CampaignView storage c = _campaign(campaignId);
         if (msg.sender != resolver) revert WrongCaller();
-        if (c.state != T.CampaignState.PRODUCTION_VERIFIED || hasOpenRequest[campaignId] || fulfillmentReportHash == bytes32(0)) {
+        if (
+            c.state != T.CampaignState.PRODUCTION_VERIFIED || hasOpenRequest[campaignId]
+                || fulfillmentReportHash == bytes32(0)
+        ) {
             revert WrongState();
         }
         c.state = T.CampaignState.FULFILLMENT_COMPLETE;
@@ -355,8 +485,12 @@ contract FundTogetherReward is ReentrancyGuard {
 
     function startWindDown(uint256 id) external {
         T.CampaignView storage c = _campaign(id);
-        if ((c.state != T.CampaignState.ACTIVE && c.state != T.CampaignState.PRODUCTION_VERIFIED && c.state != T.CampaignState.FULFILLMENT_COMPLETE)
-            || hasOpenRequest[id] || block.timestamp < c.executionEnd) {
+        if (
+            (c.state != T.CampaignState.ACTIVE
+                    && c.state != T.CampaignState.PRODUCTION_VERIFIED
+                    && c.state != T.CampaignState.FULFILLMENT_COMPLETE) || hasOpenRequest[id]
+                || block.timestamp < c.executionEnd
+        ) {
             revert WrongState();
         }
         c.state = T.CampaignState.STOPPED;
@@ -375,7 +509,8 @@ contract FundTogetherReward is ReentrancyGuard {
             _refundClaimed[id][msg.sender] = true;
             baseAmount = Math.mulDiv(contributions[id][msg.sender], c.basePool, c.contributed);
         }
-        uint256 supplementEntitlement = Math.mulDiv(contributions[id][msg.sender], c.supplementPool, c.contributed);
+        uint256 supplementEntitlement =
+            Math.mulDiv(contributions[id][msg.sender], c.supplementPool, c.contributed);
         uint256 supplementAmount = supplementEntitlement - _supplementClaimed[id][msg.sender];
         if (baseAmount == 0 && supplementAmount == 0) revert WrongState();
 
@@ -395,12 +530,16 @@ contract FundTogetherReward is ReentrancyGuard {
     function _receiveExact(address sender, uint256 amount) private {
         uint256 beforeBalance = supportedToken.balanceOf(address(this));
         supportedToken.safeTransferFrom(sender, address(this), amount);
-        if (supportedToken.balanceOf(address(this)) != beforeBalance + amount) revert NonExactTransfer();
+        if (supportedToken.balanceOf(address(this)) != beforeBalance + amount) {
+            revert NonExactTransfer();
+        }
     }
 
     function _sendExact(address recipient, uint256 amount) private {
         uint256 beforeBalance = supportedToken.balanceOf(address(this));
         supportedToken.safeTransfer(recipient, amount);
-        if (supportedToken.balanceOf(address(this)) + amount != beforeBalance) revert NonExactTransfer();
+        if (supportedToken.balanceOf(address(this)) + amount != beforeBalance) {
+            revert NonExactTransfer();
+        }
     }
 }

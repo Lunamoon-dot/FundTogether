@@ -9,6 +9,7 @@ import {
   rewardReviews,
   rewardTiers,
   rewardCampaignProjection,
+  editionsChainCampaigns,
   users,
 } from "../database/schema";
 import type {
@@ -31,6 +32,20 @@ export class RewardCampaignService {
     private readonly cryptoService: RewardCryptoService,
     private readonly indexerService: RewardIndexerService
   ) {}
+
+  private async getCampaignProjection(campaignId: string, onchainCampaignId: string | null, editions: boolean) {
+    if (editions) {
+      const [projection] = await this.db.select({ snapshot: editionsChainCampaigns.snapshot })
+        .from(editionsChainCampaigns)
+        .where(and(eq(editionsChainCampaigns.campaignId, campaignId), eq(editionsChainCampaigns.canonical, true)));
+      return projection?.snapshot ?? null;
+    }
+    if (!onchainCampaignId) return null;
+    const [projection] = await this.db.select({ snapshot: rewardCampaignProjection.snapshot })
+      .from(rewardCampaignProjection)
+      .where(eq(rewardCampaignProjection.campaignMetadataId, campaignId));
+    return projection?.snapshot ?? null;
+  }
 
   /**
    * Flow V1: Creator submits identity and rights declaration for Admin verification
@@ -447,12 +462,7 @@ export class RewardCampaignService {
     }
     const tiers = await this.db.select().from(rewardTiers).where(eq(rewardTiers.campaignId, id));
     const reviews = await this.db.select().from(rewardReviews).where(eq(rewardReviews.campaignId, id));
-    let projection: any = null;
-    if (campaign.onchainCampaignId) {
-      const [proj] = await this.db.select().from(rewardCampaignProjection)
-        .where(eq(rewardCampaignProjection.campaignMetadataId, id));
-      projection = proj?.snapshot ?? null;
-    }
+    const projection = await this.getCampaignProjection(id, campaign.onchainCampaignId, isEditionsCampaign(campaign));
     return { ...campaign, tiers, reviews, projection };
   }
 
@@ -461,12 +471,7 @@ export class RewardCampaignService {
     return Promise.all(campaigns.map(async c => {
       const tiers = await this.db.select().from(rewardTiers).where(eq(rewardTiers.campaignId, c.id));
       const reviews = await this.db.select().from(rewardReviews).where(eq(rewardReviews.campaignId, c.id));
-      let projection: any = null;
-      if (c.onchainCampaignId) {
-        const [proj] = await this.db.select().from(rewardCampaignProjection)
-          .where(eq(rewardCampaignProjection.campaignMetadataId, c.id));
-        projection = proj?.snapshot ?? null;
-      }
+      const projection = await this.getCampaignProjection(c.id, c.onchainCampaignId, isEditionsCampaign(c));
       return { ...c, tiers, reviews, projection };
     }));
   }
@@ -474,16 +479,11 @@ export class RewardCampaignService {
   async listAllForResolver() {
     const campaigns = await this.db.select().from(rewardCampaigns);
     const submitted = campaigns.filter(c => !isEditionsCampaign(c) ||
-      (c.frozenSnapshot && ["UNDER_REVIEW", "APPROVED", "STOPPED"].includes(c.status)));
+      (c.frozenSnapshot && ["UNDER_REVIEW_PRIVATE", "COMMUNITY_REVIEW", "APPROVED", "STOPPED"].includes(c.status)));
     return Promise.all(submitted.map(async c => {
       const tiers = await this.db.select().from(rewardTiers).where(eq(rewardTiers.campaignId, c.id));
       const reviews = await this.db.select().from(rewardReviews).where(eq(rewardReviews.campaignId, c.id));
-      let projection: any = null;
-      if (c.onchainCampaignId) {
-        const [proj] = await this.db.select().from(rewardCampaignProjection)
-          .where(eq(rewardCampaignProjection.campaignMetadataId, c.id));
-        projection = proj?.snapshot ?? null;
-      }
+      const projection = await this.getCampaignProjection(c.id, c.onchainCampaignId, isEditionsCampaign(c));
       return { ...c, tiers, reviews, projection };
     }));
   }
@@ -501,12 +501,7 @@ export class RewardCampaignService {
     const visible = allCampaigns.filter(c => !isEditionsCampaign(c) && publicStatuses.has(c.status));
     return Promise.all(visible.map(async c => {
       const tiers = await this.db.select().from(rewardTiers).where(eq(rewardTiers.campaignId, c.id));
-      let projection: any = null;
-      if (c.onchainCampaignId) {
-        const [proj] = await this.db.select().from(rewardCampaignProjection)
-          .where(eq(rewardCampaignProjection.campaignMetadataId, c.id));
-        projection = proj?.snapshot ?? null;
-      }
+      const projection = await this.getCampaignProjection(c.id, c.onchainCampaignId, isEditionsCampaign(c));
       return { ...c, tiers, projection };
     }));
   }

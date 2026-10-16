@@ -1,4 +1,5 @@
 import { formatUnits } from 'viem';
+import { fundingProgressPercent } from './fundingProgress';
 
 interface EditionProgressChartProps {
   pledged: string;
@@ -17,16 +18,13 @@ function formatSafeToken(baseUnits: string): string {
 
 export function EditionProgressChart({ pledged, goal, className = '' }: EditionProgressChartProps) {
   let pledgedBig = 0n;
-  let goalBig = 0n;
   try {
     pledgedBig = BigInt(pledged || '0');
-    goalBig = BigInt(goal || '0');
   } catch {
     // fallback safe
   }
 
-  const pct = goalBig > 0n ? Number((pledgedBig * 100n) / goalBig) : 0;
-  const clampedPct = Math.min(Math.max(pct, 0), 100);
+  const pct = fundingProgressPercent(pledged, goal);
 
   const pledgedFormatted = formatSafeToken(pledged);
   const goalFormatted = formatSafeToken(goal);
@@ -47,7 +45,7 @@ export function EditionProgressChart({ pledged, goal, className = '' }: EditionP
       <div className="edition-progress-chart__track" aria-hidden="true">
         <div
           className="edition-progress-chart__bar"
-          style={{ width: `${clampedPct}%` }}
+          style={{ width: `${pct}%` }}
         />
       </div>
     </div>
