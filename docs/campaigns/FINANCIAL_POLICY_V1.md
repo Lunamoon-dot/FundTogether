@@ -35,8 +35,9 @@ Campaign creation and Community Review do not collect an estimated delivery rang
 
 Backers own refundable claims while funds are in escrow. Only contract transitions
 may authorize refunds, disbursements, goal settlement, or surplus claims. A Creator
-disbursement starts with an off-chain request form; the first revision may omit files,
-while later revisions include evidence of prior use. An eligible Resolver may approve
+disbursement starts with an off-chain request form; every revision includes a detailed
+use-of-funds explanation file, while later revisions also include separate evidence of
+prior use. An eligible Resolver may approve
 or reject the matching request hash; only approval moves the requested amount to the
 frozen Creator wallet. The Creator later anchors an off-chain completion dossier with
 `requestCompletion`; an eligible Resolver may

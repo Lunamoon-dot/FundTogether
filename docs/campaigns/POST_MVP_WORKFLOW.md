@@ -259,8 +259,8 @@ PRODUCTION_EVIDENCE_SUBMITTED
                                       ├── download cho entitlement hợp lệ
                                       ├── challenge mở → completion bị khóa
                                       ├── ACTIVE → Creator requestDisbursement
-                                      │             ├── lần đầu: form only, không bắt docs
-                                      │             ├── lần sau: kèm bằng chứng dùng khoản trước
+                                      │             ├── mọi lần: kèm file giải thích sử dụng tiền
+                                      │             ├── lần sau: kèm thêm bằng chứng dùng khoản trước
                                       │             └── Resolver approve/reject, không có timer cố định
                                       └── hết challenge window, không dispute → Creator requestCompletion
                                                             │
@@ -469,7 +469,7 @@ P4  Mở rộng sản phẩm
 | Hướng | Trạng thái | Điều kiện để xem xét |
 | --- | --- | --- |
 | **EIP-712 Resolver approval** | Định hướng UX, chưa triển khai | Contract version riêng; bind creator, terms, `chainId`, `verifyingContract`, nonce, expiry; có replay/expiry tests và migration plan |
-| **Creator advance / progressive disbursement** | MVP hẹp: Resolver duyệt từng request khi campaign `ACTIVE`; lần đầu không bắt docs, lần sau cần bằng chứng dùng khoản trước | Mở rộng milestone, exposure cap, expense reconciliation và policy chia phí vẫn deferred |
+| **Creator advance / progressive disbursement** | MVP hẹp: Resolver duyệt từng request khi campaign `ACTIVE`; mọi lần cần file giải thích sử dụng tiền, từ lần 2 cần thêm bằng chứng dùng khoản trước | Mở rộng milestone, exposure cap, expense reconciliation và policy chia phí vẫn deferred |
 | **Funding request / expense reconciliation** | Deferred | State machine và accounting mới; không được suy ra từ `ACTIVE` hiện tại |
 | **Shared refund vault / proportional refund** | Deferred | Custody, isolation, conservation invariant và recovery policy riêng |
 | **Multiple tiers / bundles / inventory** | Ngoài MVP | Benefit, entitlement, pricing và contract semantics mới |
