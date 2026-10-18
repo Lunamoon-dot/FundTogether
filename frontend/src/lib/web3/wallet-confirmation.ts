@@ -1,5 +1,5 @@
-// Transactions may still be broadcast after a timeout; retain their lock.
-// Discarded authentication signatures can release theirs without moving funds.
+// A wallet provider request may remain pending after our timeout; retain its lock
+// until the provider promise settles so retries cannot queue another prompt.
 const pendingRequests = new Map<string, symbol>()
 
 export function assertWalletRequestAvailable(connectorUid: string) {
@@ -7,18 +7,13 @@ export function assertWalletRequestAvailable(connectorUid: string) {
     throw new Error('Ví còn một yêu cầu xác nhận chưa xử lý. Mở extension để xác nhận hoặc từ chối yêu cầu cũ trước khi thử lại.')
 }
 
-export function releaseWalletRequest(connectorUid: string) {
-  pendingRequests.delete(connectorUid)
-}
-
-export async function requestWalletConfirmation<T>({ connectorUid, request, onResult, timeoutMs = 90_000, signal, timeoutMessage, releaseOnAbandon = false }: {
+export async function requestWalletConfirmation<T>({ connectorUid, request, onResult, timeoutMs = 90_000, signal, timeoutMessage }: {
   connectorUid: string
   request: () => Promise<T>
   onResult?: (result: T, late: boolean) => void
   timeoutMs?: number
   signal?: AbortSignal
   timeoutMessage?: string
-  releaseOnAbandon?: boolean
 }) {
   signal?.throwIfAborted()
   assertWalletRequestAvailable(connectorUid)
@@ -53,6 +48,5 @@ export async function requestWalletConfirmation<T>({ connectorUid, request, onRe
   } finally {
     clearTimeout(timer)
     if (abort) signal?.removeEventListener('abort', abort)
-    if (releaseOnAbandon) release()
   }
 }

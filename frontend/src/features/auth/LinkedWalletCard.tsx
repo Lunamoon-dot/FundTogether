@@ -66,9 +66,8 @@ export function LinkedWalletCard({ address, chainId, userId, onUnlink, unlinkDis
       <div className="balance-grid">
         {supportsToken && (
           <div className="balance-tile" aria-live="polite">
-            <div className="balance-tile__icon">🪙</div>
             <div className="balance-tile__body">
-              <span className="balance-tile__caption">Token ủng hộ Editions</span>
+              <span className="balance-tile__caption">Token ủng hộ</span>
               {tokenBalance.isError ? (
                 <p className="balance-tile__error" role="alert">Không tải được số dư MockUSDC. Thử tải lại số dư.</p>
               ) : tokenBalance.isPending ? (
@@ -83,7 +82,6 @@ export function LinkedWalletCard({ address, chainId, userId, onUnlink, unlinkDis
         )}
 
         <div className="balance-tile linked-wallet__balance" aria-live="polite">
-          <div className="balance-tile__icon">⛽</div>
           <div className="balance-tile__body">
             <span className="balance-tile__caption">Phí gas giao dịch</span>
             {!chain ? (
@@ -109,7 +107,7 @@ export function LinkedWalletCard({ address, chainId, userId, onUnlink, unlinkDis
             disabled={balance.isFetching || tokenBalance.isFetching}
             onClick={() => void Promise.all([balance.refetch(), ...(supportsToken ? [tokenBalance.refetch()] : [])])}
           >
-            {balance.isFetching || tokenBalance.isFetching ? 'Đang tải…' : '🔄 Tải lại số dư'}
+            {balance.isFetching || tokenBalance.isFetching ? 'Đang tải…' : 'Tải lại số dư'}
           </button>
         )}
 

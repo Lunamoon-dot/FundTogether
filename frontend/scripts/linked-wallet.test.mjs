@@ -7,7 +7,7 @@ import { WagmiProvider, createConfig, http } from 'wagmi'
 import { getBalanceQueryOptions, readContractQueryOptions } from 'wagmi/query'
 import { createServer } from 'vite'
 
-for (const mode of ['development', 'reward']) {
+for (const mode of ['development', 'fundtogether']) {
   const server = await createServer({ mode, server: { middlewareMode: true, ws: false }, logLevel: 'error' })
   after(() => server.close())
   const { LinkedWalletCard } = await server.ssrLoadModule('/src/features/auth/LinkedWalletCard.tsx')

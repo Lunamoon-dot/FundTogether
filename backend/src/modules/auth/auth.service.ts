@@ -18,8 +18,8 @@ import {
   platformRoles,
   users,
   walletLinks,
-  organizations,
-  rewardCampaigns,
+  campaigns,
+  creatorProfiles,
 } from "../../database/schema";
 
 export const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -118,6 +118,24 @@ export class AuthService {
     };
   }
 
+  async walletAvailability(userId: string, address: string, chainId: number) {
+    const [link] = await this.database
+      .select({ userId: walletLinks.userId })
+      .from(walletLinks)
+      .where(
+        and(
+          eq(walletLinks.chainId, String(chainId)),
+          eq(walletLinks.address, address.toLowerCase()),
+        ),
+      )
+      .limit(1);
+    const alreadyLinked = link?.userId === userId;
+    return {
+      canLink: !link || alreadyLinked,
+      alreadyLinked,
+    };
+  }
+
   async linkWallet(
     userId: string,
     token: string,
@@ -167,12 +185,12 @@ export class AuthService {
       )).for("update");
       // Safe retry after a response was lost; never touch another account's link.
       if (!wallet) return;
-      const [organization] = await tx.select({ id: organizations.id }).from(organizations)
-        .where(eq(organizations.representativeWalletLinkId, wallet.id)).limit(1);
-      if (organization) throw new ConflictException("Không thể gỡ ví đại diện tổ chức. Ví này đang ràng buộc quyền quản lý campaign.");
-      const [edition] = await tx.select({ id: rewardCampaigns.id }).from(rewardCampaigns)
-        .where(eq(rewardCampaigns.payoutWalletLinkId, wallet.id)).limit(1);
-      if (edition) throw new ConflictException("Ví này đang gắn với cam kết Editions đã khóa; không thể gỡ liên kết.");
+      const [campaign] = await tx.select({ id: campaigns.id }).from(campaigns)
+        .where(eq(campaigns.payoutWalletLinkId, wallet.id)).limit(1);
+      if (campaign) throw new ConflictException("Ví này đang gắn với cam kết Campaign đã khóa; không thể gỡ liên kết.");
+      const [studioProfile] = await tx.select({ id: creatorProfiles.id }).from(creatorProfiles)
+        .where(eq(creatorProfiles.studioWalletLinkId, wallet.id)).limit(1);
+      if (studioProfile) throw new ConflictException("Ví này đang là ví Studio đã xác minh; hãy cập nhật hồ sơ Studio trước khi gỡ liên kết.");
       await tx.delete(walletLinks).where(and(eq(walletLinks.id, wallet.id), eq(walletLinks.userId, userId)));
       // Old authenticated sessions must not retain access after wallet removal.
       await tx.delete(authSessions).where(and(eq(authSessions.userId, userId), ne(authSessions.tokenHash, hashToken(token))));

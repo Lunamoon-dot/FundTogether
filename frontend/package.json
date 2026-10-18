@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --mode reward",
-    "dev:reward": "vite --mode reward",
-    "build": "tsc -b && vite build --mode reward",
+    "dev": "vite --mode fundtogether",
+    "dev:fundtogether": "vite --mode fundtogether",
+    "build": "tsc -b && vite build --mode fundtogether",
     "test": "node --test scripts/*.test.mjs",
     "lint": "oxlint",
     "preview": "vite preview"

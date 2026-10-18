@@ -71,13 +71,13 @@ describe("wallet connections at account boundaries", () => {
     } finally { cache.clear(); }
   });
 
-  it.each(["switch", "logout"])("%s clears Creator and Editions data, aborts pending requests, and rejects late results", async action => {
+  it.each(["switch", "logout"])("%s clears Creator and Campaign data, aborts pending requests, and rejects late results", async action => {
     const { cache, address, render } = boundary();
     const oldAccount = { userId: "creator-one", wallets: [{ address, chainId: 31339 }] };
     const privateKeys = [
-      ["my-reward-creator-profile", oldAccount.userId], ["my-reward-campaigns", oldAccount.userId],
-      ["reward-editions-entitlements", oldAccount.userId], ["reward-editions-feedback", "campaign", oldAccount.userId],
-      ["reward-editions-evidence", "campaign", oldAccount.userId], ["reward-admin-creators", oldAccount.userId],
+      ["my-campaign-creator-profile", oldAccount.userId], ["my-campaign-campaigns", oldAccount.userId],
+      ["campaign-campaign-entitlements", oldAccount.userId], ["campaign-campaign-feedback", "campaign", oldAccount.userId],
+      ["campaign-campaign-evidence", "campaign", oldAccount.userId], ["campaign-admin-creators", oldAccount.userId],
     ];
     let requestSignal: AbortSignal | undefined;
     let resolveRequest!: (value: string) => void;
@@ -85,7 +85,7 @@ describe("wallet connections at account boundaries", () => {
       render(oldAccount);
       for (const key of privateKeys) cache.setQueryData(key, "PRIVATE OLD ACCOUNT");
       cache.setQueryData(["unrelated-public-reference"], "keep");
-      const pendingKey = ["my-reward-campaigns", oldAccount.userId, "pending"];
+      const pendingKey = ["my-campaign-campaigns", oldAccount.userId, "pending"];
       const pending = cache.fetchQuery({ queryKey: pendingKey, queryFn: ({ signal }: { signal: AbortSignal }) => {
         requestSignal = signal;
         return new Promise<string>(resolve => { resolveRequest = resolve; });
@@ -95,11 +95,11 @@ describe("wallet connections at account boundaries", () => {
       expect(await pending).toBe("cancelled");
       for (const key of [...privateKeys, pendingKey]) expect(cache.getQueryState(key)).toBeUndefined();
       expect(cache.getQueryData(["unrelated-public-reference"])).toBe("keep");
-      cache.setQueryData(["my-reward-campaigns", "creator-two"], "NEW ACCOUNT");
+      cache.setQueryData(["my-campaign-campaigns", "creator-two"], "NEW ACCOUNT");
       resolveRequest("LATE PRIVATE RESPONSE");
       await Promise.resolve();
       expect(cache.getQueryState(pendingKey)).toBeUndefined();
-      expect(cache.getQueryData(["my-reward-campaigns", "creator-two"])).toBe("NEW ACCOUNT");
+      expect(cache.getQueryData(["my-campaign-campaigns", "creator-two"])).toBe("NEW ACCOUNT");
     } finally { cache.clear(); }
   });
 });

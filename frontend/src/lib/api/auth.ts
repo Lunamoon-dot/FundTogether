@@ -14,6 +14,11 @@ export interface WalletChallenge {
   uri: string
 }
 
+export interface WalletAvailability {
+  canLink: boolean
+  alreadyLinked: boolean
+}
+
 export async function getSession() {
   const { data } = await http.get<AccountSession>('/auth/session')
   return data
@@ -42,6 +47,13 @@ export async function getNonce() {
 
 export async function getLinkNonce() {
   const { data } = await http.post<WalletChallenge>('/auth/wallets/nonce')
+  return data
+}
+
+export async function checkWalletAvailability(address: string, chainId: number) {
+  const { data } = await http.get<WalletAvailability>('/auth/wallets/availability', {
+    params: { address, chainId },
+  })
   return data
 }
 

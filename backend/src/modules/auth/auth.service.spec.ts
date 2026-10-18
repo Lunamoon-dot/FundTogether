@@ -3,7 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import * as argon2 from "argon2";
 import { AuthService } from "./auth.service";
 import { AuthController } from "./auth.controller";
-import { authSessions, organizations, rewardCampaigns, users, walletLinks } from "../../database/schema";
+import { authSessions, campaigns, creatorProfiles, users, walletLinks } from "../../database/schema";
 
 jest.mock("@nestjs/config", () => ({
   ConfigService: class {
@@ -135,7 +135,7 @@ describe("account authentication", () => {
       jest.mocked(argon2.verify).mockResolvedValue(true);
       readsByTable = new Map<unknown, unknown[][]>([
         [users, [[user], [user]]], [authSessions, [[{ userId: user.id }]]],
-        [walletLinks, [[wallet], []]], [organizations, [[]]], [rewardCampaigns, [[]]],
+        [walletLinks, [[wallet], []]], [campaigns, [[]]], [creatorProfiles, [[]]],
       ]);
     });
     it("controller rejects malformed targets and caller-supplied user IDs", () => {
@@ -170,14 +170,9 @@ describe("account authentication", () => {
       await expect(service.unlinkWallet(user.id, token, address, 31339, "password")).rejects.toBeInstanceOf(UnauthorizedException);
       expect(database.delete).not.toHaveBeenCalled();
     });
-    it("blocks organization representatives", async () => {
-      readsByTable!.set(organizations, [[{ id: "org" }]]);
-      await expect(service.unlinkWallet(user.id, token, address, 31339, "password")).rejects.toBeInstanceOf(ConflictException);
-      expect(database.delete).not.toHaveBeenCalled();
-    });
-    it.each(["FROZEN", "APPROVED"])("blocks a wallet pinned to an Editions %s commitment", async status => {
-      readsByTable!.set(rewardCampaigns, [[{ id: "edition", status }]]);
-      await expect(service.unlinkWallet(user.id, token, address, 31339, "password")).rejects.toThrow("cam kết Editions đã khóa");
+    it.each(["FROZEN", "APPROVED"])("blocks a wallet pinned to an Campaign %s commitment", async status => {
+      readsByTable!.set(campaigns, [[{ id: "campaign", status }]]);
+      await expect(service.unlinkWallet(user.id, token, address, 31339, "password")).rejects.toThrow("cam kết Campaign đã khóa");
       expect(database.delete).not.toHaveBeenCalled();
     });
     it("removes an unused link and invalidates other sessions and pending challenges", async () => {
@@ -214,5 +209,36 @@ describe("account authentication", () => {
       service.verifySession("header.payload.signature"),
     ).rejects.toBeInstanceOf(UnauthorizedException);
     expect(database.select).not.toHaveBeenCalled();
+  });
+
+  describe("wallet availability", () => {
+    const address = `0x${"1".repeat(40)}`;
+
+    it("allows an unlinked wallet without revealing another account", async () => {
+      readsByTable = new Map([[walletLinks, [[]]]]);
+
+      await expect(service.walletAvailability(user.id, address, 31339)).resolves.toEqual({
+        canLink: true,
+        alreadyLinked: false,
+      });
+    });
+
+    it("recognizes a wallet linked to the current account", async () => {
+      readsByTable = new Map([[walletLinks, [[{ userId: user.id }]]]]);
+
+      await expect(service.walletAvailability(user.id, address, 31339)).resolves.toEqual({
+        canLink: true,
+        alreadyLinked: true,
+      });
+    });
+
+    it("blocks a wallet linked to another account before SIWE", async () => {
+      readsByTable = new Map([[walletLinks, [[{ userId: "other-user" }]]]]);
+
+      await expect(service.walletAvailability(user.id, address, 31339)).resolves.toEqual({
+        canLink: false,
+        alreadyLinked: false,
+      });
+    });
   });
 });

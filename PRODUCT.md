@@ -1,4 +1,12 @@
-# FundTogether Editions — Backer Journey
+# FundTogether — Product & Website Surface Map
+> **Tài liệu:** Product inventory, UX handoff và scope contract
+> **Cập nhật:** 2026-10-16
+> **Phạm vi:** Campaign `COMICS_ARTBOOK` · một `DIGITAL_DOWNLOAD` PDF · MockUSDC local
+> **Nguồn chuẩn liên quan:** [Docs index](docs/README.md) · [Campaign scope](docs/campaigns/SCOPE.md) · [Workflow](docs/campaigns/WORKFLOWS.md)
+
+Tài liệu này mô tả toàn bộ bề mặt website, tính năng, vai trò, trạng thái và handoff
+của FundTogether. Nó phân biệt hành vi đã thấy trong checkout, chính sách sản phẩm,
+đề xuất UX và phần còn phải xác minh; cập nhật tài liệu không tự chứng minh executable behavior.
 
 Status: UX research synthesis for the existing local MVP  
 Scope: discover → pledge → track → receive one private PDF  
@@ -12,18 +20,18 @@ Product language: Vietnamese UI; English domain terms are retained only where th
 - **Assumption** — required to make the proposed journey coherent, but not established by the current product.
 - **Open question** — requires product or user-research validation before production design is treated as final.
 
-Mobbin access was attempted on 2026-10-14 through three bounded research streams: campaign discovery/detail, pledge and transaction progress, and returning-user library/recovery. Each first flow search was blocked with `Mobbin MCP requires a paid plan`. No flow metadata, screen images, or canonical `mobbin_url` values were returned. Therefore this document makes no Mobbin-backed claims and does not fabricate references. Section 8 records the resulting research gap; Section 9 is a research brief rather than a completed reference board.
+Mobbin access was attempted again on 2026-10-15 through three independent bounded research streams: campaign discovery/detail, pledge and transaction progress, and returning-user library/recovery. Each required first flow search was blocked with `Mobbin MCP requires a paid plan. Upgrade at https://mobbin.com/pricing to continue.` No flow metadata, screen images, or canonical `mobbin_url` values were returned. Therefore this document makes no Mobbin-backed claims and does not fabricate references. Section 8 records the resulting research gap; Section 9 is a research brief rather than a completed reference board.
 
 ## 1. Purpose
 
-FundTogether Editions needs a backer experience for supporting one independent digital comic or artbook and later retrieving its private PDF. The journey must help the backer answer four questions at every point:
+FundTogether needs a backer experience for supporting one independent digital comic or artbook and later retrieving its private PDF. The journey must help the backer answer four questions at every point:
 
 1. What exactly am I supporting?
 2. What must happen before the creator receives the escrowed funds?
 3. Has my pledge been recorded, or is the transaction still unresolved?
 4. What can I do now: wait, download, report a problem, challenge, or claim a refund?
 
-The experience belongs in the existing product because FundTogether Editions already implements the underlying local workflow: one reviewed `COMICS_ARTBOOK` campaign, one fixed-price `DIGITAL_DOWNLOAD` PDF, one pledge per wallet, evidence review, private release, challenges, and pre-payout refunds. This document defines the backer-facing experience around that verified behavior. It does not redesign the protocol or authorize a public or real-money launch.
+The experience belongs in the existing product because FundTogether already implements the underlying local workflow: one reviewed `COMICS_ARTBOOK` campaign, one fixed-price `DIGITAL_DOWNLOAD` PDF tier, repeatable quantity-based pledges, evidence review, private release, challenges, and pre-payout refunds. This document defines the backer-facing experience around that verified behavior. It does not redesign the protocol or authorize a public or real-money launch.
 
 ## 2. Existing Product Context
 
@@ -31,26 +39,52 @@ The experience belongs in the existing product because FundTogether Editions alr
 
 The current web application uses a persistent user-area sidebar.
 
-- `Truyện tranh & Artbook` opens the Editions feed at `#/reward`.
-- `Phần thưởng của tôi` appears after sign-in and opens the Editions library at `#/reward/my-rewards`.
+- `Truyện tranh & Artbook` opens the Campaign feed at `#/campaigns`.
+- `Bộ sưu tập của tôi` appears after sign-in and opens the Campaign collection at `#/campaigns/library`; it can hold digital entitlements now and future NFT ownership records.
 - `Tài khoản` or `Đăng nhập` opens account access and linked-wallet management at `#/account`.
-- Historical Reward campaigns remain available through separate history links. They cannot receive new pledges and must not be presented as Editions campaigns.
+- Successful historical Campaign records appear in the Campaign feed under the `Đã gây quỹ` filter. Their cards remain read-only historical records and cannot receive new pledges.
+
+### Adjacent role surfaces and handoffs
+
+The backer journey sits inside a larger role-based product. These surfaces are part of the existing application context, but they are not being redesigned by this backer-focused document:
+
+| Surface | Route | Existing responsibility | Handoff to the backer journey |
+| --- | --- | --- | --- |
+| Account & wallet access | `#/account` | Sign in, connect/link a wallet, show network and balance readiness, and expose role-specific portals | Backer must complete account and linked-wallet readiness before signing a pledge; Creator/Resolver actions must use the correct role wallet |
+| Creator Studio | `#/campaigns/creator`, `#/campaigns/creator/draft`, `#/campaigns/creator/new` | Creator profile/IP declaration, Campaign draft preparation, evidence and production submission, freeze/submit, and campaign publication steps | A frozen and Resolver-approved commitment can become a canonical funding campaign visible to backers |
+| Admin Console | `#/admin` | Verify creator/IP profiles, monitor lifecycle queues and operational exceptions, and refresh administrative data | Admin verification is a prerequisite for eligible creator work; Admin does not decide financial release or refund transitions |
+| Resolver Console | `#/campaigns/resolver` | Review campaign commitments, open/close Community Review, approve/request changes/reject, inspect production/PDF evidence, and resolve eligible disputes | Resolver decisions create the states that determine whether a campaign is pledgeable, downloadable, challengeable, or refundable |
+| Community Review | `#/campaigns/review` | Let signed-in community members submit public comments or private issue reports on the currently exposed commitment/evidence | Public comments are anonymized for the community; private issues are visible to their author, Creator and Resolver. Neither type opens pledge, approves funds, or creates entitlement |
+| Campaign public detail | `#/campaigns/:id` | Show the frozen promise, review decision, on-chain funding/production/release state, and personal pledge/PDF/refund actions | This is the backer's campaign entry point and the shared status surface after Creator/Resolver handoffs |
+| Campaign library | `#/campaigns/library` | List canonical backer entitlements and their next action | Durable return point for tracking, PDF access, or refund recovery |
+| Historical Campaign records | `#/campaigns/history/entitlements` and direct historical detail | Preserve historical campaign records and entitlements | Historical records remain read-only and separate; no new pledge or physical-fulfillment flow is restored |
+
+The role handoff is therefore:
+
+```text
+Creator profile/IP verification
+  → Creator Studio freezes and submits the Campaign commitment
+  → Resolver reviews and may open Community Review
+  → Resolver approves the commitment; Creator and Resolver complete the separate on-chain activation step
+  → Backer discovers, pledges, tracks, and receives the private PDF
+  → Resolver decisions or deadline transitions determine release, challenge, or refund states
+```
 
 ### Current discovery journey
 
-The Editions feed currently explains the local MockUSDC pilot and lists campaign dossiers that are under review or approved. Each entry shows:
+The Campaign feed separates campaigns currently funding, successful funded history, and approved dossiers waiting for on-chain activation. Community Review remains a separate review surface. Each campaign card shows:
 
 - title and short pitch;
 - creator display name;
 - fixed price per PDF;
-- dossier-review status;
-- count of community feedback items.
+- plain-language lifecycle status;
+- the standard PDF deliverable and, on the funding shelf, an integer-safe funding-progress view.
 
-The feed does not currently demonstrate cover art, public sample pages, search, categories, saved items, or personalized recommendations. Private sample material exists for review, but the repository does not establish it as public backer content.
+Community Review is explicitly not a pledge surface. Private sample material exists for review, but the repository does not establish cover art, public sample pages, search, categories, saved items, personalized recommendations, or other public discovery features.
 
 ### Current presentation conventions
 
-The user area uses a muted green and neutral palette, white bordered panels, compact status pills, plain-language buttons, and inline status/error messages. Desktop navigation is a persistent left sidebar; at narrow widths it becomes a wrapped horizontal group above the content. Campaign and account content collapses to one column on small screens. The current Editions experience is primarily text-led, so a prototype should improve hierarchy without inventing unverified campaign media.
+The user area uses a muted green and neutral palette, white bordered panels, compact status pills, plain-language buttons, and inline status/error messages. Desktop navigation is a persistent left sidebar; at narrow widths it becomes a wrapped horizontal group above the content. Campaign and account content collapses to one column on small screens. The current Campaign experience is primarily text-led, so a prototype should improve hierarchy without inventing unverified campaign media.
 
 ### Current campaign detail
 
@@ -61,11 +95,11 @@ The campaign page currently presents the frozen campaign dossier:
 - content outline;
 - self-funded production budget;
 - evidence plan;
-- expected release window;
+- production evidence plan; the release deadline is collected only after the Creator confirms campaign completion;
 - funding goal and duration;
 - commitment hash and Resolver decisions.
 
-When the campaign exists on chain, the same page also shows the financial and production state, amount raised, escrowed amount, funding deadline, release deadline, challenge deadline, and open dispute count. The pledge action is displayed only during funding and only when the signed-in account does not already have an active entitlement for that campaign.
+When the campaign exists on chain, the same page also shows the financial and production state, amount raised, escrowed amount, funding deadline, the release deadline only after Creator confirmation, challenge deadline, and open dispute count. The pledge action is displayed during funding even when the signed-in account already has an active entitlement, because the backer may buy more package units.
 
 ### Current account and wallet convention
 
@@ -75,28 +109,28 @@ A backer transaction requires the connected wallet to:
 
 - be linked to the signed-in FundTogether account;
 - be on local chain `31339`;
-- hold the fixed MockUSDC pledge amount;
+- hold enough MockUSDC for the selected quantity;
 - hold enough native currency for network fees.
 
 The platform fee is zero. That statement must not be presented as meaning the network transaction has no gas cost.
 
 ### Current pledge behavior
 
-The campaign CTA is one fixed action: `Ủng hộ [price] MockUSDC · một PDF`.
+The campaign shows one fixed-price pledge preflight with a quantity selector: `Ủng hộ [quantity] gói · [price × quantity] MockUSDC`. Before a wallet request, it checks account sign-in, the linked wallet, local chain `31339`, canonical `FUNDING` state, and MockUSDC balance/allowance for the selected total. An existing entitlement does not block another purchase.
 
-If token allowance is insufficient, the product requests an exact-price token approval first. The wallet then requests the pledge transaction. The current UI reports wallet confirmation, submitted transaction, successful receipt, and canonical indexer confirmation as text notices. A pledge is complete only after canonical synchronization produces the entitlement. Token approval by itself is not a pledge, and a submitted transaction is not yet a recorded pledge.
+If token allowance is insufficient, the product requests token approval for the selected total first. The wallet then requests one quantity-bearing pledge transaction. The UI keeps the public transaction hash and lifecycle in a versioned browser-local recovery record, reports wallet confirmation, submission, receipt, and canonical indexer confirmation separately, and offers status reconciliation before retrying an uncertain action. A pledge is complete only after canonical synchronization produces the quantity-bearing entitlement. Token approval by itself is not a pledge, and a submitted transaction is not yet a recorded pledge.
 
 ### Current returning-user journey
 
-The Editions library currently lists each entitlement as a text panel containing a raw access code, amount paid, confirmation status, and a generic link back to the campaign. The title and current next action are not shown in the library entry.
+The Campaign library currently lists each entitlement as a panel containing the campaign title, amount paid, plain-language access status, a short explanation, and a state-specific next action. Technical identifiers remain behind a details disclosure. The library is the durable return point after canonical indexing, while campaign detail remains the place for download, refund, challenge, and issue actions.
 
 Download is available on campaign detail only when the entitlement is `DOWNLOAD_ELIGIBLE`. The downloaded bytes are checked against the approved SHA-256 hash before the product hands the file to the browser download mechanism. The product cannot prove that the user saved or opened it. Downloading and optionally confirming that the PDF was checked are separate actions. Neither action alone releases funds.
 
 ### Existing product constraints that must remain visible in the UX
 
 - This is a local Anvil/MockUSDC pilot, not a public or real-money service.
-- Each campaign offers one standard PDF at one fixed price.
-- Each wallet can pledge once per campaign; there are no quantities, gifts, transfers, extra tiers, stock limits, shipping, keys, or DRM promises.
+- Each campaign offers one standard PDF tier at one fixed unit price.
+- Each wallet can buy a positive quantity in one transaction and can submit more pledge transactions later; there are no gifts, transfers, extra tiers, stock limits, shipping, keys, or DRM promises.
 - Dossier approval and on-chain campaign publication are separate states.
 - The creator receives no advance. Payout occurs only after accepted PDF release, the seven-day challenge period, and resolution of open challenges.
 - Production-evidence approval does not make the PDF downloadable.
@@ -123,7 +157,7 @@ The intended emotional outcome is informed confidence. The backer should feel th
 ## 4. User Journey
 
 ```text
-Discover Editions
+Discover Campaign
   → open a campaign
   → understand the work, creator, fixed PDF promise, price, dates and protections
   → choose “Ủng hộ”
@@ -135,7 +169,7 @@ Discover Editions
   → submitted / receipt pending
   → canonical recording pending
   → pledge recorded
-  → open “Thư viện PDF Editions”
+  → open “Thư viện PDF Campaign”
   → follow campaign production and release state
   → PDF becomes available
   → download and verify the PDF
@@ -229,7 +263,7 @@ The user opens `Truyện tranh & Artbook` or follows a campaign link.
 **Failure / recovery**
 
 - Feed or detail load failure shows a retry action and keeps navigation available.
-- Missing campaign shows a clear not-found state with return to Editions.
+- Missing campaign shows a clear not-found state with return to Campaign.
 
 ### Flow B — Become pledge-ready
 
@@ -324,7 +358,7 @@ The wallet submitted a pledge but the page was closed, reloaded, timed out, lost
 
 **Failure / recovery**
 
-This flow is a repository-derived recommendation. The current component keeps progress in memory and does not demonstrate reload recovery. The product requirement is to protect the user from duplicate intent; the implementation mechanism is outside this document.
+The current prototype stores only the public transaction hash, action, campaign/account context, lifecycle stage, and an operator-readable error in browser local storage under a versioned namespace. On return to the same campaign, the interface restores the record, checks the receipt, calls the canonical sync endpoint, and withholds a new pledge CTA while the result is unresolved. A failed/reverted record can be retried after the failed state is explicit; no private key, signature, or secret is stored.
 
 ### Flow E — Track a supported work
 
@@ -360,8 +394,8 @@ The backer opens `Phần thưởng của tôi` or follows the success link after
 
 **Failure / recovery**
 
-- Library load errors show retry without mixing historical Reward records into Editions.
-- Empty library links back to Editions discovery.
+- Library load errors show retry without mixing historical records into Campaign.
+- Empty library links back to Campaign discovery.
 
 ### Flow F — Download and optionally confirm the PDF
 
@@ -431,13 +465,13 @@ If the report succeeds but the challenge transaction is rejected or unresolved, 
 
 ## 6. Screen & State Inventory
 
-### Screen 1 — Editions discovery
+### Screen 1 — Campaign discovery
 
 **Purpose**  
 Help visitors find a work and understand whether it is inspectable, fundable, or already in production.
 
 **Entry conditions**  
-Open `#/reward` from the sidebar or a return link.
+Open `#/campaigns` from the sidebar or a return link.
 
 **Required information**  
 Local-pilot notice; title; creator; one-PDF price; dossier/campaign state; funding progress when open; relevant date; feedback count.
@@ -446,7 +480,7 @@ Local-pilot notice; title; creator; one-PDF price; dossier/campaign state; fundi
 `Xem campaign`.
 
 **Secondary actions**  
-Open existing historical Reward records; creator entry remains available but visually secondary for the backer journey.
+Open existing historical Campaign records; creator entry remains available but visually secondary for the backer journey.
 
 **States**  
 Loading, error with retry, empty, under review, approved/not opened, funding, production/release, refunding, completed.
@@ -475,7 +509,7 @@ Sign in; view community-feedback count; expand evidence, decisions, and technica
 Loading; not found; under review; approved/not opened; funding; signed-out funding; already pledged; funding expired/awaiting finalization; production; PDF review; released/challenge; eligible refund transition pending; refunding; paid out.
 
 **Exit / transition**  
-Pledge readiness, personal status, report/challenge, or Editions feed.
+Pledge readiness, personal status, report/challenge, or Campaign feed.
 
 ### Screen 3 — Account and wallet readiness
 
@@ -567,12 +601,12 @@ Return to campaign; copy transaction identifier.
 Recorded; recorded while funding still open; recorded near/after a state transition.
 
 **Exit / transition**  
-Editions library or campaign status.
+Campaign library or campaign status.
 
-### Screen 7 — Editions library
+### Screen 7 — Campaign library
 
 **Purpose**  
-Act as the durable home for every current Editions entitlement and its next action.
+Act as the durable home for every current Campaign entitlement and its next action.
 
 **Entry conditions**  
 Signed-in user opens `Phần thưởng của tôi` or comes from pledge success.
@@ -584,7 +618,7 @@ Work title; creator; amount paid; plain-language personal status; campaign phase
 Depends on state: view status, download PDF, resolve access issue, or claim refund.
 
 **Secondary actions**  
-Open full campaign details; open historical Reward rights through the separate history link.
+Open full campaign details; open historical entitlements through the separate history link.
 
 **States**  
 Loading; error/retry; empty; pending release; download eligible; confirmed; refund eligible; refunded; orphaned; paid out with valid access.
@@ -719,7 +753,7 @@ Each pledge wallet can open at most one formal challenge for the campaign. After
 
 ### Navigation and accessibility
 
-- Keep the existing sidebar vocabulary and separate Editions from historical Reward records.
+- Keep the existing sidebar vocabulary and separate Campaign from historical records.
 - All status changes and errors need programmatic status/alert announcements.
 - Keyboard focus moves to the new state heading after a major in-page transition.
 - Disabled actions include adjacent explanatory text; disabled appearance alone is insufficient.
@@ -732,7 +766,7 @@ Each pledge wallet can open at most one formal challenge for the campaign. After
 
 | UX question | Planned research | Result | Classification |
 | --- | --- | --- | --- |
-| Campaign discovery and one-PDF value proposition | Web crowdfunding discovery → project detail → reward understanding | Search blocked before results; no images or URLs returned | **RESEARCH PENDING** |
+| Campaign discovery and one-PDF value proposition | Web crowdfunding discovery → project detail → benefit understanding | Search blocked before results; no images or URLs returned | **RESEARCH PENDING** |
 | Wallet pledge and transaction progress | Fixed-price contribution → wallet handoff → pending → confirmed/recovery | Search blocked before results; no images or URLs returned | **RESEARCH PENDING** |
 | Returning backer, digital library, download, and issue recovery | Supported-work status → digital delivery → download/problem resolution | Search blocked before results; no images or URLs returned | **RESEARCH PENDING** |
 
@@ -742,7 +776,7 @@ No result can be classified as `ADOPT`, `ADAPT`, `INSPIRATION`, or `REJECT` beca
 
 These are product recommendations, not Mobbin findings.
 
-| Pattern | Repository finding | Application to FundTogether Editions | Status |
+| Pattern | Repository finding | Application to FundTogether | Status |
 | --- | --- | --- | --- |
 | State-specific primary action | The current page can expose multiple actor/protocol actions near the pledge action | Backer mode shows only pledge, status, download, challenge, or refund as the dominant action for the current state | Prototype recommendation |
 | Plain-language status plus audit detail | Current UI exposes raw codes and hashes directly | Put Vietnamese status/consequence first; keep raw identifiers in expandable technical detail | Prototype recommendation |
@@ -756,7 +790,7 @@ These are product recommendations, not Mobbin findings.
 
 These rejections come from confirmed FundTogether scope, not from Mobbin comparison.
 
-- Tier selection, cart, quantity, add-ons, gifting, and upsells.
+- Tier selection, cart, add-ons, gifting, and upsells. The funding surface has only a quantity selector for the single standard tier.
 - Shipping, delivery address, tracking, physical inventory, or fulfillment confirmation.
 - Treating token approval as payment success.
 - Treating wallet submission as a recorded pledge.
@@ -771,20 +805,20 @@ Mobbin did not return references because the connected account requires a paid p
 
 | Our screen/state | Mobbin reference | What to inspect when access is available | Intended usage |
 | --- | --- | --- | --- |
-| Editions discovery | **Unavailable — research pending** | How campaign cards balance title, creator, progress, price/reward, status, and deadline without becoming dense | Compare for Adapt |
+| Campaign discovery | **Unavailable — research pending** | How campaign cards balance title, creator, progress, price/benefit, status, and deadline without becoming dense | Compare for Adapt |
 | Campaign detail: evaluate | **Unavailable — research pending** | Story hierarchy, trust/evidence placement, sticky contribution summary, separation of core promise from policy detail | Compare for Adapt |
 | Account/wallet readiness | **Unavailable — research pending** | How a task resumes after authentication and how prerequisites are resolved one at a time | Compare for Adapt |
 | Pledge review | **Unavailable — research pending** | Fixed contribution summary, total/cost clarity, wallet handoff expectation, cancellation | Compare for Adapt |
 | Transaction progress | **Unavailable — research pending** | Multi-step wallet progress, submitted identifiers, pending/unknown outcome, recovery after interruption | Compare for Adopt/Adapt |
 | Pledge recorded | **Unavailable — research pending** | Success acknowledgement, durable receipt, and next action toward owned content | Compare for Adapt |
-| Editions library | **Unavailable — research pending** | Purchased/supported content cards, delivery readiness, one next action, empty state | Compare for Adapt |
+| Campaign library | **Unavailable — research pending** | Purchased/supported content cards, delivery readiness, one next action, empty state | Compare for Adapt |
 | Verified download | **Unavailable — research pending** | Download preparation, integrity/error feedback, retry, separate acknowledgement | Compare for Adapt |
 | Issue/challenge | **Unavailable — research pending** | Consequence explanation, deadline visibility, confirmation for a consequential escalation | Compare for Adapt |
 | Refund claim | **Unavailable — research pending** | Eligible amount, destination, pending transaction, completion, and safe retry | Compare for Adapt |
 
 For the future Mobbin pass, use low result counts and investigate one journey at a time. Candidate query intents:
 
-- `crowdfunding browse projects and open campaign reward detail`
+- `crowdfunding browse projects and open campaign benefit detail`
 - `crypto contribution confirm in wallet then pending transaction and success`
 - `digital purchase library item pending release then download`
 - `transaction submitted outcome unknown check status`
@@ -797,15 +831,15 @@ Only canonical links returned by Mobbin may be added. Actual images must be insp
 
 The following decisions are intentional for the first backer prototype:
 
-1. The backer journey covers one `COMICS_ARTBOOK`, one fixed-price standard pledge, and one private PDF entitlement.
+1. The backer journey covers one `COMICS_ARTBOOK`, one fixed-price standard PDF tier, quantity selection, and one private entitlement record per canonical pledge log.
 2. The feed and detail page distinguish dossier review, on-chain publication, funding, production, PDF review, challenge, refunding, and payout.
 3. Campaign detail leads with the creative promise and backer decision information. Hashes and protocol identifiers remain available through progressive disclosure.
-4. During funding, a signed-out visitor sees `Đăng nhập để ủng hộ`, preserving the campaign as the return destination. The wallet-authorized pledge CTA is available only to a signed-in account without an existing active entitlement.
-5. Pledge review shows the exact token amount, selected linked wallet, local network, zero platform fee, separate network-fee requirement, and expected release.
+4. During funding, a signed-out visitor sees `Đăng nhập để ủng hộ`, preserving the campaign as the return destination. A signed-in account may pledge even when it already owns an active entitlement.
+5. Pledge review shows the selected quantity, exact `price × quantity` token amount, selected linked wallet, local network, zero platform fee, separate network-fee requirement, and expected release.
 6. Token spending approval and pledge signing are presented as separate wallet actions when both are required.
 7. `Đã ủng hộ` is shown only after the pledge is canonically recorded and the entitlement belongs to the account.
 8. A submitted but unresolved transaction enters a recoverable pending state. Status checking is primary; repeat submission is withheld until a definitive safe-to-retry result.
-9. Pledge success links directly to `Thư viện PDF Editions`, which is the durable return point for the backer.
+9. Pledge success links directly to `Thư viện PDF Campaign`, which is the durable return point for the backer.
 10. Library entries use work identity, plain-language personal state, next relevant date, and one state-specific primary action instead of leading with raw codes.
 11. Production-evidence approval never displays a PDF download action.
 12. PDF download succeeds only after byte/hash verification. A failed verification is an issue state.
@@ -815,7 +849,7 @@ The following decisions are intentional for the first backer prototype:
 16. Deadline arrival and refund eligibility do not imply that the contract state already changed. The UX shows the pending transition until its transaction succeeds and is canonically recorded.
 17. A verified PDF handed to the browser is not described as proven saved, opened, or accepted.
 18. Valid entitlements are not described as automatically expiring; the product does not promise permanent hosting.
-19. Historical Reward records stay visibly separate and cannot collect new pledges.
+19. Historical Campaign records stay visibly separate and cannot collect new pledges.
 20. No cover art, public sample reader, favorites, social sharing, notification subscription, inline PDF reader, or recommendation system is required by this UX scope.
 
 ## 11. Assumptions & Open Questions
@@ -823,7 +857,7 @@ The following decisions are intentional for the first backer prototype:
 ### Confirmed
 
 - The current product is a local chain `31339` / MockUSDC pilot.
-- A campaign offers one fixed-price PDF and one pledge per wallet.
+- A campaign offers one fixed-price PDF tier and a wallet may pledge a positive quantity repeatedly.
 - Resolver decisions and community feedback have different authority.
 - No creator advance or platform fee exists in the approved local policy.
 - Accepted PDF release starts a seven-day challenge period.
@@ -870,16 +904,201 @@ This UX exercise does not define or implement:
 - public-chain, real-asset, legal, tax, KYC, AML, consumer-rights, or public-launch acceptance;
 - creator or Resolver workspace redesign;
 - financial-policy changes, creator advances, fees, partial refunds, post-payout contract refunds, or transferable entitlements;
-- additional campaign categories, reward tiers, quantities, gifting, shipping, keys, licenses, or DRM;
+- additional campaign categories, benefit tiers, quantities, gifting, shipping, keys, licenses, or DRM;
 - cover-art production, public sample reading, an inline PDF reader, permanent hosting, notifications, recommendations, favorites, or social features;
 - visual branding, design tokens, component specifications, or `DESIGN.md`;
-- changes to historical Reward obligations or records.
+- changes to historical Campaign obligations or records.
 
 ## Quality-gate result
 
 - Another design agent can understand the intended backer experience, required states, transitions, branches, and product constraints from this document.
 - Confirmed behavior, repository-derived recommendations, assumptions, and open questions are separated.
 - Important money, transaction, access, challenge, and refund states are represented.
-- The proposed journey remains within the current FundTogether Editions local MVP.
+- The proposed journey remains within the current FundTogether local MVP.
 - No Mobbin claim or link has been invented.
 - **Outstanding research limitation:** actual Mobbin images could not be inspected and canonical references could not be attached because the MCP returned a paid-plan access block. Section 9 defines the bounded follow-up research needed to close this gap.
+
+## 13. Complete website surface inventory
+
+### 13.1 Application shell
+
+Shared shell quanh mọi Campaign page:
+
+- brand block: FundTogether + `Campaign · Comics & Artbooks`;
+- sidebar gồm `Khám phá` và signed-in `Không gian làm việc`;
+- account entry đổi giữa `Đăng nhập` và `Tài khoản`;
+- network context: `Mạng thử nghiệm · MockUSDC`;
+- role-aware links cho Creator, Resolver và Admin;
+- footer ghi local development environment và Anvil chain `31339`;
+- hash routing giữ campaign context qua authentication và wallet handoff;
+- mobile menu không được che current state hoặc primary action.
+
+### 13.2 Route và page matrix
+
+| Route | Trang / surface | Người dùng chính | Chức năng chính |
+| --- | --- | --- | --- |
+| `#/` / `#/campaigns` | Campaign discovery/feed | Public, Backer | Filter shelf, campaign card, mở detail |
+| `#/campaigns/review` | Community Review | Community, Resolver | Đọc hồ sơ review, gửi comment/issue |
+| `#/campaigns/:id` | Campaign detail public | Public, Backer | Creative promise, ledger, pledge, delivery |
+| `#/campaigns/:id/creator` | Campaign detail Creator | Creator | Evidence, production, feedback read-only |
+| `#/campaigns/:id/resolver` | Campaign detail Resolver | Resolver | Evidence, activation, challenge, settlement |
+| `#/campaigns/library` | Campaign Library | Backer | Entitlement, PDF/refund recovery |
+| `#/account` / `#/workspace` | Account và wallet | All | Session, SIWE, linked wallets, roles |
+| `#/campaigns/creator` | Creator Studio | Creator | Draft gate, workflow, submission |
+| `#/campaigns/creator/profile` | Studio Profile | Creator | Bio, IP declaration, publications |
+| `#/campaigns/resolver` | Resolver Console | Resolver | Queue, dossier, review, exceptions |
+| `#/admin` / `#/campaigns/admin` | Admin Console | Admin | IP verification, KPI, exceptions |
+| `#/campaigns/history*` / `#/campaigns/:id` | Historical Campaign | Historical backer | Read-only historical data |
+
+### 13.3 Discovery và campaign card
+
+Feed gồm filter `Tất cả`, `Đang gây quỹ`, `Đã gây quỹ`, `Chờ kích hoạt`; shelf/grid;
+loading/error/empty state; card title, creator, category, pitch, state, price, progress,
+deadline và một CTA. Chỉ canonical Campaign binding với contract state `FUNDING` mới có
+CTA pledge. `APPROVED + NOT_PUBLISHED` là `Chờ kích hoạt`, không phải `Đang gây quỹ`.
+Historical funded card có nhãn lịch sử và không nhận pledge mới. Không có cart,
+multi-tier, shipping, inventory hoặc physical fulfillment; funding chỉ có quantity selector
+cho tier standard hiện tại.
+
+### 13.4 Campaign detail
+
+Trang detail có hai vùng: Folio/content và Notarial ledger. Bốn tab là:
+
+| Tab | Nội dung |
+| --- | --- |
+| `Tổng quan (Folio)` | Title, creator, pitch, story, benefit promise, trust dossier, entitlement |
+| `Sản xuất & Bằng chứng` | Production evidence, final PDF, hashes, upload/review |
+| `Cam kết & Tiến trình` | Timeline, application/publication/contract states, decisions |
+| `Góp ý & Thẩm định` | Comment, issue, challenge và decision context |
+
+Backer signed-out chỉ đọc và thấy `Đăng nhập để ủng hộ`; signed-in thấy exact price,
+wallet, network và preflight. `PENDING_RELEASE` không có download. `DOWNLOAD_ELIGIBLE`
+có ticket/download. Report, formal challenge và refund là ba action khác nhau.
+
+Creator được upload evidence/PDF đúng gate nhưng không tự approve hoặc tự bật download.
+Resolver được xem private evidence, review đúng object, activate exact frozen terms và
+resolve challenge. Sai Resolver wallet/deployment phải chặn signing.
+
+### 13.5 Pledge preflight và transaction
+
+Preflight chỉ ready khi campaign là `ON_CHAIN_CONFIRMED` + `FUNDING`, session/wallet
+đúng, chain/deployment/token đúng, balance đủ, allowance đủ hoặc cần approve, và không
+có unresolved transaction/active entitlement trùng campaign.
+
+Preflight phải hiển thị title, standard PDF, exact MockUSDC amount, wallet rút gọn,
+chain ID, zero platform fee, network fee riêng và thông báo pledge chỉ hoàn tất sau
+receipt + canonical event + indexer + entitlement. Approval thành công không phải pledge.
+
+```text
+Preflight → Awaiting signature → Submitted(hash)
+         → Receipt confirmed → Indexing → Canonical entitlement
+         → Failed / rejected / unknown
+```
+
+Khi unknown outcome, primary action là `Kiểm tra trạng thái`; không tự động retry.
+Transaction hash phải copy được và context phải còn sau reload/navigation.
+
+### 13.6 Account, SIWE và wallet
+
+Account gồm đăng nhập/tạo tài khoản, SIWE, session errors, link/unlink wallet,
+disconnect/change wallet, linked wallet list, role badges và return-to-origin.
+Client address không được trusted nếu chưa verify signature. Resolver wallet phải
+so sánh case-insensitive với deployment Resolver trước nonce/challenge/signature.
+Wrong wallet bị chặn nhưng disconnect/change-wallet vẫn hoạt động.
+
+### 13.7 Campaign Library
+
+Library card phải có campaign title, creator, amount paid, plain-language access state,
+consequence, next date, transaction disclosure và một CTA chính.
+
+| Access | Cách nói | CTA |
+| --- | --- | --- |
+| `PENDING_RELEASE` | Pledge canonical, PDF đang chờ duyệt | Theo dõi campaign |
+| `DOWNLOAD_ELIGIBLE` | PDF đã sẵn sàng | Tải PDF riêng tư |
+| `DELIVERY_UNAVAILABLE` | File cần Resolver kiểm tra | Xem sự cố / báo lỗi |
+| `REFUND_ELIGIBLE` | Có thể nhận full refund | Claim bằng ví đã pledge |
+| `REFUNDED` | Refund đã canonical | Không cần thêm action |
+| `ORPHANED` | Quyền lợi không còn hợp lệ | Xem chi tiết |
+
+Download flow: entitlement check → fresh canonical check → short-lived private ticket
+→ URL validation → blob → byte/hash verification → browser handoff. Ticket expiry không
+phải entitlement expiry; không hứa permanent hosting hoặc DRM.
+
+### 13.8 Creator Studio và Studio Profile
+
+Creator flow bắt buộc: profile/IP declaration → Admin verification → draft validation
+→ sample/content/budget/evidence plan → freeze → Resolver review → correction loop
+→ approval/activation → production evidence → final PDF/hash → release review.
+
+Draft chỉ nhận `COMICS_ARTBOOK`, một standard `DIGITAL_DOWNLOAD` PDF, goal/price/duration
+integer-safe, không nhận ngày phát hành trong commitment. Creator chỉ chốt release deadline
+sau khi xác nhận hoàn thành campaign và production evidence đã được Resolver duyệt. Không quantity tier, inventory, bundle,
+shipping hoặc physical promise. `CHANGES_REQUESTED` quay về editable `DRAFT` nhưng giữ history.
+
+Studio Profile có display name, bio, IP declaration, status, publications, validation và
+rejection reason. Profile chưa `VERIFIED` thì Studio chỉ hiển thị gate và không cho submit.
+
+### 13.9 Resolver và Admin
+
+Resolver queue tách frozen/private review, community review, activation, funding, production,
+release, challenge/dispute, refund/payout và orphaned/indexer exception. Dossier có creator
+profile, frozen snapshot, tier terms, plans, evidence, feedback và decision history.
+
+Resolver actions phải ghi đúng object: `Approve campaign`, `Yêu cầu chỉnh sửa`, `Reject campaign`,
+`Duyệt bằng chứng sản xuất`, `Duyệt PDF cuối`, `Chấp nhận khiếu nại`, `Bác khiếu nại`,
+`Mở hoàn tiền khi quá hạn policy` và `Trả Creator khi đủ điều kiện`.
+
+Admin Console gồm KPI review queue/funding/pending sync/exceptions, lifecycle distribution,
+exception list, creator/IP tabs và confirmation trước approve/reject. Admin chỉ verify
+creator/IP và theo dõi vận hành; không approve release, payout, refund hoặc sửa canonical state.
+
+## 14. Capability catalog
+
+| Capability | Chi tiết phải có | Authority |
+| --- | --- | --- |
+| Auth/session | Email/password, SIWE, refresh, return-to-origin | Backend + signature verification |
+| Wallet linking | Link/unlink, chain check, Resolver guard, recovery | Backend + wallet signature |
+| Creator profile | Bio, IP declaration, status, rejection reason | Admin review |
+| Draft/review | Typed config, revision, save, freeze, submit, correction | Backend + Resolver |
+| Activation | Exact terms, binding, deployment check, orphan recovery | Campaign contract + indexer |
+| Pledge | Balance/allowance, approve, fixed pledge, one wallet | Campaign contract |
+| Indexing | Receipt, event, idempotent projection, entitlement | Indexer + DB projection |
+| Evidence/delivery | Private evidence, final PDF, SHA-256, ticket, byte verification | Storage + Resolver + Backend |
+| Feedback/challenge | Comment, issue, formal challenge, uphold/dismiss | App + contract |
+| Refund/payout | Eligibility, original wallet, claim, release/challenge gates | Campaign contract/policy |
+| Operations | Summary, KPI, queue, exception, indexer lag | Role-specific read models |
+
+## 15. State and source-of-truth matrix
+
+| Dimension | Ví dụ state | Nguồn chính | Website consequence |
+| --- | --- | --- | --- |
+| Application | DRAFT, FROZEN, UNDER_REVIEW_PRIVATE, APPROVED | PostgreSQL review/application | Edit/review visibility |
+| Publication | NOT_PUBLISHED, ORPHANED, ON_CHAIN_CONFIRMED | Campaign binding/indexer | Pledge visibility |
+| Contract | FUNDING, PRODUCTION, RELEASE_REVIEW, RELEASED, REFUNDING, SETTLED | Smart contract snapshot | Financial eligibility |
+| Entitlement | PENDING_RELEASE, DOWNLOAD_ELIGIBLE, DELIVERY_UNAVAILABLE, REFUND_ELIGIBLE, REFUNDED | Indexed entitlement | Library CTA |
+| Transaction | Awaiting signature, submitted, receipt, indexing, canonical | Browser + receipt + indexer | Recovery copy |
+| File | Uploaded, hashed, accepted, ticketed, verified | Storage + Resolver decision | Evidence/PDF access |
+
+Browser local state chỉ là recovery hint; không cấp quyền tiền hoặc file nếu canonical source chưa xác nhận.
+
+## 16. Product and safety rules
+
+- Approval thành công không phải pledge thành công.
+- Receipt thành công không phải canonical entitlement.
+- Deadline đến không phải contract transition đã mined.
+- `REFUND_ELIGIBLE` không phải `REFUNDED`.
+- Production evidence approval không phải PDF download availability.
+- Report, formal challenge và refund claim là ba flow khác nhau.
+- Download handoff không chứng minh file đã lưu hoặc mở.
+- Mọi disabled action cần lý do cạnh button; không dùng màu là tín hiệu duy nhất.
+
+## 17. Final documentation status
+
+`PRODUCT.md` hiện bao quát Backer journey, Creator Studio, Studio Profile, Resolver Console,
+Admin Console, Account/Wallet, Community Review, Campaign Library và Historical Campaign.
+Đây là documentation-only update; không sửa frontend, backend, contract, database hoặc
+deployment. Các thay đổi code đang dirty trong checkout được giữ nguyên.
+
+Mobbin research vẫn **PENDING** vì paid-plan gate; không có screenshot, canonical URL
+hoặc Mobbin classification nào được bịa. Các pattern trong file là repository-derived
+recommendations và phải được kiểm tra bằng user research/Mobbin khi có quyền truy cập.
