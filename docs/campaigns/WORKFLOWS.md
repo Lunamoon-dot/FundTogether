@@ -47,6 +47,30 @@ Feed công khai tách ba surface, không trộn trạng thái: `rreview` chỉ h
 canonical; `rfunding` chỉ hiển thị binding canonical có state `FUNDING (0)`. `APPROVED`
 không đồng nghĩa đang nhận pledge.
 
+## 1.1 Workspace và boundary theo vai trò
+
+Campaign detail không còn dùng một trang chung rồi ẩn/hiện mutation theo role. Mỗi
+vai trò có workspace canonical riêng:
+
+```text
+Public / Backer  → #/campaigns/:id
+Creator          → #/campaigns/creator/:id
+Resolver         → #/campaigns/resolver/:id
+Admin operations → #/admin/campaigns/:id
+```
+
+Public/Backer là nơi đọc trạng thái công khai và thực hiện pledge hoặc hành động
+entitlement của chính Backer. Creator là nơi xử lý campaign do mình sở hữu và gửi
+evidence, PDF, completion hoặc request nghiệp vụ thuộc Creator. Resolver xem xét hồ
+sơ riêng tư, chốt review và các quyết định được contract cho phép. Admin chỉ xem
+projection vận hành, publication/indexer và exception; Admin không có quyền Resolver
+chỉ vì đã mở được Admin workspace.
+
+Đây là boundary ở UI và HTTP authorization, không phải lớp bảo mật duy nhất. Route
+gate chỉ giúp điều hướng đúng; backend vẫn kiểm session, ownership và role, còn
+contract vẫn quyết định các chuyển trạng thái tiền. Các URL detail cũ được redirect
+về route canonical tương ứng trước khi workspace mới mount.
+
 ## 2. Phát hành và pledge
 
 ```text

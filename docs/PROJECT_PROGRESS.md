@@ -3,6 +3,21 @@
 > **Status:** Current implementation evidence log. A recorded PASS applies only
 > to the named command, date and environment; it is not public-launch approval.
 
+## 2026-10-19 Role-oriented Campaign workspaces
+
+- Implemented canonical Public/Backer, Creator, Resolver and Admin Campaign detail
+  routes. Legacy role-suffixed detail URLs redirect before mounting a workspace.
+- Separated mutation ownership in the UI: Backer actions stay on public detail;
+  Creator owns production/completion/request work; Resolver owns review and allowed
+  financial decisions; Admin is an operational read-only projection.
+- Added backend authorization coverage for public preview/evidence, Creator ownership,
+  canonical Backer reads, Resolver decisions, Admin operations, and rejection of
+  body-supplied actor/destination identifiers. Focused ACL suite passed 7/7; adjacent
+  HTTP and review suites passed. Workflow HTTP acceptance requires the fresh local RPC
+  runtime and will be rerun after the authorized reset.
+- No contract, ABI, schema, API wire format or financial-policy change is part of this
+  boundary split.
+
 ## 2026-10-18 Security remediation checkpoint
 
 - Added bounded review conversations: transactional cap of 200 messages per

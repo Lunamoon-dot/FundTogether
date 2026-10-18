@@ -55,7 +55,10 @@ The backer journey sits inside a larger role-based product. These surfaces are p
 | Admin Console | `#/admin` | Verify creator/IP profiles, monitor lifecycle queues and operational exceptions, and refresh administrative data | Admin verification is a prerequisite for eligible creator work; Admin does not decide financial release or refund transitions |
 | Resolver Console | `#/campaigns/resolver` | Review campaign commitments, open/close Community Review, approve/request changes/reject, inspect production/PDF evidence, and resolve eligible disputes | Resolver decisions create the states that determine whether a campaign is pledgeable, downloadable, challengeable, or refundable |
 | Community Review | `#/campaigns/review` | Let signed-in community members submit public comments or private issue reports on the currently exposed commitment/evidence | Public comments are anonymized for the community; private issues are visible to their author, Creator and Resolver. Neither type opens pledge, approves funds, or creates entitlement |
-| Campaign public detail | `#/campaigns/:id` | Show the frozen promise, review decision, on-chain funding/production/release state, and personal pledge/PDF/refund actions | This is the backer's campaign entry point and the shared status surface after Creator/Resolver handoffs |
+| Campaign public / Backer detail | `#/campaigns/:id` | Show the frozen promise, review decision, on-chain funding/production/release state, and the current Backer's pledge/PDF/refund actions | Public discovery and Backer financial/entitlement entry point; it does not mount Creator or Resolver mutations |
+| Campaign Creator workspace | `#/campaigns/creator/:id` | Owned campaign dossier, production evidence, final PDF, completion and Creator-owned follow-up requests | Creator-only private workspace; ownership is checked before private reads |
+| Campaign Resolver workspace | `#/campaigns/resolver/:id` | Review dossier/evidence, Resolver decisions, eligible funding finalization and settlement review | Resolver-only review/decision workspace; role checks remain server/contract enforced |
+| Campaign Admin operations | `#/admin/campaigns/:id` | Publication, indexer, lifecycle and operational exception projection | Admin read-only operations surface; it does not grant Resolver financial authority |
 | Campaign library | `#/campaigns/library` | List canonical backer entitlements and their next action | Durable return point for tracking, PDF access, or refund recovery |
 | Historical Campaign records | `#/campaigns/history/entitlements` and direct historical detail | Preserve historical campaign records and entitlements | Historical records remain read-only and separate; no new pledge or physical-fulfillment flow is restored |
 
@@ -940,8 +943,9 @@ Shared shell quanh mọi Campaign page:
 | `#/` / `#/campaigns` | Campaign discovery/feed | Public, Backer | Filter shelf, campaign card, mở detail |
 | `#/campaigns/review` | Community Review | Community, Resolver | Đọc hồ sơ review, gửi comment/issue |
 | `#/campaigns/:id` | Campaign detail public | Public, Backer | Creative promise, ledger, pledge, delivery |
-| `#/campaigns/:id/creator` | Campaign detail Creator | Creator | Evidence, production, feedback read-only |
-| `#/campaigns/:id/resolver` | Campaign detail Resolver | Resolver | Evidence, activation, challenge, settlement |
+| `#/campaigns/creator/:id` | Campaign Creator workspace | Creator | Owned dossier, evidence, production, completion, Creator requests |
+| `#/campaigns/resolver/:id` | Campaign Resolver workspace | Resolver | Review, evidence, activation, challenge, settlement decisions |
+| `#/admin/campaigns/:id` | Campaign Admin operations | Admin | Publication/indexer/lifecycle inspection; no Resolver decisions |
 | `#/campaigns/library` | Campaign Library | Backer | Entitlement, PDF/refund recovery |
 | `#/account` / `#/workspace` | Account và wallet | All | Session, SIWE, linked wallets, roles |
 | `#/campaigns/creator` | Creator Studio | Creator | Draft gate, workflow, submission |

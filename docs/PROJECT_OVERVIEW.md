@@ -15,6 +15,25 @@ The `/v1/fundtogether/campaigns` routes own preparation, review, publication pre
 
 Historical contract/ABI, terms, financial records, canonical events and refund synchronization are retained. Physical API/UI and runtime shipping encryption are removed. Migration 0005 archives audited delivery records and batches before dropping active delivery columns; unreconciled/changed records abort it. It was applied to the main local database after the operator stopped the old API, and the rebuilt API was started and verified on 2026-10-13. Scope-text screening rejects common explicit physical promises conservatively; it is not semantic/IP verification or a replacement for Resolver review.
 
+## Role-oriented Campaign workspaces
+
+Campaign detail is split by responsibility; the route is a presentation and navigation
+boundary, not the financial authority. The canonical hash routes are:
+
+| Route | Workspace | Allowed responsibility |
+| --- | --- | --- |
+| `#/campaigns/:id` | Public / Backer | Read public campaign state; an authenticated Backer may prepare and submit a pledge when the canonical contract state allows it; inspect that Backer's entitlement, download, challenge and refund actions. |
+| `#/campaigns/creator/:id` | Creator | Read the owned campaign's private dossier; submit production evidence, final PDF, completion dossier and Creator-owned follow-up requests. |
+| `#/campaigns/resolver/:id` | Resolver | Review the campaign dossier and private evidence; approve/request changes/reject review, finalize eligible funding and make the Resolver decisions allowed by the contract. |
+| `#/admin/campaigns/:id` | Admin operations | Inspect publication, indexer and lifecycle projections and operational exceptions. Admin does not inherit Resolver financial authority. |
+
+The frontend route gate prevents accidental cross-role navigation, but it is not an
+authorization mechanism. Backend session/role/ownership checks remain authoritative;
+the contract remains authoritative for pledge, escrow, finalization, release and refund
+transitions. Legacy detail URLs redirect to these canonical workspaces before the new
+page mounts, and this split does not change ABI, schema, financial policy or event
+projection semantics.
+
 The detailed plan and observed R0–R5 progress are in `docs/plans/2026-10-13-fundtogether-digital-pdf-mvp.md`. The migration statements above are historical upgrade evidence; the current disposable local test runtime was reset on 2026-10-17 with one final-schema baseline, `0000_fundtogether_baseline.sql`, and a fresh Anvil state with newly deployed local contracts. This local reset does not rewrite production migration history or affect any production chain. See PROJECT_PROGRESS for test results and the remaining manual/public-launch limitations.
 
 ```text
