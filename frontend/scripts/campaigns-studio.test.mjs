@@ -270,10 +270,11 @@ test('saving a new draft keeps the creator in the step-three editor', async () =
 })
 
 test('creator publication waits for the Resolver approval that exists on chain', async () => {
-  const source = await readFile(new URL('../src/features/campaigns/public/Page.tsx', import.meta.url), 'utf8')
+  const source = await readFile(new URL('../src/features/campaigns/creator/CampaignWorkspacePage.tsx', import.meta.url), 'utf8')
+  const activation = await readFile(new URL('../src/features/campaigns/shared/ui/ActivationPanel.tsx', import.meta.url), 'utf8')
   assert.match(source, /onchainApproved/)
-  assert.match(source, /Primary Resolver chưa ký duyệt cam kết trên chain/)
-  assert.match(source, /Kiểm tra lại chữ ký/)
+  assert.match(source, /Primary Resolver chưa ký đúng commitment trên chain/)
+  assert.match(activation, /Ký duyệt đúng commitment trên chain/)
 })
 
 test('new Campaign wizard offers one PDF without a physical, inventory or add-tier input', () => {

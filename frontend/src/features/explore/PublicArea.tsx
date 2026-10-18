@@ -8,13 +8,13 @@ const AccountAccess = lazy(() => import('../auth/AccountAccess').then(module => 
 const PublicCampaignPage = lazy(() => import('../campaigns/public/CampaignPage').then(module => ({ default: module.PublicCampaignPage })));
 const CreatorCampaignWorkspacePage = lazy(() => import('../campaigns/creator/CampaignWorkspacePage').then(module => ({ default: module.CreatorCampaignWorkspacePage })));
 const ResolverCampaignReviewPage = lazy(() => import('../campaigns/resolver/CampaignReviewPage').then(module => ({ default: module.ResolverCampaignReviewPage })));
-const CampaignPage = lazy(() => import('../campaigns/public/Page').then(module => ({ default: module.CampaignPage })));
+const CampaignOperationsPage = lazy(() => import('../campaigns/admin/CampaignOperationsPage').then(module => ({ default: module.AdminCampaignOperationsPage })));
 const Library = lazy(() => import('../campaigns/backer/Library').then(module => ({ default: module.Library })));
 const Studio = lazy(() => import('../campaigns/creator/Studio').then(module => ({ default: module.Studio })));
 const Profile = lazy(() => import('../campaigns/creator/Profile').then(module => ({ default: module.Profile })));
 const HistoricalEntitlements = lazy(() => import('../campaigns/historical/HistoricalEntitlements').then(module => ({ default: module.HistoricalEntitlements })));
 const ResolverConsole = lazy(() => import('../campaigns/resolver/Console').then(module => ({ default: module.Console })));
-const AdminConsole = lazy(() => import('../campaigns/resolver/AdminConsole').then(module => ({ default: module.AdminConsole })));
+const AdminConsole = lazy(() => import('../campaigns/admin/AdminConsole').then(module => ({ default: module.AdminConsole })));
 
 export type { PublicAreaProps };
 
@@ -88,14 +88,21 @@ export function PublicArea(props: PublicAreaProps) {
           ) : (
             <p className="review-notice review-notice--blocked">Tài khoản cần có quyền RESOLVER để truy cập workspace này.</p>
           )
+        ) : campaignDetail.workspace === 'admin' ? (
+          session && hasAdminRole ? (
+            <CampaignOperationsPage
+              key={`${campaignDetail.campaignId}:${session.userId}:${campaignDetail.initialTab}`}
+              id={campaignDetail.campaignId}
+              session={session}
+              initialTab={campaignDetail.initialTab}
+            />
+          ) : !session ? (
+            <p>Đăng nhập để mở Admin operations workspace. <a href="#/account">Đăng nhập</a></p>
+          ) : (
+            <p className="review-notice review-notice--blocked">Tài khoản cần có quyền ADMIN để truy cập workspace này.</p>
+          )
         ) : (
-          <CampaignPage
-            key={`${campaignDetail.campaignId}:${session?.userId ?? 'public'}:${campaignDetail.workspace}:${campaignDetail.initialTab}`}
-            id={campaignDetail.campaignId}
-            session={session}
-            mode="public"
-            initialTab={campaignDetail.initialTab}
-          />
+          <p role="status" className="muted">Không tìm thấy workspace campaign.</p>
         )
       )}
       {historicalEntitlements && session && <HistoricalEntitlements key={session.userId} />}

@@ -10,7 +10,7 @@ const read = relative => fs.readFileSync(path.join(root, 'src', 'features', 'cam
 test('completion settlement exposes the dossier and exactly two surplus destinations', () => {
   const panel = read('shared/ui/CompletionSettlementPanel.tsx')
   const api = read('api/campaigns.ts')
-  const creatorPage = read('public/Page.tsx')
+  const creatorPage = read('creator/CampaignActions.tsx')
   const publicPage = read('public/CampaignPage.tsx')
 
   assert.match(creatorPage, /CompletionSettlementPanel/)

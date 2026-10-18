@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 
 const preflight = await readFile(new URL('../src/features/campaigns/shared/ui/PledgePreflight.tsx', import.meta.url), 'utf8')
 const transaction = await readFile(new URL('../src/features/campaigns/transactions/useTransaction.ts', import.meta.url), 'utf8')
-const page = await readFile(new URL('../src/features/campaigns/public/Page.tsx', import.meta.url), 'utf8')
+const page = await readFile(new URL('../src/features/campaigns/backer/CampaignActions.tsx', import.meta.url), 'utf8')
 
 test('required read failures fail closed before READY', () => {
   assert.match(preflight, /wallets\.error \|\| balance\.error \|\| allowance\.error/)
@@ -36,8 +36,8 @@ test('pledge maps token balance errors and blocks approval when balance is insuf
 })
 
 test('pledge flow is hidden after the funding deadline', () => {
-  assert.match(page, /state\.state === 0 && mode === 'public' && state\.price && !fundingExpired/)
-  assert.match(page, /tx\.send\('pledge',[\s\S]*?\.finally\(\(\) => \{ void chain\.refetch\(\); \}\)/)
+  assert.match(page, /state\.state === 0 && state\.price && !fundingExpired/)
+  assert.match(page, /transaction\.send\('pledge',[\s\S]*?\.finally\(onRefresh\)/)
 })
 
 test('activation preflight rejects a Creator wallet that is a Resolver wallet', () => {

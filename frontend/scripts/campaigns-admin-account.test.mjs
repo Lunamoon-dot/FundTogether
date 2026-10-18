@@ -11,7 +11,7 @@ after(() => server.close())
 
 const { LifecycleDistributionChart } = await server.ssrLoadModule('/src/features/campaigns/shared/ui/LifecycleDistributionChart.tsx')
 const { ExceptionList } = await server.ssrLoadModule('/src/features/campaigns/shared/ui/ExceptionList.tsx')
-const { AdminConsole } = await server.ssrLoadModule('/src/features/campaigns/resolver/AdminConsole.tsx')
+const { AdminConsole } = await server.ssrLoadModule('/src/features/campaigns/admin/AdminConsole.tsx')
 const { classifyAccountError } = await server.ssrLoadModule('/src/features/auth/account-error.ts')
 const { AccountAccess } = await server.ssrLoadModule('/src/features/auth/AccountAccess.tsx')
 const { AppProviders } = await server.ssrLoadModule('/src/app/providers/AppProviders.tsx')

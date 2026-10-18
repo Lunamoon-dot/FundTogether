@@ -1,5 +1,6 @@
 import type React from 'react';
 import type { AccountSession } from '../../lib/api/auth';
+import { resolveCampaignDetailRoute } from './campaignRoutes';
 import './PublicArea.css';
 
 export interface PublicAreaProps {
@@ -19,15 +20,16 @@ export function AppShell({
   session,
   children,
 }: AppShellProps) {
-  const isCampaignFeed = path === '/' || path === '/campaigns' || path === '/campaigns/history';
+  const campaignDetail = resolveCampaignDetailRoute(path);
+  const isCampaignFeed = path === '/' || path === '/campaigns' || path === '/campaigns/history' || campaignDetail?.workspace === 'public';
   const isCampaignCommunityReview = path === '/campaigns/review';
   const isCampaignCreatorStudio = path === '/campaigns/creator';
   const isCampaignCreatorDraft = path === '/campaigns/creator/draft' || path === '/campaigns/creator/new';
   const isCampaignCreatorProfile = path === '/campaigns/creator/profile';
-  const isCampaignCreatorWorkspace = isCampaignCreatorStudio || isCampaignCreatorDraft;
+  const isCampaignCreatorWorkspace = isCampaignCreatorStudio || isCampaignCreatorDraft || campaignDetail?.workspace === 'creator';
   const isCampaignLibrary = path === '/campaigns/library';
-  const isAdmin = path === '/admin' || path === '/campaigns/admin';
-  const isCampaignResolver = path === '/campaigns/resolver';
+  const isAdmin = path === '/admin' || path === '/campaigns/admin' || campaignDetail?.workspace === 'admin';
+  const isCampaignResolver = path === '/campaigns/resolver' || campaignDetail?.workspace === 'resolver';
   const isAccount = path === '/account' || path === '/workspace';
 
   const hasAdminRole = session?.roles.includes('ADMIN') ?? false;

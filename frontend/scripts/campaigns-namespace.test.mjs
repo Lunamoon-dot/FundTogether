@@ -17,12 +17,11 @@ function listFiles(directory) {
 }
 
 test('active UI lives under the campaigns namespace', () => {
-  for (const directory of ['campaigns/public', 'campaigns/creator', 'campaigns/resolver', 'campaigns/backer', 'campaigns/transactions', 'campaigns/shared']) {
+  for (const directory of ['campaigns/public', 'campaigns/creator', 'campaigns/resolver', 'campaigns/admin', 'campaigns/backer', 'campaigns/transactions', 'campaigns/shared']) {
     assert.equal(exists(directory), true, `missing target directory: ${directory}`);
   }
   for (const file of [
     'campaigns/public/Feed.tsx',
-    'campaigns/public/Page.tsx',
     'campaigns/public/Community.tsx',
     'campaigns/creator/Studio.tsx',
     'campaigns/creator/Profile.tsx',
@@ -30,6 +29,8 @@ test('active UI lives under the campaigns namespace', () => {
     'campaigns/creator/NewPreparationForm.tsx',
     'campaigns/resolver/Console.tsx',
     'campaigns/resolver/ReviewPanel.tsx',
+    'campaigns/admin/AdminConsole.tsx',
+    'campaigns/admin/CampaignOperationsPage.tsx',
     'campaigns/backer/Library.tsx',
     'campaigns/transactions/useTransaction.ts',
     'campaigns/shared/FrozenTerms.tsx',
@@ -55,6 +56,7 @@ test('current campaign files do not repeat the product namespace in filenames', 
     'CampaignPage.tsx',
     'CampaignWorkspacePage.tsx',
     'CampaignReviewPage.tsx',
+    'CampaignOperationsPage.tsx',
     'CampaignDetailFrame.tsx',
     'CampaignDossierList.tsx',
     'CampaignLedger.tsx',

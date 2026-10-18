@@ -9,6 +9,7 @@ import { getErrorMessage } from '../../../lib/api/error';
 import { type ExceptionItem } from '../shared/ui/ExceptionList';
 import { AdminOperationsOverview } from '../shared/ui/AdminOperationsOverview';
 import { campaignApi } from '../api/campaigns';
+import { campaignDetailHref } from '../../explore/campaignRoutes';
 import '../shared/styles.css';
 
 export function AdminConsole({ userId }: { userId: string }) {
@@ -115,21 +116,21 @@ export function AdminConsole({ userId }: { userId: string }) {
       label: `Chiến dịch "${c.title}" đã APPROVED nhưng publication vẫn NOT_PUBLISHED; chưa mở pledge`,
       severity: 'warning' as const,
       owner: c.title,
-      actionHref: `#/campaigns/${c.campaignId}/resolver`,
+      actionHref: campaignDetailHref('admin', c.campaignId),
     })),
     ...orphanedBindings.map(c => ({
       id: `orphaned-binding-${c.campaignId}`,
       label: `Chiến dịch "${c.title}" có publication ORPHANED; đối chiếu tx ${c.bindingTransactionHash ?? 'chưa xác định'}, không tạo campaign mới`,
       severity: 'danger' as const,
       owner: c.title,
-      actionHref: `#/campaigns/${c.campaignId}/resolver`,
+      actionHref: campaignDetailHref('admin', c.campaignId),
     })),
     ...indexerPendingBindings.map(c => ({
       id: `indexer-pending-${c.campaignId}`,
       label: `Chiến dịch "${c.title}" có binding canonical nhưng contract snapshot đang chờ indexer; pledge vẫn bị khóa`,
       severity: 'warning' as const,
       owner: c.title,
-      actionHref: `#/campaigns/${c.campaignId}/resolver`,
+      actionHref: campaignDetailHref('admin', c.campaignId),
     })),
   ];
 
@@ -400,3 +401,5 @@ export function AdminConsole({ userId }: { userId: string }) {
     </div>
   );
 }
+
+
