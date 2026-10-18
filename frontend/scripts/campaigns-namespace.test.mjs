@@ -53,6 +53,7 @@ test('current campaign files do not repeat the product namespace in filenames', 
   const allowedSharedDetailNames = new Set([
     'CampaignActions.tsx',
     'CampaignPage.tsx',
+    'CampaignWorkspacePage.tsx',
     'CampaignDetailFrame.tsx',
     'CampaignDossierList.tsx',
     'CampaignLedger.tsx',

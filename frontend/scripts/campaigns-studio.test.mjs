@@ -144,7 +144,7 @@ test('published but unbound Campaign exposes activation workspace from Creator S
   }])
   assert.match(html, /chưa có campaign canonical/)
   assert.match(html, /Creator ký tạo campaign trên contract/)
-  assert.match(html, /href="#\/campaigns\/campaign\/creator"/)
+  assert.match(html, /href="#\/campaigns\/creator\/campaign"/)
 })
 
 test('published but unbound Campaign appears as a Creator activation task', () => {
@@ -155,7 +155,7 @@ test('published but unbound Campaign appears as a Creator activation task', () =
 
   assert.match(html, /Cần bạn làm \(1\)/)
   assert.match(html, /Mở trang kích hoạt on-chain/)
-  assert.match(html, /href="#\/campaigns\/campaign\/creator"/)
+  assert.match(html, /href="#\/campaigns\/creator\/campaign"/)
   assert.doesNotMatch(html, /href="#\/campaigns\/creator\?edit=campaign"/)
   assert.doesNotMatch(html, />PUBLISHED</)
   assert.match(html, /Được duyệt: 1/)
@@ -184,7 +184,7 @@ test('funded production task opens the campaign production workspace', () => {
     contractState: 1,
   }])
   assert.match(html, /Cập nhật tiến độ sản xuất/)
-  assert.match(html, /href="#\/campaigns\/c-production\/creator"/)
+  assert.match(html, /href="#\/campaigns\/creator\/c-production\?tab=production"/)
   assert.doesNotMatch(html, /href="#\/campaigns\/creator\?edit=c-production/)
 })
 
@@ -529,7 +529,7 @@ test('Creator can open community feedback as a read-only task', () => {
   assert.equal(isCreatorActionable(campaign), true)
   const html = render([campaign], 'owner')
   assert.match(html, /Xem phản hồi cộng đồng/)
-  assert.match(html, /#\/campaigns\/community-feedback\/creator\/feedback/)
+  assert.match(html, /#\/campaigns\/creator\/community-feedback\?tab=activity/)
 })
 
 test('Resolver case surface keeps conversation outcome separate from financial actions', () => {

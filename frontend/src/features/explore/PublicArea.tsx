@@ -6,6 +6,7 @@ import './PublicArea.css';
 
 const AccountAccess = lazy(() => import('../auth/AccountAccess').then(module => ({ default: module.AccountAccess })));
 const PublicCampaignPage = lazy(() => import('../campaigns/public/CampaignPage').then(module => ({ default: module.PublicCampaignPage })));
+const CreatorCampaignWorkspacePage = lazy(() => import('../campaigns/creator/CampaignWorkspacePage').then(module => ({ default: module.CreatorCampaignWorkspacePage })));
 const CampaignPage = lazy(() => import('../campaigns/public/Page').then(module => ({ default: module.CampaignPage })));
 const Library = lazy(() => import('../campaigns/backer/Library').then(module => ({ default: module.Library })));
 const Studio = lazy(() => import('../campaigns/creator/Studio').then(module => ({ default: module.Studio })));
@@ -62,13 +63,24 @@ export function PublicArea(props: PublicAreaProps) {
             session={session}
             initialTab={campaignDetail.initialTab}
           />
+        ) : campaignDetail.workspace === 'creator' ? (
+          session ? (
+            <CreatorCampaignWorkspacePage
+              key={`${campaignDetail.campaignId}:${session.userId}:${campaignDetail.initialTab}`}
+              id={campaignDetail.campaignId}
+              session={session}
+              initialTab={campaignDetail.initialTab}
+            />
+          ) : (
+            <p>Đăng nhập để mở Creator workspace. <a href="#/account">Đăng nhập</a></p>
+          )
         ) : (
           <CampaignPage
             key={`${campaignDetail.campaignId}:${session?.userId ?? 'public'}:${campaignDetail.workspace}:${campaignDetail.initialTab}`}
             id={campaignDetail.campaignId}
             session={session}
-            mode={campaignDetail.workspace === 'creator' || campaignDetail.workspace === 'resolver'
-              ? campaignDetail.workspace
+            mode={campaignDetail.workspace === 'resolver'
+              ? 'resolver'
               : 'public'}
             initialTab={campaignDetail.initialTab}
           />
