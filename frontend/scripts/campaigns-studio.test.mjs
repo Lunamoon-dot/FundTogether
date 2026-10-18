@@ -98,7 +98,7 @@ test('Resolver console shows canonical on-chain campaigns when the review list i
   assert.match(html, /Campaign on-chain cần xử lý/)
   assert.match(html, /nuôi Huy/)
   assert.match(html, /Mở workspace on-chain/)
-  assert.match(html, /href="#\/campaigns\/campaign-1\/resolver"/)
+  assert.match(html, /href="#\/campaigns\/resolver\/campaign-1"/)
 })
 
 test('canonical funding campaign keeps its on-chain workspace link beside the review panel', () => {
@@ -111,7 +111,7 @@ test('canonical funding campaign keeps its on-chain workspace link beside the re
     contractState: 0,
   }])
   assert.match(html, /Mở workspace on-chain/)
-  assert.match(html, /href="#\/campaigns\/campaign\/resolver"/)
+  assert.match(html, /href="#\/campaigns\/resolver\/campaign"/)
 })
 
 test('Resolver console contains only the active Campaign review flow', async () => {
@@ -134,7 +134,7 @@ test('approved Campaign expose the on-chain action directly in the Resolver queu
   const campaign = { ...reviewCampaign('APPROVED'), category: 'COMICS_ARTBOOK' }
   const html = renderResolver([campaign])
   assert.match(html, /Mở trang xử lý on-chain →/)
-  assert.match(html, /href="#\/campaigns\/campaign\/resolver"/)
+  assert.match(html, /href="#\/campaigns\/resolver\/campaign"/)
 })
 
 test('published but unbound Campaign exposes activation workspace from Creator Studio', () => {
@@ -167,7 +167,7 @@ test('published but unbound Campaign is actionable from the Resolver queue', () 
     campaignId: 'campaign', publicationStatus: 'NOT_PUBLISHED', contractState: null,
   }])
   assert.match(html, /Mở trang xử lý on-chain →/)
-  assert.match(html, /href="#\/campaigns\/campaign\/resolver"/)
+  assert.match(html, /href="#\/campaigns\/resolver\/campaign"/)
 })
 
 test('funded production task opens the campaign production workspace', () => {

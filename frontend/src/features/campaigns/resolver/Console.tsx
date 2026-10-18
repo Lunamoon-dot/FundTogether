@@ -7,6 +7,7 @@ import { CommunityPanel } from '../public/Community';
 import { ReviewQueue } from '../shared/ui/ReviewQueue';
 import { ReviewHistoryDisclosure } from '../shared/ui/ReviewHistoryDisclosure';
 import { ResolverCase } from '../shared/ui/ResolverCase';
+import { campaignDetailHref } from '../../explore/campaignRoutes';
 import '../shared/styles.css';
 
 export function Console({ userId }: { userId: string }) {
@@ -100,7 +101,7 @@ export function Console({ userId }: { userId: string }) {
                         <strong>Campaign đã canonical trên chain</strong>
                         <p>Mở workspace on-chain để kiểm tra deadline, funding state và ký bước tiếp theo.</p>
                       </div>
-                      <a className="button button--primary" href={`#/campaigns/${selectedCampaign.id}/resolver`}>
+                      <a className="button button--primary" href={campaignDetailHref('resolver', selectedCampaign.id)}>
                         Mở workspace on-chain →
                       </a>
                     </div>
@@ -112,7 +113,7 @@ export function Console({ userId }: { userId: string }) {
                         <strong>{selectedCampaign.status === 'PUBLISHED' ? 'Campaign cần kích hoạt lại trên deployment hiện tại' : 'Hồ sơ đã được duyệt'}</strong>
                         <p>Chuyển sang workspace activation để ký đúng commitment và chờ Creator tạo campaign canonical.</p>
                       </div>
-                      <a className="button button--primary" href={`#/campaigns/${selectedCampaign.id}/resolver`}>
+                      <a className="button button--primary" href={campaignDetailHref('resolver', selectedCampaign.id)}>
                         Mở trang xử lý on-chain →
                       </a>
                     </div>
@@ -176,7 +177,7 @@ export function Console({ userId }: { userId: string }) {
                             ? 'Creator đã gửi hồ sơ hoàn thành; kiểm tra và quyết định Resolver.'
                             : 'Campaign đã hoàn thành canonical; Backer tự quyết toán surplus.'}
                 </p>
-                <a className="button button--primary" href={`#/campaigns/${operation.campaignId}/resolver`}>
+                <a className="button button--primary" href={campaignDetailHref('resolver', operation.campaignId)}>
                   Mở workspace on-chain →
                 </a>
               </article>

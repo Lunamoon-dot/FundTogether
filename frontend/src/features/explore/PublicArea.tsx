@@ -7,6 +7,7 @@ import './PublicArea.css';
 const AccountAccess = lazy(() => import('../auth/AccountAccess').then(module => ({ default: module.AccountAccess })));
 const PublicCampaignPage = lazy(() => import('../campaigns/public/CampaignPage').then(module => ({ default: module.PublicCampaignPage })));
 const CreatorCampaignWorkspacePage = lazy(() => import('../campaigns/creator/CampaignWorkspacePage').then(module => ({ default: module.CreatorCampaignWorkspacePage })));
+const ResolverCampaignReviewPage = lazy(() => import('../campaigns/resolver/CampaignReviewPage').then(module => ({ default: module.ResolverCampaignReviewPage })));
 const CampaignPage = lazy(() => import('../campaigns/public/Page').then(module => ({ default: module.CampaignPage })));
 const Library = lazy(() => import('../campaigns/backer/Library').then(module => ({ default: module.Library })));
 const Studio = lazy(() => import('../campaigns/creator/Studio').then(module => ({ default: module.Studio })));
@@ -74,14 +75,25 @@ export function PublicArea(props: PublicAreaProps) {
           ) : (
             <p>Đăng nhập để mở Creator workspace. <a href="#/account">Đăng nhập</a></p>
           )
+        ) : campaignDetail.workspace === 'resolver' ? (
+          session && hasResolverRole ? (
+            <ResolverCampaignReviewPage
+              key={`${campaignDetail.campaignId}:${session.userId}:${campaignDetail.initialTab}`}
+              id={campaignDetail.campaignId}
+              session={session}
+              initialTab={campaignDetail.initialTab}
+            />
+          ) : !session ? (
+            <p>Đăng nhập để mở Resolver workspace. <a href="#/account">Đăng nhập</a></p>
+          ) : (
+            <p className="review-notice review-notice--blocked">Tài khoản cần có quyền RESOLVER để truy cập workspace này.</p>
+          )
         ) : (
           <CampaignPage
             key={`${campaignDetail.campaignId}:${session?.userId ?? 'public'}:${campaignDetail.workspace}:${campaignDetail.initialTab}`}
             id={campaignDetail.campaignId}
             session={session}
-            mode={campaignDetail.workspace === 'resolver'
-              ? 'resolver'
-              : 'public'}
+            mode="public"
             initialTab={campaignDetail.initialTab}
           />
         )
