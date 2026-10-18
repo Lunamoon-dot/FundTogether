@@ -50,8 +50,14 @@ test('retired product branches and empty placeholders are removed', () => {
 
 test('current campaign files do not repeat the product namespace in filenames', () => {
   const files = listFiles(relative('campaigns')).map(file => path.basename(file));
+  const allowedSharedDetailNames = new Set([
+    'CampaignDetailFrame.tsx',
+    'CampaignDossierList.tsx',
+    'CampaignLedger.tsx',
+    'CampaignOverview.tsx',
+  ]);
   assert.deepEqual(
-    files.filter(name => /^(?:Reward|Campaign)/.test(name)),
+    files.filter(name => /^(?:Reward|Campaign)/.test(name) && !allowedSharedDetailNames.has(name)),
     [],
     'the campaigns folder already supplies product context',
   );

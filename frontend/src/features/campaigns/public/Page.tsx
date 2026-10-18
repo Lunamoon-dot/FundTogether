@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { formatUnits, keccak256, toHex } from 'viem';
 import type { AccountSession } from '../../../lib/api/auth';
@@ -6,16 +6,17 @@ import { campaignApi } from '../api/campaigns';
 import { getErrorMessage } from '../../../lib/api/error';
 import { useTransaction } from '../transactions/useTransaction';
 import { getCampaignUiState } from '../shared/ui/campaignState';
-import { StatusBadge } from '../shared/ui/StatusBadge';
-import { fundingProgressPercent } from '../shared/ui/fundingProgress';
 import { Timeline, type TimelineEvent } from '../shared/ui/Timeline';
 import { ActivationPanel } from '../shared/ui/ActivationPanel';
 import { PledgePreflight } from '../shared/ui/PledgePreflight';
 import { ReviewThread } from '../shared/ui/ReviewThread';
-import { ColophonRubric } from '../shared/ui/ColophonRubric';
 import { CommunityPanel, FeedbackComposerModal } from './Community';
 import { CompletionSettlementPanel } from '../shared/ui/CompletionSettlementPanel';
 import { DisbursementPanel } from '../shared/ui/DisbursementPanel';
+import { CampaignDetailFrame } from '../shared/detail/CampaignDetailFrame';
+import { CampaignOverview } from '../shared/detail/CampaignOverview';
+import { CampaignLedger } from '../shared/detail/CampaignLedger';
+import { CampaignDossierList } from '../shared/detail/CampaignDossierList';
 import '../shared/styles.css';
 const amount = (value: string) => `${formatUnits(BigInt(value), 6)} MockUSDC`;
 const zeroHash = `0x${'0'.repeat(64)}`;
@@ -167,165 +168,82 @@ export function CampaignPage({ id, session, mode = 'public', initialTab = 'overv
     });
   }
 
-  const percent = state ? fundingProgressPercent(state.raised, state.goal) : 0;
-  const formatDate = (isoOrSeconds?: string) => {
-    if (!isoOrSeconds) return 'Chưa xác định';
-    try {
-      const d = /^\d+$/.test(isoOrSeconds) ? new Date(Number(isoOrSeconds) * 1000) : new Date(isoOrSeconds);
-      if (isNaN(d.getTime())) return isoOrSeconds;
-      return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-    } catch {
-      return isoOrSeconds;
-    }
-  };
+  const alerts = <>
+    {[error, tx.error, chain.error && getErrorMessage(chain.error), showPublicationTermsError && getErrorMessage(publicationTerms.error), evidence.error && getErrorMessage(evidence.error), entitlements.error && getErrorMessage(entitlements.error)].filter(Boolean).map((message, index) => (
+      <div key={index} role="alert" className="monograph-alert monograph-alert--error mt-4">
+        {userFacingError(String(message))}
+      </div>
+    ))}
+    {notice && <div role="status" className="monograph-alert monograph-alert--success mt-4">{notice}</div>}
+    {tx.notice && <div role="status" className="monograph-alert monograph-alert--success mt-4">{tx.notice}</div>}
+    {!userId && (
+      <div className="monograph-alert monograph-alert--info mt-4">
+        <a href="#/account" className="underline font-semibold">Đăng nhập</a> để góp ý, liên kết ví và ủng hộ bằng MockUSDC local.
+      </div>
+    )}
+    {state?.state === 4 && (
+      <div className="monograph-alert monograph-alert--warning mt-6 space-y-1">
+        <div className="flex items-center gap-2 font-semibold"><span aria-hidden="true">⚠</span><span>Campaign không đạt mục tiêu — đang hoàn tiền</span></div>
+        <p className="text-sm m-0">Chiến dịch đang trong trạng thái hoàn tiền. Backer tự thực hiện claim refund.</p>
+      </div>
+    )}
+  </>;
+
+  const ledgerActions: ReactNode = state && activeId !== null ? (
+    state.state === 4 ? (
+      <div className="space-y-2">
+        <div className="text-xs font-semibold text-[#b45309]">
+          {own?.access === 'REFUNDED' ? 'Bạn đã nhận hoàn tiền' : own?.access === 'REFUND_ELIGIBLE' ? 'Khoản pledge của bạn đã đủ điều kiện hoàn tiền' : 'Backer tự nhận hoàn tiền'}
+        </div>
+        <p className="text-xs text-[var(--ink-lead)] m-0">
+          {own?.access === 'REFUNDED' ? 'Giao dịch hoàn tiền đã được ghi nhận. Bạn không cần thực hiện thêm bước nào.' : own?.access === 'REFUND_ELIGIBLE' ? 'Tiền sẽ trở về đúng ví đã dùng để pledge.' : 'Resolver đã mở trạng thái hoàn tiền. Mỗi backer tự claim khoản của mình; Creator không nhận khoản này.'}
+        </p>
+        {userId && own?.access === 'REFUND_ELIGIBLE' && (
+          <button disabled={busy} className="button button--primary w-full" onClick={() => void tx.send('claimRefund', [activeId], { expectedWallet: own.backerWallet })}>Nhận hoàn tiền vào ví đã pledge</button>
+        )}
+      </div>
+    ) : (
+      <>
+        {fundingAwaitingFinalization && <p role="status" className="text-xs text-[#b45309] m-0">Đã hết hạn gây quỹ · chờ chốt kết quả. Deadline đã qua nhưng contract chỉ chuyển sang hoàn tiền sau khi có giao dịch chốt kết quả. Resolver cần kết nối đúng ví Primary hoặc Backup để thực hiện bước này.</p>}
+        {state.state === 3 && <p className="text-xs text-[var(--ink-subtle)] m-0">Challenge đến {date(state.challengeDeadline)} · {state.openDisputes} tranh chấp mở. Chỉ gửi hồ sơ hoàn thành sau hạn và khi không còn tranh chấp.</p>}
+        {state.state === 0 && mode === 'public' && state.price && !fundingExpired && (
+          <PledgePreflight
+            campaignId={id}
+            userId={userId}
+            activeId={activeId}
+            price={state.price}
+            chain={chain.data!}
+            deployment={chain.data!.deployment}
+            transaction={tx.transaction?.action === 'pledge' ? tx.transaction : null}
+            busy={busy}
+            onPledge={quantity => void tx.send('pledge', [activeId, quantity], { pledgePrice: (BigInt(state.price) * quantity).toString() }).finally(() => { void chain.refetch(); })}
+            onReconcile={() => void tx.reconcile()}
+          />
+        )}
+        {userId && (
+          <div className="space-y-2">
+            {fundingAwaitingFinalization && mode === 'resolver' && !canReview && <p role="alert" className="text-xs text-[#dc2626] m-0">Chưa thấy ví Resolver hợp lệ. Hãy chuyển MetaMask sang ví Primary hoặc Backup Resolver rồi refresh trang.</p>}
+            {showFinalizeFunding && <button disabled={busy || !canReview} className="button button--secondary" onClick={() => void tx.send('finalizeFunding', [activeId])}>Chốt kết quả khi hết hạn gây quỹ</button>}
+            {showStartRefunds && <button disabled={busy || !canReview} className="button button--secondary w-full" onClick={() => void tx.send('startRefunds', [activeId])}>Mở hoàn tiền khi quá hạn policy</button>}
+            {mode === 'creator' && ![4, 5, 6].includes(state.state) && <button disabled={busy} className="button button--secondary w-full" onClick={() => void tx.send('cancelCampaign', [activeId], { expectedWallet: state.creator })}>Hủy campaign và mở hoàn tiền toàn bộ</button>}
+          </div>
+        )}
+      </>
+    )
+  ) : null;
 
   return (
     <>
-    <div className="campaign-container monograph-container">
-      {/* 1. Breadcrumbs */}
-      <div className="monograph-nav">
-        <div className="flex items-center gap-1.5">
-          <a href="#/campaigns">← The Salon</a>
-          <span>/</span>
-          <span className="truncate max-w-[140px] font-mono">{id}</span>
-          <span>/</span>
-          <span className="font-semibold text-neutral-800">The Monograph</span>
-        </div>
-        <div className="text-xs uppercase text-neutral-500 font-mono">
-          CAMPAIGN · COMICS &amp; ARTBOOKS
-        </div>
-      </div>
-
-      {/* 3. Navigation Tabs */}
-      <div className="monograph-tabs" role="tablist">
-        {(['overview', 'production', 'commitments', 'activity'] as const).map(tab => (
-          <button
-            key={tab}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === tab}
-            onClick={() => setActiveTab(tab)}
-            className={`monograph-tab-btn ${activeTab === tab ? 'monograph-tab-btn--active' : ''}`}
-          >
-            {tab === 'overview' ? 'Tổng quan (Folio)' : tab === 'production' ? 'Sản xuất & Bằng chứng' : tab === 'commitments' ? 'Cam kết & Tiến trình' : 'Góp ý & Thẩm định'}
-          </button>
-        ))}
-      </div>
-
-      {/* 4. Alert / Notices */}
-      {[error, tx.error, chain.error && getErrorMessage(chain.error), showPublicationTermsError && getErrorMessage(publicationTerms.error), evidence.error && getErrorMessage(evidence.error), entitlements.error && getErrorMessage(entitlements.error)].filter(Boolean).map((message, index) => (
-        <div key={index} role="alert" className="monograph-alert monograph-alert--error mt-4">
-          {userFacingError(String(message))}
-        </div>
-      ))}
-      {notice && <div role="status" className="monograph-alert monograph-alert--success mt-4">{notice}</div>}
-      {tx.notice && <div role="status" className="monograph-alert monograph-alert--success mt-4">{tx.notice}</div>}
-      {!userId && (
-        <div className="monograph-alert monograph-alert--info mt-4">
-          <a href="#/account" className="underline font-semibold">Đăng nhập</a> để góp ý, liên kết ví và ủng hộ bằng MockUSDC local.
-        </div>
-      )}
-
-      {/* Refunding Banner */}
-      {state?.state === 4 && (
-        <div className="monograph-alert monograph-alert--warning mt-6 space-y-1">
-          <div className="flex items-center gap-2 font-semibold">
-            <span aria-hidden="true">⚠</span>
-            <span>Campaign không đạt mục tiêu — đang hoàn tiền</span>
-          </div>
-          <p className="text-sm m-0">
-            Chiến dịch đang trong trạng thái hoàn tiền. Backer tự thực hiện claim refund.
-          </p>
-        </div>
-      )}
-
-      {/* 5. Main 2-Column Split-Volume Layout */}
-      <div className="monograph-split-layout mt-6">
-        {/* Left Column (The Auteur Folio) */}
-        <div className="monograph-folio">
-          {/* Compact Campaign Edition Header */}
-          <div className="monograph-hero monograph-hero--compact">
-            <div className="monograph-hero__content">
-              <div className="monograph-hero__kicker">
-                <span>ẤN BẢN ĐỘC QUYỀN</span>
-                <span>·</span>
-                <span>STANDARD PDF TIER</span>
-              </div>
-              <h1 className="monograph-hero__title">
-                {item.config.title || 'Standard PDF'}
-              </h1>
-              <p className="monograph-hero__author">
-                Auteur / Tác giả: <strong>{item.creatorDisplayName}</strong>
-              </p>
-              <div className="monograph-hero__pills">
-                <StatusBadge state={uiState} />
-                {campaignApproved && (
-                  <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-[#f0f4ee] text-[#2b5936] border border-[#d2e3d5]">
-                    ✓ Resolver Verified
-                  </span>
-                )}
-                {state?.state === 4 && (
-                  <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-[#faeceb] text-[#9e2a2b] border border-[#e8c4c3]">
-                    ⚠ Đang hoàn tiền tự động
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <div className="monograph-hero__rubric">
-              <ColophonRubric
-                compact={true}
-                commitmentHash={item.commitmentHash}
-                collateralPercent={percent}
-                pledgedFormatted={state ? amount(state.raised) : undefined}
-                goalFormatted={amount(item.config.goal)}
-                resolverVerified={campaignApproved}
-                stateLabel={uiState.label}
-                creatorName={item.creatorDisplayName}
-              />
-            </div>
-          </div>
+    <CampaignDetailFrame
+      campaignId={id}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      alerts={alerts}
+      main={
+        <>
+          <CampaignOverview campaign={item} chain={chain.data ?? null} uiState={uiState} timelineEvents={timelineEvents} showDetails={activeTab === 'overview'} />
           {activeTab === 'overview' && (
             <>
-              {/* Thông tin ấn phẩm & Tier */}
-              <div className="monograph-card">
-                <span className="monograph-card__kicker">ẤN PHẨM &amp; PHẦN THƯỞNG TIÊU CHUẨN</span>
-                <h2 className="monograph-card__title">Thông tin ấn phẩm</h2>
-                <p className="monograph-card__pitch">
-                  {item.config.tiers[0]?.benefitItems[0]?.description || item.config.pitch || 'Một file PDF hoàn chỉnh của truyện tranh hoặc artbook.'}
-                </p>
-
-                <div className="monograph-tier-spec">
-                  <div className="monograph-tier-spec__header">
-                    <span className="monograph-tier-spec__badge">STANDARD DIGITAL CAMPAIGN</span>
-                    <span className="monograph-tier-spec__price">{amount(item.config.tiers[0].price)}</span>
-                  </div>
-                  <div className="monograph-tier-spec__details">
-                    <div className="monograph-tier-spec__item">
-                      <svg className="monograph-tier-spec__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="16" y1="13" x2="8" y2="13"></line>
-                        <line x1="16" y1="17" x2="8" y2="17"></line>
-                        <polyline points="10 9 9 9 8 9"></polyline>
-                      </svg>
-                      <div>
-                        <strong>Gói phần thưởng:</strong> {item.config.tiers[0]?.title || 'Standard Digital Campaign'} (Ấn bản độc quyền dành cho backer)
-                      </div>
-                    </div>
-                    <div className="monograph-tier-spec__item">
-                      <svg className="monograph-tier-spec__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                      </svg>
-                      <div>
-                        <strong>Cơ chế phân phối:</strong> Tải xuống tệp PDF hoàn chỉnh qua vé xác thực ngắn hạn sau khi Resolver duyệt phát hành.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               {chain.data && state && (
                 <DisbursementPanel
                   campaignId={id}
@@ -337,73 +255,17 @@ export function CampaignPage({ id, session, mode = 'public', initialTab = 'overv
                 />
               )}
 
-              {/* Production documents */}
               <div className="monograph-card">
                 <span className="monograph-card__kicker">HỒ SƠ THẨM ĐỊNH (EDITORIAL DOSSIER)</span>
                 <h2 className="monograph-card__title">Tài liệu sản xuất &amp; Kế hoạch cam kết</h2>
                 <p className="monograph-card__desc">
                   Các tài liệu minh chứng do auteur cam kết và được Resolver thẩm định kỹ lưỡng trước khi mở gây quỹ.
                 </p>
-
-                <div className="monograph-dossier-stack">
-                  <details className="monograph-dossier">
-                    <summary className="monograph-dossier__summary">
-                      <div className="monograph-dossier__left">
-                        <span className="monograph-dossier__tag">01</span>
-                        <svg className="monograph-dossier__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                          <line x1="9" y1="9" x2="15" y2="9" />
-                          <line x1="9" y1="13" x2="15" y2="13" />
-                          <line x1="9" y1="17" x2="13" y2="17" />
-                        </svg>
-                        <span className="monograph-dossier__label">Đề cương nội dung</span>
-                      </div>
-                      <span className="monograph-dossier__chevron" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
-                      </span>
-                    </summary>
-                    <div className="monograph-dossier__content">
-                      {item.contentOutline || <span className="italic text-[var(--ink-subtle)]">Chưa có đề cương nội dung chi tiết.</span>}
-                    </div>
-                  </details>
-
-                  <details className="monograph-dossier">
-                    <summary className="monograph-dossier__summary">
-                      <div className="monograph-dossier__left">
-                        <span className="monograph-dossier__tag">02</span>
-                        <svg className="monograph-dossier__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                          <line x1="12" y1="1" x2="12" y2="23"></line>
-                          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                        </svg>
-                        <span className="monograph-dossier__label">Kế hoạch ngân sách</span>
-                      </div>
-                      <span className="monograph-dossier__chevron" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
-                      </span>
-                    </summary>
-                    <div className="monograph-dossier__content">
-                      {item.budgetPlan || <span className="italic text-[var(--ink-subtle)]">Chưa có kế hoạch ngân sách chi tiết.</span>}
-                    </div>
-                  </details>
-
-                  <details className="monograph-dossier">
-                    <summary className="monograph-dossier__summary">
-                      <div className="monograph-dossier__left">
-                        <span className="monograph-dossier__tag">03</span>
-                        <svg className="monograph-dossier__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                        </svg>
-                        <span className="monograph-dossier__label">Kế hoạch bằng chứng</span>
-                      </div>
-                      <span className="monograph-dossier__chevron" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
-                      </span>
-                    </summary>
-                    <div className="monograph-dossier__content">
-                      {item.evidencePlan || <span className="italic text-[var(--ink-subtle)]">Chưa có kế hoạch bằng chứng sản xuất.</span>}
-                    </div>
-                  </details>
-                </div>
+                <CampaignDossierList
+                  contentOutline={item.contentOutline}
+                  budgetPlan={item.budgetPlan}
+                  evidencePlan={item.evidencePlan}
+                />
               </div>
 
               {/* Backer entitlement card when owned and not refunded */}
@@ -663,138 +525,10 @@ export function CampaignPage({ id, session, mode = 'public', initialTab = 'overv
               {onchainId && <>ID on-chain: <code>#{onchainId}</code></>}
             </div>
           </details>
-        </div>
-
-        {/* Right Column (Sidebar: The Notarial Ledger) */}
-        <aside className="monograph-ledger" aria-label="Sổ công chứng ký quỹ">
-          <div className="monograph-ledger__header">
-            <span className="monograph-ledger__kicker">NOTARIAL ESCROW LEDGER</span>
-            <h2 className="monograph-ledger__title">Funding summary</h2>
-            <div className="monograph-ledger__amount">
-              {state ? amount(state.raised) : '0 MockUSDC'}
-            </div>
-            <div className="monograph-ledger__meter" aria-hidden="true">
-              <div
-                className="monograph-ledger__meter-bar"
-                style={{ width: `${percent}%` }}
-              />
-            </div>
-            <div className="monograph-ledger__ratio">
-              {percent}% of {amount(item.config.goal)}
-            </div>
-          </div>
-
-          {/* Deadlines */}
-          <div className="monograph-ledger__dates">
-            <div className="monograph-ledger__date-row">
-              <span className="monograph-ledger__date-label">Funding deadline</span>
-              <span className="monograph-ledger__date-val">
-                {state ? formatDate(state.fundingDeadline) : `${item.config.fundingDuration / 86400} ngày`}
-              </span>
-            </div>
-            <div className="monograph-ledger__date-row">
-              <span className="monograph-ledger__date-label">Delivery deadline</span>
-              <span className="monograph-ledger__date-val">
-                {state && BigInt(state.releaseDeadline) > 0n ? formatDate(state.releaseDeadline) : 'Chưa chốt · Creator xác nhận khi hoàn thành campaign'}
-              </span>
-            </div>
-          </div>
-
-          {/* Actions & Lifecycle triggers */}
-          {state && activeId !== null && (
-            <div className="monograph-ledger__actions">
-              {state.state === 4 ? (
-                <div className="space-y-2">
-                  <div className="text-xs font-semibold text-[#b45309]">
-                    {own?.access === 'REFUNDED'
-                      ? 'Bạn đã nhận hoàn tiền'
-                      : own?.access === 'REFUND_ELIGIBLE'
-                      ? 'Khoản pledge của bạn đã đủ điều kiện hoàn tiền'
-                      : 'Backer tự nhận hoàn tiền'}
-                  </div>
-                  <p className="text-xs text-[var(--ink-lead)] m-0">
-                    {own?.access === 'REFUNDED'
-                      ? 'Giao dịch hoàn tiền đã được ghi nhận. Bạn không cần thực hiện thêm bước nào.'
-                      : own?.access === 'REFUND_ELIGIBLE'
-                      ? 'Tiền sẽ trở về đúng ví đã dùng để pledge.'
-                      : 'Resolver đã mở trạng thái hoàn tiền. Mỗi backer tự claim khoản của mình; Creator không nhận khoản này.'}
-                  </p>
-                  {userId && own?.access === 'REFUND_ELIGIBLE' && (
-                    <button disabled={busy} className="button button--primary w-full" onClick={() => void tx.send('claimRefund', [activeId], { expectedWallet: own.backerWallet })}>
-                      Nhận hoàn tiền vào ví đã pledge
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <>
-                  {fundingAwaitingFinalization && (
-                    <p role="status" className="text-xs text-[#b45309] m-0">
-                      Đã hết hạn gây quỹ · chờ chốt kết quả. Deadline đã qua nhưng contract chỉ chuyển sang hoàn tiền sau khi có giao dịch chốt kết quả. Resolver cần kết nối đúng ví Primary hoặc Backup để thực hiện bước này.
-                    </p>
-                  )}
-                  {state.state === 3 && (
-                    <p className="text-xs text-[var(--ink-subtle)] m-0">
-                      Challenge đến {date(state.challengeDeadline)} · {state.openDisputes} tranh chấp mở. Chỉ gửi hồ sơ hoàn thành sau hạn và khi không còn tranh chấp.
-                    </p>
-                  )}
-          {state.state === 0 && mode === 'public' && state.price && !fundingExpired && (
-                    <PledgePreflight
-                      campaignId={id}
-                      userId={userId}
-                      activeId={activeId}
-                      price={state.price}
-                      chain={chain.data!}
-                      deployment={chain.data!.deployment}
-                      transaction={tx.transaction?.action === 'pledge' ? tx.transaction : null}
-                      busy={busy}
-                      onPledge={quantity => void tx.send('pledge', [activeId, quantity], { pledgePrice: (BigInt(state.price) * quantity).toString() }).finally(() => { void chain.refetch(); })}
-                      onReconcile={() => void tx.reconcile()}
-                    />
-                  )}
-                  {userId && (
-                    <div className="space-y-2">
-                      {fundingAwaitingFinalization && mode === 'resolver' && !canReview && (
-                        <p role="alert" className="text-xs text-[#dc2626] m-0">
-                          Chưa thấy ví Resolver hợp lệ. Hãy chuyển MetaMask sang ví Primary hoặc Backup Resolver rồi refresh trang.
-                        </p>
-                      )}
-                      {showFinalizeFunding && (
-                        <button disabled={busy || !canReview} className="button button--secondary" onClick={() => void tx.send('finalizeFunding', [activeId])}>
-                          Chốt kết quả khi hết hạn gây quỹ
-                        </button>
-                      )}
-                      {showStartRefunds && (
-                        <button disabled={busy || !canReview} className="button button--secondary w-full" onClick={() => void tx.send('startRefunds', [activeId])}>
-                          Mở hoàn tiền khi quá hạn policy
-                        </button>
-                      )}
-                      {mode === 'creator' && ![4, 5, 6].includes(state.state) && (
-                        <button disabled={busy} className="button button--secondary w-full" onClick={() => void tx.send('cancelCampaign', [activeId], { expectedWallet: state.creator })}>
-                          Hủy campaign và mở hoàn tiền toàn bộ
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {!state && (
-            <div className="monograph-ledger__tier">
-              <span className="monograph-ledger__date-label">Tóm tắt tier</span>
-              <div className="monograph-ledger__tier-price">
-                <span>Giá 1 PDF:</span>
-                <strong>{amount(item.config.tiers[0].price)}</strong>
-              </div>
-              <div className="mt-1">
-                <StatusBadge state={uiState} />
-              </div>
-            </div>
-          )}
-        </aside>
-      </div>
-    </div>
+        </>
+      }
+      ledger={<CampaignLedger campaign={item} chain={chain.data ?? null} actions={ledgerActions} />}
+    />
     {feedbackComposerOpen && userId && mode !== 'creator' && (
       <FeedbackComposerModal
         id={id}
