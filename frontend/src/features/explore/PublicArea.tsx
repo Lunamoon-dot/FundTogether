@@ -5,6 +5,7 @@ import { resolveCampaignDetailRoute } from './campaignRoutes';
 import './PublicArea.css';
 
 const AccountAccess = lazy(() => import('../auth/AccountAccess').then(module => ({ default: module.AccountAccess })));
+const PublicCampaignPage = lazy(() => import('../campaigns/public/CampaignPage').then(module => ({ default: module.PublicCampaignPage })));
 const CampaignPage = lazy(() => import('../campaigns/public/Page').then(module => ({ default: module.CampaignPage })));
 const Library = lazy(() => import('../campaigns/backer/Library').then(module => ({ default: module.Library })));
 const Studio = lazy(() => import('../campaigns/creator/Studio').then(module => ({ default: module.Studio })));
@@ -54,6 +55,13 @@ export function PublicArea(props: PublicAreaProps) {
       {campaignDetail && (
         campaignDetail.legacy ? (
           <LegacyCampaignRedirect href={campaignDetail.canonicalHref} />
+        ) : campaignDetail.workspace === 'public' ? (
+          <PublicCampaignPage
+            key={`${campaignDetail.campaignId}:${session?.userId ?? 'public'}:${campaignDetail.initialTab}`}
+            id={campaignDetail.campaignId}
+            session={session}
+            initialTab={campaignDetail.initialTab}
+          />
         ) : (
           <CampaignPage
             key={`${campaignDetail.campaignId}:${session?.userId ?? 'public'}:${campaignDetail.workspace}:${campaignDetail.initialTab}`}

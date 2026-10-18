@@ -51,6 +51,8 @@ test('retired product branches and empty placeholders are removed', () => {
 test('current campaign files do not repeat the product namespace in filenames', () => {
   const files = listFiles(relative('campaigns')).map(file => path.basename(file));
   const allowedSharedDetailNames = new Set([
+    'CampaignActions.tsx',
+    'CampaignPage.tsx',
     'CampaignDetailFrame.tsx',
     'CampaignDossierList.tsx',
     'CampaignLedger.tsx',

@@ -15,7 +15,7 @@ const { EditorialCampaignCard } = await server.ssrLoadModule('/src/features/camp
 const { ProgressChart } = await server.ssrLoadModule('/src/features/campaigns/shared/ui/ProgressChart.tsx')
 const { Timeline } = await server.ssrLoadModule('/src/features/campaigns/shared/ui/Timeline.tsx')
 const { getCampaignUiState } = await server.ssrLoadModule('/src/features/campaigns/shared/ui/campaignState.ts')
-const campaignPageSource = await readFile(new URL('../src/features/campaigns/public/Page.tsx', import.meta.url), 'utf8')
+const publicCampaignPageSource = await readFile(new URL('../src/features/campaigns/public/CampaignPage.tsx', import.meta.url), 'utf8')
 
 const preview = (id, title, surface, status = 'APPROVED') => ({
   id, status, surface, reviewStartedAt: status === 'COMMUNITY_REVIEW' ? '2026-10-15T00:00:00.000Z' : null,
@@ -60,10 +60,9 @@ test('public Campaign feed keeps activation and funding campaigns in separate fi
 })
 
 test('public campaign surface does not surface private publication errors', () => {
-  assert.match(campaignPageSource, /showPublicationTermsError/)
-  assert.match(campaignPageSource, /if \(mode !== 'public' && chain\.data\?\.status !== 'ON_CHAIN_CONFIRMED'\) void publicationTerms\.refetch\(\)/)
-  assert.match(campaignPageSource, /publicationTerms\.error && chain\.data\?\.status !== 'ON_CHAIN_CONFIRMED'/)
-  assert.match(campaignPageSource, /\['campaign-campaign-publication-terms', id, userId, mode\]/)
+  assert.doesNotMatch(publicCampaignPageSource, /publicationTerms|showPublicationTermsError|approveCampaign|createCampaign/)
+  assert.match(publicCampaignPageSource, /campaignApi\.evidence\(id, false/)
+  assert.match(publicCampaignPageSource, /campaignApi\.entitlements\(signal\)/)
 })
 
 test('published campaign without a current binding is labeled as activation pending', () => {
