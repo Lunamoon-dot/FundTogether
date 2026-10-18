@@ -33,3 +33,24 @@ test('resolver queue and route use the canonical resolver workspace', () => {
   assert.match(area, /hasResolverRole/);
   assert.match(consoleSource, /campaignDetailHref\('resolver'/);
 });
+
+test('resolver workspace keeps pre-activation commitment signing reachable', () => {
+  const actions = read('campaigns/resolver/CampaignActions.tsx');
+
+  assert.match(actions, /section === 'overview'/);
+  assert.match(actions, /chain\.status === 'NOT_PUBLISHED' \|\| chain\.status === 'ORPHANED'/);
+  assert.match(actions, /<ActivationPanel/);
+  assert.match(actions, /transaction\.transaction\?\.action === 'approveCampaign'/);
+});
+
+test('resolver activation follows the Campaign contract approveCampaign ABI order', () => {
+  const page = read('campaigns/resolver/CampaignReviewPage.tsx');
+
+  assert.match(page, /tx\.send\('approveCampaign', \[result\.data\.creatorWallet, result\.data\.commitmentHash, BigInt\(result\.data\.goal\), BigInt\(result\.data\.price\), BigInt\(result\.data\.fundingDuration\)\]/);
+});
+
+test('creator activation follows the Campaign contract createCampaign ABI order', () => {
+  const page = read('campaigns/creator/CampaignWorkspacePage.tsx');
+
+  assert.match(page, /tx\.send\('createCampaign', \[result\.data\.commitmentHash, BigInt\(result\.data\.goal\), BigInt\(result\.data\.price\), BigInt\(result\.data\.fundingDuration\)\]/);
+});

@@ -7,12 +7,11 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)))
 const read = relative => fs.readFileSync(path.join(root, 'src', 'features', 'campaigns', relative), 'utf8')
 
-test('public campaign workspace is role-neutral and does not accept a mode prop', () => {
+test('public campaign workspace keeps backer settlement reads separate from resolver actions', () => {
   const source = read('public/CampaignPage.tsx')
 
   assert.match(source, /export interface PublicCampaignPageProps/)
   assert.match(source, /export function PublicCampaignPage/)
-  assert.doesNotMatch(source, /mode\s*=/)
   assert.doesNotMatch(source, /approveCampaign|createCampaign|reviewProduction|approveDisbursement|rejectDisbursement|approveCompletion|rejectCompletion/)
 })
 
@@ -25,6 +24,7 @@ test('public workspace keeps public evidence and entitlement reads user-scoped',
   assert.match(source, /campaignApi\.chain\(id/)
   assert.match(source, /ReviewThread/)
   assert.match(source, /CommunityPanel/)
+  assert.match(source, /CompletionSettlementPanel/)
 })
 
 test('backer actions own pledge, refund, challenge, and entitlement controls', () => {

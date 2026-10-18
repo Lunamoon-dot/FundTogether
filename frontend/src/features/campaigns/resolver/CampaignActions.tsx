@@ -83,6 +83,23 @@ export function ResolverCampaignActions({
   }
 
   if (!state || activeId === null || chain.status !== 'ON_CHAIN_CONFIRMED') {
+    if (section === 'overview' && (chain.status === 'NOT_PUBLISHED' || chain.status === 'ORPHANED')) {
+      if (!connectedResolver) {
+        return <div className="monograph-alert monograph-alert--warning" role="alert">
+          Ví hiện tại không phải Primary hoặc Backup Resolver. Các nút ký đã khóa; hãy chuyển đúng ví rồi kiểm tra lại.
+        </div>;
+      }
+      return <ActivationPanel
+        mode="resolver"
+        terms={terms}
+        chain={chain}
+        transaction={transaction.transaction?.action === 'approveCampaign' ? transaction.transaction : null}
+        busy={busy}
+        onRefresh={onRefresh}
+        onActivate={onActivate}
+        onReconcile={onReconcile}
+      />;
+    }
     return <p className="text-sm text-[var(--ink-subtle)]">Chưa có trạng thái campaign canonical để mở hành động Resolver.</p>;
   }
 

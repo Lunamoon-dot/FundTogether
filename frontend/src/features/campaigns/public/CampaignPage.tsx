@@ -13,6 +13,7 @@ import { CampaignDetailFrame } from '../shared/detail/CampaignDetailFrame';
 import { CampaignOverview } from '../shared/detail/CampaignOverview';
 import { CampaignLedger } from '../shared/detail/CampaignLedger';
 import { CampaignDossierList } from '../shared/detail/CampaignDossierList';
+import { CompletionSettlementPanel } from '../shared/ui/CompletionSettlementPanel';
 import { BackerCampaignActions } from '../backer/CampaignActions';
 import '../shared/styles.css';
 
@@ -159,6 +160,7 @@ export function PublicCampaignPage({ id, session, initialTab = 'overview' }: Pub
                   </div>
                 )}
                 {state?.productionApproved && <div className="rounded-lg border border-[var(--border-hairline)] p-3.5 bg-[#f0fdf4] text-xs text-[#166534] font-medium flex items-center gap-2"><span aria-hidden="true">✓</span><span>EVIDENCE_REVIEWED · Bằng chứng sản xuất đã được duyệt.</span></div>}
+                {showPostFundingReview && chain.data && <CompletionSettlementPanel campaignId={id} userId={userId} mode="public" chain={chain.data} transaction={tx} entitlement={own} onRefresh={refresh} />}
                 {communityReview && <div className="monograph-card space-y-2"><span className="monograph-card__kicker">GIAI ĐOẠN ĐÁNH GIÁ</span><h2 className="monograph-card__title">Community review đang mở</h2><p className="monograph-card__pitch">Community chỉ gửi phản hồi tham khảo; Resolver là người quyết định. Hồ sơ chưa mở pledge.</p><p className="text-xs text-[var(--ink-subtle)] m-0">Hồ sơ chỉ xuất hiện ở đây sau khi Resolver chủ động mở community review.</p>{userId && <button type="button" className="button button--primary mt-2" onClick={() => setFeedbackComposerOpen(true)}>Gửi góp ý</button>}</div>}
               </>
             )}

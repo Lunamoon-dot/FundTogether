@@ -29,6 +29,15 @@ test('Creator workspace owns production and funding follow-up actions only', () 
   assert.doesNotMatch(page, /PledgePreflight|claimRefund|claimSurplus|reviewProduction|approveDisbursement|rejectDisbursement|approveCompletion|rejectCompletion/)
 })
 
+test('Creator workspace separates production evidence from final PDF upload', () => {
+  const page = read('creator/CampaignWorkspacePage.tsx')
+
+  assert.match(page, /!state\.productionApproved \|\| BigInt\(state\.releaseDeadline\) > 0n/)
+  assert.match(page, /state\.productionApproved \? 'PDF cuối riêng tư' : 'Bằng chứng sản xuất riêng tư'/)
+  assert.match(page, /Gửi PDF cuối để Resolver duyệt/)
+  assert.match(page, /Gửi bằng chứng sản xuất để Resolver duyệt/)
+})
+
 test('Creator Studio uses the canonical Creator campaign workspace route', () => {
   const source = read('creator/Studio.tsx')
 

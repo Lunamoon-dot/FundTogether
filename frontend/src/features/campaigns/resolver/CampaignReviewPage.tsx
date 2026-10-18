@@ -77,7 +77,7 @@ export function ResolverCampaignReviewPage({ id, session, initialTab = 'overview
       const result = await terms.refetch();
       if (!result.data) throw new Error('Chưa đọc được commitment publication.');
       if (result.data.onchainApproved) throw new Error('Commitment đã được Resolver ký; chờ Creator tạo campaign.');
-      await tx.send('approveCampaign', [result.data.creatorWallet, BigInt(result.data.goal), BigInt(result.data.price), BigInt(result.data.fundingDuration), result.data.commitmentHash], { expectedWallet: result.data.deployment.resolver });
+      await tx.send('approveCampaign', [result.data.creatorWallet, result.data.commitmentHash, BigInt(result.data.goal), BigInt(result.data.price), BigInt(result.data.fundingDuration)], { expectedWallet: result.data.deployment.resolver });
     });
   }
 

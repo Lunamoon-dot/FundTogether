@@ -193,7 +193,7 @@ async function runBrowserScenario() {
   await creator.getByLabel(/Bằng chứng sản xuất riêng tư/).setInputFiles({ name: 'proof.png', mimeType: 'image/png', buffer: png });
   await creator.getByLabel(/Tóm tắt công khai/).fill('All twelve chapters are drawn and edited.');
   await creator.getByRole('button', { name: 'Lưu file và hash' }).click();
-  await transact(creator, 'Gửi đúng hash này để Resolver duyệt');
+  await transact(creator, 'Gửi bằng chứng sản xuất để Resolver duyệt');
   await refreshPrivateCampaign(resolver, 'resolver'); await resolver.getByRole('tab', { name: 'Sản xuất & Bằng chứng', exact: true }).click();
   await transact(resolver, 'Duyệt bằng chứng sản xuất');
   await refreshPrivateCampaign(creator, 'creator'); await creator.getByRole('tab', { name: 'Sản xuất & Bằng chứng', exact: true }).click();
@@ -206,7 +206,7 @@ async function runBrowserScenario() {
   await creator.getByLabel(/PDF cuối riêng tư/).setInputFiles({ name: 'comic.pdf', mimeType: 'application/pdf', buffer: pdfBytes });
   await creator.getByLabel(/Tóm tắt công khai/).fill('Final PDF includes the complete twelve-chapter comic.');
   await creator.getByRole('button', { name: 'Lưu file và hash' }).click();
-  await transact(creator, 'Gửi đúng hash này để Resolver duyệt');
+  await transact(creator, 'Gửi PDF cuối để Resolver duyệt');
   await refreshPrivateCampaign(resolver, 'resolver'); await resolver.getByRole('tab', { name: 'Sản xuất & Bằng chứng', exact: true }).click(); await transact(resolver, 'Duyệt PDF cuối');
   await refreshPrivateCampaign(backer);
   await backer.getByRole('tab', { name: 'Góp ý & Thẩm định', exact: true }).click();

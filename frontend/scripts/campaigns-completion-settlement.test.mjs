@@ -14,7 +14,9 @@ test('completion settlement exposes the dossier and exactly two surplus destinat
   const publicPage = read('public/CampaignPage.tsx')
 
   assert.match(creatorPage, /CompletionSettlementPanel/)
-  assert.doesNotMatch(publicPage, /CompletionSettlementPanel|DisbursementPanel|ActivationPanel/)
+  assert.match(publicPage, /CompletionSettlementPanel/)
+  assert.match(publicPage, /mode="public"/)
+  assert.doesNotMatch(publicPage, /DisbursementPanel|ActivationPanel|approveCompletion|rejectCompletion/)
   assert.match(panel, /createCompletionRequest/)
   assert.match(panel, /requestCompletion/)
   assert.match(panel, /approveCompletion/)
