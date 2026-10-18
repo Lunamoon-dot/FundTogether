@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { PropsWithChildren } from 'react'
 import { AccountSessionProvider } from '../../features/auth/AccountSessionProvider'
+import { WalletConnectionRecovery } from '../../features/auth/WalletConnectionRecovery'
 import { RainbowKitProvider, lightTheme } from '@rainbow-me/rainbowkit'
 import { WagmiProvider } from 'wagmi'
 import deployment, { activeChain } from '../../lib/web3/deployment-context'
@@ -17,7 +18,7 @@ const queryClient = new QueryClient({
   },
 })
 
-const editionsRainbowTheme = lightTheme({
+const campaignRainbowTheme = lightTheme({
   accentColor: '#181716',
   accentColorForeground: '#ffffff',
   borderRadius: 'small',
@@ -29,8 +30,11 @@ export function AppProviders({ children }: PropsWithChildren) {
   return (
     <WagmiProvider config={wagmiConfig} reconnectOnMount={false}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider theme={editionsRainbowTheme}>
-          <AccountSessionProvider>{children}</AccountSessionProvider>
+        <RainbowKitProvider theme={campaignRainbowTheme}>
+          <AccountSessionProvider>
+            {children}
+            <WalletConnectionRecovery />
+          </AccountSessionProvider>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

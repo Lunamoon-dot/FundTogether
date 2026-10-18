@@ -41,23 +41,24 @@ export async function requestWalletProof<T extends { chainId: number }>({ expect
   }
   checkIdentity()
   onStage?.('prepare')
+  const preparation = prepare
+    ? waitStep(prepare, preparationTimeoutMs, 'Không đọc được kết nối ví trong 8 giây. Chưa gửi yêu cầu ký. Ngắt kết nối và chọn đúng ví để thử lại.')
+    : Promise.resolve()
+  onStage?.('challenge')
+  const challengeResponse = waitStep(challenge, challengeTimeoutMs, 'Backend chưa trả thông điệp xác thực. Chưa gửi yêu cầu ký; kiểm tra kết nối API rồi thử lại.')
   const [_, nonce] = await Promise.all([
-    prepare
-      ? waitStep(prepare, preparationTimeoutMs, 'Không đọc được kết nối ví trong 8 giây. Chưa gửi yêu cầu ký. Ngắt kết nối và chọn đúng ví để thử lại.')
-      : Promise.resolve(),
-    waitStep(challenge, challengeTimeoutMs, 'Backend chưa trả thông điệp xác thực. Chưa gửi yêu cầu ký; kiểm tra kết nối API rồi thử lại.'),
+    preparation,
+    challengeResponse,
   ])
   checkIdentity()
   if (nonce.chainId !== expected.chainId) throw new Error(`Chuyển ví sang mạng có chain ID ${nonce.chainId}.`)
   const text = message(nonce)
-  onStage?.('signature')
   const signature = await requestWalletConfirmation({
     connectorUid: expected.connectorUid ?? expected.address!,
-    request: () => { checkIdentity(); return sign(text, expected.address!) },
+    request: () => { onStage?.('signature'); checkIdentity(); return sign(text, expected.address!) },
     timeoutMs,
     signal,
-    releaseOnAbandon: true,
-    timeoutMessage: 'Ví chưa trả chữ ký trong thời gian chờ. Lần liên kết này đã dừng; chữ ký trả muộn sẽ bị bỏ qua. Nếu ví còn hiển thị yêu cầu cũ, từ chối yêu cầu đó trước khi thử lại.',
+    timeoutMessage: 'Ví chưa trả chữ ký trong thời gian chờ. Yêu cầu cũ có thể vẫn đang treo trong extension; hãy từ chối yêu cầu đó trước khi thử lại hoặc tải lại trang.',
   })
   checkIdentity()
   return { message: text, signature }

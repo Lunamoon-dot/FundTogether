@@ -6,6 +6,7 @@ import { getAccount, getConnectorClient } from 'wagmi/actions'
 import { BaseError, ResourceUnavailableRpcError, UserRejectedRequestError } from 'viem'
 import { signMessage } from 'viem/actions'
 import {
+  checkWalletAvailability,
   getLinkNonce,
   getNonce,
   getSession,
@@ -19,7 +20,7 @@ import {
 import type { AccountSession } from '../../lib/api/auth'
 import { createSiweMessage } from '../../lib/web3/siwe'
 import { requestWalletProof } from '../../lib/web3/wallet-proof'
-import { assertWalletRequestAvailable, releaseWalletRequest } from '../../lib/web3/wallet-confirmation'
+import { assertWalletRequestAvailable } from '../../lib/web3/wallet-confirmation'
 import { getResolverWalletBlockReason } from '../../lib/web3/wallet-link-guard'
 import deployment from '../../lib/web3/deployment-context'
 import { getErrorMessage } from '../../lib/api/error'
@@ -50,6 +51,7 @@ export function AccountAccess({
   const [walletStatus, setWalletStatus] = useState('')
   const [walletStage, setWalletStage] = useState<'prepare' | 'challenge' | 'signature' | 'verify' | ''>('')
   const [signatureSeconds, setSignatureSeconds] = useState(90)
+  const [walletAvailability, setWalletAvailability] = useState<'idle' | 'checking' | 'available' | 'current' | 'other' | 'unavailable'>('idle')
   const proofController = useRef<AbortController | null>(null)
   const running = useRef(false)
   const mounted = useRef(true)
@@ -69,10 +71,40 @@ export function AccountAccess({
     proofController.current?.abort(new Error('Kết nối ví hoặc tài khoản đã thay đổi. Lần xác thực cũ đã dừng; bạn có thể liên kết bằng kết nối hiện tại.'))
   }, [address, chainId, connector?.uid, session?.userId])
   const alreadyLinked = Boolean(address && session?.wallets.some(wallet => wallet.address.toLowerCase() === address.toLowerCase() && wallet.chainId === chainId))
+  useEffect(() => {
+    let active = true
+    if (alreadyLinked) {
+      setWalletAvailability('current')
+      return () => { active = false }
+    }
+    if (!session || !address || !chainId) {
+      setWalletAvailability('idle')
+      return () => { active = false }
+    }
+    setWalletAvailability('checking')
+    void checkWalletAvailability(address, chainId)
+      .then(result => {
+        if (!active) return
+        setWalletAvailability(result.alreadyLinked ? 'current' : result.canLink ? 'available' : 'other')
+      })
+      .catch(() => {
+        if (active) setWalletAvailability('unavailable')
+      })
+    return () => { active = false }
+  }, [alreadyLinked, address, chainId, session?.userId])
   const resolverWalletBlockReason = getResolverWalletBlockReason({
-    roles: session?.roles ?? [], connectedAddress: address, resolverAddress: deployment.resolver,
+    roles: session?.roles ?? [], connectedAddress: address,
+    resolverAddress: deployment.resolver, backupResolverAddress: deployment.backupResolver,
   })
   const wrongResolverWallet = Boolean(resolverWalletBlockReason)
+  const hasPrimaryResolverWallet = Boolean(session?.wallets.some(
+    wallet => wallet.address.toLowerCase() === deployment.resolver.toLowerCase()
+      && wallet.chainId === deployment.chainId,
+  ))
+  const hasBackupResolverWallet = Boolean(session?.wallets.some(
+    wallet => wallet.address.toLowerCase() === deployment.backupResolver.toLowerCase()
+      && wallet.chainId === deployment.chainId,
+  ))
 
   async function run(action: () => Promise<void>) {
     if (running.current) return
@@ -127,59 +159,60 @@ export function AccountAccess({
     void run(async () => {
       if (!address || !chainId || !connector) throw new Error('Kết nối ví trước.')
       assertWalletRequestAvailable(connector.uid)
+      if (session) {
+        const availability = await checkWalletAvailability(address, chainId)
+        if (availability.alreadyLinked) {
+          onSession(await getSession())
+          return
+        }
+        if (!availability.canLink) {
+          throw new Error('Ví này đã liên kết với tài khoản khác. Hãy chọn đúng ví của tài khoản hiện tại.')
+        }
+      }
       const controller = new AbortController()
       proofController.current = controller
       let signer: Awaited<ReturnType<typeof getConnectorClient>> | undefined
-      try {
-        const { message, signature } = await requestWalletProof({
-          expected: { address, chainId, connectorUid: connector.uid, userId: session?.userId ?? null },
-          current: () => { const active = getAccount(config)
-            return { ...active, address: mounted.current ? active.address : undefined,
-              connectorUid: active.connector?.uid, userId: currentSession.current?.userId ?? null } },
-          prepare: async () => { signer = await getConnectorClient(config, { account: address, connector, chainId }) },
-          challenge: () => session ? getLinkNonce() : getNonce(),
-          message: challenge => createSiweMessage({
-            ...challenge, address,
-            statement: session ? `Link this wallet to FundTogether account ${session.userId}.` : undefined,
-          }),
-          sign: (text, account) => {
-            if (!signer) throw new Error('Chưa đọc được kết nối ví. Chưa gửi yêu cầu ký.')
-            return signMessage(signer, { message: text, account })
-          },
-          signal: controller.signal,
-          onStage: stage => {
-            setWalletStage(stage)
-            setSignatureSeconds(90)
-            setWalletStatus(stage === 'prepare'
-              ? `Đang kiểm tra kết nối ${connector.name} (tối đa 8 giây). Chưa gửi yêu cầu ký.`
-              : stage === 'challenge' ? 'Đang lấy thông điệp xác thực từ backend…'
-                : `Đang chờ chữ ký trong ${connector.name}. Mở đúng ví này để xem yêu cầu ký; có thể nằm trong cửa sổ riêng.`)
-          },
-        })
-        setWalletStage('verify')
-        setWalletStatus('Đã nhận chữ ký. Đang xác minh với backend…')
-        const linked = await (session
-            ? linkWallet(message, signature)
-            : verifySiwe(message, signature))
-        if (!mounted.current) return
-        if (currentSession.current?.userId !== session?.userId) throw new Error('Tài khoản đã thay đổi. Tải lại phiên đăng nhập trước khi tiếp tục.')
-        onSession(linked)
-      } finally {
-        if (connector?.uid) releaseWalletRequest(connector.uid)
-        if (address) releaseWalletRequest(address)
-      }
+      const { message, signature } = await requestWalletProof({
+        expected: { address, chainId, connectorUid: connector.uid, userId: session?.userId ?? null },
+        current: () => { const active = getAccount(config)
+          return { ...active, address: mounted.current ? active.address : undefined,
+            connectorUid: active.connector?.uid, userId: currentSession.current?.userId ?? null } },
+        prepare: async () => { signer = await getConnectorClient(config, { account: address, connector, chainId }) },
+        challenge: () => session ? getLinkNonce() : getNonce(),
+        message: challenge => createSiweMessage({
+          ...challenge, address,
+          statement: session ? `Link this wallet to FundTogether account ${session.userId}.` : undefined,
+        }),
+        sign: (text, account) => {
+          if (!signer) throw new Error('Chưa đọc được kết nối ví. Chưa gửi yêu cầu ký.')
+          return signMessage(signer, { message: text, account })
+        },
+        signal: controller.signal,
+        onStage: stage => {
+          setWalletStage(stage)
+          setSignatureSeconds(90)
+          setWalletStatus(stage === 'prepare'
+            ? `Đang kiểm tra kết nối ${connector.name} (tối đa 8 giây). Chưa gửi yêu cầu ký.`
+            : stage === 'challenge' ? 'Đang lấy thông điệp xác thực từ backend…'
+              : `Đang chờ chữ ký trong ${connector.name}. Mở đúng ví này để xem yêu cầu ký; có thể nằm trong cửa sổ riêng.`)
+        },
+      })
+      setWalletStage('verify')
+      setWalletStatus('Đã nhận chữ ký. Đang xác minh với backend…')
+      const linked = await (session
+          ? linkWallet(message, signature)
+          : verifySiwe(message, signature))
+      if (!mounted.current) return
+      if (currentSession.current?.userId !== session?.userId) throw new Error('Tài khoản đã thay đổi. Tải lại phiên đăng nhập trước khi tiếp tục.')
+      onSession(linked)
     })
   }
 
 
   function stopWaiting() {
-    if (connector?.uid) releaseWalletRequest(connector.uid)
-    if (address) releaseWalletRequest(address)
     proofController.current?.abort(new Error('Đã dừng lần xác thực này; chữ ký trả muộn sẽ bị bỏ qua. Nếu extension còn hiển thị yêu cầu cũ, từ chối yêu cầu đó trước khi thử lại.'))
   }
   function disconnectWallet() {
-    if (connector?.uid) releaseWalletRequest(connector.uid)
-    if (address) releaseWalletRequest(address)
     stopWaiting()
     setError('')
     if (connector) disconnect({ connector })
@@ -196,17 +229,6 @@ export function AccountAccess({
       if (fresh.userId !== currentSession.current?.userId) throw new Error('Tài khoản đã thay đổi. Tải lại trang để đọc phiên hiện tại.')
       onSession(fresh)
     })}>Kiểm tra lại liên kết</button>}
-    <button
-      type="button"
-      className="button button--quiet"
-      onClick={() => {
-        if (connector?.uid) releaseWalletRequest(connector.uid)
-        if (address) releaseWalletRequest(address)
-        if (typeof window !== 'undefined') window.location.reload()
-      }}
-    >
-      Làm mới kết nối (F5)
-    </button>
   </>
 
   if (session) {
@@ -243,11 +265,11 @@ export function AccountAccess({
                   <button
                     type="button"
                     className="button button--primary button--sm"
-                    disabled={busy || wrongResolverWallet}
+                    disabled={busy || wrongResolverWallet || walletAvailability === 'checking' || walletAvailability === 'other'}
                     onClick={verifyExternalWallet}
                     title="Liên kết ví này với tài khoản bằng chữ ký SIWE"
                   >
-                    {busy ? linkingLabel : wrongResolverWallet ? 'Chọn đúng ví' : 'Liên kết ví (Ký SIWE)'}
+                    {busy ? linkingLabel : wrongResolverWallet ? 'Chọn đúng ví' : walletAvailability === 'checking' ? 'Đang kiểm tra ví…' : walletAvailability === 'other' ? 'Chọn ví khác' : 'Liên kết ví (Ký SIWE)'}
                   </button>
                 )}
                 {address && alreadyLinked && (
@@ -278,6 +300,15 @@ export function AccountAccess({
               <p>{resolverWalletBlockReason}</p>
               <button type="button" className="button button--secondary button--sm" disabled={busy || !connector} onClick={disconnectWallet}>
                 Ngắt ví đang kết nối
+              </button>
+            </div>
+          )}
+
+          {walletAvailability === 'other' && !wrongResolverWallet && (
+            <div className="review-notice review-notice--blocked" role="alert" style={{ marginTop: '16px' }}>
+              <p>Ví đang chọn trong extension đã liên kết với tài khoản khác. Hãy đổi sang ví thuộc tài khoản hiện tại trước khi liên kết.</p>
+              <button type="button" className="button button--secondary button--sm" disabled={busy || !connector} onClick={disconnectWallet}>
+                Ngắt ví đang chọn
               </button>
             </div>
           )}
@@ -319,11 +350,21 @@ export function AccountAccess({
           <section className="resolver-portal-banner" aria-label="Khu vực kiểm duyệt viên">
             <div className="resolver-portal-banner__left">
               <strong>Cổng kiểm duyệt viên (Resolver Portal)</strong>
-              <p>
-                Ví resolver hợp đồng: <code>{deployment.resolver}</code> (Chain ID {deployment.chainId}). Chọn ví này để ký duyệt chiến dịch hoặc quyết định tranh chấp.
-              </p>
+              {hasPrimaryResolverWallet ? (
+                <p>
+                  Ví Resolver chính: <code>{deployment.resolver}</code> (Chain ID {deployment.chainId}). Ví này có thể ký duyệt chiến dịch và quyết định tranh chấp.
+                </p>
+              ) : hasBackupResolverWallet ? (
+                <p>
+                  Ví Resolver dự phòng: <code>{deployment.backupResolver}</code> (Chain ID {deployment.chainId}). Ví này chỉ takeover quyền review sau 7 ngày nếu Resolver chính chưa xử lý.
+                </p>
+              ) : (
+                <p>
+                  Contract có ví Resolver chính <code>{deployment.resolver}</code> và ví dự phòng <code>{deployment.backupResolver}</code> (Chain ID {deployment.chainId}). Hãy liên kết đúng ví tương ứng với tài khoản hiện tại.
+                </p>
+              )}
             </div>
-            <a href="#/reward/resolver" className="button button--secondary button--sm">
+            <a href="#/campaigns/resolver" className="button button--secondary button--sm">
               Mở Resolver Console →
             </a>
           </section>

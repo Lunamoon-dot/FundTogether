@@ -392,15 +392,26 @@
   line-height: 1.6;
 }
 .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   min-height: 42px;
-  padding: 0 18px;
+  padding: 0 20px;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 13px;
   font-weight: 600;
   font-family: var(--font-sans);
   letter-spacing: 0.02em;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  text-decoration: none;
+  cursor: pointer;
+  line-height: 1;
+  box-sizing: border-box;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+a.button {
+  text-decoration: none;
 }
 .button--lg {
   min-height: 50px;
@@ -416,10 +427,13 @@
   color: #fff;
   background: var(--ink-carbon, #181716);
   border-color: var(--ink-carbon, #181716);
+  box-shadow: 0 1px 3px rgba(24, 23, 22, 0.12);
 }
 .button--primary:hover:not(:disabled) {
   background: #2e2c29;
   border-color: #2e2c29;
+  box-shadow: 0 3px 10px rgba(24, 23, 22, 0.18);
+  color: #fff;
 }
 .button--secondary {
   color: var(--ink-carbon, #181716);
@@ -464,7 +478,7 @@ label {
   font-size: 13px;
   font-weight: 600;
 }
-input,
+input:not([type="checkbox"]):not([type="radio"]),
 textarea {
   width: 100%;
   border: 1px solid var(--border-hairline, rgba(24, 23, 22, 0.18));
@@ -479,9 +493,21 @@ textarea {
     border-color 0.15s ease,
     box-shadow 0.15s ease;
 }
-input {
+input:not([type="checkbox"]):not([type="radio"]) {
   min-height: 44px;
   padding: 0 13px;
+}
+input[type="checkbox"],
+input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  min-height: 16px;
+  max-width: 16px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--seal-vermilion, #9e2a2b);
+  cursor: pointer;
+  flex-shrink: 0;
 }
 textarea {
   min-height: 90px;
@@ -489,11 +515,11 @@ textarea {
   resize: vertical;
   line-height: 1.6;
 }
-input::placeholder,
+input:not([type="checkbox"]):not([type="radio"])::placeholder,
 textarea::placeholder {
   color: var(--ink-subtle, #7d7973);
 }
-input:focus,
+input:not([type="checkbox"]):not([type="radio"]):focus,
 textarea:focus {
   border-color: var(--ink-carbon, #181716);
   box-shadow: 0 0 0 2px var(--seal-vermilion-border, rgba(158, 42, 43, 0.25));
@@ -763,7 +789,7 @@ textarea:focus {
   font-size: 12px;
   font-weight: 400;
 }
-input[aria-invalid='true'],
+input:not([type='checkbox']):not([type='radio'])[aria-invalid='true'],
 textarea[aria-invalid='true'] {
   border-color: #bd5d51;
 }

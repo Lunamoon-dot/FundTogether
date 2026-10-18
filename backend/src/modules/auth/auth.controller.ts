@@ -6,6 +6,7 @@ import {
   Header,
   HttpCode,
   Post,
+  Query,
   Req,
   Res,
   UseGuards,
@@ -31,6 +32,12 @@ const verifyBodySchema = z
       .string()
       .regex(/^0x[\da-fA-F]+$/)
       .max(2048),
+  })
+  .strict();
+const walletAvailabilityQuerySchema = z
+  .object({
+    address: z.string().regex(/^0x[\da-fA-F]{40}$/),
+    chainId: z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   })
   .strict();
 
@@ -99,6 +106,18 @@ export class AuthController {
   @HttpCode(200)
   walletNonce(@Req() request: Request) {
     return this.authService.createNonce(request.sessionToken!);
+  }
+
+  @Get("wallets/availability")
+  @Header("Cache-Control", "no-store")
+  @UseGuards(AuthGuard)
+  walletAvailability(@Query() query: unknown, @Req() request: Request) {
+    const input = this.parse(walletAvailabilityQuerySchema, query);
+    return this.authService.walletAvailability(
+      request.account!.userId,
+      input.address,
+      input.chainId,
+    );
   }
 
   @Post("wallets/link")

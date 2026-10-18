@@ -6,6 +6,7 @@ import { hexToString, verifyMessage } from 'viem'
 import { signMessage } from 'viem/actions'
 import { connect, disconnect, getAccount, getConnectorClient } from 'wagmi/actions'
 import { createBrowserWalletConfig } from '../src/lib/web3/wallet-config.ts'
+import { assertWalletRequestAvailable } from '../src/lib/web3/wallet-confirmation.ts'
 import { requestWalletProof } from '../src/lib/web3/wallet-proof.ts'
 
 const chain = { id: 31338, name: 'Test B', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
@@ -19,7 +20,7 @@ async function fixture(run) {
   const signer = privateKeyToAccount(generatePrivateKey())
   class Provider extends EventEmitter {
     calls = []
-    isMetaMask = true // Other extensions may also expose this compatibility flag.
+    isMetaMask = true // Other extensions may also expose this workflow flag.
     sign = text => signer.signMessage({ message: hexToString(text) })
     async request({ method, params }) {
       this.calls.push({ method, params })
@@ -44,14 +45,16 @@ async function fixture(run) {
   const config = createBrowserWalletConfig(chain, chain.rpcUrls.default.http[0])
   await tick()
   const connector = config.connectors.find(item => item.id === 'io.metamask')
-  const proof = async () => {
+  const proof = async (onStage) => {
     const active = getAccount(config)
     const expected = { address: active.address, chainId: active.chainId, connectorUid: active.connector?.uid, userId: 'resolver' }
     const client = await getConnectorClient(config, { connector, account: signer.address, chainId: chain.id })
     return requestWalletProof({ expected,
       current: () => { const state = getAccount(config); return { address: state.address, chainId: state.chainId, connectorUid: state.connector?.uid, userId: 'resolver' } },
       challenge: async () => ({ chainId: chain.id }), message: () => 'Proof for selected resolver account',
-      sign: (message, account) => signMessage(client, { message, account }), timeoutMs: 1000 })
+      sign: (message, account) => signMessage(client, { message, account }), timeoutMs: 1000,
+      onStage,
+    })
   }
   try { await run({ config, connector, metamask, brave, signer, proof, announce }) }
   finally { config._internal.mipd?.destroy(); globalThis.window = previous }
@@ -69,6 +72,37 @@ test('discovered MetaMask signs through its exact provider, not Brave or an SDK'
   assert.equal(await verifyMessage({ ...result, address: h.signer.address }), true)
   assert.equal(h.metamask.calls.filter(c => c.method === 'personal_sign').length, 1)
   assert.equal(h.brave.calls.length, 0)
+}))
+
+test('reports the challenge stage before signing and starts the signature timer at provider dispatch', async () => fixture(async h => {
+  await connect(h.config, { connector: h.connector })
+  const events = []
+  const originalSign = h.metamask.sign
+  h.metamask.sign = async text => {
+    events.push('sign')
+    return originalSign(text)
+  }
+
+  await h.proof(stage => events.push(stage))
+
+  assert.deepEqual(events, ['prepare', 'challenge', 'signature', 'sign'])
+}))
+
+test('keeps a timed-out SIWE request locked while MetaMask still has it pending', async () => fixture(async h => {
+  await connect(h.config, { connector: h.connector })
+  let resolveSign
+  h.metamask.sign = () => new Promise(resolve => { resolveSign = resolve })
+
+  await assert.rejects(h.proof(), /Yêu cầu cũ có thể vẫn đang treo/)
+  assert.equal(typeof resolveSign, 'function')
+  assert.throws(
+    () => assertWalletRequestAvailable(h.connector.uid),
+    /chưa xử lý/,
+  )
+
+  resolveSign(await h.signer.signMessage({ message: 'Proof for selected resolver account' }))
+  await tick()
+  assert.doesNotThrow(() => assertWalletRequestAvailable(h.connector.uid))
 }))
 
 test('rejection followed by disconnect/reconnect sends one new request to MetaMask', async () => fixture(async h => {

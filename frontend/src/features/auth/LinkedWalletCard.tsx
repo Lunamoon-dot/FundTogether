@@ -67,7 +67,7 @@ export function LinkedWalletCard({ address, chainId, userId, onUnlink, unlinkDis
         {supportsToken && (
           <div className="balance-tile" aria-live="polite">
             <div className="balance-tile__body">
-              <span className="balance-tile__caption">Token ủng hộ Editions</span>
+              <span className="balance-tile__caption">Token ủng hộ</span>
               {tokenBalance.isError ? (
                 <p className="balance-tile__error" role="alert">Không tải được số dư MockUSDC. Thử tải lại số dư.</p>
               ) : tokenBalance.isPending ? (

@@ -2,7 +2,7 @@
   min-height: 100vh;
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
-  grid-template-rows: 1fr auto;
+  grid-template-rows: 1fr;
 }
 .public-sidebar {
   position: sticky;
@@ -211,13 +211,6 @@
   list-style: none;
 }
 .public-campaign-grid h2 { margin-top: 12px; }
-.public-campaign-grid .organization-description {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  white-space: pre-wrap;
-}
 .public-campaign-facts {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -273,7 +266,6 @@
 .campaign-card h2 { font-size: 20px; line-height: 1.4; }
 .campaign-card h2 a { color: #1e3327; text-decoration: none; }
 .campaign-card h2 a:hover { color: #267450; text-decoration: underline; }
-.campaign-card .organization-description { margin: 0; color: #68776d; line-height: 1.6; }
 .funding-progress { display: grid; gap: 8px; margin-top: auto; }
 .funding-progress__labels { display: flex; justify-content: space-between; color: #64756a; font-size: 13px; }
 .funding-progress progress { width: 100%; height: 9px; accent-color: #267450; }
@@ -290,9 +282,9 @@
 .campaign-detail-main { display: grid; gap: 16px; min-width: 0; }
 .campaign-detail-aside { display: grid; gap: 16px; position: sticky; top: 92px; }
 .campaign-detail-layout .panel { margin: 0; }
-.campaign-detail-layout .reward-plan-form { gap: 14px; }
-.campaign-detail-layout .reward-plan-form label { display: grid; gap: 6px; }
-.campaign-detail-layout .reward-plan-form input { width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #cedcd1; border-radius: 8px; font: inherit; }
+.campaign-detail-layout .campaign-plan-form { gap: 14px; }
+.campaign-detail-layout .campaign-plan-form label { display: grid; gap: 6px; }
+.campaign-detail-layout .campaign-plan-form input { width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #cedcd1; border-radius: 8px; font: inherit; }
 .campaign-aside-summary p { color: #69776e; }
 .current-step { padding: 22px 24px; border: 1px solid #d8e5da; border-left: 4px solid #267450; border-radius: 12px; background: #f7faf7; }
 .current-step h2 { margin: 8px 0; }
@@ -302,7 +294,7 @@
 .campaign-detail-main h2 { margin-bottom: 12px; }
 .campaign-detail-main > section > details { padding: 14px 0; border-top: 1px solid #edf0ec; }
 .campaign-detail-main > section > details > summary { cursor: pointer; font-weight: 600; }
-.campaign-detail-main .reward-hash { overflow-wrap: anywhere; }
+.campaign-detail-main .campaign-hash { overflow-wrap: anywhere; }
 .muted { color: #768278; }
 @media (min-width: 721px) and (max-width: 1240px) {
   .public-header { position: static; flex-wrap: wrap; gap: 8px 14px; padding: 12px 24px; }
@@ -396,7 +388,6 @@
 .campaign-tile h2 { margin: 2px 0 0; font-size: 22px; line-height: 1.3; letter-spacing: -.55px; }
 .campaign-tile h2 a { color: #1c3526; text-decoration: none; }
 .campaign-tile h2 a:hover { color: #236b46; }
-.campaign-tile .organization-description { display: -webkit-box; min-height: 48px; margin: 0; overflow: hidden; color: #68786c; font-size: 14px; line-height: 1.6; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .campaign-tile .funding-progress { gap: 9px; margin-top: auto; }
 .campaign-tile .funding-progress__labels { color: #65776a; font-size: 13px; }
 .campaign-tile .funding-progress__labels strong { color: #284e35; font-variant-numeric: tabular-nums; }
@@ -435,20 +426,20 @@
 }
 
 /* ==========================================================================
-   Edition App Shell & Navigation
+   Campaign App Shell & Navigation
    ========================================================================== */
-.edition-shell {
+.campaign-shell {
   background: var(--paper-bone, #f7f5f0);
   color: var(--ink-carbon, #181716);
 }
 
-.edition-shell__brand-block {
+.campaign-shell__brand-block {
   display: flex;
   flex-direction: column;
   gap: 7px;
 }
 
-.edition-shell__tagline {
+.campaign-shell__tagline {
   align-self: stretch;
   font-family: var(--font-sans, "Inter", sans-serif);
   font-size: 10px;
@@ -460,14 +451,19 @@
   text-transform: uppercase;
 }
 
-.edition-shell__nav-group {
+.campaign-shell__nav-group {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-bottom: 12px;
 }
 
-.edition-shell__nav-heading {
+.campaign-shell__nav-group + .campaign-shell__nav-group {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-hairline-subtle, rgba(24, 23, 22, 0.09));
+}
+
+.campaign-shell__nav-heading {
   font-family: var(--font-sans, "Inter", sans-serif);
   font-size: 11px;
   font-weight: 700;
@@ -477,33 +473,33 @@
   padding: 8px 12px 4px;
 }
 
-.edition-shell__account {
+.campaign-shell__account {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.edition-shell__account-meta {
+.campaign-shell__account-meta {
   display: flex;
   flex-direction: column;
   min-width: 0;
   text-align: left;
 }
 
-.edition-shell__account-name {
+.campaign-shell__account-name {
   font-family: var(--font-serif, "Newsreader", serif);
   font-weight: 600;
   color: var(--ink-carbon, #181716);
   font-size: 14px;
 }
 
-.edition-shell__account-role {
+.campaign-shell__account-role {
   font-family: var(--font-mono, "IBM Plex Mono", monospace);
   font-size: 10.5px;
   color: var(--ink-subtle, #7d7973);
 }
 
-.edition-shell__footer {
+.campaign-shell__footer {
   display: flex;
   justify-content: space-between;
   align-items: center;

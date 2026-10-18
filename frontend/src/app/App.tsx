@@ -5,13 +5,26 @@ import { PublicArea } from '../features/explore/PublicArea'
 import type { AccountSession } from '../lib/api/auth'
 import './App.css'
 
+function canonicalHashPath() {
+  const path = window.location.hash.slice(1) || '/'
+  if (path !== '/campaigns' && !path.startsWith('/campaigns/')) return path
+
+  const suffix = path.slice('/campaigns'.length)
+  const canonical = suffix === '/campaigns' || suffix.startsWith('/campaigns/')
+    ? `/campaigns${suffix.slice('/campaigns'.length)}`
+    : `/campaigns${suffix}`
+  window.history.replaceState(null, '', `#${canonical}`)
+  return canonical
+}
+
 function App() {
-  const [path, setPath] = useState(() => window.location.hash.slice(1) || '/')
+  const [path, setPath] = useState(canonicalHashPath)
   const { session, setSession, sessionLoading, sessionError, setSessionError } = useAccountSession()
   const queryClient = useQueryClient()
 
   useEffect(() => {
-    const changed = () => setPath(window.location.hash.slice(1) || '/')
+    const changed = () => setPath(canonicalHashPath())
+    changed()
     window.addEventListener('hashchange', changed)
     return () => window.removeEventListener('hashchange', changed)
   }, [])
@@ -19,8 +32,7 @@ function App() {
   function changeSession(next: AccountSession | null) {
     setSessionError('')
     if (next?.userId !== session?.userId) {
-      for (const prefix of ['campaigns', 'organizations', 'organization-campaigns', 'organization-campaign',
-        'organization-evidence', 'review-access', 'review-campaigns', 'review-campaign',
+      for (const prefix of ['campaigns', 'review-access', 'review-campaigns', 'review-campaign',
         'publication-submission', 'campaign-publication']) {
         queryClient.removeQueries({ queryKey: [prefix] })
       }

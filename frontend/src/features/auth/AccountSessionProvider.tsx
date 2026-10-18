@@ -32,7 +32,7 @@ export function AccountSessionProvider({ children }: PropsWithChildren) {
     if (previousAccountId.current === accountId) return
     if (previousAccountId.current !== undefined) queryClient.removeQueries({ predicate: q => {
       const scope = String(q.queryKey[0])
-      return scope.startsWith('reward-') || scope.startsWith('my-reward-')
+      return scope.startsWith('campaign-') || scope.startsWith('my-campaign-')
     } })
     previousAccountId.current = accountId
 

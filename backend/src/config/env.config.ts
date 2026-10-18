@@ -3,12 +3,12 @@ export const configuration = () => ({
   port: Number.parseInt(process.env.PORT ?? "3000", 10),
   webOrigin: process.env.WEB_ORIGIN ?? "http://localhost:5173",
   authDomain: process.env.AUTH_DOMAIN ?? "localhost:5173",
-  authChainId: Number.parseInt(process.env.AUTH_CHAIN_ID ?? "31337", 10),
+  authChainId: Number.parseInt(process.env.AUTH_CHAIN_ID ?? "31339", 10),
   authSessionCookieName: process.env.AUTH_SESSION_COOKIE_NAME ?? "ft_session",
   databaseUrl:
     process.env.DATABASE_URL ??
     "postgresql://postgres:postgres@localhost:5432/fundtogether",
-  blockchainRpcUrl: process.env.REWARD_RPC_URL,
+  blockchainRpcUrl: process.env.FUNDTOGETHER_RPC_URL,
   s3Endpoint: process.env.S3_ENDPOINT,
   s3Region: process.env.S3_REGION ?? "us-east-1",
   s3Bucket: process.env.S3_BUCKET,

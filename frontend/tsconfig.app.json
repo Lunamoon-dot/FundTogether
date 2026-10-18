@@ -10,7 +10,10 @@
 
     /* Bundler mode */
     "moduleResolution": "bundler",
-    "paths": { "@fundtogether/deployment": ["../.local/hed/generated/deployment.local.json"] },
+    "paths": {
+      "@fundtogether/deployment": ["./src/lib/web3/missing-campaign-deployment.json"],
+      "@fundtogether/historical-deployment": ["./src/lib/web3/missing-historical-deployment.json"]
+    },
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",

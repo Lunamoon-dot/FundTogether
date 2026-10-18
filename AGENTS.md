@@ -7,7 +7,7 @@ read `docs/research-direction.md` and `docs/PROJECT_OVERVIEW.md` first.
 The current project direction was explicitly locked on 2026-10-08 and updated through 2026-10-13.
 
 Align decisions with its research goals, narrow scope and evaluation criteria:
-- Current product scope is **FundTogether Editions**: a deliberately narrow **Reward Crowdfunding** pilot for independent digital comics and artbooks (`COMICS_ARTBOOK`).
+- Current product scope is **FundTogether**: a deliberately narrow **Reward Crowdfunding** pilot for independent digital comics and artbooks (`COMICS_ARTBOOK`).
 - Core capabilities: Evidence-backed creator/IP review, one standard digital-download tier (PDF), escrowed pledges in MockUSDC, production-evidence review, private PDF release, disputes and refunds.
 - **Out of scope:** Physical fulfilment, shipping/logistics, inventory tiers, and legacy charity/donation crowdfunding workflows. The repository does not retain active legacy charity workflow implementation.
 
@@ -50,7 +50,7 @@ React frontend (Vite/TS) ↔ NestJS API ↔ PostgreSQL (Drizzle) / MinIO (S3 sto
 - Local Anvil RPC node (chain `31339`)
 - Local ports: PostgreSQL `5436`, MinIO `9202/9203`, API `3002`, Web `5175`, Anvil RPC `9548`
 
-## Editions core journeys
+## Campaign core journeys
 
 1. **Creator journey:**
    - Connect wallet & sign in via SIWE.
@@ -63,7 +63,7 @@ React frontend (Vite/TS) ↔ NestJS API ↔ PostgreSQL (Drizzle) / MinIO (S3 sto
    - Approve or request correction/reject on-chain with documented reasoning.
 
 3. **Backer journey:**
-   - Browse approved campaigns in Editions feed.
+   - Browse approved campaigns in the Campaign feed.
    - Approve MockUSDC token and pledge into the escrow contract.
    - Indexer records canonical pledge and issues versioned entitlement.
 
@@ -77,7 +77,7 @@ React frontend (Vite/TS) ↔ NestJS API ↔ PostgreSQL (Drizzle) / MinIO (S3 sto
 ## Working rules
 
 - Read nearby files, `docs/research-direction.md`, and `docs/PROJECT_OVERVIEW.md` before making changes.
-- Never reintroduce legacy charity/organization crowdfunding or physical shipping logic into the Editions product flow.
+- Never reintroduce legacy charity/organization crowdfunding or physical shipping logic into the Campaign product flow.
 - Integer-safe token amounts and `bigint` only; never use floating point for financial calculations.
 - Track transaction lifecycle explicitly: wallet request → submitted → canonical receipt → indexer projection.
 - Validate inputs on the server even when the frontend validates them.
@@ -85,8 +85,8 @@ React frontend (Vite/TS) ↔ NestJS API ↔ PostgreSQL (Drizzle) / MinIO (S3 sto
 
 ## Current status
 
-- **Scope:** Reward Crowdfunding only (FundTogether Editions — Comics & Artbooks). Legacy physical delivery and charity workflows are retired/archived.
-- **Backend:** NestJS Reward module (`src/reward`), controllers, services, indexers, storage, and migrations 0000–0005 fully verified (195/195 Jest tests pass).
-- **Frontend:** Editions feed, Creator Studio, Resolver console, Backer library, and Web3 integration verified (29/29 tests pass).
-- **Contracts:** Foundry Editions escrow contracts, fuzzing, and deployment manifests verified.
-- **Local runtime:** Fully automated launcher via `backend/scripts/reward/start-services.ps1`.
+- **Scope:** Reward Crowdfunding only (FundTogether — Comics & Artbooks). Legacy physical delivery and charity workflows are retired/archived.
+- **Backend:** NestJS application with domain modules under `src/modules`, controllers, services, indexers, storage, and migrations 0000–0005 fully verified (195/195 Jest tests pass).
+- **Frontend:** Campaign feed, Creator Studio, Resolver console, Backer library, and Web3 integration verified (29/29 tests pass).
+- **Contracts:** Foundry campaign escrow contracts, fuzzing, and deployment manifests verified.
+- **Local runtime:** Fully automated launcher via `backend/scripts/campaigns/start-services.ps1`.
