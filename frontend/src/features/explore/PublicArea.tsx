@@ -1,6 +1,7 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { CommunityReviewPage, Feed } from '../campaigns/public/Feed';
 import { AppShell, type PublicAreaProps } from './AppShell';
+import { resolveCampaignDetailRoute } from './campaignRoutes';
 import './PublicArea.css';
 
 const AccountAccess = lazy(() => import('../auth/AccountAccess').then(module => ({ default: module.AccountAccess })));
@@ -14,6 +15,14 @@ const AdminConsole = lazy(() => import('../campaigns/resolver/AdminConsole').the
 
 export type { PublicAreaProps };
 
+function LegacyCampaignRedirect({ href }: { href: string }) {
+  useEffect(() => {
+    if (window.location.hash !== href) window.location.replace(href);
+  }, [href]);
+
+  return <p role="status" className="muted">Đang chuyển tới không gian làm việc…</p>;
+}
+
 export function PublicArea(props: PublicAreaProps) {
   const { path, session, sessionLoading, error, onSession } = props;
 
@@ -26,7 +35,7 @@ export function PublicArea(props: PublicAreaProps) {
   const isCampaignLibrary = path === '/campaigns/library';
   const isAdmin = path === '/admin' || path === '/campaigns/admin';
   const isCampaignResolver = path === '/campaigns/resolver';
-  const campaignDetail = /^(?!\/campaigns\/(?:review|history|library|creator(?:\/|$)|resolver(?:\/|$)|admin(?:\/|$)))\/campaigns\/([^/]+)(?:\/(creator|resolver)(?:\/(feedback))?)?$/.exec(path);
+  const campaignDetail = resolveCampaignDetailRoute(path);
   const history = path === '/campaigns/history';
   const historicalEntitlements = path === '/campaigns/history/entitlements';
 
@@ -43,13 +52,19 @@ export function PublicArea(props: PublicAreaProps) {
       )}
       {isCampaignCommunityReview && <CommunityReviewPage />}
       {campaignDetail && (
-        <CampaignPage
-          key={`${campaignDetail[1]}:${session?.userId ?? 'public'}:${campaignDetail[2] ?? 'public'}:${campaignDetail[3] ?? 'overview'}`}
-          id={campaignDetail[1]}
-          session={session}
-          mode={(campaignDetail[2] as 'creator' | 'resolver') || 'public'}
-          initialTab={campaignDetail[3] === 'feedback' ? 'activity' : 'overview'}
-        />
+        campaignDetail.legacy ? (
+          <LegacyCampaignRedirect href={campaignDetail.canonicalHref} />
+        ) : (
+          <CampaignPage
+            key={`${campaignDetail.campaignId}:${session?.userId ?? 'public'}:${campaignDetail.workspace}:${campaignDetail.initialTab}`}
+            id={campaignDetail.campaignId}
+            session={session}
+            mode={campaignDetail.workspace === 'creator' || campaignDetail.workspace === 'resolver'
+              ? campaignDetail.workspace
+              : 'public'}
+            initialTab={campaignDetail.initialTab}
+          />
+        )
       )}
       {historicalEntitlements && session && <HistoricalEntitlements key={session.userId} />}
       {(isCampaignCreatorStudio || isCampaignCreatorDraft) && session && <Studio key={session.userId} userId={session.userId} path={path} />}

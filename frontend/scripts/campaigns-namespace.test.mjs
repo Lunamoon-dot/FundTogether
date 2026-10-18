@@ -85,11 +85,17 @@ test('current campaign modules own their APIs and review responsibilities', () =
 test('public workflow contracts remain stable', () => {
   const shell = fs.readFileSync(path.join(featuresRoot, 'explore', 'AppShell.tsx'), 'utf8');
   const router = fs.readFileSync(path.join(featuresRoot, 'explore', 'PublicArea.tsx'), 'utf8');
+  const routeContract = fs.readFileSync(path.join(featuresRoot, 'explore', 'campaignRoutes.ts'), 'utf8');
   const campaignApiSource = fs.readFileSync(path.join(frontendRoot, 'src', 'features', 'campaigns', 'api', 'campaigns.ts'), 'utf8');
   for (const route of ['#/campaigns', '#/campaigns/review', '#/campaigns/creator', '#/campaigns/creator/profile', '#/campaigns/library']) {
     assert.match(shell, new RegExp(route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
-  assert.equal(router.includes('\\/campaigns\\/([^/]+)'), true, 'missing #/campaigns/:id route parser');
+  assert.match(router, /resolveCampaignDetailRoute/);
+  assert.equal(
+    routeContract.includes('pattern: /^\\/campaigns\\/([^/?#]+)'),
+    true,
+    'missing #/campaigns/:id route contract',
+  );
   assert.match(campaignApiSource, /\/v1\/fundtogether/);
   assert.doesNotMatch(campaignApiSource, /\/v1\/campaigns(?!\/)/);
 });
