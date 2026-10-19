@@ -1,13 +1,47 @@
 import type React from 'react';
 import type { AccountSession } from '../../../../lib/api/auth';
-import type { ResolvedCampaignDetailRoute } from '../../../explore/campaignRoutes';
+import { campaignDetailFocusHref, campaignDetailHref, type CampaignDetailFocus, type CampaignDetailTab, type ResolvedCampaignDetailRoute } from '../../../explore/campaignRoutes';
 import type { WorkspaceRole } from './workspaceRole';
 import './workspace.css';
 
 interface WorkspaceNavItem {
   label: string;
-  href: string;
+  href: string | ((detail: ResolvedCampaignDetailRoute | null) => string);
   matches: (path: string, detail: ResolvedCampaignDetailRoute | null) => boolean;
+}
+
+type AdminWorkspaceFocus = 'studio' | 'projection' | 'indexer';
+
+function resolverHref(detail: ResolvedCampaignDetailRoute | null, tab: CampaignDetailTab, focus?: CampaignDetailFocus) {
+  if (detail?.workspace !== 'resolver') return '#/campaigns/resolver';
+  return focus
+    ? campaignDetailFocusHref('resolver', detail.campaignId, tab, focus)
+    : campaignDetailHref('resolver', detail.campaignId, tab === 'overview' ? undefined : tab);
+}
+
+function resolverSectionMatches(detail: ResolvedCampaignDetailRoute | null, tab: CampaignDetailTab, focus?: CampaignDetailFocus) {
+  return detail?.workspace === 'resolver' && detail.initialTab === tab && detail.focus === focus;
+}
+
+function adminHref(
+  detail: ResolvedCampaignDetailRoute | null,
+  tab: CampaignDetailTab,
+  focus: AdminWorkspaceFocus,
+) {
+  return detail?.workspace === 'admin'
+    ? campaignDetailHref('admin', detail.campaignId, tab)
+    : `#/admin?focus=${focus}`;
+}
+
+function adminSectionMatches(
+  path: string,
+  detail: ResolvedCampaignDetailRoute | null,
+  tab: CampaignDetailTab,
+  focus: AdminWorkspaceFocus,
+) {
+  return detail?.workspace === 'admin'
+    ? detail.initialTab === tab
+    : path === `/admin?focus=${focus}`;
 }
 
 const workspaceMeta: Record<WorkspaceRole, { label: string; description: string; nav: WorkspaceNavItem[] }> = {
@@ -28,11 +62,11 @@ const workspaceMeta: Record<WorkspaceRole, { label: string; description: string;
     description: 'Thẩm định và ra quyết định',
     nav: [
       { label: 'Hàng chờ', href: '#/campaigns/resolver', matches: path => path === '/campaigns/resolver' },
-      { label: 'Campaign đang xử lý', href: '#/campaigns/resolver', matches: (_, detail) => detail?.workspace === 'resolver' },
-      { label: 'Giải ngân', href: '#/campaigns/resolver', matches: (path, detail) => detail?.workspace === 'resolver' && path.includes('activity') },
-      { label: 'PDF & hoàn thành', href: '#/campaigns/resolver', matches: (path, detail) => detail?.workspace === 'resolver' && path.includes('production') },
-      { label: 'Tranh chấp', href: '#/campaigns/resolver', matches: (_, detail) => detail?.workspace === 'resolver' },
-      { label: 'Nhật ký quyết định', href: '#/campaigns/resolver', matches: (path, detail) => detail?.workspace === 'resolver' && path.includes('commitments') },
+      { label: 'Campaign đang xử lý', href: detail => resolverHref(detail, 'overview'), matches: (_, detail) => resolverSectionMatches(detail, 'overview') },
+      { label: 'Giải ngân', href: detail => resolverHref(detail, 'production', 'disbursement'), matches: (_, detail) => resolverSectionMatches(detail, 'production', 'disbursement') },
+      { label: 'PDF & hoàn thành', href: detail => resolverHref(detail, 'production'), matches: (_, detail) => resolverSectionMatches(detail, 'production') },
+      { label: 'Tranh chấp', href: detail => resolverHref(detail, 'activity', 'disputes'), matches: (_, detail) => resolverSectionMatches(detail, 'activity', 'disputes') },
+      { label: 'Nhật ký quyết định', href: detail => resolverHref(detail, 'commitments', 'decisions'), matches: (_, detail) => resolverSectionMatches(detail, 'commitments', 'decisions') },
     ],
   },
   admin: {
@@ -40,10 +74,10 @@ const workspaceMeta: Record<WorkspaceRole, { label: string; description: string;
     description: 'Theo dõi hệ thống và projection',
     nav: [
       { label: 'Tổng quan hệ thống', href: '#/admin', matches: path => path === '/admin' },
-      { label: 'Xác minh Studio', href: '#/admin', matches: (_, detail) => detail?.workspace === 'admin' },
-      { label: 'Campaign projection', href: '#/admin', matches: (_, detail) => detail?.workspace === 'admin' },
-      { label: 'Indexer & deployment', href: '#/admin', matches: (_, detail) => detail?.workspace === 'admin' },
-      { label: 'Tài khoản & quyền', href: '#/admin', matches: path => path === '/admin' },
+      { label: 'Xác minh Studio', href: '#/admin?focus=studio', matches: path => path === '/admin?focus=studio' },
+      { label: 'Campaign projection', href: detail => adminHref(detail, 'production', 'projection'), matches: (path, detail) => adminSectionMatches(path, detail, 'production', 'projection') },
+      { label: 'Indexer & deployment', href: detail => adminHref(detail, 'commitments', 'indexer'), matches: (path, detail) => adminSectionMatches(path, detail, 'commitments', 'indexer') },
+      { label: 'Tài khoản & quyền', href: '#/account', matches: path => path === '/account' },
     ],
   },
 };
@@ -79,7 +113,8 @@ export function WorkspaceShell({ role, path, detail, session, children }: Worksp
         <nav className="workspace-nav" aria-label={meta.label}>
           {meta.nav.map(item => {
             const active = item.matches(path, detail);
-            return <a key={item.label} href={item.href} aria-current={active ? 'page' : undefined}>{item.label}</a>;
+            const href = typeof item.href === 'function' ? item.href(detail) : item.href;
+            return <a key={item.label} href={href} aria-current={active ? 'page' : undefined}>{item.label}</a>;
           })}
         </nav>
 

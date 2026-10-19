@@ -40,6 +40,26 @@ test('internal role routes use distinct dashboard shells and navigation', () => 
   assert.doesNotMatch(admin, /Duyệt hồ sơ giải ngân|Gửi hồ sơ hoàn thành/)
 })
 
+test('resolver campaign navigation opens the selected operational section', () => {
+  const html = render('/campaigns/resolver/campaign-1?tab=production', { userId: 'resolver', roles: ['RESOLVER'], wallets: [] })
+
+  assert.match(html, /href="#\/campaigns\/resolver\/campaign-1"/)
+  assert.match(html, /href="#\/campaigns\/resolver\/campaign-1\?tab=production&amp;focus=disbursement"/)
+  assert.match(html, /href="#\/campaigns\/resolver\/campaign-1\?tab=production"/)
+  assert.match(html, /href="#\/campaigns\/resolver\/campaign-1\?tab=activity&amp;focus=disputes"/)
+  assert.match(html, /href="#\/campaigns\/resolver\/campaign-1\?tab=commitments&amp;focus=decisions"/)
+})
+
+test('admin navigation opens the selected operational area', () => {
+  const html = render('/admin/campaigns/campaign-1?tab=production', { userId: 'admin', roles: ['ADMIN'], wallets: [] })
+
+  assert.match(html, /href="#\/admin"/)
+  assert.match(html, /href="#\/admin\?focus=studio"/)
+  assert.match(html, /href="#\/admin\/campaigns\/campaign-1\?tab=production"/)
+  assert.match(html, /href="#\/admin\/campaigns\/campaign-1\?tab=commitments"/)
+  assert.match(html, /href="#\/account"/)
+})
+
 test('public campaign route keeps the public discovery shell', () => {
   const html = render('/campaigns', { userId: 'admin', roles: ['ADMIN', 'RESOLVER'], wallets: [] })
 

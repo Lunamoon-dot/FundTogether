@@ -36,7 +36,7 @@ export function PublicArea(props: PublicAreaProps) {
   const isCampaignCreatorProfile = path === '/campaigns/creator/profile';
   const isCampaignCreator = isCampaignCreatorStudio || isCampaignCreatorDraft || isCampaignCreatorProfile;
   const isCampaignLibrary = path === '/campaigns/library';
-  const isAdmin = path === '/admin' || path === '/campaigns/admin';
+  const isAdmin = path === '/admin' || path.startsWith('/admin?') || path === '/campaigns/admin';
   const isCampaignResolver = path === '/campaigns/resolver';
   const campaignDetail = resolveCampaignDetailRoute(path);
   const history = path === '/campaigns/history';
@@ -82,6 +82,7 @@ export function PublicArea(props: PublicAreaProps) {
               id={campaignDetail.campaignId}
               session={session}
               initialTab={campaignDetail.initialTab}
+              focus={campaignDetail.focus}
             />
           ) : !session ? (
             <p>Đăng nhập để mở Resolver workspace. <a href="#/account">Đăng nhập</a></p>
@@ -115,7 +116,15 @@ export function PublicArea(props: PublicAreaProps) {
           <p>Đăng nhập để xem bộ sưu tập của bạn.</p>
         )
       )}
-      {isAdmin && session && hasAdminRole && <AdminConsole key={session.userId} userId={session.userId} />}
+      {isAdmin && session && hasAdminRole && (
+        <AdminConsole
+          key={session.userId}
+          userId={session.userId}
+          focus={path === '/admin?focus=studio' || path === '/admin?focus=projection' || path === '/admin?focus=indexer'
+            ? path.slice('/admin?focus='.length) as 'studio' | 'projection' | 'indexer'
+            : undefined}
+        />
+      )}
       {isAdmin && !session && (
         <p>
           Đăng nhập để vào trang quản trị. <a href="#/account">Đăng nhập</a>

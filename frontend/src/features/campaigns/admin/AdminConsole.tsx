@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   listAdminCreatorProfiles,
@@ -12,7 +12,13 @@ import { campaignApi } from '../api/campaigns';
 import { campaignDetailHref } from '../../explore/campaignRoutes';
 import '../shared/styles.css';
 
-export function AdminConsole({ userId }: { userId: string }) {
+export function AdminConsole({
+  userId,
+  focus,
+}: {
+  userId: string;
+  focus?: 'studio' | 'projection' | 'indexer';
+}) {
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [notice, setNotice] = useState('');
@@ -24,6 +30,12 @@ export function AdminConsole({ userId }: { userId: string }) {
     outcome: 'VERIFIED' | 'REJECTED';
     reason?: string;
   } | null>(null);
+
+  useEffect(() => {
+    if (!focus) return;
+    const targetId = focus === 'studio' ? 'admin-creators-list' : 'admin-operations-overview';
+    document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [focus]);
 
   const { data: profiles, refetch: refetchProfiles, isPending: profilesPending } = useQuery({
     queryKey: ['campaign-admin-creators', userId],
@@ -209,6 +221,7 @@ export function AdminConsole({ userId }: { userId: string }) {
 
       {/* Unified Operational Dashboard Overview */}
       <AdminOperationsOverview
+        id="admin-operations-overview"
         lifecycleCounts={lifecycleCounts}
         exceptionItems={exceptionItems}
       />

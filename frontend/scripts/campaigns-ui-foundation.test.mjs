@@ -118,9 +118,9 @@ test('AppShell renders active navigation, role-gated navigation, environment con
   assert.doesNotMatch(html, /Campaign Campaign đã tồn tại|href="#\/campaigns\/history"/)
   assert.match(html, /Child Content/)
 
-  // Role-gated links
-  assert.match(html, /href="#\/campaigns\/creator"/)
-  assert.match(html, /href="#\/campaigns\/creator\/profile"/)
+  // Resolver/Admin workspaces stay separate from Creator-only workspaces.
+  assert.doesNotMatch(html, /href="#\/campaigns\/creator"/)
+  assert.doesNotMatch(html, /href="#\/campaigns\/creator\/profile"/)
   assert.match(html, /href="#\/campaigns\/library"/)
   assert.match(html, /href="#\/admin"/)
   assert.match(html, /href="#\/campaigns\/resolver"/)
@@ -128,6 +128,26 @@ test('AppShell renders active navigation, role-gated navigation, environment con
   // Environment and account
   assert.match(html, /MockUSDC|Mạng thử nghiệm/)
   assert.match(html, /href="#\/account"/)
+})
+
+test('AppShell keeps Creator workspace navigation for an ordinary member', () => {
+  const html = renderToStaticMarkup(
+    createElement(
+      AppShell,
+      {
+        path: '/campaigns',
+        session: { userId: 'creator', roles: [], wallets: [] },
+        sessionLoading: false,
+        error: '',
+        onSession: () => {},
+      },
+      createElement('div', null, 'Creator Page')
+    )
+  )
+
+  assert.match(html, /href="#\/campaigns\/creator"/)
+  assert.match(html, /href="#\/campaigns\/creator\/profile"/)
+  assert.doesNotMatch(html, /href="#\/campaigns\/resolver"/)
 })
 
 test('AppShell hides role-gated navigation for unauthenticated guest', () => {

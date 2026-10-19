@@ -3,7 +3,7 @@ import { after, test } from 'node:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createServer } from 'vite'
-import { campaignDetailHref, resolveCampaignDetailRoute } from '../src/features/explore/campaignRoutes.ts'
+import { campaignDetailFocusHref, campaignDetailHref, resolveCampaignDetailRoute } from '../src/features/explore/campaignRoutes.ts'
 
 const server = await createServer({ mode: 'fundtogether', server: { middlewareMode: true, ws: false }, logLevel: 'error' })
 after(() => server.close())
@@ -32,6 +32,10 @@ test('resolves every canonical campaign workspace route', () => {
     ['/campaigns/resolver/comic-1?tab=commitments', {
       workspace: 'resolver', campaignId: 'comic-1', initialTab: 'commitments', legacy: false,
       canonicalHref: '#/campaigns/resolver/comic-1?tab=commitments',
+    }],
+    ['/campaigns/resolver/comic-1?tab=production&focus=disbursement', {
+      workspace: 'resolver', campaignId: 'comic-1', initialTab: 'production', focus: 'disbursement', legacy: false,
+      canonicalHref: '#/campaigns/resolver/comic-1?tab=production&focus=disbursement',
     }],
     ['/admin/campaigns/comic-1?tab=activity', {
       workspace: 'admin', campaignId: 'comic-1', initialTab: 'activity', legacy: false,
@@ -111,6 +115,10 @@ test('encodes campaign IDs before generating hrefs', () => {
   assert.equal(
     campaignDetailHref('resolver', 'comic 100%', 'activity'),
     '#/campaigns/resolver/comic%20100%25?tab=activity',
+  )
+  assert.equal(
+    campaignDetailFocusHref('resolver', 'comic 100%', 'production', 'disbursement'),
+    '#/campaigns/resolver/comic%20100%25?tab=production&focus=disbursement',
   )
 })
 

@@ -1,10 +1,12 @@
 export type CampaignDetailWorkspace = 'public' | 'creator' | 'resolver' | 'admin';
 export type CampaignDetailTab = 'overview' | 'production' | 'commitments' | 'activity';
+export type CampaignDetailFocus = 'disbursement' | 'disputes' | 'decisions';
 
 export interface ResolvedCampaignDetailRoute {
   workspace: CampaignDetailWorkspace;
   campaignId: string;
   initialTab: CampaignDetailTab;
+  focus?: CampaignDetailFocus;
   legacy: boolean;
   canonicalHref: string;
 }
@@ -30,7 +32,7 @@ const campaignDetailRoutePatterns: CampaignDetailRoutePattern[] = [
     legacy: false,
   },
   {
-    pattern: /^\/campaigns\/resolver\/([^/?#]+)(?:\?tab=(overview|production|commitments|activity))?$/,
+    pattern: /^\/campaigns\/resolver\/([^/?#]+)(?:\?tab=(overview|production|commitments|activity)(?:&focus=(disbursement|disputes|decisions))?)?$/,
     workspace: 'resolver',
     legacy: false,
   },
@@ -82,6 +84,15 @@ export function campaignDetailHref(
   return tab ? `${href}?tab=${tab}` : href;
 }
 
+export function campaignDetailFocusHref(
+  workspace: CampaignDetailWorkspace,
+  campaignId: string,
+  tab: CampaignDetailTab,
+  focus: CampaignDetailFocus,
+): string {
+  return `${campaignDetailHref(workspace, campaignId, tab)}&focus=${focus}`;
+}
+
 export function resolveCampaignDetailRoute(path: string): ResolvedCampaignDetailRoute | null {
   for (const route of campaignDetailRoutePatterns) {
     const match = route.pattern.exec(path);
@@ -100,14 +111,18 @@ export function resolveCampaignDetailRoute(path: string): ResolvedCampaignDetail
 
     const requestedTab = match[2] as CampaignDetailTab | undefined;
     const initialTab = route.initialTab ?? requestedTab ?? 'overview';
+    const focus = route.workspace === 'resolver' ? match[3] as CampaignDetailFocus | undefined : undefined;
     const canonicalTab = requestedTab ?? (initialTab === 'overview' ? undefined : initialTab);
 
     return {
       workspace: route.workspace,
       campaignId,
       initialTab,
+      ...(focus ? { focus } : {}),
       legacy: route.legacy,
-      canonicalHref: campaignDetailHref(route.workspace, campaignId, canonicalTab),
+      canonicalHref: focus
+        ? campaignDetailFocusHref(route.workspace, campaignId, canonicalTab ?? 'overview', focus)
+        : campaignDetailHref(route.workspace, campaignId, canonicalTab),
     };
   }
 

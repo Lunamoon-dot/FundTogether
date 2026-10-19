@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { AccountSession } from '../../../lib/api/auth';
 import { getErrorMessage } from '../../../lib/api/error';
@@ -9,6 +9,7 @@ import { ReviewThread } from '../shared/ui/ReviewThread';
 import { CommunityPanel } from '../public/Community';
 import { InternalCampaignFrame } from '../shared/workspace/InternalCampaignFrame';
 import { CampaignDossierList } from '../shared/detail/CampaignDossierList';
+import type { CampaignDetailFocus } from '../../explore/campaignRoutes';
 import { ResolverCampaignActions } from './CampaignActions';
 import '../shared/styles.css';
 
@@ -18,9 +19,10 @@ export interface ResolverCampaignReviewPageProps {
   id: string;
   session: AccountSession;
   initialTab?: 'overview' | 'production' | 'commitments' | 'activity';
+  focus?: CampaignDetailFocus;
 }
 
-export function ResolverCampaignReviewPage({ id, session, initialTab = 'overview' }: ResolverCampaignReviewPageProps): React.ReactElement {
+export function ResolverCampaignReviewPage({ id, session, initialTab = 'overview', focus }: ResolverCampaignReviewPageProps): React.ReactElement {
   const operations = useQuery({
     queryKey: ['campaign-campaign-operations', 'resolver', session.userId],
     queryFn: ({ signal }) => campaignApi.operations('resolver', signal),
@@ -54,6 +56,10 @@ export function ResolverCampaignReviewPage({ id, session, initialTab = 'overview
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [working, setWorking] = useState(false);
+  useEffect(() => {
+    if (!focus) return;
+    document.getElementById(`resolver-focus-${focus}`)?.scrollIntoView({ block: 'start' });
+  }, [focus, activeTab, preview.data, chain.data, evidence.data]);
   const refresh = () => {
     void operations.refetch();
     void preview.refetch();
@@ -114,7 +120,7 @@ export function ResolverCampaignReviewPage({ id, session, initialTab = 'overview
         <div className="monograph-card space-y-4"><span className="monograph-card__kicker">PRIVATE EVIDENCE REVIEW</span><h2 className="monograph-card__title">Bằng chứng sản xuất &amp; PDF cuối</h2><p className="monograph-card__desc">Các file dưới đây chỉ được tải trong boundary Resolver đã được backend cấp quyền.</p>{evidence.data?.map(proof => <article key={proof.id} className="border-t border-[var(--border-hairline)] pt-3 space-y-1"><strong>{proof.purpose === 'FINAL_PDF' ? 'PDF cuối' : 'Bằng chứng sản xuất'}</strong><p className="text-sm">{proof.summary}</p><p className="text-xs font-mono break-all">{proof.sha256}<br />{proof.evidenceHash}</p></article>)}</div>
         {chain.data && <ResolverCampaignActions campaignId={id} userId={session.userId} chain={chain.data} terms={terms.data} evidence={evidence.data ?? []} transaction={tx} busy={busy} section="production" onRefresh={refresh} onActivate={() => void activate()} onReconcile={() => void chain.refetch()} />}
       </>}
-      {activeTab === 'commitments' && <div className="space-y-6"><div className="monograph-card space-y-4"><span className="monograph-card__kicker">VÒNG ĐỜI DỰ ÁN</span><h2 className="monograph-card__title">Tiến trình vòng đời</h2><Timeline events={timelineEvents} /></div><div className="monograph-card space-y-3"><span className="monograph-card__kicker">MINH BẠCH ON-CHAIN</span><h2 className="monograph-card__title">Cam kết mã hóa</h2><code className="font-mono text-xs break-all">{item.commitmentHash}</code></div></div>}
+      {activeTab === 'commitments' && <div className="space-y-6"><div className="monograph-card space-y-4"><span className="monograph-card__kicker">VÒNG ĐỜI DỰ ÁN</span><h2 className="monograph-card__title">Tiến trình vòng đời</h2><Timeline events={timelineEvents} /></div><div id="resolver-focus-decisions" className="monograph-card space-y-3"><span className="monograph-card__kicker">NHẬT KÝ QUYẾT ĐỊNH</span><h2 className="monograph-card__title">Lịch sử quyết định Resolver</h2>{item.decisions.length === 0 ? <p className="monograph-card__desc">Chưa có quyết định thẩm định nào được ghi nhận.</p> : <div className="space-y-2">{item.decisions.map((decision, index) => <article key={`${decision.commitmentHash}-${decision.reviewedAt}-${index}`} className="border-t border-[var(--border-hairline)] pt-2"><strong>{decision.outcome}</strong><p className="text-sm text-[var(--ink-subtle)] m-0">{decision.reviewedAt}</p><code className="font-mono text-xs break-all">{decision.commitmentHash}</code></article>)}</div>}</div><div className="monograph-card space-y-3"><span className="monograph-card__kicker">MINH BẠCH ON-CHAIN</span><h2 className="monograph-card__title">Cam kết mã hóa</h2><code className="font-mono text-xs break-all">{item.commitmentHash}</code></div></div>}
       {activeTab === 'activity' && <div className="space-y-6">{chain.data && <ResolverCampaignActions campaignId={id} userId={session.userId} chain={chain.data} terms={terms.data} evidence={evidence.data ?? []} transaction={tx} busy={busy} section="activity" onRefresh={refresh} onActivate={() => void activate()} onReconcile={() => void chain.refetch()} />}<ReviewThread campaignId={id} userId={session.userId} viewerMode="resolver" targetHash={state && state.productionHash !== zeroHash ? state.productionHash : item.commitmentHash} /><CommunityPanel id={id} userId={session.userId} viewerMode="resolver" commitmentHash={item.commitmentHash} evidence={evidence.data ?? []} /></div>}
       <details className="monograph-technical-details"><summary>Chi tiết kỹ thuật &amp; hợp đồng</summary><div className="monograph-technical-details__body">Commitment Hash: <code className="campaign-hash">{item.commitmentHash}</code><br />{chain.data?.onchainCampaignId && <>ID on-chain: <code>#{chain.data.onchainCampaignId}</code></>}</div></details>
     </>}

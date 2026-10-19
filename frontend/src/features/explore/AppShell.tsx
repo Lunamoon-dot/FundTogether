@@ -30,7 +30,7 @@ export function AppShell({
   const isCampaignCreatorProfile = path === '/campaigns/creator/profile';
   const isCampaignCreatorWorkspace = isCampaignCreatorStudio || isCampaignCreatorDraft || campaignDetail?.workspace === 'creator';
   const isCampaignLibrary = path === '/campaigns/library';
-  const isAdmin = path === '/admin' || path === '/campaigns/admin' || campaignDetail?.workspace === 'admin';
+  const isAdmin = path === '/admin' || path.startsWith('/admin?') || path === '/campaigns/admin' || campaignDetail?.workspace === 'admin';
   const isCampaignResolver = path === '/campaigns/resolver' || campaignDetail?.workspace === 'resolver';
   const isAccount = path === '/account' || path === '/workspace';
 
@@ -75,12 +75,16 @@ export function AppShell({
           {session && (
             <div className="campaign-shell__nav-group">
               <span className="campaign-shell__nav-heading">Không gian làm việc</span>
-              <a href="#/campaigns/creator" aria-current={isCampaignCreatorWorkspace ? 'page' : undefined}>
-                Xưởng ấn phẩm
-              </a>
-              <a href="#/campaigns/creator/profile" aria-current={isCampaignCreatorProfile ? 'page' : undefined}>
-                Hồ sơ Studio
-              </a>
+              {!hasResolverRole && (
+                <>
+                  <a href="#/campaigns/creator" aria-current={isCampaignCreatorWorkspace ? 'page' : undefined}>
+                    Xưởng ấn phẩm
+                  </a>
+                  <a href="#/campaigns/creator/profile" aria-current={isCampaignCreatorProfile ? 'page' : undefined}>
+                    Hồ sơ Studio
+                  </a>
+                </>
+              )}
               {hasResolverRole && (
                 <a href="#/campaigns/resolver" aria-current={isCampaignResolver ? 'page' : undefined}>
                   Thẩm định Resolver

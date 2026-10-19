@@ -78,8 +78,20 @@ export function CreatorCampaignWorkspacePage({ id, session, initialTab = 'overvi
   const state = chain.data?.snapshot;
   const productionFunded = state != null && BigInt(state.creatorPaid ?? '0') > 0n;
   const activeId = chain.data?.onchainCampaignId == null ? null : BigInt(chain.data.onchainCampaignId);
+  const chainNow = chain.data?.chainTimestamp ? BigInt(chain.data.chainTimestamp) : null;
+  const completionMinimumDate = chainNow == null
+    ? new Date().toISOString().slice(0, 10)
+    : new Date(Number(chainNow) * 1000).toISOString().slice(0, 10);
+  const completionDeadlineSeconds = completionDeadline
+    ? BigInt(Math.floor(new Date(`${completionDeadline}T23:59:59Z`).getTime() / 1000))
+    : null;
+  const completionDeadlineExpired = chainNow != null && completionDeadlineSeconds != null && completionDeadlineSeconds <= chainNow;
   const productionTransactionMessage =
     (tx.transaction?.action === 'submitProduction' || tx.transaction?.action === 'submitRelease')
+      ? (tx.error || tx.notice)
+      : '';
+  const completionTransactionMessage =
+    tx.transaction?.action === 'confirmCampaignCompletion'
       ? (tx.error || tx.notice)
       : '';
 
@@ -148,6 +160,7 @@ export function CreatorCampaignWorkspacePage({ id, session, initialTab = 'overvi
               <h2 className="monograph-card__title">Bằng chứng &amp; bản PDF cuối</h2>
               <p className="monograph-card__pitch">{state.productionApproved ? 'EVIDENCE_REVIEWED · Bằng chứng sản xuất đã được duyệt.' : 'Bằng chứng sản xuất chưa được duyệt.'} Creator gửi hồ sơ tại đây; Resolver sẽ xem xét ở workspace riêng.</p>
               {productionTransactionMessage && <p className={`monograph-alert ${tx.error ? 'monograph-alert--error' : 'monograph-alert--info'}`} role={tx.error ? 'alert' : 'status'}>{productionTransactionMessage}</p>}
+              {state.state === 1 && state.productionApproved && BigInt(state.releaseDeadline) > 0n && state.pdfHash === zeroHash && <div className="monograph-alert monograph-alert--info" role="status"><strong>Bước tiếp theo: gửi PDF cuối.</strong> Creator đã chốt hạn phát hành PDF. Hãy tải PDF cuối lên, lưu hash rồi gửi Resolver duyệt; đây chưa phải yêu cầu hoàn thành campaign.</div>}
               {state.state === 1 && (!state.productionApproved || BigInt(state.releaseDeadline) > 0n) && <form onSubmit={event => { event.preventDefault(); void upload(); }} className="space-y-3 pt-2" aria-disabled={!productionFunded}>
                 {!productionFunded && <div className="rounded border border-[var(--border-hairline)] bg-[var(--paper-bone)] p-3 text-sm" role="status"><strong>Chưa có giải ngân được Resolver duyệt.</strong> Form sản xuất sẽ mở sau khi yêu cầu giải ngân lần 1 được phê duyệt on-chain.</div>}
                 <fieldset disabled={busy || !productionFunded} className="space-y-3 border-0 p-0 m-0">
@@ -156,7 +169,7 @@ export function CreatorCampaignWorkspacePage({ id, session, initialTab = 'overvi
                   <button disabled={busy || !file || !productionFunded} className="button button--primary">Lưu file và hash</button>
                 </fieldset>
               </form>}
-              {state.state === 1 && state.productionApproved && BigInt(state.releaseDeadline) === 0n && <div className="rounded border border-[var(--border-hairline)] bg-[var(--paper-bone)] p-3 space-y-2"><p className="text-sm font-semibold m-0">Creator xác nhận hoàn thành campaign</p><label className="block text-xs font-mono uppercase tracking-wider">Hạn cam kết phát hành PDF (UTC)<input type="date" value={completionDeadline} min={new Date().toISOString().slice(0, 10)} onChange={event => setCompletionDeadline(event.target.value)} className="mt-1 block rounded border p-2 text-sm" /></label><button type="button" disabled={busy || !completionDeadline || activeId === null} className="button button--primary" onClick={() => void work(async () => { const deadline = BigInt(Math.floor(new Date(`${completionDeadline}T23:59:59Z`).getTime() / 1000)); await tx.send('confirmCampaignCompletion', [activeId, deadline], { expectedWallet: state.creator }); })}>Xác nhận hoàn thành campaign</button></div>}
+              {state.state === 1 && state.productionApproved && BigInt(state.releaseDeadline) === 0n && <div className="rounded border border-[var(--border-hairline)] bg-[var(--paper-bone)] p-3 space-y-2"><p className="text-sm font-semibold m-0">Chốt hạn phát hành PDF</p><p className="text-sm m-0 text-[var(--ink-subtle)]">Giao dịch này chỉ ghi hạn phát hành PDF lên chain; chưa gửi hồ sơ hoàn thành cho Resolver.</p>{completionTransactionMessage && <p className={`monograph-alert ${tx.error ? 'monograph-alert--error' : 'monograph-alert--info'}`} role={tx.error ? 'alert' : 'status'}>{completionTransactionMessage}</p>}{completionDeadlineExpired && <p className="monograph-alert monograph-alert--error" role="alert">Hạn đã chọn nằm trước thời gian hiện tại của chain ({new Date(Number(chainNow) * 1000).toISOString().replace('T', ' ').replace('.000Z', ' UTC')}). Chọn ngày từ {completionMinimumDate} trở đi.</p>}<label className="block text-xs font-mono uppercase tracking-wider">Hạn cam kết phát hành PDF (UTC)<input type="date" value={completionDeadline} min={completionMinimumDate} onChange={event => setCompletionDeadline(event.target.value)} className="mt-1 block rounded border p-2 text-sm" /></label><button type="button" disabled={busy || !completionDeadline || completionDeadlineExpired || activeId === null} className="button button--primary" onClick={() => void work(async () => { const deadline = BigInt(Math.floor(new Date(`${completionDeadline}T23:59:59Z`).getTime() / 1000)); await tx.send('confirmCampaignCompletion', [activeId, deadline], { expectedWallet: state.creator }); })}>Ký chốt hạn phát hành PDF</button></div>}
               {evidence.data?.map(proof => <div key={proof.id} className="border-t border-[var(--border-hairline)] pt-3.5 space-y-1.5"><h3 className="text-sm font-semibold m-0">{proof.purpose === 'FINAL_PDF' ? 'PDF cuối' : 'Bằng chứng sản xuất'}</h3><p className="text-sm m-0">{proof.summary}</p><p className="text-xs font-mono break-all bg-[var(--paper-bone)] p-2 rounded">File: {proof.sha256}<br />Bằng chứng: {proof.evidenceHash}</p><button type="button" disabled={busy} className="button button--secondary" onClick={() => void work(async () => saveBlob(await campaignApi.evidenceFile(id, proof.id), proof.mediaType === 'application/pdf' ? 'review.pdf' : 'evidence.png'))}>Tải file để kiểm tra</button>{state.state === 1 && <button type="button" disabled={busy || !productionFunded || activeId === null} className="button button--primary" onClick={() => void tx.send(proof.purpose === 'FINAL_PDF' ? 'submitRelease' : 'submitProduction', proof.purpose === 'FINAL_PDF' ? [activeId, proof.sha256, proof.evidenceHash] : [activeId, proof.evidenceHash], { expectedWallet: state.creator })}>{proof.purpose === 'FINAL_PDF' ? 'Gửi PDF cuối để Resolver duyệt' : 'Gửi bằng chứng sản xuất để Resolver duyệt'}</button>}</div>)}
             </div>}
             {chain.data && <DisbursementPanel campaignId={id} userId={userId} mode="creator" chain={chain.data} transaction={tx} onRefresh={refresh} />}

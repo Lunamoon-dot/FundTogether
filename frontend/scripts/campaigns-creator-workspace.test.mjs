@@ -57,6 +57,21 @@ test('production evidence action exposes its wallet preflight result beside the 
   assert.match(page, /disabled=\{busy \|\| !productionFunded \|\| activeId === null\}/)
 })
 
+test('completion action exposes its wallet preflight result beside the action', () => {
+  const page = read('creator/CampaignWorkspacePage.tsx')
+
+  assert.match(page, /completionTransactionMessage/)
+  assert.match(page, /confirmCampaignCompletion/)
+})
+
+test('completion deadline follows the canonical chain clock', () => {
+  const page = read('creator/CampaignWorkspacePage.tsx')
+
+  assert.match(page, /chainTimestamp/)
+  assert.match(page, /completionMinimumDate/)
+  assert.match(page, /min=\{completionMinimumDate\}/)
+})
+
 test('Creator Studio uses the canonical Creator campaign workspace route', () => {
   const source = read('creator/Studio.tsx')
 
