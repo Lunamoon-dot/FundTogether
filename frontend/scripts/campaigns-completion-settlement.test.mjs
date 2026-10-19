@@ -10,9 +10,15 @@ const read = relative => fs.readFileSync(path.join(root, 'src', 'features', 'cam
 test('completion settlement exposes the dossier and exactly two surplus destinations', () => {
   const panel = read('shared/ui/CompletionSettlementPanel.tsx')
   const api = read('api/campaigns.ts')
-  const page = read('public/Page.tsx')
+  const creatorPage = read('creator/CampaignActions.tsx')
+  const publicPage = read('public/CampaignPage.tsx')
 
-  assert.match(page, /CompletionSettlementPanel/)
+  assert.match(creatorPage, /CompletionSettlementPanel/)
+  assert.match(publicPage, /CompletionSettlementPanel/)
+  assert.match(publicPage, /mode="public"/)
+  assert.match(publicPage, /DisbursementPanel/)
+  assert.match(publicPage, /mode="public".*DisbursementPanel|DisbursementPanel.*mode="public"/s)
+  assert.doesNotMatch(publicPage, /ActivationPanel|approveCompletion|rejectCompletion/)
   assert.match(panel, /createCompletionRequest/)
   assert.match(panel, /requestCompletion/)
   assert.match(panel, /approveCompletion/)
@@ -33,4 +39,24 @@ test('completed state is surplus settlement, not a full payout label', () => {
   assert.match(source, /COMPLETION_REQUESTED: 5/)
   assert.match(source, /chờ quyết toán surplus/)
   assert.doesNotMatch(source, /PAYOUT_REQUESTED|Đã giải ngân|requestPayout/)
+})
+
+test('disbursement form reports client validation instead of silently blocking submit', () => {
+  const panel = read('shared/ui/DisbursementPanel.tsx')
+
+  assert.match(panel, /function validateRequest\(\)/)
+  assert.match(panel, /noValidate/)
+  assert.match(panel, /Hãy nhập số tiền giải ngân hợp lệ/)
+  assert.match(panel, /Hãy đính kèm tài liệu giải thích sử dụng tiền/)
+  assert.match(panel, /const validationError = validateRequest\(\)/)
+})
+
+test('disbursement draft stays retryable until the request is canonical', () => {
+  const panel = read('shared/ui/DisbursementPanel.tsx')
+
+  assert.match(panel, /const draft = latest\?\.status === 'DRAFT' \? latest : undefined/)
+  assert.match(panel, /Hồ sơ đã lưu nhưng chưa ký on-chain/)
+  assert.match(panel, /Ký lại requestDisbursement/)
+  assert.match(panel, /pending && !draft/)
+  assert.match(panel, /Đã ghi nhận yêu cầu giải ngân on-chain/)
 })

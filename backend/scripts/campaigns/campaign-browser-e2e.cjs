@@ -117,8 +117,16 @@ async function runBrowserScenario() {
   const physicalColumns = await db.$client.query("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='historical_entitlements' AND column_name ~ 'shipping|tracking|delivered_at'");
   assert.equal(physicalColumns.rowCount, 0);
   checked('Authenticated browser requests cannot invoke retired physical APIs; active schema has no shipping or tracking columns');
-  async function navigate(page, suffix = '') {
-    await page.evaluate(hash => { location.hash = hash; }, `/campaigns/campaigns/${campaign.id}${suffix}`);
+  const publicCampaign = id => `/campaigns/${encodeURIComponent(id)}`;
+  const creatorCampaign = (id, tab) => `/campaigns/creator/${encodeURIComponent(id)}${tab ? `?tab=${tab}` : ''}`;
+  const resolverCampaign = (id, tab) => `/campaigns/resolver/${encodeURIComponent(id)}${tab ? `?tab=${tab}` : ''}`;
+  const adminCampaign = (id, tab) => `/admin/campaigns/${encodeURIComponent(id)}${tab ? `?tab=${tab}` : ''}`;
+  assert.deepEqual(
+    [publicCampaign(campaign.id), creatorCampaign(campaign.id), resolverCampaign(campaign.id), adminCampaign(campaign.id)],
+    [`/campaigns/${campaign.id}`, `/campaigns/creator/${campaign.id}`, `/campaigns/resolver/${campaign.id}`, `/admin/campaigns/${campaign.id}`],
+  );
+  async function navigate(page, route = publicCampaign(campaign.id)) {
+    await page.evaluate(hash => { location.hash = hash; }, route);
     try {
       await page.getByRole('tab', { name: 'Tổng quan (Folio)', exact: true }).waitFor();
     } catch (error) {
@@ -127,7 +135,7 @@ async function runBrowserScenario() {
       throw error;
     }
   }
-  async function refreshPrivateCampaign(page, suffix = '') {
+  async function refreshPrivateCampaign(page, workspace = 'public', tab) {
     await page.reload({ waitUntil: 'networkidle' });
     await page.evaluate(() => { location.hash = '/account'; });
     await page.getByText('Ví đã liên kết với tài khoản', { exact: true }).waitFor();
@@ -137,7 +145,14 @@ async function runBrowserScenario() {
       await page.getByRole('button', { name: /Campaign Test Wallet/ }).click();
     }
     await page.getByText('Ví đã liên kết với tài khoản', { exact: true }).waitFor();
-    await navigate(page, suffix);
+    const route = workspace === 'creator'
+      ? creatorCampaign(campaign.id, tab)
+      : workspace === 'resolver'
+        ? resolverCampaign(campaign.id, tab)
+        : workspace === 'admin'
+          ? adminCampaign(campaign.id, tab)
+          : publicCampaign(campaign.id);
+    await navigate(page, route);
     await page.getByRole('tab', { name: 'Tổng quan (Folio)', exact: true }).waitFor();
   }
   async function transact(page, name) {
@@ -164,7 +179,7 @@ async function runBrowserScenario() {
   await resolver.getByRole('button', { name: 'Duyệt hồ sơ PDF', exact: true }).click();
   await resolver.getByRole('link', { name: 'Mở trang xử lý on-chain →' }).click();
   await transact(resolver, 'Ký duyệt đúng commitment trên chain');
-  await navigate(creator, '/creator'); await transact(creator, 'Tạo campaign trên chain');
+  await navigate(creator, creatorCampaign(campaign.id)); await transact(creator, 'Tạo campaign trên chain');
   checked('Community feedback is visible before Resolver approves exact terms and Creator publishes a separate local campaign');
   const mintBacker1 = await wallet(accounts[0]).writeContract({ address: tokenAddress, abi: token.abi, functionName: 'mint', args: [accounts[4], 10000000n] }); await client.waitForTransactionReceipt({ hash: mintBacker1 });
   const mintBacker2 = await wallet(accounts[0]).writeContract({ address: tokenAddress, abi: token.abi, functionName: 'mint', args: [accounts[5], 20000000n] }); await client.waitForTransactionReceipt({ hash: mintBacker2 });
@@ -172,34 +187,34 @@ async function runBrowserScenario() {
   await navigate(backer2); await backer2.getByRole('spinbutton').fill('2'); await transact(backer2, 'Bắt đầu approve rồi pledge');
   assert.equal(await backer.getByRole('button', { name: 'Kiểm tra và tải PDF riêng tư' }).count(), 0);
   await client.request({ method: 'evm_increaseTime', params: [86401] }); await client.request({ method: 'evm_mine' });
-  await refreshPrivateCampaign(resolver, '/resolver'); await transact(resolver, 'Chốt kết quả khi hết hạn gây quỹ');
+  await refreshPrivateCampaign(resolver, 'resolver'); await transact(resolver, 'Chốt kết quả khi hết hạn gây quỹ');
   checked('Unequal canonical pledges produce rights without premature download');
-  await refreshPrivateCampaign(creator, '/creator'); await creator.getByRole('tab', { name: 'Sản xuất & Bằng chứng', exact: true }).click();
+  await refreshPrivateCampaign(creator, 'creator'); await creator.getByRole('tab', { name: 'Sản xuất & Bằng chứng', exact: true }).click();
   await creator.getByLabel(/Bằng chứng sản xuất riêng tư/).setInputFiles({ name: 'proof.png', mimeType: 'image/png', buffer: png });
   await creator.getByLabel(/Tóm tắt công khai/).fill('All twelve chapters are drawn and edited.');
   await creator.getByRole('button', { name: 'Lưu file và hash' }).click();
-  await transact(creator, 'Gửi đúng hash này để Resolver duyệt');
-  await refreshPrivateCampaign(resolver, '/resolver'); await resolver.getByRole('tab', { name: 'Sản xuất & Bằng chứng', exact: true }).click();
+  await transact(creator, 'Gửi bằng chứng sản xuất để Resolver duyệt');
+  await refreshPrivateCampaign(resolver, 'resolver'); await resolver.getByRole('tab', { name: 'Sản xuất & Bằng chứng', exact: true }).click();
   await transact(resolver, 'Duyệt bằng chứng sản xuất');
-  await refreshPrivateCampaign(creator, '/creator'); await creator.getByRole('tab', { name: 'Sản xuất & Bằng chứng', exact: true }).click();
+  await refreshPrivateCampaign(creator, 'creator'); await creator.getByRole('tab', { name: 'Sản xuất & Bằng chứng', exact: true }).click();
   const releaseTimestamp = Number((await client.getBlock()).timestamp) + 7 * 86400;
   const releaseDate = new Date(releaseTimestamp * 1000).toISOString().slice(0, 10);
   await creator.getByLabel('Hạn cam kết phát hành PDF (UTC)').fill(releaseDate);
   await transact(creator, 'Xác nhận hoàn thành campaign');
-  await refreshPrivateCampaign(creator, '/creator'); await creator.getByRole('tab', { name: 'Sản xuất & Bằng chứng', exact: true }).click();
+  await refreshPrivateCampaign(creator, 'creator'); await creator.getByRole('tab', { name: 'Sản xuất & Bằng chứng', exact: true }).click();
   const pdf = await PDFDocument.create(); pdf.addPage().drawText('Twelve-chapter local comic acceptance fixture'); const pdfBytes = Buffer.from(await pdf.save());
   await creator.getByLabel(/PDF cuối riêng tư/).setInputFiles({ name: 'comic.pdf', mimeType: 'application/pdf', buffer: pdfBytes });
   await creator.getByLabel(/Tóm tắt công khai/).fill('Final PDF includes the complete twelve-chapter comic.');
   await creator.getByRole('button', { name: 'Lưu file và hash' }).click();
-  await transact(creator, 'Gửi đúng hash này để Resolver duyệt');
-  await refreshPrivateCampaign(resolver, '/resolver'); await resolver.getByRole('tab', { name: 'Sản xuất & Bằng chứng', exact: true }).click(); await transact(resolver, 'Duyệt PDF cuối');
+  await transact(creator, 'Gửi PDF cuối để Resolver duyệt');
+  await refreshPrivateCampaign(resolver, 'resolver'); await resolver.getByRole('tab', { name: 'Sản xuất & Bằng chứng', exact: true }).click(); await transact(resolver, 'Duyệt PDF cuối');
   await refreshPrivateCampaign(backer);
   await backer.getByRole('tab', { name: 'Góp ý & Thẩm định', exact: true }).click();
   await backer.getByText('Trao đổi thẩm định sau funding', { exact: true }).waitFor();
   await backer.getByLabel('Nội dung cần Creator làm rõ').fill('Please clarify how the final delivery evidence maps to the promised chapter sequence.');
   await backer.getByRole('button', { name: 'Mở trao đổi với Creator', exact: true }).click();
   await backer.getByText('Please clarify how the final delivery evidence maps to the promised chapter sequence.', { exact: true }).waitFor();
-  await refreshPrivateCampaign(creator, '/creator'); await creator.getByRole('tab', { name: 'Góp ý & Thẩm định', exact: true }).click();
+  await refreshPrivateCampaign(creator, 'creator'); await creator.getByRole('tab', { name: 'Góp ý & Thẩm định', exact: true }).click();
   await creator.getByText('Trao đổi thẩm định sau funding', { exact: true }).waitFor();
   await creator.getByLabel('Phản hồi trong trao đổi').fill('I have checked the final delivery evidence and will clarify the chapter mapping in the release notes.');
   await creator.getByRole('button', { name: 'Gửi phản hồi', exact: true }).click();
@@ -239,7 +254,7 @@ async function runBrowserScenario() {
   await navigate(community); assert.equal(await community.getByRole('button', { name: 'Kiểm tra và tải PDF riêng tư' }).count(), 0);
   checked('Separate production/PDF reviews enable exact-byte download only for Backer, without implied acceptance');
   await client.request({ method: 'evm_increaseTime', params: [7 * 86400 + 1] }); await client.request({ method: 'evm_mine' });
-  await refreshPrivateCampaign(creator, '/creator');
+  await refreshPrivateCampaign(creator, 'creator');
   await creator.getByRole('heading', { name: 'Gửi hồ sơ hoàn thành', exact: true }).waitFor();
   await creator.getByPlaceholder('Tiêu đề hồ sơ').fill('Completion dossier for reviewed PDF');
   await creator.getByPlaceholder('Tóm tắt kết quả hoàn thành').fill('The reviewed PDF is complete and ready for Resolver completion review.');
@@ -254,7 +269,7 @@ async function runBrowserScenario() {
   assert.deepEqual(Buffer.concat(completionChunks), pdfBytes);
   assert.equal(await backer.getByText(/Không nhập số tiền hoặc địa chỉ nhận/).count(), 0, 'Backer must not see Creator-only completion form');
   checked('Creator submits a private completion dossier without amount/destination; Backer can inspect and download it');
-  await refreshPrivateCampaign(resolver, '/resolver');
+  await refreshPrivateCampaign(resolver, 'resolver');
   await resolver.getByRole('heading', { name: 'Quyết định Resolver', exact: true }).waitFor();
   await resolver.getByPlaceholder('Lý do quyết định').fill('Resolver verified the completion dossier and supporting file; settlement may proceed.');
   await transact(resolver, 'Ghi quyết định và ký on-chain');

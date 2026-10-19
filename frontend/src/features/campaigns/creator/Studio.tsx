@@ -12,6 +12,7 @@ import { getCampaignUiState } from '../shared/ui/campaignState';
 import type { Campaign } from '../api/campaigns';
 import { getErrorMessage } from '../../../lib/api/error';
 import { campaignApi } from '../api/campaigns';
+import { campaignDetailHref } from '../../explore/campaignRoutes';
 import '../shared/styles.css';
 
 export function Studio({ userId, path }: { userId: string; path?: string }) {
@@ -119,13 +120,13 @@ export function Studio({ userId, path }: { userId: string; path?: string }) {
             {creatorTasks.map(c => {
               const operation = operations.data?.find(item => item.campaignId === c.id);
               const editHref = operation?.contractState === 1
-                ? `#/campaigns/${c.id}/creator`
+                ? campaignDetailHref('creator', c.id, 'production')
                 : c.status === 'COMMUNITY_REVIEW'
-                ? `#/campaigns/${c.id}/creator/feedback`
+                ? campaignDetailHref('creator', c.id, 'activity')
                 : c.status === 'CHANGES_REQUESTED'
                 ? `#/campaigns/creator?edit=${c.id}&step=3`
                 : ['APPROVED', 'PUBLISHED'].includes(c.status)
-                ? `#/campaigns/${c.id}/creator`
+                ? campaignDetailHref('creator', c.id)
                 : `#/campaigns/creator?edit=${c.id}`;
               return (
                 <CreatorTaskCard
@@ -210,13 +211,13 @@ export function Studio({ userId, path }: { userId: string; path?: string }) {
                       <span className="studio-project-card__next-label">Tiếp theo</span>
                       {projectedChainState === 4 && <p className="studio-project-card__message muted">Campaign không đạt mục tiêu. Backer tự nhận hoàn tiền; Creator không cần thao tác.</p>}
                       {projectedChainState === 0 && <p className="studio-project-card__message muted">Campaign đang gây quỹ trên chain. Hiện chưa có việc nào cần Creator xử lý.</p>}
-                      {projectedChainState === 1 && <a className="button button--primary studio-project-card__action" href={`#/campaigns/${c.id}/creator`}>Cập nhật tiến độ sản xuất →</a>}
+                      {projectedChainState === 1 && <a className="button button--primary studio-project-card__action" href={campaignDetailHref('creator', c.id, 'production')}>Cập nhật tiến độ sản xuất →</a>}
                       {projectedChainState === null && !activationPending && <p className="studio-project-card__message muted">Standard PDF · Hoàn thiện hồ sơ và gửi thẩm định; bản thảo chưa nhận pledge.</p>}
                       {projectedChainState === null && c.status === 'UNDER_REVIEW_PRIVATE' && <p className="studio-project-card__message muted">Hồ sơ đang được Resolver kiểm tra riêng; chưa mở community review.</p>}
                       {operation?.publicationStatus === 'ORPHANED' && <p className="studio-project-card__message muted">Có binding cũ nhưng chưa canonical. Không tạo campaign mới; hãy mở chi tiết để đối chiếu.</p>}
                       {activationPending && <p className="studio-project-card__message muted">Hồ sơ đã duyệt nhưng chưa có campaign canonical; mở workspace để kiểm tra chữ ký Resolver, sau đó Creator ký tạo campaign trên contract.</p>}
                       {activationPending && c.frozenSnapshot && ['COMMUNITY_REVIEW', 'APPROVED', 'PUBLISHED'].includes(c.status) && (
-                        <a className="button button--secondary studio-project-card__action" href={c.status === 'COMMUNITY_REVIEW' ? `#/campaigns/${c.id}/creator/feedback` : `#/campaigns/${c.id}/creator`}>
+                        <a className="button button--secondary studio-project-card__action" href={c.status === 'COMMUNITY_REVIEW' ? campaignDetailHref('creator', c.id, 'activity') : campaignDetailHref('creator', c.id)}>
                           {c.status === 'COMMUNITY_REVIEW' ? 'Xem góp ý cộng đồng →' : c.status === 'PUBLISHED' ? 'Mở workspace kích hoạt →' : 'Mở chi tiết campaign →'}
                         </a>
                       )}

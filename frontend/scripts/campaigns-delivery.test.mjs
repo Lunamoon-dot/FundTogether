@@ -8,7 +8,8 @@ import { createServer } from 'vite'
 
 const server = await createServer({ mode: 'fundtogether', server: { middlewareMode: true, ws: false }, logLevel: 'error' })
 after(() => server.close())
-const { CampaignPage } = await server.ssrLoadModule('/src/features/campaigns/public/Page.tsx')
+const { PublicCampaignPage } = await server.ssrLoadModule('/src/features/campaigns/public/CampaignPage.tsx')
+const { CreatorCampaignWorkspacePage } = await server.ssrLoadModule('/src/features/campaigns/creator/CampaignWorkspacePage.tsx')
 const { CommunityPanel, FeedbackComposerModal } = await server.ssrLoadModule('/src/features/campaigns/public/Community.tsx')
 const { Library } = await server.ssrLoadModule('/src/features/campaigns/backer/Library.tsx')
 const { ReviewThread } = await server.ssrLoadModule('/src/features/campaigns/shared/ui/ReviewThread.tsx')
@@ -25,16 +26,21 @@ function render(component, props, entries = []) {
   client.clear(); return html
 }
 function campaign(access, state = 3, mode = 'public', snapshotOverrides = {}, previewOverrides = {}) {
-  return render(CampaignPage, { id: 'campaign', session: { userId: 'owner', roles: [], wallets: [] }, mode }, [
+  const component = mode === 'creator' ? CreatorCampaignWorkspacePage : PublicCampaignPage
+  const session = { userId: 'owner', roles: [], wallets: [] }
+  const props = { id: 'campaign', session }
+  return render(component, props, [
     [['campaign-campaign-public', 'campaign'], { ...preview, ...previewOverrides }],
     [['campaign-campaign-chain', 'campaign'], { status: 'ON_CHAIN_CONFIRMED', onchainCampaignId: '0', deployment: {}, challenges: [], snapshot: { state, raised: '10000001', escrowed: '10000001', fundingDeadline: '1791900000', releaseDeadline: '1794900000', challengeDeadline: '1795000000', openDisputes: '0', productionApproved: true, productionHash: hash, ...snapshotOverrides } }],
     [['campaign-campaign-evidence', 'campaign', 'public'], []],
+    [['campaign-campaign-evidence', 'campaign', 'owner'], []],
+    [['campaign-campaign-operations', 'creator', 'owner'], [{ campaignId: 'campaign' }]],
     [['campaign-campaign-entitlements', 'owner'], [{ id: 'right', campaignId: 'campaign', amountPaid: '10000001', access, confirmedAt: null }]],
     [['campaign-campaign-feedback', 'campaign', 'owner'], { items: [], canSubmit: true }],
   ])
 }
 function publishedFundingCampaign() {
-  return render(CampaignPage, { id: 'campaign', session: null, mode: 'public' }, [
+  return render(PublicCampaignPage, { id: 'campaign', session: null }, [
     [['campaign-campaign-public', 'campaign'], { ...preview, status: 'PUBLISHED', surface: 'FUNDING' }],
     [['campaign-campaign-chain', 'campaign'], { status: 'ON_CHAIN_CONFIRMED', onchainCampaignId: '0', deployment: {}, challenges: [], snapshot: {
       state: 0, raised: '0', escrowed: '0', goal: '100000000', price: '20000000', fundingDeadline: '1791900000', releaseDeadline: '0',
@@ -195,16 +201,16 @@ test('deadline controls stay out of backer and creator views and appear only for
   const backerBeforeDeadline = campaign('PENDING_RELEASE', 0, 'public')
   assert.doesNotMatch(backerBeforeDeadline, /Chốt kết quả khi hết hạn gây quỹ|Mở hoàn tiền khi quá hạn policy/)
 
-  const source = await (await import('node:fs/promises')).readFile(new URL('../src/features/campaigns/public/Page.tsx', import.meta.url), 'utf8')
-  assert.match(source, /Đã hết hạn gây quỹ · chờ chốt kết quả/)
-  assert.match(source, /Chưa thấy ví Resolver hợp lệ/)
-  assert.match(source, /const showFinalizeFunding = Boolean\(state && mode === 'resolver' && state\.state === 0 && fundingExpired\)/)
-  assert.match(source, /const showStartRefunds = Boolean\(state && mode === 'resolver' && state\.state !== 0 && !\[4, 5, 6\]\.includes\(state\.state\)/)
-  assert.match(source, /disabled=\{busy \|\| !canReview\} className="button button--secondary" onClick=\{\(\) => void tx\.send\('finalizeFunding'/)
+  const backerSource = await (await import('node:fs/promises')).readFile(new URL('../src/features/campaigns/backer/CampaignActions.tsx', import.meta.url), 'utf8')
+  const resolverSource = await (await import('node:fs/promises')).readFile(new URL('../src/features/campaigns/resolver/CampaignActions.tsx', import.meta.url), 'utf8')
+  assert.match(backerSource, /Đã hết hạn gây quỹ · chờ Resolver chốt kết quả/)
+  assert.match(resolverSource, /canFinalizeFunding = Boolean\(state && activeId !== null && state\.state === CAMPAIGN_CHAIN_STATE\.FUNDING && fundingExpired\)/)
+  assert.match(resolverSource, /canStartRefunds = Boolean\(/)
+  assert.match(resolverSource, /transaction\.send\('finalizeFunding'/)
 })
 
 test('funding card keeps creator cancellation for now but hides the technical canonical reload control', async () => {
-  const source = await (await import('node:fs/promises')).readFile(new URL('../src/features/campaigns/public/Page.tsx', import.meta.url), 'utf8')
+  const source = await (await import('node:fs/promises')).readFile(new URL('../src/features/campaigns/creator/CampaignActions.tsx', import.meta.url), 'utf8')
   assert.match(source, /cancelCampaign/)
   assert.doesNotMatch(source, /Tải lại trạng thái canonical/)
   assert.doesNotMatch(source, /Trạng thái UI:/)

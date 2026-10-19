@@ -41,7 +41,7 @@ test('orphaned publication stays in recovery and never renders as funding', () =
 })
 
 test('Admin and Creator use campaign operations instead of historical publication fields', async () => {
-  const admin = await readFile(new URL('../src/features/campaigns/resolver/AdminConsole.tsx', import.meta.url), 'utf8')
+  const admin = await readFile(new URL('../src/features/campaigns/admin/AdminConsole.tsx', import.meta.url), 'utf8')
   const creator = await readFile(new URL('../src/features/campaigns/creator/Studio.tsx', import.meta.url), 'utf8')
   assert.match(admin, /campaignApi\.operations\('admin'/)
   assert.doesNotMatch(admin, /listHistoricalCampaigns/)

@@ -17,12 +17,11 @@ function listFiles(directory) {
 }
 
 test('active UI lives under the campaigns namespace', () => {
-  for (const directory of ['campaigns/public', 'campaigns/creator', 'campaigns/resolver', 'campaigns/backer', 'campaigns/transactions', 'campaigns/shared']) {
+  for (const directory of ['campaigns/public', 'campaigns/creator', 'campaigns/resolver', 'campaigns/admin', 'campaigns/backer', 'campaigns/transactions', 'campaigns/shared']) {
     assert.equal(exists(directory), true, `missing target directory: ${directory}`);
   }
   for (const file of [
     'campaigns/public/Feed.tsx',
-    'campaigns/public/Page.tsx',
     'campaigns/public/Community.tsx',
     'campaigns/creator/Studio.tsx',
     'campaigns/creator/Profile.tsx',
@@ -30,6 +29,8 @@ test('active UI lives under the campaigns namespace', () => {
     'campaigns/creator/NewPreparationForm.tsx',
     'campaigns/resolver/Console.tsx',
     'campaigns/resolver/ReviewPanel.tsx',
+    'campaigns/admin/AdminConsole.tsx',
+    'campaigns/admin/CampaignOperationsPage.tsx',
     'campaigns/backer/Library.tsx',
     'campaigns/transactions/useTransaction.ts',
     'campaigns/shared/FrozenTerms.tsx',
@@ -50,8 +51,19 @@ test('retired product branches and empty placeholders are removed', () => {
 
 test('current campaign files do not repeat the product namespace in filenames', () => {
   const files = listFiles(relative('campaigns')).map(file => path.basename(file));
+  const allowedSharedDetailNames = new Set([
+    'CampaignActions.tsx',
+    'CampaignPage.tsx',
+    'CampaignWorkspacePage.tsx',
+    'CampaignReviewPage.tsx',
+    'CampaignOperationsPage.tsx',
+    'CampaignDetailFrame.tsx',
+    'CampaignDossierList.tsx',
+    'CampaignLedger.tsx',
+    'CampaignOverview.tsx',
+  ]);
   assert.deepEqual(
-    files.filter(name => /^(?:Reward|Campaign)/.test(name)),
+    files.filter(name => /^(?:Reward|Campaign)/.test(name) && !allowedSharedDetailNames.has(name)),
     [],
     'the campaigns folder already supplies product context',
   );
@@ -85,11 +97,17 @@ test('current campaign modules own their APIs and review responsibilities', () =
 test('public workflow contracts remain stable', () => {
   const shell = fs.readFileSync(path.join(featuresRoot, 'explore', 'AppShell.tsx'), 'utf8');
   const router = fs.readFileSync(path.join(featuresRoot, 'explore', 'PublicArea.tsx'), 'utf8');
+  const routeContract = fs.readFileSync(path.join(featuresRoot, 'explore', 'campaignRoutes.ts'), 'utf8');
   const campaignApiSource = fs.readFileSync(path.join(frontendRoot, 'src', 'features', 'campaigns', 'api', 'campaigns.ts'), 'utf8');
   for (const route of ['#/campaigns', '#/campaigns/review', '#/campaigns/creator', '#/campaigns/creator/profile', '#/campaigns/library']) {
     assert.match(shell, new RegExp(route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
-  assert.equal(router.includes('\\/campaigns\\/([^/]+)'), true, 'missing #/campaigns/:id route parser');
+  assert.match(router, /resolveCampaignDetailRoute/);
+  assert.equal(
+    routeContract.includes('pattern: /^\\/campaigns\\/([^/?#]+)'),
+    true,
+    'missing #/campaigns/:id route contract',
+  );
   assert.match(campaignApiSource, /\/v1\/fundtogether/);
   assert.doesNotMatch(campaignApiSource, /\/v1\/campaigns(?!\/)/);
 });

@@ -1,18 +1,30 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { CommunityReviewPage, Feed } from '../campaigns/public/Feed';
 import { AppShell, type PublicAreaProps } from './AppShell';
+import { resolveCampaignDetailRoute } from './campaignRoutes';
 import './PublicArea.css';
 
 const AccountAccess = lazy(() => import('../auth/AccountAccess').then(module => ({ default: module.AccountAccess })));
-const CampaignPage = lazy(() => import('../campaigns/public/Page').then(module => ({ default: module.CampaignPage })));
+const PublicCampaignPage = lazy(() => import('../campaigns/public/CampaignPage').then(module => ({ default: module.PublicCampaignPage })));
+const CreatorCampaignWorkspacePage = lazy(() => import('../campaigns/creator/CampaignWorkspacePage').then(module => ({ default: module.CreatorCampaignWorkspacePage })));
+const ResolverCampaignReviewPage = lazy(() => import('../campaigns/resolver/CampaignReviewPage').then(module => ({ default: module.ResolverCampaignReviewPage })));
+const CampaignOperationsPage = lazy(() => import('../campaigns/admin/CampaignOperationsPage').then(module => ({ default: module.AdminCampaignOperationsPage })));
 const Library = lazy(() => import('../campaigns/backer/Library').then(module => ({ default: module.Library })));
 const Studio = lazy(() => import('../campaigns/creator/Studio').then(module => ({ default: module.Studio })));
 const Profile = lazy(() => import('../campaigns/creator/Profile').then(module => ({ default: module.Profile })));
 const HistoricalEntitlements = lazy(() => import('../campaigns/historical/HistoricalEntitlements').then(module => ({ default: module.HistoricalEntitlements })));
 const ResolverConsole = lazy(() => import('../campaigns/resolver/Console').then(module => ({ default: module.Console })));
-const AdminConsole = lazy(() => import('../campaigns/resolver/AdminConsole').then(module => ({ default: module.AdminConsole })));
+const AdminConsole = lazy(() => import('../campaigns/admin/AdminConsole').then(module => ({ default: module.AdminConsole })));
 
 export type { PublicAreaProps };
+
+function LegacyCampaignRedirect({ href }: { href: string }) {
+  useEffect(() => {
+    if (window.location.hash !== href) window.location.replace(href);
+  }, [href]);
+
+  return <p role="status" className="muted">Đang chuyển tới không gian làm việc…</p>;
+}
 
 export function PublicArea(props: PublicAreaProps) {
   const { path, session, sessionLoading, error, onSession } = props;
@@ -26,7 +38,7 @@ export function PublicArea(props: PublicAreaProps) {
   const isCampaignLibrary = path === '/campaigns/library';
   const isAdmin = path === '/admin' || path === '/campaigns/admin';
   const isCampaignResolver = path === '/campaigns/resolver';
-  const campaignDetail = /^(?!\/campaigns\/(?:review|history|library|creator(?:\/|$)|resolver(?:\/|$)|admin(?:\/|$)))\/campaigns\/([^/]+)(?:\/(creator|resolver)(?:\/(feedback))?)?$/.exec(path);
+  const campaignDetail = resolveCampaignDetailRoute(path);
   const history = path === '/campaigns/history';
   const historicalEntitlements = path === '/campaigns/history/entitlements';
 
@@ -43,13 +55,55 @@ export function PublicArea(props: PublicAreaProps) {
       )}
       {isCampaignCommunityReview && <CommunityReviewPage />}
       {campaignDetail && (
-        <CampaignPage
-          key={`${campaignDetail[1]}:${session?.userId ?? 'public'}:${campaignDetail[2] ?? 'public'}:${campaignDetail[3] ?? 'overview'}`}
-          id={campaignDetail[1]}
-          session={session}
-          mode={(campaignDetail[2] as 'creator' | 'resolver') || 'public'}
-          initialTab={campaignDetail[3] === 'feedback' ? 'activity' : 'overview'}
-        />
+        campaignDetail.legacy ? (
+          <LegacyCampaignRedirect href={campaignDetail.canonicalHref} />
+        ) : campaignDetail.workspace === 'public' ? (
+          <PublicCampaignPage
+            key={`${campaignDetail.campaignId}:${session?.userId ?? 'public'}:${campaignDetail.initialTab}`}
+            id={campaignDetail.campaignId}
+            session={session}
+            initialTab={campaignDetail.initialTab}
+          />
+        ) : campaignDetail.workspace === 'creator' ? (
+          session ? (
+            <CreatorCampaignWorkspacePage
+              key={`${campaignDetail.campaignId}:${session.userId}:${campaignDetail.initialTab}`}
+              id={campaignDetail.campaignId}
+              session={session}
+              initialTab={campaignDetail.initialTab}
+            />
+          ) : (
+            <p>Đăng nhập để mở Creator workspace. <a href="#/account">Đăng nhập</a></p>
+          )
+        ) : campaignDetail.workspace === 'resolver' ? (
+          session && hasResolverRole ? (
+            <ResolverCampaignReviewPage
+              key={`${campaignDetail.campaignId}:${session.userId}:${campaignDetail.initialTab}`}
+              id={campaignDetail.campaignId}
+              session={session}
+              initialTab={campaignDetail.initialTab}
+            />
+          ) : !session ? (
+            <p>Đăng nhập để mở Resolver workspace. <a href="#/account">Đăng nhập</a></p>
+          ) : (
+            <p className="review-notice review-notice--blocked">Tài khoản cần có quyền RESOLVER để truy cập workspace này.</p>
+          )
+        ) : campaignDetail.workspace === 'admin' ? (
+          session && hasAdminRole ? (
+            <CampaignOperationsPage
+              key={`${campaignDetail.campaignId}:${session.userId}:${campaignDetail.initialTab}`}
+              id={campaignDetail.campaignId}
+              session={session}
+              initialTab={campaignDetail.initialTab}
+            />
+          ) : !session ? (
+            <p>Đăng nhập để mở Admin operations workspace. <a href="#/account">Đăng nhập</a></p>
+          ) : (
+            <p className="review-notice review-notice--blocked">Tài khoản cần có quyền ADMIN để truy cập workspace này.</p>
+          )
+        ) : (
+          <p role="status" className="muted">Không tìm thấy workspace campaign.</p>
+        )
       )}
       {historicalEntitlements && session && <HistoricalEntitlements key={session.userId} />}
       {(isCampaignCreatorStudio || isCampaignCreatorDraft) && session && <Studio key={session.userId} userId={session.userId} path={path} />}

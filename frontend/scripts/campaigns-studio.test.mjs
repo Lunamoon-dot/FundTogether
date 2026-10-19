@@ -98,7 +98,7 @@ test('Resolver console shows canonical on-chain campaigns when the review list i
   assert.match(html, /Campaign on-chain cần xử lý/)
   assert.match(html, /nuôi Huy/)
   assert.match(html, /Mở workspace on-chain/)
-  assert.match(html, /href="#\/campaigns\/campaign-1\/resolver"/)
+  assert.match(html, /href="#\/campaigns\/resolver\/campaign-1"/)
 })
 
 test('canonical funding campaign keeps its on-chain workspace link beside the review panel', () => {
@@ -111,7 +111,7 @@ test('canonical funding campaign keeps its on-chain workspace link beside the re
     contractState: 0,
   }])
   assert.match(html, /Mở workspace on-chain/)
-  assert.match(html, /href="#\/campaigns\/campaign\/resolver"/)
+  assert.match(html, /href="#\/campaigns\/resolver\/campaign"/)
 })
 
 test('Resolver console contains only the active Campaign review flow', async () => {
@@ -134,7 +134,7 @@ test('approved Campaign expose the on-chain action directly in the Resolver queu
   const campaign = { ...reviewCampaign('APPROVED'), category: 'COMICS_ARTBOOK' }
   const html = renderResolver([campaign])
   assert.match(html, /Mở trang xử lý on-chain →/)
-  assert.match(html, /href="#\/campaigns\/campaign\/resolver"/)
+  assert.match(html, /href="#\/campaigns\/resolver\/campaign"/)
 })
 
 test('published but unbound Campaign exposes activation workspace from Creator Studio', () => {
@@ -144,7 +144,7 @@ test('published but unbound Campaign exposes activation workspace from Creator S
   }])
   assert.match(html, /chưa có campaign canonical/)
   assert.match(html, /Creator ký tạo campaign trên contract/)
-  assert.match(html, /href="#\/campaigns\/campaign\/creator"/)
+  assert.match(html, /href="#\/campaigns\/creator\/campaign"/)
 })
 
 test('published but unbound Campaign appears as a Creator activation task', () => {
@@ -155,7 +155,7 @@ test('published but unbound Campaign appears as a Creator activation task', () =
 
   assert.match(html, /Cần bạn làm \(1\)/)
   assert.match(html, /Mở trang kích hoạt on-chain/)
-  assert.match(html, /href="#\/campaigns\/campaign\/creator"/)
+  assert.match(html, /href="#\/campaigns\/creator\/campaign"/)
   assert.doesNotMatch(html, /href="#\/campaigns\/creator\?edit=campaign"/)
   assert.doesNotMatch(html, />PUBLISHED</)
   assert.match(html, /Được duyệt: 1/)
@@ -167,7 +167,7 @@ test('published but unbound Campaign is actionable from the Resolver queue', () 
     campaignId: 'campaign', publicationStatus: 'NOT_PUBLISHED', contractState: null,
   }])
   assert.match(html, /Mở trang xử lý on-chain →/)
-  assert.match(html, /href="#\/campaigns\/campaign\/resolver"/)
+  assert.match(html, /href="#\/campaigns\/resolver\/campaign"/)
 })
 
 test('funded production task opens the campaign production workspace', () => {
@@ -184,7 +184,7 @@ test('funded production task opens the campaign production workspace', () => {
     contractState: 1,
   }])
   assert.match(html, /Cập nhật tiến độ sản xuất/)
-  assert.match(html, /href="#\/campaigns\/c-production\/creator"/)
+  assert.match(html, /href="#\/campaigns\/creator\/c-production\?tab=production"/)
   assert.doesNotMatch(html, /href="#\/campaigns\/creator\?edit=c-production/)
 })
 
@@ -270,10 +270,11 @@ test('saving a new draft keeps the creator in the step-three editor', async () =
 })
 
 test('creator publication waits for the Resolver approval that exists on chain', async () => {
-  const source = await readFile(new URL('../src/features/campaigns/public/Page.tsx', import.meta.url), 'utf8')
+  const source = await readFile(new URL('../src/features/campaigns/creator/CampaignWorkspacePage.tsx', import.meta.url), 'utf8')
+  const activation = await readFile(new URL('../src/features/campaigns/shared/ui/ActivationPanel.tsx', import.meta.url), 'utf8')
   assert.match(source, /onchainApproved/)
-  assert.match(source, /Primary Resolver chưa ký duyệt cam kết trên chain/)
-  assert.match(source, /Kiểm tra lại chữ ký/)
+  assert.match(source, /Primary Resolver chưa ký đúng commitment trên chain/)
+  assert.match(activation, /Ký duyệt đúng commitment trên chain/)
 })
 
 test('new Campaign wizard offers one PDF without a physical, inventory or add-tier input', () => {
@@ -529,7 +530,7 @@ test('Creator can open community feedback as a read-only task', () => {
   assert.equal(isCreatorActionable(campaign), true)
   const html = render([campaign], 'owner')
   assert.match(html, /Xem phản hồi cộng đồng/)
-  assert.match(html, /#\/campaigns\/community-feedback\/creator\/feedback/)
+  assert.match(html, /#\/campaigns\/creator\/community-feedback\?tab=activity/)
 })
 
 test('Resolver case surface keeps conversation outcome separate from financial actions', () => {

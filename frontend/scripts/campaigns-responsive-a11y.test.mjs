@@ -46,7 +46,7 @@ test('CSS includes overflow-wrap or word-break for cryptographic hashes and addr
 })
 
 test('Backer primary surfaces do not expose raw entitlement codes in primary headings', async () => {
-  const campaignPageSource = await readFile(resolve('src/features/campaigns/public/Page.tsx'), 'utf8')
+  const campaignPageSource = await readFile(resolve('src/features/campaigns/public/CampaignPage.tsx'), 'utf8')
   // Assert headings do not format raw codes like <h1>REFUND_ELIGIBLE</h1> or <h2>CLAIMABLE</h2>
   assert.doesNotMatch(campaignPageSource, /<h[1-3][^>]*>\s*\{?[^}]*(?:REFUND_ELIGIBLE|CLAIMABLE|REFUNDED|ORPHANED)[^}]*\}?\s*<\/h[1-3]>/)
 })

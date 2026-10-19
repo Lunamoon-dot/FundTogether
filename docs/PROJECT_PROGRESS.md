@@ -3,6 +3,45 @@
 > **Status:** Current implementation evidence log. A recorded PASS applies only
 > to the named command, date and environment; it is not public-launch approval.
 
+## 2026-10-19 Role-oriented Campaign workspaces
+
+- Implemented canonical Public/Backer, Creator, Resolver and Admin Campaign detail
+  routes. Legacy role-suffixed detail URLs redirect before mounting a workspace.
+- Separated mutation ownership in the UI: Backer actions stay on public detail;
+  Creator owns production/completion/request work; Resolver owns review and allowed
+  financial decisions; Admin is an operational read-only projection.
+- Added backend authorization coverage for public preview/evidence, Creator ownership,
+  canonical Backer reads, Resolver decisions, Admin operations, and rejection of
+  body-supplied actor/destination identifiers. Focused ACL suite passed 7/7; adjacent
+  HTTP and review suites passed. Workflow HTTP acceptance requires the fresh local RPC
+  runtime and will be rerun after the authorized reset.
+- No contract, ABI, schema, API wire format or financial-policy change is part of this
+  boundary split.
+- Fixed the Resolver pre-activation boundary: an approved but unbound campaign now
+  exposes only the Resolver commitment-signing panel; financial actions remain
+  closed until the canonical binding exists. Corrected the frontend argument order
+  for `approveCampaign` and `createCampaign` to match the generated Campaign ABI.
+- Kept production evidence and final-PDF submission visibly separate, and exposed
+  the completion dossier to an entitled Backer as read-only evidence plus the two
+  existing surplus choices. The Backer still cannot create or decide a completion
+  request.
+- Authorized disposable-runtime reset completed. The previous chain/deployment
+  metadata was archived under
+  `.local/fundtogether/reset-backups/20261019-role-workspaces-reset`; the named
+  FundTogether PostgreSQL/MinIO volumes were intentionally removed and recreated.
+  Fresh chain `31339` is running with Campaign deployment
+  `0xc351628eb244ec633d5f21fbd6621e1a683b1181`, deployment block `109`, API `3002`
+  and web `5175`. The fresh DB has 6 seeded users/wallet links and zero campaigns,
+  chain events, evidence, pledges, payout/completion requests or surplus claims;
+  MinIO has no buckets.
+- PASS after reset: Campaign backend suite `95/95`, workflow/review/http acceptance
+  `66/66`, focused workspace ACL `7/7`, frontend `175/175`, frontend production
+  build, and the active browser E2E with 9 checkpoints through completion and
+  pro-rata surplus claims. The historical `test:fundtogether:e2e` wrapper still
+  invokes a stale legacy six-scenario script whose first completion scenario leaves
+  residual escrow and therefore reverts; it is not the active Campaign browser path
+  and was not changed as part of this workspace boundary refactor.
+
 ## 2026-10-18 Security remediation checkpoint
 
 - Added bounded review conversations: transactional cap of 200 messages per
