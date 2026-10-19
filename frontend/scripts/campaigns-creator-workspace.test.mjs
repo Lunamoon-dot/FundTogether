@@ -32,7 +32,8 @@ test('Creator workspace keeps payout requests in production and funding follow-u
   assert.ok(productionStart > overviewStart)
   assert.doesNotMatch(page.slice(overviewStart, productionStart), /DisbursementPanel/)
   assert.match(page.slice(productionStart), /DisbursementPanel/)
-  assert.match(page, /ledger=\{activeTab === 'overview'\s*\?/)
+  assert.match(page, /InternalCampaignFrame/)
+  assert.doesNotMatch(page, /CampaignDetailFrame|CampaignOverview|CampaignLedger/)
   assert.doesNotMatch(page, /PledgePreflight|claimRefund|claimSurplus|reviewProduction|approveDisbursement|rejectDisbursement|approveCompletion|rejectCompletion/)
 })
 
