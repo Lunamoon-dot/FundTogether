@@ -5,6 +5,21 @@
 The repository supports **FundTogether** only. Reward Crowdfunding is
 the funding model; it is not a module, database or deployment namespace.
 
+## Decentralization boundary
+
+The current architecture is hybrid, not a decentralized verification
+protocol. The Campaign contract owns escrow custody and deterministic financial
+transitions; PostgreSQL and private object storage hold application and
+evidence data; Resolver roles remain trusted human authorities for review and
+dispute decisions; Community Review is advisory and does not vote or authorize
+fund movement.
+
+This means the current product provides auditable on-chain settlement and
+contract-enforced consequences for authorized decisions. It does not prove the
+truth of off-chain evidence, remove the need for a trusted reviewer, or
+implement review-to-earn, reviewer staking, reviewer voting or decentralized
+governance. Those are deferred research directions, not current behavior.
+
 New campaign creation is **FundTogether**, a `COMICS_ARTBOOK` draft/review flow with one `STANDARD` tier and one `DIGITAL_DOWNLOAD` PDF. The server stores the normalized `FUNDTOGETHER_V1` / `fundtogether-comic-download-mvp-v1` configuration in `campaigns.draft_config`; the creator account is server-owned. Unknown fields, alternate categories/benefit types/formats, finite inventory and physical/shipping/address/tracking input are rejected.
 
 The standard tier lives in the versioned draft configuration. R2 adds private sample evidence, content/budget/evidence plans and verified linked-wallet selection; delivery dates are not part of the draft commitment. Revision-checked updates and row locks protect freeze/review from concurrent changes. A versioned SHA-256 snapshot binds identity, wallet, PDF/tier terms and evidence hashes; correction decisions preserve the reviewed snapshot in history. The wallet binding cannot be removed while frozen/approved. Creator self-review and Admin self-verification are rejected.

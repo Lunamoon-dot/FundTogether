@@ -11,6 +11,20 @@ FundTogether MVP is a local MockUSDC crowdfunding pilot for an independent digit
 
 The purpose is to evaluate verifiable funding, production-evidence review, and digital-delivery transparency. It is not an investment, marketplace, publishing platform, DRM product, or logistics system.
 
+### Trust and decentralization boundary
+
+The MVP uses on-chain escrow and deterministic settlement, but its evidence
+and decision layer remains permissioned. Admin/Resolver roles review identity,
+campaign, production, release and dispute evidence; the Primary/Backup
+Resolver arrangement is a fallback authority, not decentralized governance.
+Community feedback is advisory and cannot approve payment, create entitlement or
+lock escrow.
+
+The MVP therefore must not be presented as decentralized verification,
+trustless governance or review-to-earn. Reviewer selection, paid voting,
+staking/slashing, commit–reveal and decentralized dispute resolution are
+deferred research candidates and are not implemented in this scope.
+
 ### Exactly in scope
 
 | Concern | MVP rule |

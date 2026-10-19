@@ -7,6 +7,16 @@ acceptance and main-runtime verification; exact evidence and limitations are in
 [PROJECT_PROGRESS.md](../PROJECT_PROGRESS.md). No public/real-asset launch is
 authorized. Financial policy version: `campaigns-local-escrow-v6`.
 
+## Research limitation
+
+This policy secures custody and constrains financial transitions on the local
+Campaign contract, but it does not decentralize evidence verification. Resolver
+roles remain trusted decision-makers, while Community Review remains advisory.
+The policy must not be described as decentralized governance, trustless
+verification or a reviewer-reward mechanism. Any reviewer pool, voting,
+staking/reward or challenge-governance proposal requires a separate, evaluated
+policy and is not enabled by this version.
+
 ## Approved local policy
 
 | Gate | Approved local rule |
