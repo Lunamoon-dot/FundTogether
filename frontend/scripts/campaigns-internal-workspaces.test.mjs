@@ -47,3 +47,42 @@ test('public campaign route keeps the public discovery shell', () => {
   assert.match(html, /Thẩm định Resolver/)
   assert.doesNotMatch(html, /Creator Studio|Resolver Console|Admin Operations/)
 })
+
+test('internal campaign frame exposes operational metrics and role-specific tabs', async () => {
+  const { InternalCampaignFrame } = await server.ssrLoadModule('/src/features/campaigns/shared/workspace/InternalCampaignFrame.tsx')
+  const campaign = {
+    id: 'campaign-1',
+    title: 'Nuôi Huy',
+    creatorDisplayName: 'Huy Studio',
+    config: { goal: '100', price: '20' },
+  }
+  const chain = {
+    snapshot: {
+      raised: '240',
+      escrowed: '140',
+      creatorPaid: '100',
+      fundingDeadline: '1795737600',
+      releaseDeadline: '1798416000',
+      state: 3,
+    },
+  }
+  const html = renderToStaticMarkup(createElement(InternalCampaignFrame, {
+    role: 'resolver',
+    campaign,
+    chain,
+    activeTab: 'production',
+    onTabChange: () => {},
+    alerts: null,
+    main: createElement('div', null, 'Resolver work surface'),
+  }))
+
+  assert.match(html, /workspace-campaign-frame/)
+  assert.match(html, /workspace-metric-strip/)
+  assert.match(html, /workspace-inspector/)
+  assert.match(html, /Hàng chờ/)
+  assert.match(html, /PDF &amp; hoàn thành/)
+  assert.match(html, /Đã huy động/)
+  assert.match(html, /Escrow còn lại/)
+  assert.match(html, /Đã giải ngân/)
+  assert.doesNotMatch(html, /Funding summary|NOTARIAL ESCROW LEDGER/)
+})
