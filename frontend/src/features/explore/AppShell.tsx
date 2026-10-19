@@ -2,6 +2,7 @@ import type React from 'react';
 import type { AccountSession } from '../../lib/api/auth';
 import { resolveCampaignDetailRoute } from './campaignRoutes';
 import './PublicArea.css';
+import { resolveWorkspaceRole, WorkspaceShell } from '../campaigns/shared/workspace/WorkspaceShell';
 
 export interface PublicAreaProps {
   path: string;
@@ -34,6 +35,11 @@ export function AppShell({
 
   const hasAdminRole = session?.roles.includes('ADMIN') ?? false;
   const hasResolverRole = session?.roles.includes('RESOLVER') ?? false;
+
+  const workspaceRole = resolveWorkspaceRole(path, campaignDetail);
+  if (workspaceRole) {
+    return <WorkspaceShell role={workspaceRole} path={path} detail={campaignDetail} session={session}>{children}</WorkspaceShell>;
+  }
 
   return (
     <div className="public-area campaign-shell">
