@@ -4,13 +4,10 @@ import type { AccountSession } from '../../../lib/api/auth';
 import { getErrorMessage } from '../../../lib/api/error';
 import { campaignApi } from '../api/campaigns';
 import { useTransaction } from '../transactions/useTransaction';
-import { getCampaignUiState } from '../shared/ui/campaignState';
 import { Timeline, type TimelineEvent } from '../shared/ui/Timeline';
 import { ReviewThread } from '../shared/ui/ReviewThread';
 import { CommunityPanel } from '../public/Community';
-import { CampaignDetailFrame } from '../shared/detail/CampaignDetailFrame';
-import { CampaignOverview } from '../shared/detail/CampaignOverview';
-import { CampaignLedger } from '../shared/detail/CampaignLedger';
+import { InternalCampaignFrame } from '../shared/workspace/InternalCampaignFrame';
 import { CampaignDossierList } from '../shared/detail/CampaignDossierList';
 import { ResolverCampaignActions } from './CampaignActions';
 import '../shared/styles.css';
@@ -88,7 +85,6 @@ export function ResolverCampaignReviewPage({ id, session, initialTab = 'overview
 
   const item = preview.data;
   const state = chain.data?.snapshot;
-  const uiState = getCampaignUiState({ status: item.status, chainState: state?.state, publicationStatus: chain.data?.status ?? null, role: 'resolver' });
   const timelineEvents: TimelineEvent[] = [
     { label: 'Chuẩn bị hồ sơ', detail: 'Hồ sơ đã khóa và có thể kiểm tra', tone: 'done' },
     { label: 'Thẩm định hồ sơ', detail: approved ? 'Resolver đã phê duyệt hồ sơ' : 'Đang chờ quyết định hồ sơ', tone: approved ? 'done' : 'current' },
@@ -102,13 +98,14 @@ export function ResolverCampaignReviewPage({ id, session, initialTab = 'overview
     <div className="monograph-alert monograph-alert--info mt-4">Resolver workspace: các giao dịch tài chính chỉ mở sau khi contract/indexer xác nhận đúng state và ví hiện tại là Primary hoặc Backup Resolver.</div>
   </>;
 
-  return <CampaignDetailFrame
-    campaignId={id}
+  return <InternalCampaignFrame
+    role="resolver"
+    campaign={item}
+    chain={chain.data ?? null}
     activeTab={activeTab}
     onTabChange={setActiveTab}
     alerts={alerts}
     main={<>
-      <CampaignOverview campaign={item} chain={chain.data ?? null} uiState={uiState} timelineEvents={timelineEvents} showDetails={activeTab === 'overview'} />
       {activeTab === 'overview' && <>
         <div className="monograph-card"><span className="monograph-card__kicker">EDITORIAL DOSSIER · PRIVATE REVIEW</span><h2 className="monograph-card__title">Hồ sơ Creator &amp; kế hoạch cam kết</h2><p className="monograph-card__desc">Resolver đọc hồ sơ riêng tư để quyết định đúng boundary. Backer không có quyền ký các quyết định này.</p><CampaignDossierList contentOutline={item.contentOutline} budgetPlan={item.budgetPlan} evidencePlan={item.evidencePlan} /></div>
         {chain.data && <ResolverCampaignActions campaignId={id} userId={session.userId} chain={chain.data} terms={terms.data} evidence={evidence.data ?? []} transaction={tx} busy={busy || terms.isFetching} section="overview" onRefresh={refresh} onActivate={() => void activate()} onReconcile={() => { if (tx.transaction?.txHash) void tx.reconcile(); else if (chain.data?.bindingTransactionHash) void tx.reconcile('createCampaign', chain.data.bindingTransactionHash); else void chain.refetch(); }} />}
@@ -121,6 +118,5 @@ export function ResolverCampaignReviewPage({ id, session, initialTab = 'overview
       {activeTab === 'activity' && <div className="space-y-6">{chain.data && <ResolverCampaignActions campaignId={id} userId={session.userId} chain={chain.data} terms={terms.data} evidence={evidence.data ?? []} transaction={tx} busy={busy} section="activity" onRefresh={refresh} onActivate={() => void activate()} onReconcile={() => void chain.refetch()} />}<ReviewThread campaignId={id} userId={session.userId} viewerMode="resolver" targetHash={state && state.productionHash !== zeroHash ? state.productionHash : item.commitmentHash} /><CommunityPanel id={id} userId={session.userId} viewerMode="resolver" commitmentHash={item.commitmentHash} evidence={evidence.data ?? []} /></div>}
       <details className="monograph-technical-details"><summary>Chi tiết kỹ thuật &amp; hợp đồng</summary><div className="monograph-technical-details__body">Commitment Hash: <code className="campaign-hash">{item.commitmentHash}</code><br />{chain.data?.onchainCampaignId && <>ID on-chain: <code>#{chain.data.onchainCampaignId}</code></>}</div></details>
     </>}
-    ledger={activeTab === 'overview' ? <CampaignLedger campaign={item} chain={chain.data ?? null} /> : null}
   />;
 }

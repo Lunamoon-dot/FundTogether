@@ -4,13 +4,10 @@ import type { AccountSession } from '../../../lib/api/auth';
 import { campaignApi } from '../api/campaigns';
 import { getErrorMessage } from '../../../lib/api/error';
 import { useTransaction } from '../transactions/useTransaction';
-import { getCampaignUiState } from '../shared/ui/campaignState';
 import { Timeline, type TimelineEvent } from '../shared/ui/Timeline';
 import { ReviewThread } from '../shared/ui/ReviewThread';
 import { CommunityPanel } from '../public/Community';
-import { CampaignDetailFrame } from '../shared/detail/CampaignDetailFrame';
-import { CampaignOverview } from '../shared/detail/CampaignOverview';
-import { CampaignLedger } from '../shared/detail/CampaignLedger';
+import { InternalCampaignFrame } from '../shared/workspace/InternalCampaignFrame';
 import { CampaignDossierList } from '../shared/detail/CampaignDossierList';
 import { DisbursementPanel } from '../shared/ui/DisbursementPanel';
 import { CreatorCampaignActions, CreatorLedgerActions } from './CampaignActions';
@@ -115,7 +112,6 @@ export function CreatorCampaignWorkspacePage({ id, session, initialTab = 'overvi
   if (!preview.data) return <p role="alert">{getErrorMessage(preview.error)}</p>;
 
   const item = preview.data;
-  const uiState = getCampaignUiState({ status: item.status, chainState: state?.state, publicationStatus: chain.data?.status ?? null, role: 'creator' });
   const onchainId = chain.data?.onchainCampaignId;
   const timelineEvents: TimelineEvent[] = [
     { label: 'Chuẩn bị hồ sơ', detail: 'Hồ sơ đã khóa và kiểm tra bản quyền', tone: 'done' },
@@ -131,14 +127,16 @@ export function CreatorCampaignWorkspacePage({ id, session, initialTab = 'overvi
   </>;
 
   return (
-    <CampaignDetailFrame
-      campaignId={id}
+    <InternalCampaignFrame
+      role="creator"
+      campaign={item}
+      chain={chain.data ?? null}
       activeTab={activeTab}
       onTabChange={setActiveTab}
       alerts={alerts}
+      actions={chain.data ? <CreatorLedgerActions chain={chain.data} transaction={tx} /> : null}
       main={
         <>
-          <CampaignOverview campaign={item} chain={chain.data ?? null} uiState={uiState} timelineEvents={timelineEvents} showDetails={activeTab === 'overview'} />
           {activeTab === 'overview' && <>
             <div className="monograph-card"><span className="monograph-card__kicker">HỒ SƠ THẨM ĐỊNH (EDITORIAL DOSSIER)</span><h2 className="monograph-card__title">Tài liệu sản xuất &amp; Kế hoạch cam kết</h2><p className="monograph-card__desc">Hồ sơ riêng của Creator, được Resolver xem xét trước khi mở gây quỹ.</p><CampaignDossierList contentOutline={item.contentOutline} budgetPlan={item.budgetPlan} evidencePlan={item.evidencePlan} /></div>
             {chain.data && <CreatorCampaignActions campaignId={id} userId={userId} chain={chain.data} terms={publicationTerms.data} transaction={tx} busy={busy || publicationTerms.isFetching} onRefresh={refresh} onActivate={() => void activate()} onReconcile={() => { if (tx.transaction?.txHash) void tx.reconcile(); else if (chain.data?.bindingTransactionHash) void tx.reconcile('createCampaign', chain.data.bindingTransactionHash); else void chain.refetch(); }} />}
@@ -171,7 +169,6 @@ export function CreatorCampaignWorkspacePage({ id, session, initialTab = 'overvi
           {chain.data && <details className="monograph-technical-details"><summary>Chi tiết kỹ thuật &amp; hợp đồng</summary><div className="monograph-technical-details__body">Commitment Hash: <code className="campaign-hash">{item.commitmentHash}</code><br />{onchainId && <>ID on-chain: <code>#{onchainId}</code></>}</div></details>}
         </>
       }
-      ledger={activeTab === 'overview' ? <CampaignLedger campaign={item} chain={chain.data ?? null} actions={chain.data ? <CreatorLedgerActions chain={chain.data} transaction={tx} /> : null} /> : null}
     />
   );
 }

@@ -61,7 +61,7 @@ export function InternalCampaignFrame({ role, campaign, chain, activeTab, onTabC
       <header className="workspace-campaign-header">
         <div>
           <div className="workspace-eyebrow">Campaign workspace · {role}</div>
-          <h1>{campaign.config.title || campaign.title}</h1>
+          <h1>{campaign.config.title}</h1>
           <p>{campaign.creatorDisplayName} <span aria-hidden="true">·</span> {campaign.id}</p>
         </div>
         <div className="workspace-campaign-header__status">

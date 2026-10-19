@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import { after, test } from 'node:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -85,4 +86,21 @@ test('internal campaign frame exposes operational metrics and role-specific tabs
   assert.match(html, /Escrow còn lại/)
   assert.match(html, /Đã giải ngân/)
   assert.doesNotMatch(html, /Funding summary|NOTARIAL ESCROW LEDGER/)
+})
+
+test('internal campaign pages do not mount the public editorial frame', async () => {
+  const paths = [
+    'src/features/campaigns/creator/CampaignWorkspacePage.tsx',
+    'src/features/campaigns/resolver/CampaignReviewPage.tsx',
+    'src/features/campaigns/admin/CampaignOperationsPage.tsx',
+  ]
+  for (const path of paths) {
+    const source = await readFile(new URL(`../${path}`, import.meta.url), 'utf8')
+    assert.match(source, /InternalCampaignFrame/)
+    assert.doesNotMatch(source, /CampaignDetailFrame|CampaignOverview|CampaignLedger/)
+  }
+
+  const publicSource = await readFile(new URL('../src/features/campaigns/public/CampaignPage.tsx', import.meta.url), 'utf8')
+  assert.match(publicSource, /CampaignDetailFrame/)
+  assert.match(publicSource, /CampaignLedger/)
 })
