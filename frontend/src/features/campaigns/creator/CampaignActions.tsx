@@ -1,7 +1,6 @@
 import type { CampaignChain, CampaignTerms, Entitlement } from '../api/campaigns';
 import { ActivationPanel } from '../shared/ui/ActivationPanel';
 import { CompletionSettlementPanel } from '../shared/ui/CompletionSettlementPanel';
-import { DisbursementPanel } from '../shared/ui/DisbursementPanel';
 import type { useTransaction } from '../transactions/useTransaction';
 
 type CreatorTransactionController = ReturnType<typeof useTransaction>;
@@ -32,7 +31,6 @@ export function CreatorCampaignActions({ campaignId, userId, chain, terms, trans
         onActivate={onActivate}
         onReconcile={onReconcile}
       />
-      <DisbursementPanel campaignId={campaignId} userId={userId} mode="creator" chain={chain} transaction={transaction} onRefresh={onRefresh} />
       <CompletionSettlementPanel campaignId={campaignId} userId={userId} mode="creator" chain={chain} transaction={transaction} entitlement={entitlement} onRefresh={onRefresh} />
     </>
   );

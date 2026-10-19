@@ -54,9 +54,9 @@ export function CampaignDetailFrame({ campaignId, activeTab, onTabChange, alerts
 
         {alerts}
 
-        <div className="monograph-split-layout mt-6">
+        <div className={ledger ? 'monograph-split-layout mt-6' : 'mt-6'}>
           <div className="monograph-folio">{main}</div>
-          <aside className="monograph-ledger" aria-label="Sổ công chứng ký quỹ">{ledger}</aside>
+          {ledger && <aside className="monograph-ledger" aria-label="Sổ công chứng ký quỹ">{ledger}</aside>}
         </div>
       </div>
       {footer}

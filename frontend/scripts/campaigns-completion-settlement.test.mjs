@@ -40,3 +40,23 @@ test('completed state is surplus settlement, not a full payout label', () => {
   assert.match(source, /chờ quyết toán surplus/)
   assert.doesNotMatch(source, /PAYOUT_REQUESTED|Đã giải ngân|requestPayout/)
 })
+
+test('disbursement form reports client validation instead of silently blocking submit', () => {
+  const panel = read('shared/ui/DisbursementPanel.tsx')
+
+  assert.match(panel, /function validateRequest\(\)/)
+  assert.match(panel, /noValidate/)
+  assert.match(panel, /Hãy nhập số tiền giải ngân hợp lệ/)
+  assert.match(panel, /Hãy đính kèm tài liệu giải thích sử dụng tiền/)
+  assert.match(panel, /const validationError = validateRequest\(\)/)
+})
+
+test('disbursement draft stays retryable until the request is canonical', () => {
+  const panel = read('shared/ui/DisbursementPanel.tsx')
+
+  assert.match(panel, /const draft = latest\?\.status === 'DRAFT' \? latest : undefined/)
+  assert.match(panel, /Hồ sơ đã lưu nhưng chưa ký on-chain/)
+  assert.match(panel, /Ký lại requestDisbursement/)
+  assert.match(panel, /pending && !draft/)
+  assert.match(panel, /Đã ghi nhận yêu cầu giải ngân on-chain/)
+})

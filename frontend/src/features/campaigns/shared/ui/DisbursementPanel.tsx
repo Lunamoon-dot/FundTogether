@@ -54,6 +54,7 @@ export function DisbursementPanel({ campaignId, userId, mode, chain, transaction
   const creatorPaid = snapshot.creatorPaid ?? '0';
   const creatorWallet = snapshot.creator;
   const latest = requests.data?.[0];
+  const draft = latest?.status === 'DRAFT' ? latest : undefined;
   const pending = latest && ['DRAFT', 'SUBMITTED_ON_CHAIN', 'UNDER_REVIEW'].includes(latest.status) ? latest : undefined;
   const revision = (latest?.revision ?? 0) + 1;
   const canCreate = mode === 'creator' && snapshot.state === CAMPAIGN_CHAIN_STATE.ACTIVE && !pending
@@ -61,20 +62,63 @@ export function DisbursementPanel({ campaignId, userId, mode, chain, transaction
   const reviewable = latest && ['SUBMITTED_ON_CHAIN', 'UNDER_REVIEW'].includes(latest.status) ? latest : undefined;
   const canDecide = mode === 'resolver' && Boolean(reviewable && transaction.address);
 
+  function validateRequest() {
+    const trimmedAmount = amount.trim();
+    if (!/^[0-9]+(\.[0-9]{1,6})?$/.test(trimmedAmount)) return 'Hãy nhập số tiền giải ngân hợp lệ, tối đa 6 chữ số thập phân.';
+    try {
+      if (parseUnits(trimmedAmount, 6) <= 0n) return 'Số tiền giải ngân phải lớn hơn 0.';
+    } catch {
+      return 'Hãy nhập số tiền giải ngân hợp lệ, tối đa 6 chữ số thập phân.';
+    }
+    if (title.trim().length < 3) return 'Tiêu đề yêu cầu phải có ít nhất 3 ký tự.';
+    if (summary.trim().length < 20) return 'Tóm tắt sử dụng tiền phải có ít nhất 20 ký tự.';
+    if (reason.trim().length < 20) return 'Lý do giải ngân phải có ít nhất 20 ký tự.';
+    if (breakdown.trim().length < 10) return 'Bảng phân bổ phải có ít nhất 10 ký tự.';
+    if (explanationFiles.length === 0) return 'Hãy đính kèm tài liệu giải thích sử dụng tiền.';
+    if (revision > 1 && evidenceFiles.length === 0) return 'Từ lần 2, hãy đính kèm bằng chứng sử dụng khoản trước.';
+    return null;
+  }
+
+  async function signRequest(request: Pick<CampaignPayoutRequest, 'requestHash' | 'amount'>) {
+    if (activeId === null) {
+      setMessage('Campaign chưa có ID on-chain canonical để ký requestDisbursement.');
+      return;
+    }
+    setMessage('Hãy ký requestDisbursement trong ví.');
+    await transaction.send('requestDisbursement', [activeId, request.requestHash, BigInt(request.amount)], { expectedWallet: creatorWallet });
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (activeId === null) return;
+    const validationError = validateRequest();
+    if (validationError) {
+      setMessage(validationError);
+      return;
+    }
+    if (activeId === null) {
+      setMessage('Campaign chưa có ID on-chain canonical để ký requestDisbursement.');
+      return;
+    }
     try {
       const rawAmount = parseUnits(amount.trim(), 6).toString();
       setMessage('Đang lưu yêu cầu giải ngân…');
       const request = await campaignApi.createPayoutRequest(campaignId, { amount: rawAmount, title, summary, reason, breakdown, explanationFiles, evidenceFiles });
       await requests.refetch();
-      setMessage('Đã lưu yêu cầu. Hãy ký requestDisbursement trong ví.');
-      await transaction.send('requestDisbursement', [activeId, request.requestHash, BigInt(rawAmount)], { expectedWallet: creatorWallet });
+      await signRequest(request);
       setAmount(''); setTitle(''); setSummary(''); setReason(''); setBreakdown(''); setExplanationFiles([]); setEvidenceFiles([]);
       onRefresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Không thể tạo yêu cầu giải ngân.');
+    }
+  }
+
+  async function retryDraft() {
+    if (!draft) return;
+    try {
+      await signRequest(draft);
+      onRefresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Không thể ký lại yêu cầu giải ngân.');
     }
   }
 
@@ -123,7 +167,7 @@ export function DisbursementPanel({ campaignId, userId, mode, chain, transaction
         {latest.decisions.map(decision => <p key={decision.id} className="text-sm border-t pt-2 mt-2"><strong>{decision.outcome}:</strong> {decision.reason}</p>)}
       </article>}
 
-      {canCreate && <form className="space-y-3" onSubmit={event => void submit(event)}>
+      {canCreate && <form noValidate className="space-y-3" onSubmit={event => void submit(event)}>
         <h3>Gửi yêu cầu giải ngân lần #{revision}</h3>
         <p className="text-sm text-[var(--ink-subtle)]">Mỗi lần đều cần tài liệu giải thích chi tiết khoản tiền sẽ dùng vào đâu. Từ lần 2, đính kèm thêm bằng chứng sử dụng khoản trước.</p>
         <input required inputMode="decimal" pattern="^[0-9]+(\.[0-9]{1,6})?$" placeholder="Số tiền MockUSDC" value={amount} onChange={event => setAmount(event.target.value)} />
@@ -136,7 +180,11 @@ export function DisbursementPanel({ campaignId, userId, mode, chain, transaction
         <button disabled={transaction.busy} className="button button--primary" type="submit">Lưu yêu cầu và ký requestDisbursement</button>
       </form>}
 
-      {mode === 'creator' && snapshot.state === CAMPAIGN_CHAIN_STATE.ACTIVE && pending && <p className="text-sm text-[var(--ink-subtle)]">Đã gửi yêu cầu giải ngân canonical. Chờ Resolver xem và quyết định.</p>}
+      {mode === 'creator' && snapshot.state === CAMPAIGN_CHAIN_STATE.ACTIVE && draft && <div className="space-y-2">
+        <p className="text-sm text-[var(--ink-subtle)]">Hồ sơ đã lưu nhưng chưa ký on-chain. Creator cần ký requestDisbursement trong ví để Resolver có thể xem xét.</p>
+        <button type="button" className="button button--secondary" disabled={transaction.busy} onClick={() => void retryDraft()}>Ký lại requestDisbursement</button>
+      </div>}
+      {mode === 'creator' && snapshot.state === CAMPAIGN_CHAIN_STATE.ACTIVE && pending && !draft && <p className="text-sm text-[var(--ink-subtle)]">Đã ghi nhận yêu cầu giải ngân on-chain. Chờ Resolver xem và quyết định.</p>}
       {canDecide && <form className="space-y-3" onSubmit={event => void decide(event)}>
         <h3>Quyết định Resolver</h3>
         <select value={decisionOutcome} onChange={event => setDecisionOutcome(event.target.value as typeof decisionOutcome)}>

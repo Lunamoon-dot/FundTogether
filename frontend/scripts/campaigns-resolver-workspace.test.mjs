@@ -21,8 +21,10 @@ test('resolver workspace owns the private review boundary and resolver-only acti
   assert.match(actions, /reviewRelease/);
   assert.match(actions, /reviewProduction/);
   assert.match(actions, /resolveChallenge/);
-  assert.match(actions, /DisbursementPanel/);
+  assert.match(actions, /section === 'production'[\s\S]*DisbursementPanel/);
+  assert.doesNotMatch(actions, /\n    <DisbursementPanel/);
   assert.doesNotMatch(page, /PledgePreflight|claimSurplus|createPayoutRequest|createCompletionRequest/);
+  assert.match(page, /ledger=\{activeTab === 'overview'\s*\?/);
 });
 
 test('resolver queue and route use the canonical resolver workspace', () => {

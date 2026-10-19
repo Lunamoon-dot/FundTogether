@@ -121,6 +121,6 @@ export function ResolverCampaignReviewPage({ id, session, initialTab = 'overview
       {activeTab === 'activity' && <div className="space-y-6">{chain.data && <ResolverCampaignActions campaignId={id} userId={session.userId} chain={chain.data} terms={terms.data} evidence={evidence.data ?? []} transaction={tx} busy={busy} section="activity" onRefresh={refresh} onActivate={() => void activate()} onReconcile={() => void chain.refetch()} />}<ReviewThread campaignId={id} userId={session.userId} viewerMode="resolver" targetHash={state && state.productionHash !== zeroHash ? state.productionHash : item.commitmentHash} /><CommunityPanel id={id} userId={session.userId} viewerMode="resolver" commitmentHash={item.commitmentHash} evidence={evidence.data ?? []} /></div>}
       <details className="monograph-technical-details"><summary>Chi tiết kỹ thuật &amp; hợp đồng</summary><div className="monograph-technical-details__body">Commitment Hash: <code className="campaign-hash">{item.commitmentHash}</code><br />{chain.data?.onchainCampaignId && <>ID on-chain: <code>#{chain.data.onchainCampaignId}</code></>}</div></details>
     </>}
-    ledger={<CampaignLedger campaign={item} chain={chain.data ?? null} />}
+    ledger={activeTab === 'overview' ? <CampaignLedger campaign={item} chain={chain.data ?? null} /> : null}
   />;
 }

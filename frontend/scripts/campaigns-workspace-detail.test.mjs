@@ -93,6 +93,21 @@ test('role-neutral detail components render the folio, tier, dossier, ledger, an
   assert.match(html, /140 MockUSDC/)
 })
 
+test('detail frame omits the ledger column when no ledger is provided', () => {
+  const html = renderToStaticMarkup(createElement(CampaignDetailFrame, {
+    campaignId: campaign.id,
+    activeTab: 'production',
+    onTabChange: () => {},
+    alerts: null,
+    main: createElement('div', null, 'production content'),
+    ledger: null,
+  }))
+
+  assert.match(html, /production content/)
+  assert.doesNotMatch(html, /monograph-ledger/)
+  assert.doesNotMatch(html, /Sổ công chứng ký quỹ/)
+})
+
 test('dossier list renders each supplied plan without financial actions', () => {
   const html = renderToStaticMarkup(createElement(CampaignDossierList, {
     contentOutline: 'Outline body', budgetPlan: 'Budget body', evidencePlan: 'Evidence body',

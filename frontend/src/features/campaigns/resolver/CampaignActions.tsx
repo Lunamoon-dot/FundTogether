@@ -132,6 +132,7 @@ export function ResolverCampaignActions({
             : [activeId, state.productionHash, accepted],
         )}>{accepted ? 'Duyệt' : 'Từ chối'} {state.state === CAMPAIGN_CHAIN_STATE.RELEASE_REVIEW ? 'PDF cuối' : 'bằng chứng sản xuất'}</button>)}
       </div>}
+      <DisbursementPanel campaignId={campaignId} userId={userId} mode="resolver" chain={chain} transaction={transaction} onRefresh={onRefresh} />
     </section>;
   }
 
@@ -166,7 +167,6 @@ export function ResolverCampaignActions({
     />
     {canFinalizeFunding && <div className="monograph-card space-y-2"><h2 className="monograph-card__title">Kết quả gây quỹ</h2><p className="text-sm">Deadline đã qua. Contract sẽ tự quyết định đạt hay không đạt dựa trên raised và goal.</p><button type="button" className="button button--secondary" disabled={busy} onClick={() => void transaction.send('finalizeFunding', [activeId])}>Chốt kết quả khi hết hạn gây quỹ</button></div>}
     {canStartRefunds && <div className="monograph-card space-y-2"><h2 className="monograph-card__title">Mở hoàn tiền</h2><p className="text-sm">Policy hoặc challenge đã đủ điều kiện mở refund.</p><button type="button" className="button button--secondary" disabled={busy} onClick={() => void transaction.send('startRefunds', [activeId])}>Mở hoàn tiền</button></div>}
-    <DisbursementPanel campaignId={campaignId} userId={userId} mode="resolver" chain={chain} transaction={transaction} onRefresh={onRefresh} />
     <CompletionSettlementPanel campaignId={campaignId} userId={userId} mode="resolver" chain={chain} transaction={transaction} onRefresh={onRefresh} />
   </>;
 }

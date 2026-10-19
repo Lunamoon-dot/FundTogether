@@ -27,6 +27,18 @@ test('public workspace keeps public evidence and entitlement reads user-scoped',
   assert.match(source, /CompletionSettlementPanel/)
 })
 
+test('public workspace keeps the ledger on overview and payout dossier on production', () => {
+  const source = read('public/CampaignPage.tsx')
+  const overviewStart = source.indexOf("{activeTab === 'overview'")
+  const productionStart = source.indexOf("{activeTab === 'production'")
+
+  assert.ok(overviewStart >= 0)
+  assert.ok(productionStart > overviewStart)
+  assert.doesNotMatch(source.slice(overviewStart, productionStart), /DisbursementPanel/)
+  assert.match(source.slice(productionStart), /DisbursementPanel/)
+  assert.match(source, /ledger=\{activeTab === 'overview'\s*\?/)
+})
+
 test('backer actions own pledge, refund, challenge, and entitlement controls', () => {
   const source = read('backer/CampaignActions.tsx')
 

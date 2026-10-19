@@ -65,7 +65,7 @@ export function AdminCampaignOperationsPage({ id, session, initialTab = 'overvie
       {activeTab === 'activity' && <div className="monograph-card space-y-3"><span className="monograph-card__kicker">ADMIN · READ ONLY</span><h2 className="monograph-card__title">Không có quyết định tài chính</h2><p className="monograph-card__desc">Phản hồi và quyết định Resolver được xem ở đúng workspace vai trò; Admin không ký thay Resolver.</p></div>}
       <details className="monograph-technical-details"><summary>Chi tiết kỹ thuật &amp; projection</summary><div className="monograph-technical-details__body">Commitment Hash: <code className="campaign-hash">{item.commitmentHash}</code><br />{chain.data?.onchainCampaignId && <>ID on-chain: <code>#{chain.data.onchainCampaignId}</code></>}</div></details>
     </>}
-    ledger={<CampaignLedger campaign={item} chain={chain.data ?? null} />}
+    ledger={activeTab === 'overview' ? <CampaignLedger campaign={item} chain={chain.data ?? null} /> : null}
   />;
 }
 
