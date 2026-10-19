@@ -2,7 +2,8 @@ import type React from 'react';
 import type { AccountSession } from '../../lib/api/auth';
 import { resolveCampaignDetailRoute } from './campaignRoutes';
 import './PublicArea.css';
-import { resolveWorkspaceRole, WorkspaceShell } from '../campaigns/shared/workspace/WorkspaceShell';
+import { WorkspaceShell } from '../campaigns/shared/workspace/WorkspaceShell';
+import { resolveWorkspaceRole } from '../campaigns/shared/workspace/workspaceRole';
 
 export interface PublicAreaProps {
   path: string;

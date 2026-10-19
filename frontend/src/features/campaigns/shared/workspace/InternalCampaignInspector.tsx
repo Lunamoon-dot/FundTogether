@@ -1,6 +1,6 @@
 import { formatUnits } from 'viem';
 import type { CampaignChain, CampaignPreview } from '../../api/campaigns';
-import type { WorkspaceRole } from './WorkspaceShell';
+import type { WorkspaceRole } from './workspaceRole';
 
 export interface InternalCampaignInspectorProps {
   role: WorkspaceRole;

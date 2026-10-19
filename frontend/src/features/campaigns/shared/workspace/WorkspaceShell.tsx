@@ -1,9 +1,8 @@
 import type React from 'react';
 import type { AccountSession } from '../../../../lib/api/auth';
 import type { ResolvedCampaignDetailRoute } from '../../../explore/campaignRoutes';
+import type { WorkspaceRole } from './workspaceRole';
 import './workspace.css';
-
-export type WorkspaceRole = 'creator' | 'resolver' | 'admin';
 
 interface WorkspaceNavItem {
   label: string;
@@ -48,13 +47,6 @@ const workspaceMeta: Record<WorkspaceRole, { label: string; description: string;
     ],
   },
 };
-
-export function resolveWorkspaceRole(path: string, detail: ResolvedCampaignDetailRoute | null): WorkspaceRole | null {
-  if (detail?.workspace === 'creator' || path === '/campaigns/creator' || path.startsWith('/campaigns/creator/')) return 'creator';
-  if (detail?.workspace === 'resolver' || path === '/campaigns/resolver' || path.startsWith('/campaigns/resolver/')) return 'resolver';
-  if (detail?.workspace === 'admin' || path === '/admin' || path === '/campaigns/admin' || path.startsWith('/admin/')) return 'admin';
-  return null;
-}
 
 export interface WorkspaceShellProps {
   role: WorkspaceRole;

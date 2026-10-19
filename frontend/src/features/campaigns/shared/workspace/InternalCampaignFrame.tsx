@@ -3,7 +3,7 @@ import { formatUnits } from 'viem';
 import type { CampaignChain, CampaignPreview } from '../../api/campaigns';
 import type { CampaignDetailTab } from '../../../explore/campaignRoutes';
 import { InternalCampaignInspector } from './InternalCampaignInspector';
-import type { WorkspaceRole } from './WorkspaceShell';
+import type { WorkspaceRole } from './workspaceRole';
 
 export interface InternalCampaignFrameProps {
   role: WorkspaceRole;
