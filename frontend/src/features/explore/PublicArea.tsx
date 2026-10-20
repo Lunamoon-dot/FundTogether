@@ -4,6 +4,7 @@ import { AppShell, type PublicAreaProps } from './AppShell';
 import { resolveCampaignDetailRoute } from './campaignRoutes';
 import './PublicArea.css';
 import { VNextProtocolPage } from '../campaigns/vnext/VNextProtocolPage';
+import { VNextJudgePage } from '../campaigns/vnext/VNextJudgePage';
 
 const AccountAccess = lazy(() => import('../auth/AccountAccess').then(module => ({ default: module.AccountAccess })));
 const PublicCampaignPage = lazy(() => import('../campaigns/public/CampaignPage').then(module => ({ default: module.PublicCampaignPage })));
@@ -42,7 +43,8 @@ export function PublicArea(props: PublicAreaProps) {
   const isCampaignResolver = path === '/campaigns/resolver';
   const isCampaignJudge = path === '/campaigns/judge';
   const isVNext = path === '/campaigns/vnext' || path.startsWith('/campaigns/vnext/');
-  const vnextCampaignId = path.startsWith('/campaigns/vnext/') ? path.slice('/campaigns/vnext/'.length) : undefined;
+  const isVNextJudge = path === '/campaigns/vnext/judge';
+  const vnextCampaignId = path.startsWith('/campaigns/vnext/') && !isVNextJudge ? path.slice('/campaigns/vnext/'.length) : undefined;
   const campaignDetail = resolveCampaignDetailRoute(path);
   const history = path === '/campaigns/history';
   const historicalEntitlements = path === '/campaigns/history/entitlements';
@@ -59,7 +61,8 @@ export function PublicArea(props: PublicAreaProps) {
         <Feed key={history ? 'funded' : 'feed'} initialFilter={history ? 'funded' : 'all'} />
       )}
       {isCampaignCommunityReview && <CommunityReviewPage />}
-      {isVNext && <VNextProtocolPage campaignId={vnextCampaignId || undefined} />}
+      {isVNext && !isVNextJudge && <VNextProtocolPage campaignId={vnextCampaignId || undefined} />}
+      {isVNextJudge && <VNextJudgePage />}
       {campaignDetail && (
         campaignDetail.legacy ? (
           <LegacyCampaignRedirect href={campaignDetail.canonicalHref} />
@@ -190,6 +193,7 @@ export function PublicArea(props: PublicAreaProps) {
         !isCampaignResolver &&
         !isCampaignJudge &&
         !isVNext &&
+        !isVNextJudge &&
         !account && (
           <section className="panel public-empty">
             <h1>Không tìm thấy trang</h1>

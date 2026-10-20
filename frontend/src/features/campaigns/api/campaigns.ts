@@ -127,13 +127,31 @@ export interface DeploymentManifest {
 }
 export interface VNextDeployment {
   configured: boolean;
+  protocolKind?: 'FUNDTOGETHER_VNEXT';
   chainId?: 31339;
+  rpcUrl?: string;
+  abiVersion?: string;
+  abiHash?: `0x${string}`;
+  tokenDecimals?: 6;
+  confirmations?: 1;
   campaignEscrow?: `0x${string}`;
   juryRegistry?: `0x${string}`;
   juryReview?: `0x${string}`;
+  randomnessProvider?: `0x${string}`;
   tokenAddress?: `0x${string}`;
   policyHash?: `0x${string}`;
-  abiVersion?: string;
+  genesisHash?: `0x${string}`;
+  campaignCodeHash?: `0x${string}`;
+  registryCodeHash?: `0x${string}`;
+  reviewCodeHash?: `0x${string}`;
+  tokenCodeHash?: `0x${string}`;
+  deploymentBlockNumber?: string;
+  deploymentBlockHash?: `0x${string}`;
+}
+export interface VNextTransactionStatus {
+  txHash: `0x${string}`;
+  state: 'INDEXING' | 'ON_CHAIN_CONFIRMED';
+  eventCount: number;
 }
 export interface VNextCampaignProjection {
   streamId: string;
@@ -163,6 +181,29 @@ export interface VNextMilestoneProjection {
   state: number;
   paid: boolean;
 }
+export interface VNextJudgeAssignment {
+  reviewCaseId: string;
+  roundId: string;
+  courtId: string;
+  slot: number;
+  judgeAddress: string;
+}
+export interface VNextAssignedReview {
+  streamId: string;
+  reviewCaseId: string;
+  rootCaseId: string;
+  campaignId: string;
+  milestoneId: string;
+  evidenceRevision: string;
+  roundId: string;
+  creator: string;
+  enrolledCount: string;
+  outcome: number | null;
+  finalized: boolean;
+  lastBlockNumber: string;
+  assignments: VNextJudgeAssignment[];
+}
+export type VNextReviewWithAssignments = VNextAssignedReview;
 export interface CampaignChain {
   deployment: DeploymentManifest; status: 'ON_CHAIN_CONFIRMED' | 'ORPHANED' | 'NOT_PUBLISHED'; onchainCampaignId: string | null;
   bindingTransactionHash: `0x${string}` | null;
@@ -323,6 +364,9 @@ export const campaignApi = {
   vnextDeployment: async () => (await http.get<VNextDeployment>('/v1/fundtogether/vnext/deployment')).data,
   vnextCampaign: async (id: string, signal?: AbortSignal) => (await http.get<VNextCampaignProjection>(`/v1/fundtogether/vnext/campaigns/${id}`, { signal })).data,
   vnextMilestones: async (id: string, signal?: AbortSignal) => (await http.get<VNextMilestoneProjection[]>(`/v1/fundtogether/vnext/campaigns/${id}/milestones`, { signal })).data,
+  vnextAssignedReviews: async (signal?: AbortSignal) => (await http.get<VNextAssignedReview[]>('/v1/fundtogether/vnext/reviews/assigned', { signal })).data,
+  vnextReviews: async (signal?: AbortSignal) => (await http.get<VNextReviewWithAssignments[]>('/v1/fundtogether/vnext/reviews', { signal })).data,
+  vnextTransaction: async (txHash: string, signal?: AbortSignal) => (await http.get<VNextTransactionStatus>(`/v1/fundtogether/vnext/transactions/${txHash}`, { signal })).data,
   chain: async (id: string, signal?: AbortSignal) => (await http.get<CampaignChain>(`${base}/campaigns/${id}/chain`, { signal })).data,
   operations: async (scope: 'creator' | 'judge' | 'resolver' | 'admin', signal?: AbortSignal) =>
     (await http.get<OperationSummary[]>(`${base}/operations/${scope}`, { signal })).data,

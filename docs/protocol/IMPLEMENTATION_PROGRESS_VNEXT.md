@@ -6,6 +6,7 @@
 
 **Roadmap:** [A–Z VNext build roadmap](../superpowers/plans/2026-10-20-vnext-a-z-build-roadmap.md)
 **Specification:** [Protocol Specification V1](FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_V1.md)
+**Wallet journey slice:** [Wallet Journeys Implementation Spec](../superpowers/specs/2026-10-20-vnext-wallet-journeys-design.md)
 **Remediation registry:** [Parameter Registry V2](parameters-v2-remediation.md)
 **Runtime boundary:** local Anvil/MockUSDC only; no public-chain acceptance
 
@@ -35,7 +36,7 @@ so the focused Solidity suite must be rerun before this delta is called green.
 | P0/P1 remediation | `JuryReview.sol`, `JuryRegistry.sol`, `CampaignEscrowVNext.sol` | Retry/settlement/stake/liveness/budget/refund/court-order regressions covered; full Foundry suite: 117 passed |
 | Q/R | `vnext-indexer.service.ts`, `vnext-event-projector.ts`, VNext Drizzle schema | Persistent event/projection/checkpoint transaction; replay/crash/refund/completion tests: 8 passed; real PostgreSQL replay check passed |
 | S/T | `vnext.controller.ts`, `vnext-evidence-integrity.ts` | Read-only projection API, SHA-256 evidence check and focused evidence tests added |
-| U/V/W/X | `VNextProtocolPage.tsx` | Read-only VNext protocol/campaign projection surface added; Creator/Backer/Judge wallet journeys remain incomplete |
+| U/V/W/X | `VNextProtocolPage.tsx`, `VNextCreateCampaignPanel.tsx`, `VNextActionPanel.tsx`, `VNextJudgePage.tsx` | VNext Creator campaign creation/publication finalization, Backer actions and Judge stake/commit–reveal surface added; full journey and runtime acceptance remain incomplete |
 
 ## Current executable behavior
 
@@ -77,6 +78,13 @@ The current VNext contract slice can:
   release unenrolled reservations after the enrollment deadline;
 - preserve `R = P + F + E` in the tested partial-payout/refund and failed-token
   transfer paths.
+- expose permissionless Creator/Backer actions from the VNext projection page;
+  transaction UI distinguishes wallet request, submitted hash, successful
+  receipt and canonical indexer confirmation;
+- expose a separate VNext Judge route for stake deposit/withdrawal,
+  case-stake reservation, enrollment and assigned commit–reveal actions;
+- validate VNext genesis, deployed bytecode and campaign ABI identity before a
+  wallet transaction is signed.
 
 ## Not implemented yet
 
@@ -85,12 +93,13 @@ The following remain incomplete and must not be inferred from the passing slice:
 - non-reveal penalty remains the explicitly frozen local value `0`; production
   penalty economics and service-fee funding are not approved;
 - full appeal/retry contribution eligibility and evidence availability wiring
-  in the backend;
+  in the backend and wallet journeys;
 - production batch/pull settlement and gas policy for the maximum 300-Judge
   snapshot;
 - complete invariant coverage for all review liveness and multi-court paths;
-- wallet transaction journeys for Creator, Backer and Judge, including
-  commit–reveal and reward claim;
+- complete Creator multi-milestone/evidence-storage journey,
+  Backer balances and refund entitlement reads, Judge reward claim and exact
+  assigned-dossier ACL;
 - fresh local runtime deployment and end-to-end acceptance.
 
 ## Verification record
@@ -128,7 +137,22 @@ The prior runtime acceptance evidence used local Anvil chain `31339` after
 deploying policy V2 and is not a current acceptance run for this branch.
 Frontend evidence: `npm test` → 199 passed;
 `npm run build` completed with only the existing large-bundle warning.
+
+Current policy-freeze branch evidence after the wallet-journey slice:
+
+```text
+frontend: npm test -> 205 passed, 0 failed
+frontend: npm run build -> success (existing large-bundle warning)
+backend: focused VNext transaction-status Jest helper -> 3 passed, 0 failed
+backend: npm run build -> success
+contracts: Forge/Anvil verification remains pending because the tools are not
+available in this Windows environment.
 ```
+
+The current backend/frontend results do not imply contract deployment or
+runtime acceptance. The VNext transaction endpoint reports `INDEXING` until a
+canonical indexed event exists; a successful token approval intentionally ends
+at the receipt boundary because the VNext indexer does not own ERC-20 events.
 
 Every later gate must update this file with the exact command and result. A
 green test is evidence only for the behavior it covers.

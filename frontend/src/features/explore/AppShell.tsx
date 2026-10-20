@@ -34,6 +34,7 @@ export function AppShell({
   const isCampaignResolver = path === '/campaigns/resolver' || campaignDetail?.workspace === 'resolver';
   const isCampaignJudge = path === '/campaigns/judge';
   const isVNext = path === '/campaigns/vnext' || path.startsWith('/campaigns/vnext/');
+  const isVNextJudge = path === '/campaigns/vnext/judge';
   const isAccount = path === '/account' || path === '/workspace';
 
   const hasAdminRole = session?.roles.includes('ADMIN') ?? false;
@@ -97,6 +98,9 @@ export function AppShell({
               )}
               <a href="#/campaigns/judge" aria-current={isCampaignJudge ? 'page' : undefined}>
                 Judge cases
+              </a>
+              <a href="#/campaigns/vnext/judge" aria-current={isVNextJudge ? 'page' : undefined}>
+                VNext Judge
               </a>
               {hasAdminRole && (
                 <a href="#/admin" aria-current={isAdmin ? 'page' : undefined}>

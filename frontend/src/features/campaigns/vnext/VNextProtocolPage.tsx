@@ -1,11 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { campaignApi } from '../api/campaigns';
 import { getErrorMessage } from '../../../lib/api/error';
+import { useAccountSession } from '../../auth/AccountSessionProvider';
+import { VNextActionPanel } from './VNextActionPanel';
+import { VNextCreateCampaignPanel } from './VNextCreateCampaignPanel';
 
 const campaignStates = ['CREATED', 'FUNDING', 'FUNDED', 'MILESTONES_RUNNING', 'COMPLETED', 'REFUNDING'];
 const milestoneStates = ['PENDING', 'SUBMITTED', 'REVIEW_ENROLLMENT', 'BASE_REVIEW', 'RETRY_PENDING', 'PROVISIONAL_RULING', 'APPEAL_WINDOW', 'FINAL_RULING', 'PAYABLE', 'CHALLENGE_WINDOW', 'PAID', 'CORRECTION', 'RESUBMIT', 'TERMINAL'];
 
 export function VNextProtocolPage({ campaignId }: { campaignId?: string }) {
+  const { session } = useAccountSession();
   const deployment = useQuery({ queryKey: ['vnext-deployment'], queryFn: campaignApi.vnextDeployment, retry: false });
   const campaign = useQuery({
     queryKey: ['vnext-campaign', campaignId],
@@ -37,6 +41,7 @@ export function VNextProtocolPage({ campaignId }: { campaignId?: string }) {
       </section>
 
       {campaignId && campaign.error && <p role="alert" className="monograph-alert monograph-alert--error">{getErrorMessage(campaign.error)}</p>}
+      {!campaignId && deployment.data?.configured && <VNextCreateCampaignPanel deployment={deployment.data} />}
       {campaign.data && <>
         <section className="monograph-card space-y-3">
           <span className="monograph-card__kicker">CANONICAL PROJECTION</span>
@@ -54,6 +59,19 @@ export function VNextProtocolPage({ campaignId }: { campaignId?: string }) {
             </article>
           )) : <p className="muted">Chưa có milestone projection.</p>}
         </section>
+        {deployment.data?.configured && campaignId && campaign.data && (
+          <VNextActionPanel
+            campaignId={campaignId!}
+            userId={session?.userId}
+            campaign={campaign.data}
+            milestones={milestones.data ?? []}
+            deployment={deployment.data}
+            onRefresh={() => {
+              void campaign.refetch();
+              void milestones.refetch();
+            }}
+          />
+        )}
       </>}
     </div>
   );
