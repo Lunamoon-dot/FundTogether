@@ -16,7 +16,7 @@ permissionless expiry, contributor conflict exclusion, publication appeals for
 Creator verdict-fail cases, deterministic reward-dust allocation and disabled
 challenge entrypoints. Forge is unavailable on the Windows host PATH, but the
 checked-in Foundry container is available for reproducible contract builds and
-tests. Fresh local runtime acceptance remains separate.
+tests. Full web/API/browser acceptance remains separate.
 
 ## Implemented and verified slices
 
@@ -108,7 +108,9 @@ The following remain incomplete and must not be inferred from the passing slice:
   Challenger evidence owner, but inaccessible-evidence timeout policy is not
   yet wired; on-chain reward economics and production reward settlement policy
   also remain open;
-- fresh local runtime deployment and end-to-end acceptance.
+- full web/API/browser runtime acceptance and long-lived service orchestration;
+  the isolated VNext chain/deploy/indexer acceptance now passes, but it does
+  not yet prove the complete browser journey or production service topology.
 
 ## Verification record
 
@@ -166,10 +168,14 @@ frontend: npm test -> 205 passed, 0 failed
 frontend: npm run build -> success (existing large-bundle warning)
 frontend: VNext static journey tests -> 6 passed, 0 failed after assigned-case read boundary
 backend: explicit VNext Jest config -> 6 suites, 25 passed, 0 failed; npm run build -> success; migration/service tests -> 4 passed
+backend: vnext-acceptance.test.cjs -> 1 passed; migrate-isolated.cjs -> success;
+deploy-vnext.cjs --create -> success; vnext-acceptance.cjs -> PASS for one
+payout and one refund campaign, persistent projection checks included.
 contracts: Docker Foundry forge build -> success (solc 0.8.24); full
 forge test -> 124 passed, 0 failed, 0 skipped; generated VNext ABIs refreshed.
-The host still lacks native Forge/Anvil, so these are container-backed contract
-checks rather than a local runtime acceptance run.
+The host still lacks native Forge/Anvil; contract checks are container-backed.
+The separate acceptance run used a temporary Docker Anvil plus the existing
+local PostgreSQL service and passed the persistent projection assertions.
 ```
 
 The repository's default backend `npm test` currently discovers zero tests due

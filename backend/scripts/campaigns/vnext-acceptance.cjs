@@ -41,6 +41,10 @@ function loadManifest() {
   return JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 }
 
+function findCampaignProjection(rows, streamId, campaignId) {
+  return rows.find(row => row.streamId === streamId && row.onchainCampaignId === campaignId.toString());
+}
+
 async function send(client, wallet, request) {
   const hash = await wallet.writeContract(request);
   const receipt = await client.waitForTransactionReceipt({ hash, confirmations: 1 });
@@ -158,9 +162,10 @@ async function syncPersistentProjection({ client, manifest, campaignIds }) {
     const db = drizzle(pool, { schema });
     const indexer = new VNextIndexerService(db, { manifest, client });
     await indexer.runOnce();
+    const streamId = indexer.streamId();
     for (const campaignId of campaignIds) {
       const rows = await db.select().from(schema.vnextCampaignProjections);
-      const row = rows.find(item => item.onchainCampaignId === campaignId.toString());
+      const row = findCampaignProjection(rows, streamId, campaignId);
       assert.ok(row, `missing persistent projection for campaign ${campaignId}`);
       const expectedState = campaignId === campaignIds[0] ? 4 : 5;
       assert.equal(row.state, expectedState);
@@ -258,4 +263,4 @@ async function main() {
 
 if (require.main === module) main().catch(error => { console.error(error.stack || error.message); process.exitCode = 1; });
 
-module.exports = { loadManifest, loadPolicy, commitment, resolvePass };
+module.exports = { commitment, findCampaignProjection, loadManifest, loadPolicy, resolvePass };
