@@ -260,6 +260,17 @@ async function main() {
     'duplicate backer refund',
   );
 
+  const noQuorum = await createCampaign({ client, wallet: deployerWallet, manifest, goal, evidenceHash: keccak256(toHex('no-quorum-publication')), duration: 30n * 24n * 60n * 60n });
+  await advance(client, policy.judgeEnrollmentWindowSeconds + 1);
+  let retryReceipt = await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'retryPublication', args: [noQuorum.id] });
+  let retryCaseId = eventArgs(retryReceipt, campaignArtifact.abi, 'PublicationReviewCaseChanged').reviewCaseId;
+  await advance(client, policy.judgeEnrollmentWindowSeconds + 1);
+  retryReceipt = await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'retryPublication', args: [noQuorum.id] });
+  retryCaseId = eventArgs(retryReceipt, campaignArtifact.abi, 'PublicationReviewCaseChanged').reviewCaseId;
+  await advance(client, policy.judgeEnrollmentWindowSeconds + 1);
+  await send(client, deployerWallet, { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'finalizeProtocolFailure', args: [retryCaseId] });
+  assert.equal(await read(client, manifest.juryReview, reviewArtifact.abi, 'finalOutcome', [noQuorum.publicationCaseId]), 3);
+
   assert.equal(await read(client, manifest.campaignEscrow, campaignArtifact.abi, 'campaignState', [first.id]), 4);
   assert.equal(await read(client, manifest.campaignEscrow, campaignArtifact.abi, 'campaignPaidOut', [first.id]), goal);
   assert.equal(await read(client, manifest.campaignEscrow, campaignArtifact.abi, 'campaignState', [second.id]), 5);
