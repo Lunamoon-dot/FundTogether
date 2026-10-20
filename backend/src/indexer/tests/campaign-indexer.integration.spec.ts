@@ -56,11 +56,12 @@ describe("Campaign canonical ledger on isolated PostgreSQL and real local Anvil"
     const campaignArtifact = JSON.parse(readFileSync(resolve(root, "contracts/out/FundTogetherCampaign.sol/FundTogetherCampaign.json"), "utf8"));
     const tokenReceipt = await client.waitForTransactionReceipt({ hash: await wallet(accounts[0]).deployContract({ abi: token.abi, bytecode: token.bytecode.object }) });
     expect(tokenReceipt.status).toBe("success"); tokenAddress = tokenReceipt.contractAddress!;
-    const deployment = await client.waitForTransactionReceipt({ hash: await wallet(accounts[0]).deployContract({ abi: campaignArtifact.abi, bytecode: campaignArtifact.bytecode.object, args: [tokenAddress, accounts[1], accounts[2]] }) });
+    const judges = accounts.slice(6, 10);
+    const deployment = await client.waitForTransactionReceipt({ hash: await wallet(accounts[0]).deployContract({ abi: campaignArtifact.abi, bytecode: campaignArtifact.bytecode.object, args: [tokenAddress, accounts[1], accounts[2], judges] }) });
     expect(deployment.status).toBe("success"); address = deployment.contractAddress!;
-    connection = { client: client as PublicClient, manifest: parseDeploymentManifest({ protocolKind: "CAMPAIGNS", chainId: 31339, rpcUrl: "http://127.0.0.1:9548", abiVersion: "campaigns-local-v6",
+    connection = { client: client as PublicClient, manifest: parseDeploymentManifest({ protocolKind: "CAMPAIGNS", chainId: 31339, rpcUrl: "http://127.0.0.1:9548", abiVersion: "campaigns-local-judge-v1",
       abiHash: campaignAbiHash, policyHash: campaignPolicyHash, tokenDecimals: 6, confirmations: 1, contractAddress: address, tokenAddress,
-      resolver: accounts[1], backupResolver: accounts[2], genesisHash: (await client.getBlock({ blockNumber: 0n })).hash,
+      resolver: accounts[1], backupResolver: accounts[2], judges, genesisHash: (await client.getBlock({ blockNumber: 0n })).hash,
       contractCodeHash: keccak256((await client.getCode({ address }))!), tokenCodeHash: keccak256((await client.getCode({ address: tokenAddress }))!),
       deploymentBlockNumber: deployment.blockNumber.toString(), deploymentBlockHash: deployment.blockHash,
     }) };

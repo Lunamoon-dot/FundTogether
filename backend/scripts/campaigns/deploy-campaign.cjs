@@ -22,17 +22,24 @@ async function deploy(client, wallet, artifact, args = []) {
 }
 
 function deploymentRoles(accounts) {
-  if (!Array.isArray(accounts) || accounts.length < 3) {
-    throw new Error('FundTogether requires primary resolver, backup resolver, and creator accounts');
+  if (!Array.isArray(accounts) || accounts.length < 10) {
+    throw new Error('FundTogether requires primary resolver, backup resolver, creator, and four Judge accounts');
   }
-  return { deployer: accounts[0], resolver: accounts[1], backupResolver: accounts[2] };
+  const judges = accounts.slice(6, 10);
+  const uniqueJudges = new Set(judges.map(account => account.toLowerCase()));
+  if (uniqueJudges.size !== judges.length || judges.some(account => [accounts[1], accounts[2]].includes(account))) {
+    throw new Error('FundTogether Judge pool must contain four unique accounts separate from Resolver wallets');
+  }
+  return { deployer: accounts[0], resolver: accounts[1], backupResolver: accounts[2], judges };
 }
 
 async function verifyFixtureRoleMapping(client, manifest) {
   const accounts = await client.request({ method: 'eth_accounts' });
   const expected = deploymentRoles(accounts);
   if (manifest.resolver.toLowerCase() !== expected.resolver.toLowerCase()
-    || manifest.backupResolver.toLowerCase() !== expected.backupResolver.toLowerCase()) {
+    || manifest.backupResolver.toLowerCase() !== expected.backupResolver.toLowerCase()
+    || manifest.judges.length !== expected.judges.length
+    || manifest.judges.some((judge, index) => judge.toLowerCase() !== expected.judges[index].toLowerCase())) {
     throw new Error('FundTogether manifest uses an outdated local account mapping; reset and redeploy the local chain');
   }
 }
@@ -61,15 +68,15 @@ async function main() {
   if (!String(await client.request({ method: 'web3_clientVersion' })).toLowerCase().includes('anvil')) throw new Error('Local unlocked Anvil required');
 
   const accounts = await client.request({ method: 'eth_accounts' });
-  const { deployer, resolver, backupResolver } = deploymentRoles(accounts);
+  const { deployer, resolver, backupResolver, judges } = deploymentRoles(accounts);
   const wallet = createWalletClient({ account: deployer, chain, transport: http(rpcUrl) });
   const tokenReceipt = await deploy(client, wallet, artifacts.tokenArtifact);
-  const campaignReceipt = await deploy(client, wallet, artifacts.artifact, [tokenReceipt.contractAddress, resolver, backupResolver]);
+  const campaignReceipt = await deploy(client, wallet, artifacts.artifact, [tokenReceipt.contractAddress, resolver, backupResolver, judges]);
   const manifest = parseDeploymentManifest({
     protocolKind: 'CAMPAIGNS',
     chainId: 31339,
     rpcUrl,
-    abiVersion: 'campaigns-local-v6',
+    abiVersion: 'campaigns-local-judge-v1',
     abiHash: artifacts.abiHash,
     policyHash: artifacts.policyHash,
     tokenDecimals: 6,
@@ -78,6 +85,7 @@ async function main() {
     tokenAddress: tokenReceipt.contractAddress,
     resolver,
     backupResolver,
+    judges,
     genesisHash: genesis.hash,
     contractCodeHash: keccak256(await client.getCode({ address: campaignReceipt.contractAddress })),
     tokenCodeHash: keccak256(await client.getCode({ address: tokenReceipt.contractAddress })),

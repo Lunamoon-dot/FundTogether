@@ -71,9 +71,10 @@ describe("Campaign digital delivery: real HTTP, PostgreSQL, MinIO and Anvil", ()
     const token = JSON.parse(readFileSync(resolve(root, "contracts/out/MockUSDC.sol/MockUSDC.json"), "utf8"));
     const contract = JSON.parse(readFileSync(resolve(root, "contracts/out/FundTogetherCampaign.sol/FundTogetherCampaign.json"), "utf8"));
     const tr = await client.waitForTransactionReceipt({ hash: await wallet(accounts[0]).deployContract({ abi: token.abi, bytecode: token.bytecode.object }) }); tokenAddress = tr.contractAddress!;
-    const cr = await client.waitForTransactionReceipt({ hash: await wallet(accounts[0]).deployContract({ abi: contract.abi, bytecode: contract.bytecode.object, args: [tokenAddress, accounts[1], accounts[2]] }) }); address = cr.contractAddress!;
-    const manifest = parseDeploymentManifest({ protocolKind: "CAMPAIGNS", chainId: 31339, rpcUrl: "http://127.0.0.1:9548", abiVersion: "campaigns-local-v6", abiHash: campaignAbiHash,
-      policyHash: campaignPolicyHash, tokenDecimals: 6, confirmations: 1, contractAddress: address, tokenAddress, resolver: accounts[1], backupResolver: accounts[2],
+    const judges = accounts.slice(6, 10);
+    const cr = await client.waitForTransactionReceipt({ hash: await wallet(accounts[0]).deployContract({ abi: contract.abi, bytecode: contract.bytecode.object, args: [tokenAddress, accounts[1], accounts[2], judges] }) }); address = cr.contractAddress!;
+    const manifest = parseDeploymentManifest({ protocolKind: "CAMPAIGNS", chainId: 31339, rpcUrl: "http://127.0.0.1:9548", abiVersion: "campaigns-local-judge-v1", abiHash: campaignAbiHash,
+      policyHash: campaignPolicyHash, tokenDecimals: 6, confirmations: 1, contractAddress: address, tokenAddress, resolver: accounts[1], backupResolver: accounts[2], judges,
       genesisHash: (await client.getBlock({ blockNumber: 0n })).hash, contractCodeHash: keccak256((await client.getCode({ address }))!), tokenCodeHash: keccak256((await client.getCode({ address: tokenAddress }))!),
       deploymentBlockNumber: cr.blockNumber.toString(), deploymentBlockHash: cr.blockHash });
     [owner, backer, resolver, stranger] = (await db.insert(schema.users).values(["creator", "backer", "resolver", "community"].map(name => ({ email: `${name}@delivery.test` }))).returning()).map(user => user.id);

@@ -54,7 +54,7 @@ const chain = {
   bindingTransactionHash: null,
   challenges: [],
   deployment: {
-    protocolKind: 'CAMPAIGNS', chainId: 31339, abiVersion: 'campaigns-local-v6', abiHash: '0xabi',
+    protocolKind: 'CAMPAIGNS', chainId: 31339, abiVersion: 'campaigns-local-judge-v1', abiHash: '0xabi',
     contractAddress: '0xcontract', tokenAddress: '0xtoken', resolver: '0xresolver', backupResolver: '0xbackup',
     genesisHash: '0xgenesis', contractCodeHash: '0xcode', policyHash: '0xpolicy',
   },

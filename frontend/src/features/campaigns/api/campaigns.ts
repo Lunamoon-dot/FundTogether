@@ -121,8 +121,8 @@ export interface CreatorVerificationInput {
 }
 
 export interface DeploymentManifest {
-  protocolKind: 'CAMPAIGNS'; chainId: 31339; abiVersion: 'campaigns-local-v6'; abiHash: `0x${string}`;
-  contractAddress: `0x${string}`; tokenAddress: `0x${string}`; resolver: `0x${string}`; backupResolver: `0x${string}`;
+  protocolKind: 'CAMPAIGNS'; chainId: 31339; abiVersion: 'campaigns-local-judge-v1'; abiHash: `0x${string}`;
+  contractAddress: `0x${string}`; tokenAddress: `0x${string}`; resolver: `0x${string}`; backupResolver: `0x${string}`; judges: `0x${string}`[];
   genesisHash: `0x${string}`; contractCodeHash: `0x${string}`; policyHash: `0x${string}`;
 }
 export interface CampaignChain {
