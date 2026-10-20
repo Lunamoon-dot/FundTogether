@@ -174,8 +174,9 @@ deploy-vnext.cjs --create -> success; vnext-acceptance.cjs -> PASS twice,
 including one fresh Anvil genesis plus a newly created isolated PostgreSQL
 database, with one payout and one refund campaign, duplicate payout/refund
 rejection, idempotent indexer replay and no-quorum retry-to-`PROTOCOL_FAIL`
-assertions. Temporary acceptance database and Anvil were removed after
-verification.
+assertions, plus a failed publication appeal resolved by a fresh Judge pool
+and a milestone correction revision. Temporary acceptance database and Anvil
+were removed after verification.
 contracts: Docker Foundry forge build -> success (solc 0.8.24); full
 forge test -> 124 passed, 0 failed, 0 skipped; generated VNext ABIs refreshed.
 The host still lacks native Forge/Anvil; contract checks are container-backed.
