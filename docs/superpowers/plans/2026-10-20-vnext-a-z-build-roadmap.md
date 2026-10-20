@@ -470,8 +470,8 @@ authorization, I4 stake coverage, I5 Judge uniqueness, I6 court integrity, I7
 slash bound, I8 finality, I9 refund solvency and I10 terminal liveness.
 
 - [x] Run `forge test --match-path test/invariant/VNext*.t.sol -vvv`.
-- [ ] Run fuzz tests with a recorded seed and configured depth.
-- [ ] Include arbitrary caller, repeated caller and deadline-jump sequences.
+- [x] Run fuzz tests with a recorded seed and configured depth.
+- [x] Include arbitrary caller, repeated caller and deadline-jump sequences.
 - [ ] Save failing seeds as regression tests, never lower the invariant.
 
 ### Gate O — Gas, batching and edge-case hardening
@@ -716,6 +716,7 @@ Anvil/PostgreSQL/MinIO runtime.
 - Update/create: `backend/scripts/campaigns/deploy-vnext.cjs`
 - Update/create: `backend/scripts/campaigns/migrate-isolated.cjs`
 - Create: `backend/scripts/campaigns/vnext-scenarios-e2e.cjs`
+- Create: `backend/scripts/campaigns/vnext-browser-e2e.cjs`
 - Create: `backend/scripts/campaigns/vnext-runtime-identity.test.cjs`
 
 **Required scenario:** fresh genesis → deploy MockUSDC and VNext contracts →

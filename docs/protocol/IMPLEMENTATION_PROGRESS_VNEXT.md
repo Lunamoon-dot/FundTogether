@@ -34,12 +34,12 @@ tests. Full web/API/browser acceptance remains separate.
 | K | `JuryReview.sol`, `CampaignEscrowVNext.sol` | Appeal hooks exist; the active local policy keeps the challenge window passive and disables challenge entrypoints |
 | L | `CampaignEscrowVNext.sol` | Payout/refund/challenge tests: 9 passed; conservation/failure-transfer fuzz suite: 3 passed |
 | O | `JuryReview.sol`, `JuryRegistry.sol`, `CampaignEscrowVNext.sol`, `parameters-v2-remediation.md` | Gas profiles for batches 1/2/10/32, 300-Judge capped settlement, resumable partial batches, wallet-isolated reward/refund claims, and SafeERC20/state-ordering review are recorded |
-| N (partial) | `contracts/test/invariant/VNextCampaignInvariant.t.sol`, `VNextJuryInvariant.t.sol` | Stateful conservation/payout and court uniqueness/stake invariants pass at 256 runs × 128,000 calls per harness; recorded-seed state-machine coverage remains open |
+| N (partial) | `contracts/test/invariant/VNextCampaignInvariant.t.sol`, `VNextJuryInvariant.t.sol`, `contracts/test/fuzz/VNextStateMachine.t.sol` | Stateful conservation/payout and court uniqueness/stake invariants pass at 256 runs × 128,000 calls per harness; recorded-seed state-machine fuzz passes with arbitrary callers, repeated actions and deadline jumps |
 | P | `DeployVNext.s.sol`, `deploy-vnext.cjs`, `verify-vnext-runtime.cjs`, `vnext-deployment.ts` | Foundry script compiles; runtime verifier/policy identity tests: 6 passed; one-time wiring is executable |
-| P0/P1 remediation | `JuryReview.sol`, `JuryRegistry.sol`, `CampaignEscrowVNext.sol` | Retry/settlement/stake/liveness/budget/refund/court-order regressions covered; current full Foundry suite: 134 passed |
+| P0/P1 remediation | `JuryReview.sol`, `JuryRegistry.sol`, `CampaignEscrowVNext.sol` | Retry/settlement/stake/liveness/budget/refund/court-order regressions covered; current full Foundry suite: 136 passed |
 | Q/R | `vnext-indexer.service.ts`, `vnext-event-projector.ts`, `IVNextEvents.sol`, VNext Drizzle schema | Persistent event/projection/checkpoint transaction; milestone review state/case-pointer events now project retry, appeal, ruling, correction and timeout transitions; Backer contribution/refund, challenge, court-summary and Judge ledger projections added; replay/crash/refund/completion tests remain the verification boundary |
 | S/T/X | `vnext.controller.ts`, `vnext-evidence.service.ts`, `vnext-evidence.controller.ts`, `vnext.schema.ts` | Read-only projection API now exposes authenticated Backer/Judge indexed read models, assigned-Judge review reads, challenge history, indexer checkpoint/lag status, plus private VNext case-evidence upload/read ACL, canonical hash verification, short-lived user-bound evidence tickets and explicit storage-timeout/retry status |
-| U/V/W/X | `VNextProtocolPage.tsx`, `VNextCreateCampaignPanel.tsx`, `VNextActionPanel.tsx`, `VNextJudgePage.tsx`, `VNextEvidencePanel.tsx` | VNext Creator campaign creation/publication finalization, private evidence, Backer actions and Judge stake/commit–reveal/reward surface added; Judge workspace now requests assigned cases only; isolated runtime acceptance passes, while full browser journey remains incomplete |
+| U/V/W/X | `VNextProtocolPage.tsx`, `VNextCreateCampaignPanel.tsx`, `VNextActionPanel.tsx`, `VNextJudgePage.tsx`, `VNextEvidencePanel.tsx`, `backend/scripts/campaigns/vnext-browser-e2e.cjs` | VNext Creator campaign creation/publication finalization, private evidence, Backer actions and Judge stake/commit–reveal/reward surface added; Judge workspace now requests assigned cases only; a real SIWE + EIP-6963 browser Creator-create journey passes twice from fresh Anvil genesis, while the full browser funding/review/payout journey remains incomplete |
 
 ## Current executable behavior
 
@@ -120,8 +120,9 @@ The following remain incomplete and must not be inferred from the passing slice:
   limitation, while the local API/UI now expose timeout/retry status without
   creating a ruling or moving funds;
 - full web/API/browser runtime acceptance and long-lived service orchestration;
-  the isolated VNext chain/deploy/indexer acceptance now passes, but it does
-  not yet prove the complete browser journey or production service topology.
+  the isolated VNext chain/deploy/indexer acceptance and the browser
+  Creator-create slice now pass, but they do not yet prove the complete
+  browser funding/review/payout journey or production service topology.
 
 ## Verification record
 
@@ -188,15 +189,20 @@ backend: VNext runtime boot -> `GET /health` returned `200`, protocol
 `FUNDTOGETHER_VNEXT`, chain `31339`, campaign escrow
 `0xdc64a140aa3e981100a9beca4e685f962f0cf6c9`
 backend: direct fresh-chain acceptance -> `PASS`, protocol `FUNDTOGETHER_VNEXT`, chain `31339`, payout campaign `0`, refund campaign `1`, contract balance `0`
-browser: Playwright Edge read-only VNext route -> deployment and indexer
-requests returned `200`; no legacy `/public/campaigns/vnext` request remains;
-guest `/auth/session` returned the expected `401`; wallet mutation journey
-was not run
+browser: `npm run test:vnext-browser` -> `PASS` twice from fresh Anvil
+genesis; real SIWE session, EIP-6963 test wallet link, VNext Creator campaign
+creation, receipt confirmation, canonical indexer polling and `CREATED`
+projection reload all passed; no legacy `/public/campaigns/vnext` request
+remained
 contracts: focused Gate O additions -> `BatchSettlement` 3 passed,
-`JuryRegistry` 14 passed, `PayoutRefund` 9 passed; full `forge test
---summary` -> 132 passed, 0 failed, 0 skipped
+`JuryRegistry` 14 passed, `PayoutRefund` 9 passed; the pre-fuzz full
+`forge test --summary` run -> 134 passed, 0 failed, 0 skipped
 contracts: Docker Foundry forge build -> success (solc 0.8.24); full
-forge test -> 134 passed, 0 failed, 0 skipped; generated VNext ABIs refreshed.
+forge test -> 136 passed, 0 failed, 0 skipped; generated VNext ABIs refreshed.
+contracts: `test/fuzz/VNextStateMachine.t.sol` -> 2 passed with a recorded
+`--fuzz-seed 0x5eed5eed`; the fuzz sequence runs 128 cases and includes
+arbitrary callers, repeated funding finalization/refund attempts and deadline
+jumps. Conservation is asserted after every attempted action.
 The host still lacks native Forge/Anvil; contract checks are container-backed.
 The acceptance run used a temporary Docker Anvil plus a newly created isolated
 PostgreSQL database and passed the persistent projection assertions; the
