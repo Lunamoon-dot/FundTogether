@@ -63,6 +63,25 @@ library VNextTypes {
         return outcome == ReviewOutcome.FINAL_PASS || outcome == ReviewOutcome.VERDICT_FAIL;
     }
 
+    function requiredCaseStake(uint256 minimumStakeFloor, uint256 riskMultiplierBps, uint256 riskValue)
+        internal
+        pure
+        returns (uint256)
+    {
+        uint256 riskStake = (riskValue * riskMultiplierBps + 9_999) / 10_000;
+        return riskStake > minimumStakeFloor ? riskStake : minimumStakeFloor;
+    }
+
+    function refundPrefixShare(
+        uint256 refundPool,
+        uint256 prefixContribution,
+        uint256 previousPrefixContribution,
+        uint256 refundSnapshot
+    ) internal pure returns (uint256) {
+        return refundPool * prefixContribution / refundSnapshot
+            - refundPool * previousPrefixContribution / refundSnapshot;
+    }
+
     /// @notice Stable identity for one review revision and round. Vote
     /// commitments add the chain, address, vote and salt around this identity.
     function reviewKey(

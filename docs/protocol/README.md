@@ -8,6 +8,7 @@ that the current checkout or local runtime already implements the protocol.
 
 - [FundTogether VNext Protocol Specification V1](FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_V1.md)
 - [Parameter Registry V1](parameters-v1.md)
+- [Remediation Parameter Registry V2](parameters-v2-remediation.md)
 - [Threat Model VNext](THREAT_MODEL_VNEXT.md)
 - [Canonical State Machine VNext](STATE_MACHINE_VNEXT.md)
 - [Implementation Progress VNext](IMPLEMENTATION_PROGRESS_VNEXT.md)
@@ -20,9 +21,13 @@ refund, failure handling, events and invariants.
 
 - The permissionless, stake-backed, milestone-gated direction is the current
   product decision.
-- Numeric values in the parameter registry are frozen local research inputs
-  under `fundtogether-vnext-local-v1`; they are not public-chain or real-money
-  financial policy.
+- Numeric values in the parameter registries are frozen local research inputs.
+  The current remediation deployment identity is
+  `fundtogether-vnext-local-v2-remediation`; it is not public-chain or
+  real-money financial policy.
+- The V2 registry supersedes V1 only for the explicitly remediated stake,
+  retry, settlement, budget, deadline, refund and indexer rules. It does not
+  reinterpret existing campaigns or review cases.
 - A protocol rule in this directory is not an implementation claim. Contract,
   indexer, backend, frontend and local-runtime evidence must be verified
   separately.

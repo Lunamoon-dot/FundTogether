@@ -36,6 +36,12 @@ contract VNextJuryRegistryTest is Test {
     function test_caseReservationCannotExceedAvailableStake() public {
         vm.startPrank(judge);
         registry.depositStake(50e6);
+        vm.stopPrank();
+        vm.prank(controller);
+        registry.registerCase(CASE_ID, block.timestamp + 1 days, 30e6, keccak256("BASE"));
+        vm.prank(controller);
+        registry.registerCase(keccak256("case-2"), block.timestamp + 1 days, 1, keccak256("BASE"));
+        vm.startPrank(judge);
         registry.reserveCaseStake(CASE_ID, 30e6);
         vm.expectRevert(JuryRegistry.InsufficientAvailableStake.selector);
         registry.reserveCaseStake(keccak256("case-2"), 21e6);
@@ -46,9 +52,69 @@ contract VNextJuryRegistryTest is Test {
         assertEq(registry.caseStake(CASE_ID, judge), 30e6);
     }
 
+    function test_unknownCaseCannotReserveStake() public {
+        vm.startPrank(judge);
+        registry.depositStake(50e6);
+        vm.expectRevert(JuryRegistry.UnknownCase.selector);
+        registry.reserveCaseStake(CASE_ID, 30e6);
+        vm.stopPrank();
+    }
+
+    function test_reserveBelowRequiredStakeReverts() public {
+        vm.prank(judge);
+        registry.depositStake(50e6);
+        vm.prank(controller);
+        registry.registerCase(CASE_ID, block.timestamp + 1 days, 30e6, keccak256("BASE"));
+
+        vm.prank(judge);
+        vm.expectRevert(JuryRegistry.InsufficientCaseStake.selector);
+        registry.reserveCaseStake(CASE_ID, 29e6);
+    }
+
+    function test_unenrolledStakeCanBeRecovered() public {
+        vm.prank(judge);
+        registry.depositStake(50e6);
+        vm.prank(controller);
+        registry.registerCase(CASE_ID, block.timestamp + 1 days, 30e6, keccak256("BASE"));
+
+        vm.prank(judge);
+        registry.reserveCaseStake(CASE_ID, 30e6);
+        vm.warp(block.timestamp + 1 days);
+
+        registry.releaseUnenrolledCaseStake(CASE_ID, judge);
+
+        assertEq(registry.availableStake(judge), 50e6);
+        assertEq(registry.lockedStake(judge), 0);
+        assertEq(registry.caseStake(CASE_ID, judge), 0);
+    }
+
+    function test_enrolledStakeCannotUsePreEnrollmentRecovery() public {
+        vm.prank(judge);
+        registry.depositStake(50e6);
+        vm.prank(controller);
+        registry.registerCase(CASE_ID, block.timestamp + 1 days, 30e6, keccak256("BASE"));
+
+        vm.prank(judge);
+        registry.reserveCaseStake(CASE_ID, 30e6);
+        vm.prank(controller);
+        registry.markCaseEnrollment(CASE_ID, judge);
+        vm.warp(block.timestamp + 1 days);
+
+        vm.expectRevert(JuryRegistry.CaseAlreadyEnrolled.selector);
+        registry.releaseUnenrolledCaseStake(CASE_ID, judge);
+    }
+
+    function test_caseRegistrationIsControllerOnly() public {
+        vm.prank(judge);
+        vm.expectRevert(JuryRegistry.NotReviewController.selector);
+        registry.registerCase(CASE_ID, block.timestamp + 1 days, 30e6, keccak256("BASE"));
+    }
+
     function test_onlyReviewControllerCanSettleAndCannotSettleTwice() public {
         vm.prank(judge);
         registry.depositStake(50e6);
+        vm.prank(controller);
+        registry.registerCase(CASE_ID, block.timestamp + 1 days, 30e6, keccak256("BASE"));
         vm.prank(judge);
         registry.reserveCaseStake(CASE_ID, 30e6);
 
@@ -72,6 +138,8 @@ contract VNextJuryRegistryTest is Test {
     function test_settlementCannotSlashMoreThanLockedCaseStake() public {
         vm.prank(judge);
         registry.depositStake(50e6);
+        vm.prank(controller);
+        registry.registerCase(CASE_ID, block.timestamp + 1 days, 30e6, keccak256("BASE"));
         vm.prank(judge);
         registry.reserveCaseStake(CASE_ID, 30e6);
 
@@ -83,6 +151,8 @@ contract VNextJuryRegistryTest is Test {
     function test_slashPoolCanBeCreditedAndClaimedExactlyOnce() public {
         vm.prank(judge);
         registry.depositStake(50e6);
+        vm.prank(controller);
+        registry.registerCase(CASE_ID, block.timestamp + 1 days, 30e6, keccak256("BASE"));
         vm.prank(judge);
         registry.reserveCaseStake(CASE_ID, 30e6);
 

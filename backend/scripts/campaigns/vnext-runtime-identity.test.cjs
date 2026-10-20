@@ -3,7 +3,22 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
-const { parseVNextDeploymentManifest, vnextCampaignAbiHash, vnextPolicyHash } = require('../../dist/src/blockchain/vnext-deployment.js');
+const { keccak256, toHex } = require('viem');
+const {
+  parseVNextDeploymentManifest,
+  verifyVNextDeployment,
+  vnextCampaignAbiHash,
+  vnextPolicyHash,
+} = require('../../dist/src/blockchain/vnext-deployment.js');
+
+const root = path.resolve(__dirname, '../../..');
+
+function loadPolicyRegistry() {
+  const source = fs.readFileSync(path.join(root, 'docs/protocol/parameters-v2-remediation.md'), 'utf8');
+  const match = source.match(/<!-- vnext-policy-json\s*([\s\S]*?)\s*-->/);
+  if (!match) throw new Error('VNext remediation policy JSON block is missing');
+  return JSON.parse(match[1]);
+}
 
 const hash = value => `0x${value.toString(16).padStart(64, '0')}`;
 const address = value => `0x${value.toString(16).padStart(40, '0')}`;
@@ -13,7 +28,7 @@ function manifest() {
     protocolKind: 'FUNDTOGETHER_VNEXT',
     chainId: 31339,
     rpcUrl: 'http://127.0.0.1:9548',
-    abiVersion: 'fundtogether-vnext-local-v1',
+    abiVersion: 'fundtogether-vnext-local-v2-remediation',
     abiHash: vnextCampaignAbiHash,
     policyHash: vnextPolicyHash,
     tokenDecimals: 6,
@@ -55,4 +70,75 @@ test('VNext manifest fixture can be serialized and read without mutation', () =>
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('VNext runtime identity matches the remediation policy registry', () => {
+  const policy = loadPolicyRegistry();
+  assert.deepEqual({
+    policyVersion: policy.policyVersion,
+    chainId: policy.chainId,
+    tokenDecimals: policy.tokenDecimals,
+    milestoneSubmissionWindowSeconds: policy.milestoneSubmissionWindowSeconds,
+    correctionWindowSeconds: policy.correctionWindowSeconds,
+    minimumStakeFloorUnits: policy.minimumStakeFloorUnits,
+    riskMultiplierBps: policy.riskMultiplierBps,
+  }, {
+    policyVersion: 'fundtogether-vnext-local-v2-remediation',
+    chainId: 31339,
+    tokenDecimals: 6,
+    milestoneSubmissionWindowSeconds: 7 * 24 * 60 * 60,
+    correctionWindowSeconds: 7 * 24 * 60 * 60,
+    minimumStakeFloorUnits: '10000000',
+    riskMultiplierBps: 500,
+  });
+  assert.equal(vnextPolicyHash, keccak256(toHex(policy.policyVersion)));
+});
+
+test('VNext verifier enforces remediation policy values and contract wiring', async () => {
+  const current = manifest();
+  const code = {
+    [current.campaignEscrow]: '0x6000',
+    [current.juryRegistry]: '0x6001',
+    [current.juryReview]: '0x6002',
+    [current.randomnessProvider]: '0x6003',
+    [current.tokenAddress]: '0x6004',
+  };
+  const verified = {
+    ...current,
+    campaignCodeHash: keccak256(code[current.campaignEscrow]),
+    registryCodeHash: keccak256(code[current.juryRegistry]),
+    reviewCodeHash: keccak256(code[current.juryReview]),
+    tokenCodeHash: keccak256(code[current.tokenAddress]),
+  };
+  const client = {
+    getChainId: async () => 31339,
+    getBlock: async ({ blockNumber }) => ({
+      hash: blockNumber === 0n ? verified.genesisHash : verified.deploymentBlockHash,
+    }),
+    getCode: async ({ address }) => code[address],
+    readContract: async ({ address, functionName }) => {
+      if (address === verified.campaignEscrow) {
+        return {
+          supportedToken: verified.tokenAddress,
+          reviewEngine: verified.juryReview,
+          protocolVersion: 1n,
+          policyHash: verified.policyHash,
+          milestoneSubmissionWindow: 7n * 24n * 60n * 60n,
+          correctionWindow: 7n * 24n * 60n * 60n,
+        }[functionName];
+      }
+      if (address === verified.juryReview) {
+        return {
+          registry: verified.juryRegistry,
+          campaignEscrow: verified.campaignEscrow,
+          protocolVersion: 1n,
+          MINIMUM_STAKE_FLOOR: 10_000_000n,
+          RISK_MULTIPLIER_BPS: 500n,
+        }[functionName];
+      }
+      return 6;
+    },
+  };
+
+  await verifyVNextDeployment(client, parseVNextDeploymentManifest(verified));
 });

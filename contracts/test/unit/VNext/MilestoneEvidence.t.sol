@@ -19,7 +19,7 @@ contract VNextMilestoneEvidenceTest is Test {
         token = new MockUSDC();
         review = new MockReviewFinality();
         escrow = new CampaignEscrowVNext(
-            address(token), address(review), 1, keccak256("policy-v1"), 2 days
+            address(token), address(review), 1, keccak256("policy-v1"), 2 days, 7 days, 7 days
         );
 
         uint256[] memory budgets = new uint256[](1);
@@ -89,17 +89,26 @@ contract VNextMilestoneEvidenceTest is Test {
         bytes32 correctionCase = escrow.milestoneReviewCase(campaignId, 0);
         review.setFinalOutcome(correctionCase, VNextTypes.ReviewOutcome.VERDICT_FAIL);
         escrow.syncFinalRuling(campaignId, 0);
+        vm.warp(block.timestamp + 7 days);
         escrow.finalizeCorrectionFailure(campaignId, 0);
         assertEq(uint8(escrow.campaignState(campaignId)), uint8(VNextTypes.CampaignState.REFUNDING));
     }
 
-    function test_backerCanOpenAppealButCreatorCannot() public {
+    function test_CreatorCanAppealOwnVerdictFail() public {
         vm.prank(creator);
-        escrow.submitMilestoneEvidence(campaignId, 0, keccak256("evidence-r1"));
+        bytes32 caseId = escrow.submitMilestoneEvidence(
+            campaignId, 0, keccak256("evidence-r1")
+        );
+        review.setReviewResult(caseId, 2);
 
         vm.prank(creator);
-        vm.expectRevert(CampaignEscrowVNext.AppealNotAllowed.selector);
-        escrow.openAppeal(campaignId, 0);
+        bytes32 appealCaseId = escrow.openAppeal(campaignId, 0);
+        assertTrue(appealCaseId != bytes32(0));
+    }
+
+    function test_backerCanOpenAppeal() public {
+        vm.prank(creator);
+        escrow.submitMilestoneEvidence(campaignId, 0, keccak256("evidence-r1"));
 
         bytes32 appealCaseId = escrow.openAppeal(campaignId, 0);
         assertTrue(appealCaseId != bytes32(0));
@@ -107,5 +116,18 @@ contract VNextMilestoneEvidenceTest is Test {
             uint8(escrow.milestoneState(campaignId, 0)),
             uint8(VNextTypes.MilestoneState.APPEAL_WINDOW)
         );
+    }
+
+    function test_CorrectionTimeoutOpensRefund() public {
+        vm.prank(creator);
+        bytes32 caseId = escrow.submitMilestoneEvidence(campaignId, 0, keccak256("evidence-r1"));
+        review.setFinalOutcome(caseId, VNextTypes.ReviewOutcome.VERDICT_FAIL);
+        escrow.syncFinalRuling(campaignId, 0);
+
+        vm.warp(block.timestamp + 7 days);
+        vm.prank(makeAddr("permissionless-timeout-caller"));
+        escrow.expireMilestoneSubmission(campaignId, 0);
+
+        assertEq(uint8(escrow.campaignState(campaignId)), uint8(VNextTypes.CampaignState.REFUNDING));
     }
 }

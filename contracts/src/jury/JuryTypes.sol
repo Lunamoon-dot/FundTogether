@@ -18,6 +18,21 @@ library JuryTypes {
         INVALID
     }
 
+    enum RoundStatus {
+        ENROLLMENT_OPEN,
+        SNAPSHOT_PENDING,
+        ASSIGNMENT_PENDING,
+        VOTING,
+        PROVISIONAL_PASS,
+        PROVISIONAL_FAIL,
+        RETRY_ELIGIBLE,
+        APPEAL_WINDOW,
+        FINAL_PASS,
+        VERDICT_FAIL,
+        PROTOCOL_FAIL,
+        SETTLED
+    }
+
     enum SeatState {
         AVAILABLE,
         CASE_LOCKED,

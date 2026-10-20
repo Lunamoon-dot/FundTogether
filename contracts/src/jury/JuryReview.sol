@@ -21,6 +21,8 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
     using SafeERC20 for IERC20;
 
     uint256 public immutable protocolVersion;
+    uint256 public constant MINIMUM_STAKE_FLOOR = 10e6;
+    uint256 public constant RISK_MULTIPLIER_BPS = 500;
     uint256 public immutable maxEligibleJudges;
     JuryRegistry public immutable registry;
     address public campaignEscrow;
@@ -67,6 +69,10 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
     mapping(bytes32 => uint256) public appealBondForCase;
     mapping(bytes32 => uint256) public retryCount;
     mapping(bytes32 => bool) public reviewCaseSettled;
+    mapping(bytes32 => uint256) public riskValue;
+    mapping(bytes32 => uint256) public requiredCaseStake;
+    mapping(bytes32 => JuryTypes.RoundStatus) public roundStatus;
+    mapping(bytes32 => address[]) private frozenJudges;
 
     struct ReviewCase {
         address creator;
@@ -178,10 +184,11 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
         address creator,
         uint256 campaignId,
         uint256 milestoneId,
-        uint256 evidenceRevision
+        uint256 evidenceRevision,
+        uint256 riskValue_
     ) external returns (bytes32 reviewCaseId) {
         if (msg.sender != campaignEscrow) revert NotCampaignEscrow();
-        if (creator == address(0)) revert InvalidAddress();
+        if (creator == address(0) || riskValue_ == 0) revert InvalidAddress();
 
         uint256 sequence = reviewCaseCount++;
         reviewCaseId = VNextTypes.reviewKey(
@@ -200,8 +207,26 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
         randomnessDeadline[reviewCaseId] = enrollmentDeadline[reviewCaseId] + randomnessTimeout;
         commitDeadline[reviewCaseId] = enrollmentDeadline[reviewCaseId] + commitDuration;
         revealDeadline[reviewCaseId] = commitDeadline[reviewCaseId] + revealDuration;
+        riskValue[reviewCaseId] = riskValue_;
+        requiredCaseStake[reviewCaseId] =
+            VNextTypes.requiredCaseStake(MINIMUM_STAKE_FLOOR, RISK_MULTIPLIER_BPS, riskValue_);
+        roundStatus[reviewCaseId] = JuryTypes.RoundStatus.ENROLLMENT_OPEN;
+        registry.registerCase(
+            reviewCaseId,
+            enrollmentDeadline[reviewCaseId],
+            requiredCaseStake[reviewCaseId],
+            _poolId(reviewCaseId, bytes32("BASE"))
+        );
 
-        emit ReviewCaseCreated(reviewCaseId, campaignId, milestoneId, evidenceRevision, creator);
+        emit ReviewCaseCreated(
+            reviewCaseId,
+            campaignId,
+            milestoneId,
+            evidenceRevision,
+            creator,
+            riskValue_,
+            requiredCaseStake[reviewCaseId]
+        );
     }
 
     function enroll(bytes32 reviewCaseId) external {
@@ -214,8 +239,11 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
             revert JudgeAlreadyParticipated();
         }
         if (enrolledJudges[reviewCaseId].length >= maxEligibleJudges) revert InsufficientJudges();
-        if (registry.caseStake(reviewCaseId, msg.sender) == 0) revert InsufficientJudges();
+        if (registry.caseStake(reviewCaseId, msg.sender) < requiredCaseStake[reviewCaseId]) {
+            revert InsufficientJudges();
+        }
 
+        registry.markCaseEnrollment(reviewCaseId, msg.sender);
         enrolled[reviewCaseId][msg.sender] = true;
         participatedInRoot[reviewCase.rootCaseId][msg.sender] = true;
         enrolledJudges[reviewCaseId].push(msg.sender);
@@ -240,7 +268,9 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
         reviewCase.seed = seed;
         reviewCase.randomnessRequestId = keccak256(abi.encode(reviewCaseId, seed));
         reviewCase.totalCourts = reviewCase.enrolledCount / 3;
+        _freezePermutation(reviewCaseId, seed);
         reviewCase.snapshotFinalized = true;
+        roundStatus[reviewCaseId] = JuryTypes.RoundStatus.ASSIGNMENT_PENDING;
         emit JurySnapshotFinalized(
             reviewCaseId, block.number, reviewCase.enrolledCount, reviewCase.randomnessRequestId
         );
@@ -253,9 +283,10 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
             revert CourtAlreadyAssigned();
         }
 
-        _selectCourt(reviewCaseId, courtId, reviewCase.seed);
+        _materializeCourt(reviewCaseId, courtId);
         reviewCase.courtAssigned = true;
         courtAssigned[reviewCaseId][courtId] = true;
+        roundStatus[reviewCaseId] = JuryTypes.RoundStatus.VOTING;
         emit CourtAssigned(
             reviewCaseId,
             reviewCase.roundId,
@@ -346,7 +377,7 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
                 : JuryTypes.CourtResult.FAIL;
         courtResult[reviewCaseId][courtId] = result;
         courtFinalized[reviewCaseId][courtId] = true;
-        _recordCourtResult(reviewCase, result);
+        _recordCourtResult(reviewCaseId, reviewCase, result);
         emit CourtFinalized(reviewCaseId, reviewCase.roundId, courtId, uint8(result));
         if (reviewCase.courtFinalized) {
             emit ReviewRoundFinalized(
@@ -386,6 +417,7 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
         if (block.timestamp >= revealDeadline[reviewCaseId] + appealWindowDuration) {
             revert AppealWindowOpen();
         }
+        roundStatus[reviewCaseId] = JuryTypes.RoundStatus.APPEAL_WINDOW;
         uint256 roundId = appealRoundCount[rootCaseId] + 1;
         if (roundId > maximumAppealRounds) revert AppealRoundsExhausted();
 
@@ -414,6 +446,18 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
         randomnessDeadline[appealCaseId] = enrollmentDeadline[appealCaseId] + randomnessTimeout;
         commitDeadline[appealCaseId] = enrollmentDeadline[appealCaseId] + commitDuration;
         revealDeadline[appealCaseId] = commitDeadline[appealCaseId] + revealDuration;
+        riskValue[appealCaseId] = riskValue[rootCaseId];
+        requiredCaseStake[appealCaseId] =
+            VNextTypes.requiredCaseStake(
+                MINIMUM_STAKE_FLOOR, RISK_MULTIPLIER_BPS, riskValue[appealCaseId]
+            );
+        roundStatus[appealCaseId] = JuryTypes.RoundStatus.ENROLLMENT_OPEN;
+        registry.registerCase(
+            appealCaseId,
+            enrollmentDeadline[appealCaseId],
+            requiredCaseStake[appealCaseId],
+            _poolId(appealCaseId, bytes32("APPEAL"))
+        );
 
         latestCase[rootCaseId] = appealCaseId;
         appealRoundCount[rootCaseId] = roundId;
@@ -438,7 +482,14 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
         if (retryCount[rootCaseId] >= MAXIMUM_RETRIES_PER_REVIEW_LEVEL) {
             revert RetriesExhausted();
         }
-        if (!_retryReady(previous, reviewCaseId)) revert RetryNotReady();
+        if (roundStatus[reviewCaseId] != JuryTypes.RoundStatus.RETRY_ELIGIBLE) {
+            if (_retryReady(previous, reviewCaseId)) {
+                roundStatus[reviewCaseId] = JuryTypes.RoundStatus.RETRY_ELIGIBLE;
+            }
+        }
+        if (roundStatus[reviewCaseId] != JuryTypes.RoundStatus.RETRY_ELIGIBLE) {
+            revert RetryNotReady();
+        }
 
         _settleCase(reviewCaseId, VNextTypes.ReviewOutcome.PROTOCOL_FAIL);
         uint256 retryRoundId = previous.roundId + 1;
@@ -467,6 +518,18 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
         randomnessDeadline[retryCaseId] = enrollmentDeadline[retryCaseId] + randomnessTimeout;
         commitDeadline[retryCaseId] = enrollmentDeadline[retryCaseId] + commitDuration;
         revealDeadline[retryCaseId] = commitDeadline[retryCaseId] + revealDuration;
+        riskValue[retryCaseId] = riskValue[rootCaseId];
+        requiredCaseStake[retryCaseId] =
+            VNextTypes.requiredCaseStake(
+                MINIMUM_STAKE_FLOOR, RISK_MULTIPLIER_BPS, riskValue[retryCaseId]
+            );
+        roundStatus[retryCaseId] = JuryTypes.RoundStatus.ENROLLMENT_OPEN;
+        registry.registerCase(
+            retryCaseId,
+            enrollmentDeadline[retryCaseId],
+            requiredCaseStake[retryCaseId],
+            _poolId(retryCaseId, bytes32("RETRY"))
+        );
         emit ReviewRetryOpened(rootCaseId, retryRoundId, retryCaseId);
     }
 
@@ -559,6 +622,10 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
         return _case(reviewCaseId).totalCourts;
     }
 
+    function frozenJudge(bytes32 reviewCaseId, uint256 index) external view returns (address) {
+        return frozenJudges[reviewCaseId][index];
+    }
+
     function reviewRound(bytes32 reviewCaseId) external view returns (uint256) {
         return _case(reviewCaseId).roundId;
     }
@@ -572,40 +639,29 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
         if (reviewCase.creator == address(0)) revert UnknownCase();
     }
 
-    function _findUniqueIndex(
-        bytes32 reviewCaseId,
-        uint256 baseIndex,
-        address[3] memory selected,
-        uint256 selectedCount
-    ) private view returns (uint256) {
+    function _freezePermutation(bytes32 reviewCaseId, bytes32 seed) private {
+        address[] storage permutation = frozenJudges[reviewCaseId];
+        delete frozenJudges[reviewCaseId];
         uint256 length = enrolledJudges[reviewCaseId].length;
-        for (uint256 offset = 0; offset < length; offset++) {
-            uint256 index = (baseIndex + offset) % length;
-            address candidate = enrolledJudges[reviewCaseId][index];
-            if (assignedJudge[reviewCaseId][candidate]) continue;
-            bool duplicate;
-            for (uint256 selectedIndex = 0; selectedIndex < selectedCount; selectedIndex++) {
-                if (selected[selectedIndex] == candidate) {
-                    duplicate = true;
-                    break;
-                }
-            }
-            if (!duplicate) return index;
+        for (uint256 i = 0; i < length; i++) {
+            permutation.push(enrolledJudges[reviewCaseId][i]);
         }
-        revert InsufficientJudges();
+
+        for (uint256 remaining = length; remaining > 1; remaining--) {
+            uint256 swapIndex =
+                uint256(keccak256(abi.encode(seed, reviewCaseId, remaining))) % remaining;
+            address current = permutation[remaining - 1];
+            permutation[remaining - 1] = permutation[swapIndex];
+            permutation[swapIndex] = current;
+        }
     }
 
-    function _selectCourt(bytes32 reviewCaseId, uint256 courtId, bytes32 seed) private {
-        address[3] memory selected;
-        uint256 enrolledCount = enrolledJudges[reviewCaseId].length;
+    function _materializeCourt(bytes32 reviewCaseId, uint256 courtId) private {
         for (uint256 slot = 0; slot < 3; slot++) {
-            uint256 baseIndex =
-                uint256(keccak256(abi.encode(seed, reviewCaseId, courtId, slot))) % enrolledCount;
-            uint256 index = _findUniqueIndex(reviewCaseId, baseIndex, selected, slot);
-            selected[slot] = enrolledJudges[reviewCaseId][index];
-            courtJudges[reviewCaseId][courtId][slot] = selected[slot];
-            assignedJudge[reviewCaseId][selected[slot]] = true;
-            assignedCourtId[reviewCaseId][selected[slot]] = courtId;
+            address judge = frozenJudges[reviewCaseId][courtId * 3 + slot];
+            courtJudges[reviewCaseId][courtId][slot] = judge;
+            assignedJudge[reviewCaseId][judge] = true;
+            assignedCourtId[reviewCaseId][judge] = courtId;
         }
     }
 
@@ -629,9 +685,11 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
         return true;
     }
 
-    function _recordCourtResult(ReviewCase storage reviewCase, JuryTypes.CourtResult result)
-        private
-    {
+    function _recordCourtResult(
+        bytes32 reviewCaseId,
+        ReviewCase storage reviewCase,
+        JuryTypes.CourtResult result
+    ) private {
         reviewCase.finalizedCourts++;
         if (result == JuryTypes.CourtResult.PASS) reviewCase.passCourts++;
         if (result == JuryTypes.CourtResult.FAIL) reviewCase.failCourts++;
@@ -646,6 +704,12 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
                     ? JuryTypes.CourtResult.FAIL
                     : JuryTypes.CourtResult.TIED;
         reviewCase.courtFinalized = true;
+        roundStatus[reviewCaseId] =
+            reviewCase.result == JuryTypes.CourtResult.PASS
+                ? JuryTypes.RoundStatus.PROVISIONAL_PASS
+                : reviewCase.result == JuryTypes.CourtResult.FAIL
+                    ? JuryTypes.RoundStatus.PROVISIONAL_FAIL
+                    : JuryTypes.RoundStatus.RETRY_ELIGIBLE;
     }
 
     function _refundAppealBonds(bytes32 rootCaseId) private {
@@ -683,8 +747,13 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
         if (!reviewCase.snapshotFinalized) {
             return block.timestamp >= randomnessDeadline[reviewCaseId];
         }
+        if (!reviewCase.courtFinalized) {
+            return block.timestamp >= revealDeadline[reviewCaseId]
+                && reviewCase.finalizedCourts < reviewCase.totalCourts;
+        }
         return block.timestamp >= revealDeadline[reviewCaseId]
-            && (reviewCase.courtFinalized || reviewCase.finalizedCourts < reviewCase.totalCourts);
+            && (reviewCase.result == JuryTypes.CourtResult.INVALID
+                || reviewCase.result == JuryTypes.CourtResult.TIED);
     }
 
     function _settleCase(bytes32 reviewCaseId, VNextTypes.ReviewOutcome outcome) private {
@@ -713,19 +782,25 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
             registry.settleCaseStake(reviewCaseId, judge, slash);
         }
 
-        if (totalSlash == 0 || winners == 0) return;
-        uint256 reward = totalSlash / winners;
-        if (reward == 0) return;
-        for (uint256 i = 0; i < enrolledJudges[reviewCaseId].length; i++) {
-            address judge = enrolledJudges[reviewCaseId][i];
-            if (!assignedJudge[reviewCaseId][judge]) continue;
-            JuryTypes.Vote vote = votes[reviewCaseId][assignedCourtId[reviewCaseId][judge]][judge];
-            bool winner =
-                (outcome == VNextTypes.ReviewOutcome.FINAL_PASS && vote == JuryTypes.Vote.PASS)
-                    || (outcome == VNextTypes.ReviewOutcome.VERDICT_FAIL
-                        && vote == JuryTypes.Vote.FAIL);
-            if (winner) registry.creditReward(reviewCaseId, judge, reward);
+        uint256 reward = winners == 0 ? 0 : totalSlash / winners;
+        if (reward > 0) {
+            for (uint256 i = 0; i < enrolledJudges[reviewCaseId].length; i++) {
+                address judge = enrolledJudges[reviewCaseId][i];
+                if (!assignedJudge[reviewCaseId][judge]) continue;
+                JuryTypes.Vote vote = votes[reviewCaseId][assignedCourtId[reviewCaseId][judge]][judge];
+                bool winner =
+                    (outcome == VNextTypes.ReviewOutcome.FINAL_PASS && vote == JuryTypes.Vote.PASS)
+                        || (outcome == VNextTypes.ReviewOutcome.VERDICT_FAIL
+                            && vote == JuryTypes.Vote.FAIL);
+                if (winner) registry.creditReward(reviewCaseId, judge, reward);
+            }
         }
         reviewCaseSettled[reviewCaseId] = true;
+        roundStatus[reviewCaseId] = JuryTypes.RoundStatus.SETTLED;
+        emit ReviewCaseSettled(reviewCaseId, uint8(outcome), totalSlash, winners);
+    }
+
+    function _poolId(bytes32 reviewCaseId, bytes32 kind) private pure returns (bytes32) {
+        return keccak256(abi.encode(reviewCaseId, kind));
     }
 }

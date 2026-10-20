@@ -13,6 +13,9 @@ import {
 import { indexerStreams } from "./indexer.schema";
 
 export const vnextChainEvents = pgTable("vnext_chain_events", {
+  // Encoded as vnext:<chainId>:<campaignEscrowAddress>:<genesisHash>. The
+  // deployment identity is part of every event key so a database projection
+  // cannot silently mix two chains, redeployments, or genesis histories.
   streamId: text("stream_id").notNull().references(() => indexerStreams.streamId),
   transactionHash: varchar("transaction_hash", { length: 66 }).notNull(),
   logIndex: integer("log_index").notNull(),

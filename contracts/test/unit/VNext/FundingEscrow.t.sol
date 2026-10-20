@@ -21,7 +21,7 @@ contract VNextFundingEscrowTest is Test {
         token = new MockUSDC();
         review = new MockReviewFinality();
         escrow = new CampaignEscrowVNext(
-            address(token), address(review), 1, keccak256("policy-v1"), 2 days
+            address(token), address(review), 1, keccak256("policy-v1"), 2 days, 7 days, 7 days
         );
 
         uint256[] memory budgets = new uint256[](1);
@@ -73,6 +73,7 @@ contract VNextFundingEscrowTest is Test {
 
         escrow.finalizeFunding(campaignId);
         assertEq(uint8(escrow.campaignState(campaignId)), uint8(VNextTypes.CampaignState.REFUNDING));
+        escrow.freezeRefundAllocations(campaignId, 10);
 
         vm.prank(backerOne);
         escrow.claimRefund(campaignId);
@@ -82,6 +83,33 @@ contract VNextFundingEscrowTest is Test {
         assertEq(token.balanceOf(backerOne), 25e6);
         assertEq(token.balanceOf(backerTwo), 15e6);
         assertEq(token.balanceOf(address(escrow)), 0);
+    }
+
+    function test_CreatorInactiveOpensRefundAfterSubmissionDeadline() public {
+        _fund(backerOne, 25e6);
+        vm.warp(block.timestamp + 7 days);
+        escrow.finalizeFunding(campaignId);
+
+        vm.warp(block.timestamp + 7 days);
+        escrow.expireMilestoneSubmission(campaignId, 0);
+
+        assertEq(uint8(escrow.campaignState(campaignId)), uint8(VNextTypes.CampaignState.REFUNDING));
+        escrow.freezeRefundAllocations(campaignId, 10);
+        vm.prank(backerOne);
+        escrow.claimRefund(campaignId);
+        assertEq(token.balanceOf(backerOne), 25e6);
+    }
+
+    function test_TimeoutIsPermissionless() public {
+        _fund(backerOne, 25e6);
+        vm.warp(block.timestamp + 7 days);
+        escrow.finalizeFunding(campaignId);
+        vm.warp(block.timestamp + 7 days);
+
+        vm.prank(makeAddr("unrelated-timeout-caller"));
+        escrow.expireMilestoneSubmission(campaignId, 0);
+
+        assertEq(uint8(escrow.campaignState(campaignId)), uint8(VNextTypes.CampaignState.REFUNDING));
     }
 
     function _fund(address backer, uint256 amount) private {

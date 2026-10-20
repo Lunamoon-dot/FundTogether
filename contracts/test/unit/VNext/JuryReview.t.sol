@@ -58,7 +58,7 @@ contract VNextJuryReviewTest is Test {
         );
         registry.configureReviewController(address(review));
 
-        caseId = review.createReviewCase(creator, 7, 2, 1);
+        caseId = review.createReviewCase(creator, 7, 2, 1, 100e6);
         randomness.setSeed(caseId, keccak256("seed-1"));
 
         _depositAndReserve(judgeOne);
@@ -341,7 +341,7 @@ contract VNextJuryReviewTest is Test {
     }
 
     function test_noQuorumHasPermissionlessProtocolFailurePath() public {
-        bytes32 noQuorumCase = review.createReviewCase(creator, 8, 3, 1);
+        bytes32 noQuorumCase = review.createReviewCase(creator, 8, 3, 1, 100e6);
         vm.warp(review.enrollmentDeadline(noQuorumCase));
 
         bytes32 retryCaseId = review.openRetry(noQuorumCase);
@@ -356,5 +356,175 @@ contract VNextJuryReviewTest is Test {
         assertEq(
             uint8(review.finalOutcome(noQuorumCase)), uint8(VNextTypes.ReviewOutcome.PROTOCOL_FAIL)
         );
+    }
+
+    function test_EnforceRiskAdjustedMinimumStake() public {
+        bytes32 highRiskCase = review.createReviewCase(creator, 9, 4, 1, 1_000e6);
+
+        assertEq(review.requiredCaseStake(highRiskCase), 50e6);
+        assertEq(registry.requiredCaseStake(highRiskCase), 50e6);
+
+        token.mint(judgeFour, 100e6);
+        vm.startPrank(judgeFour);
+        token.approve(address(registry), type(uint256).max);
+        registry.depositStake(49e6);
+        vm.expectRevert(JuryRegistry.InsufficientCaseStake.selector);
+        registry.reserveCaseStake(highRiskCase, 49e6);
+        vm.stopPrank();
+    }
+
+    function test_RequiredCaseStakeIsFrozen() public {
+        uint256 before = review.requiredCaseStake(caseId);
+        vm.warp(review.enrollmentDeadline(caseId));
+
+        assertEq(review.requiredCaseStake(caseId), before);
+        assertEq(registry.requiredCaseStake(caseId), before);
+    }
+
+    function test_CannotRetrySubstantivePass() public {
+        _prepareCourt();
+        address first = review.courtJudge(caseId, 0, 0);
+        address second = review.courtJudge(caseId, 0, 1);
+        address third = review.courtJudge(caseId, 0, 2);
+        _commit(first, JuryTypes.Vote.PASS, SALT_ONE);
+        _commit(second, JuryTypes.Vote.PASS, SALT_TWO);
+        _commit(third, JuryTypes.Vote.FAIL, SALT_THREE);
+        vm.warp(review.commitDeadline(caseId));
+        _reveal(caseId, first, JuryTypes.Vote.PASS, SALT_ONE);
+        _reveal(caseId, second, JuryTypes.Vote.PASS, SALT_TWO);
+        _reveal(caseId, third, JuryTypes.Vote.FAIL, SALT_THREE);
+        vm.warp(review.revealDeadline(caseId));
+        review.finalizeCourt(caseId, 0);
+
+        vm.expectRevert(JuryReview.RetryNotReady.selector);
+        review.openRetry(caseId);
+        assertEq(uint8(review.reviewResult(caseId)), uint8(JuryTypes.CourtResult.PASS));
+    }
+
+    function test_CannotRetrySubstantiveFail() public {
+        _prepareCourt();
+        address first = review.courtJudge(caseId, 0, 0);
+        address second = review.courtJudge(caseId, 0, 1);
+        address third = review.courtJudge(caseId, 0, 2);
+        _commit(first, JuryTypes.Vote.FAIL, SALT_ONE);
+        _commit(second, JuryTypes.Vote.FAIL, SALT_TWO);
+        _commit(third, JuryTypes.Vote.PASS, SALT_THREE);
+        vm.warp(review.commitDeadline(caseId));
+        _reveal(caseId, first, JuryTypes.Vote.FAIL, SALT_ONE);
+        _reveal(caseId, second, JuryTypes.Vote.FAIL, SALT_TWO);
+        _reveal(caseId, third, JuryTypes.Vote.PASS, SALT_THREE);
+        vm.warp(review.revealDeadline(caseId));
+        review.finalizeCourt(caseId, 0);
+
+        vm.expectRevert(JuryReview.RetryNotReady.selector);
+        review.openRetry(caseId);
+        assertEq(uint8(review.reviewResult(caseId)), uint8(JuryTypes.CourtResult.FAIL));
+    }
+
+    function test_RetryThenFinalSettlementWorks() public {
+        _prepareCourt();
+        address first = review.courtJudge(caseId, 0, 0);
+        address second = review.courtJudge(caseId, 0, 1);
+        _commit(first, JuryTypes.Vote.PASS, SALT_ONE);
+        _commit(second, JuryTypes.Vote.PASS, SALT_TWO);
+        vm.warp(review.commitDeadline(caseId));
+        _reveal(caseId, first, JuryTypes.Vote.PASS, SALT_ONE);
+        _reveal(caseId, second, JuryTypes.Vote.PASS, SALT_TWO);
+        vm.warp(review.revealDeadline(caseId));
+        review.finalizeCourt(caseId, 0);
+
+        bytes32 retryCaseId = review.openRetry(caseId);
+        vm.warp(review.enrollmentDeadline(retryCaseId));
+        bytes32 finalRetryCaseId = review.openRetry(retryCaseId);
+        vm.warp(review.enrollmentDeadline(finalRetryCaseId));
+
+        assertEq(
+            uint8(review.finalizeProtocolFailure(finalRetryCaseId)),
+            uint8(VNextTypes.ReviewOutcome.PROTOCOL_FAIL)
+        );
+        assertTrue(review.reviewCaseSettled(caseId));
+        assertTrue(review.reviewCaseSettled(retryCaseId));
+        assertTrue(review.reviewCaseSettled(finalRetryCaseId));
+    }
+
+    function test_AssignmentIndependentOfCallOrder() public {
+        _depositAndReserve(judgeFour);
+        _depositAndReserve(judgeFive);
+        _depositAndReserve(judgeSix);
+        vm.prank(judgeFour);
+        review.enroll(caseId);
+        vm.prank(judgeFive);
+        review.enroll(caseId);
+        vm.prank(judgeSix);
+        review.enroll(caseId);
+
+        vm.warp(review.enrollmentDeadline(caseId));
+        review.finalizeSnapshot(caseId);
+        address[6] memory frozen;
+        for (uint256 i = 0; i < frozen.length; i++) {
+            frozen[i] = review.frozenJudge(caseId, i);
+        }
+
+        review.assignCourt(caseId, 1);
+        review.assignCourt(caseId, 0);
+
+        for (uint256 courtId = 0; courtId < 2; courtId++) {
+            for (uint256 slot = 0; slot < 3; slot++) {
+                assertEq(review.courtJudge(caseId, courtId, slot), frozen[courtId * 3 + slot]);
+            }
+        }
+    }
+
+    function test_AssignmentUsesThreeUniqueJudgesPerCourt() public {
+        _depositAndReserve(judgeFour);
+        _depositAndReserve(judgeFive);
+        _depositAndReserve(judgeSix);
+        vm.prank(judgeFour);
+        review.enroll(caseId);
+        vm.prank(judgeFive);
+        review.enroll(caseId);
+        vm.prank(judgeSix);
+        review.enroll(caseId);
+
+        vm.warp(review.enrollmentDeadline(caseId));
+        review.finalizeSnapshot(caseId);
+        review.assignCourt(caseId, 1);
+        review.assignCourt(caseId, 0);
+
+        for (uint256 first = 0; first < 6; first++) {
+            address left = review.courtJudge(caseId, first / 3, first % 3);
+            for (uint256 second = first + 1; second < 6; second++) {
+                address right = review.courtJudge(caseId, second / 3, second % 3);
+                assertTrue(left != right);
+            }
+        }
+    }
+
+    function test_CreatorCannotEnrollButCanOpenAppeal() public {
+        vm.prank(creator);
+        vm.expectRevert(JuryReview.CreatorConflict.selector);
+        review.enroll(caseId);
+
+        _prepareCourt();
+        address first = review.courtJudge(caseId, 0, 0);
+        address second = review.courtJudge(caseId, 0, 1);
+        address third = review.courtJudge(caseId, 0, 2);
+        _commit(first, JuryTypes.Vote.PASS, SALT_ONE);
+        _commit(second, JuryTypes.Vote.PASS, SALT_TWO);
+        _commit(third, JuryTypes.Vote.FAIL, SALT_THREE);
+        vm.warp(review.commitDeadline(caseId));
+        _reveal(caseId, first, JuryTypes.Vote.PASS, SALT_ONE);
+        _reveal(caseId, second, JuryTypes.Vote.PASS, SALT_TWO);
+        _reveal(caseId, third, JuryTypes.Vote.FAIL, SALT_THREE);
+        vm.warp(review.revealDeadline(caseId));
+        review.finalizeCourt(caseId, 0);
+
+        token.mint(creator, 1e6);
+        vm.prank(creator);
+        token.approve(address(review), 1e6);
+        bytes32 appealCaseId = review.openAppeal(caseId, creator);
+
+        assertTrue(appealCaseId != bytes32(0));
+        assertTrue(registry.caseRegistered(appealCaseId));
     }
 }

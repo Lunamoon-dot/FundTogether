@@ -44,7 +44,7 @@ contract VNextConservationTest is Test {
         token = new MockUSDC();
         review = new MockReviewFinality();
         escrow = new CampaignEscrowVNext(
-            address(token), address(review), 1, keccak256("policy-v1"), 1 days
+            address(token), address(review), 1, keccak256("policy-v1"), 1 days, 7 days, 7 days
         );
     }
 
@@ -64,6 +64,7 @@ contract VNextConservationTest is Test {
         bytes32 secondCase = _submit(campaignId, 1, "milestone-two");
         review.setFinalOutcome(secondCase, VNextTypes.ReviewOutcome.PROTOCOL_FAIL);
         escrow.syncFinalRuling(campaignId, 1);
+        escrow.freezeRefundAllocations(campaignId, 10);
         vm.prank(backerOne);
         escrow.claimRefund(campaignId);
         vm.prank(backerTwo);
@@ -86,6 +87,7 @@ contract VNextConservationTest is Test {
         _fund(backerTwo, secondAmount, campaignId);
         vm.warp(block.timestamp + 2 days);
         escrow.finalizeFunding(campaignId);
+        escrow.freezeRefundAllocations(campaignId, 10);
 
         vm.prank(backerOne);
         escrow.claimRefund(campaignId);
@@ -105,7 +107,13 @@ contract VNextConservationTest is Test {
         FailingMockUSDC failingToken = new FailingMockUSDC();
         MockReviewFinality failingReview = new MockReviewFinality();
         CampaignEscrowVNext failingEscrow = new CampaignEscrowVNext(
-            address(failingToken), address(failingReview), 1, keccak256("policy-v1"), 1 days
+            address(failingToken),
+            address(failingReview),
+            1,
+            keccak256("policy-v1"),
+            1 days,
+            7 days,
+            7 days
         );
         uint256[] memory budgets = new uint256[](1);
         budgets[0] = 100e6;

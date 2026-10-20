@@ -57,6 +57,28 @@ contract VNextStateMachineTest is Test {
         assertTrue(VNextTypes.isSubstantive(VNextTypes.ReviewOutcome.VERDICT_FAIL));
     }
 
+    function test_requiredCaseStakeUsesFloorWhenRiskValueIsSmall() public pure {
+        assertEq(VNextTypes.requiredCaseStake(10e6, 500, 1), 10e6);
+    }
+
+    function test_requiredCaseStakeUsesRiskMultiplierWhenRiskValueIsLarge() public pure {
+        assertEq(VNextTypes.requiredCaseStake(10e6, 500, 1000e6), 50e6);
+    }
+
+    function test_requiredCaseStakeRoundsUpIntegerDivision() public pure {
+        assertEq(VNextTypes.requiredCaseStake(1, 1, 1), 1);
+        assertEq(VNextTypes.requiredCaseStake(0, 1, 10_001), 2);
+    }
+
+    function test_refundPrefixShareConsumesRoundingRemainderExactly() public pure {
+        uint256 first = VNextTypes.refundPrefixShare(1, 1, 0, 2);
+        uint256 second = VNextTypes.refundPrefixShare(1, 2, 1, 2);
+
+        assertEq(first, 0);
+        assertEq(second, 1);
+        assertEq(first + second, 1);
+    }
+
     function test_reviewKeyChangesWhenRevisionOrRoundChanges() public pure {
         bytes32 base = VNextTypes.reviewKey(7, 2, 1, 9, 0, 0, 1);
         bytes32 revision = VNextTypes.reviewKey(7, 2, 2, 9, 0, 0, 1);

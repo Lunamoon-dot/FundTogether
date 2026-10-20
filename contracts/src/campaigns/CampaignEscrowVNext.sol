@@ -12,7 +12,8 @@ interface IVNextReviewCaseCreator {
         address creator,
         uint256 campaignId,
         uint256 milestoneId,
-        uint256 evidenceRevision
+        uint256 evidenceRevision,
+        uint256 riskValue
     ) external returns (bytes32 reviewCaseId);
 
     function openAppeal(bytes32 reviewCaseId, address requester)
@@ -43,6 +44,8 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
     uint256 public immutable protocolVersion;
     bytes32 public immutable policyHash;
     uint64 public immutable challengeWindowDuration;
+    uint64 public immutable milestoneSubmissionWindow;
+    uint64 public immutable correctionWindow;
 
     struct Campaign {
         address creator;
@@ -55,6 +58,9 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         uint256 refunded;
         uint256 refundPool;
         uint256 refundSnapshot;
+        uint256 refundAllocationCursor;
+        uint256 refundAllocationPrefix;
+        bool refundAllocationsFrozen;
         uint256 milestoneCount;
         bytes32 publicationEvidenceHash;
         bytes32 publicationReviewCaseId;
@@ -70,6 +76,8 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         bytes32 reviewCaseId;
         VNextTypes.ReviewOutcome finalOutcome;
         uint256 challengeDeadline;
+        uint256 submissionDeadline;
+        uint256 correctionDeadline;
         bytes32 challengeReviewCaseId;
         bytes32 challengeEvidenceHash;
         bool challengeOpened;
@@ -83,6 +91,9 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
     mapping(uint256 => mapping(uint256 => Milestone)) private milestones;
     mapping(uint256 => mapping(address => uint256)) private contributions;
     mapping(uint256 => mapping(address => bool)) public refundClaimed;
+    mapping(uint256 => address[]) private contributors;
+    mapping(uint256 => mapping(address => bool)) private contributorSeen;
+    mapping(uint256 => mapping(address => uint256)) private refundEntitlements;
 
     error InvalidAddress();
     error InvalidTerms();
@@ -107,13 +118,18 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
     error PayoutUnavailable();
     error AppealNotAllowed();
     error CorrectionLimitReached();
+    error MilestoneDeadlineExpired();
+    error RefundAllocationIncomplete();
+    error InvalidAllocationBatch();
 
     constructor(
         address token_,
         address reviewEngine_,
         uint256 protocolVersion_,
         bytes32 policyHash_,
-        uint64 challengeWindowDuration_
+        uint64 challengeWindowDuration_,
+        uint64 milestoneSubmissionWindow_,
+        uint64 correctionWindow_
     ) {
         if (
             token_ == address(0) || token_.code.length == 0 || reviewEngine_ == address(0)
@@ -121,7 +137,10 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         ) {
             revert InvalidAddress();
         }
-        if (protocolVersion_ == 0 || policyHash_ == bytes32(0) || challengeWindowDuration_ == 0) {
+        if (
+            protocolVersion_ == 0 || policyHash_ == bytes32(0) || challengeWindowDuration_ == 0
+                || milestoneSubmissionWindow_ == 0 || correctionWindow_ == 0
+        ) {
             revert InvalidTerms();
         }
         supportedToken = IERC20(token_);
@@ -129,6 +148,8 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         protocolVersion = protocolVersion_;
         policyHash = policyHash_;
         challengeWindowDuration = challengeWindowDuration_;
+        milestoneSubmissionWindow = milestoneSubmissionWindow_;
+        correctionWindow = correctionWindow_;
     }
 
     function createCampaign(
@@ -155,7 +176,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
             }
             budgetTotal += milestoneBudgets[i];
         }
-        if (budgetTotal > goal) revert InvalidTerms();
+        if (budgetTotal != goal) revert InvalidTerms();
 
         campaignId = campaignCount++;
         bytes32 termsHash = keccak256(
@@ -168,11 +189,13 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
                 acceptanceCriteriaHashes,
                 publicationEvidenceHash_,
                 protocolVersion,
-                policyHash
+                policyHash,
+                milestoneSubmissionWindow,
+                correctionWindow
             )
         );
         bytes32 publicationReviewCaseId =
-            reviewEngine.createReviewCase(msg.sender, campaignId, type(uint256).max, 1);
+            _createReviewCase(msg.sender, campaignId, type(uint256).max, 1, goal);
         if (publicationReviewCaseId == bytes32(0)) revert InvalidEvidence();
         campaigns[campaignId] = Campaign({
             creator: msg.sender,
@@ -185,6 +208,9 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
             refunded: 0,
             refundPool: 0,
             refundSnapshot: 0,
+            refundAllocationCursor: 0,
+            refundAllocationPrefix: 0,
+            refundAllocationsFrozen: false,
             milestoneCount: milestoneBudgets.length,
             publicationEvidenceHash: publicationEvidenceHash_,
             publicationReviewCaseId: publicationReviewCaseId,
@@ -201,6 +227,8 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
                 reviewCaseId: bytes32(0),
                 finalOutcome: VNextTypes.ReviewOutcome.NONE,
                 challengeDeadline: 0,
+                submissionDeadline: 0,
+                correctionDeadline: 0,
                 challengeReviewCaseId: bytes32(0),
                 challengeEvidenceHash: bytes32(0),
                 challengeOpened: false,
@@ -238,13 +266,11 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
 
         campaign.publicationOutcome = outcome;
         bool successful = outcome == VNextTypes.ReviewOutcome.FINAL_PASS;
-        campaign.state =
-            successful ? VNextTypes.CampaignState.FUNDING : VNextTypes.CampaignState.REFUNDING;
         emit PublicationFinalized(campaignId, successful, campaign.publicationReviewCaseId);
-        if (!successful) {
-            campaign.refundPool = 0;
-            campaign.refundSnapshot = 0;
-            emit CampaignRefundsOpened(campaignId, 0, 0);
+        if (successful) {
+            campaign.state = VNextTypes.CampaignState.FUNDING;
+        } else {
+            _openRefunds(campaignId, campaign);
         }
     }
 
@@ -266,6 +292,10 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         if (campaign.raised + amount > campaign.goal) revert ContributionExceedsGoal();
 
         supportedToken.safeTransferFrom(msg.sender, address(this), amount);
+        if (!contributorSeen[campaignId][msg.sender]) {
+            contributorSeen[campaignId][msg.sender] = true;
+            contributors[campaignId].push(msg.sender);
+        }
         contributions[campaignId][msg.sender] += amount;
         campaign.raised += amount;
         emit ContributionReceived(campaignId, msg.sender, amount, campaign.raised);
@@ -281,28 +311,57 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         }
 
         bool successful = campaign.raised >= campaign.goal;
-        campaign.state =
-            successful ? VNextTypes.CampaignState.FUNDED : VNextTypes.CampaignState.REFUNDING;
         emit FundingFinalized(campaignId, successful, campaign.raised);
-        if (!successful) {
-            campaign.refundPool = campaign.raised;
-            campaign.refundSnapshot = campaign.raised;
-            emit CampaignRefundsOpened(campaignId, campaign.raised, campaign.raised);
+        if (successful) {
+            campaign.state = VNextTypes.CampaignState.FUNDED;
+            milestones[campaignId][0].submissionDeadline =
+                block.timestamp + milestoneSubmissionWindow;
+        } else {
+            _openRefunds(campaignId, campaign);
+        }
+    }
+
+    function freezeRefundAllocations(uint256 campaignId, uint256 maxBackers) external {
+        Campaign storage campaign = _campaign(campaignId);
+        if (campaign.state != VNextTypes.CampaignState.REFUNDING) revert NoRefund();
+        if (campaign.refundAllocationsFrozen) return;
+        if (maxBackers == 0) revert InvalidAllocationBatch();
+
+        uint256 contributorCount = contributors[campaignId].length;
+        uint256 processed;
+        while (
+            campaign.refundAllocationCursor < contributorCount && processed < maxBackers
+        ) {
+            address backer = contributors[campaignId][campaign.refundAllocationCursor];
+            uint256 prefix = campaign.refundAllocationPrefix + contributions[campaignId][backer];
+            refundEntitlements[campaignId][backer] = VNextTypes.refundPrefixShare(
+                campaign.refundPool,
+                prefix,
+                campaign.refundAllocationPrefix,
+                campaign.refundSnapshot
+            );
+            campaign.refundAllocationPrefix = prefix;
+            campaign.refundAllocationCursor++;
+            processed++;
+        }
+        if (campaign.refundAllocationCursor == contributorCount) {
+            campaign.refundAllocationsFrozen = true;
         }
     }
 
     function claimRefund(uint256 campaignId) external nonReentrant {
         Campaign storage campaign = _campaign(campaignId);
         if (campaign.state != VNextTypes.CampaignState.REFUNDING) revert NoRefund();
+        if (!campaign.refundAllocationsFrozen) revert RefundAllocationIncomplete();
         if (refundClaimed[campaignId][msg.sender]) revert RefundAlreadyClaimed();
 
         uint256 contribution = contributions[campaignId][msg.sender];
-        if (contribution == 0 || campaign.refundSnapshot == 0) revert NoRefund();
-        uint256 amount = campaign.refundPool * contribution / campaign.refundSnapshot;
+        if (contribution == 0) revert NoRefund();
+        uint256 amount = refundEntitlements[campaignId][msg.sender];
         refundClaimed[campaignId][msg.sender] = true;
         campaign.refunded += amount;
 
-        supportedToken.safeTransfer(msg.sender, amount);
+        if (amount > 0) supportedToken.safeTransfer(msg.sender, amount);
         emit BackerRefundClaimed(campaignId, msg.sender, amount);
     }
 
@@ -326,6 +385,13 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         bool isCorrection = milestone.state == VNextTypes.MilestoneState.CORRECTION;
         if (milestone.paid) revert MilestoneAlreadyPaid();
         if (
+            milestone.state == VNextTypes.MilestoneState.PENDING
+                && block.timestamp >= milestone.submissionDeadline
+        ) revert MilestoneDeadlineExpired();
+        if (
+            isCorrection && block.timestamp >= milestone.correctionDeadline
+        ) revert MilestoneDeadlineExpired();
+        if (
             milestone.state != VNextTypes.MilestoneState.PENDING
                 && milestone.state != VNextTypes.MilestoneState.CORRECTION
                 && milestone.state != VNextTypes.MilestoneState.RESUBMIT
@@ -337,7 +403,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
 
         uint256 revision = milestone.evidenceRevision + 1;
         reviewCaseId =
-            reviewEngine.createReviewCase(campaign.creator, campaignId, milestoneId, revision);
+            _createReviewCase(campaign.creator, campaignId, milestoneId, revision, milestone.budget);
         if (reviewCaseId == bytes32(0)) revert InvalidEvidence();
 
         milestone.evidenceRevision = revision;
@@ -345,6 +411,8 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         milestone.reviewCaseId = reviewCaseId;
         milestone.finalOutcome = VNextTypes.ReviewOutcome.NONE;
         milestone.challengeDeadline = 0;
+        milestone.submissionDeadline = 0;
+        milestone.correctionDeadline = 0;
         milestone.challengeReviewCaseId = bytes32(0);
         milestone.challengeEvidenceHash = bytes32(0);
         milestone.challengeOpened = false;
@@ -368,7 +436,21 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         if (
             milestone.state != VNextTypes.MilestoneState.CORRECTION
                 || milestone.correctionCount < MAX_MILESTONE_CORRECTIONS
+                || block.timestamp < milestone.correctionDeadline
         ) revert CorrectionLimitReached();
+        milestone.state = VNextTypes.MilestoneState.TERMINAL;
+        _openRefunds(campaignId, campaign);
+    }
+
+    function expireMilestoneSubmission(uint256 campaignId, uint256 milestoneId) external {
+        Campaign storage campaign = _campaign(campaignId);
+        Milestone storage milestone = _milestone(campaignId, milestoneId);
+        bool submissionExpired = milestone.state == VNextTypes.MilestoneState.PENDING
+            && block.timestamp >= milestone.submissionDeadline;
+        bool correctionExpired = milestone.state == VNextTypes.MilestoneState.CORRECTION
+            && block.timestamp >= milestone.correctionDeadline;
+        if (!submissionExpired && !correctionExpired) revert MilestoneDeadlineExpired();
+
         milestone.state = VNextTypes.MilestoneState.TERMINAL;
         _openRefunds(campaignId, campaign);
     }
@@ -406,6 +488,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
             milestone.challengeDeadline = block.timestamp + challengeWindowDuration;
         } else if (outcome == VNextTypes.ReviewOutcome.VERDICT_FAIL) {
             milestone.state = VNextTypes.MilestoneState.CORRECTION;
+            milestone.correctionDeadline = block.timestamp + correctionWindow;
         } else {
             milestone.state = VNextTypes.MilestoneState.TERMINAL;
             _openRefunds(campaignId, campaign);
@@ -446,7 +529,9 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
     {
         Campaign storage campaign = _campaign(campaignId);
         Milestone storage milestone = _milestone(campaignId, milestoneId);
-        if (msg.sender == campaign.creator || contributions[campaignId][msg.sender] == 0) {
+        bool creatorAppeal = msg.sender == campaign.creator
+            && reviewEngine.reviewResult(milestone.reviewCaseId) == 2;
+        if (!creatorAppeal && contributions[campaignId][msg.sender] == 0) {
             revert AppealNotAllowed();
         }
         if (
@@ -487,6 +572,9 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         if (campaign.paidOut == _totalMilestoneBudget(campaignId, campaign.milestoneCount)) {
             campaign.state = VNextTypes.CampaignState.COMPLETED;
             emit CampaignCompleted(campaignId);
+        } else if (milestoneId + 1 < campaign.milestoneCount) {
+            milestones[campaignId][milestoneId + 1].submissionDeadline =
+                block.timestamp + milestoneSubmissionWindow;
         }
     }
 
@@ -508,8 +596,12 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         ) revert ChallengeNotAllowed();
         if (challengeEvidenceHash == bytes32(0)) revert InvalidEvidence();
 
-        challengeCaseId = reviewEngine.createReviewCase(
-            campaign.creator, campaignId, milestoneId, milestone.evidenceRevision
+        challengeCaseId = _createReviewCase(
+            campaign.creator,
+            campaignId,
+            milestoneId,
+            milestone.evidenceRevision,
+            milestone.budget
         );
         if (challengeCaseId == bytes32(0)) revert InvalidEvidence();
         milestone.challengeReviewCaseId = challengeCaseId;
@@ -608,6 +700,35 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         return contributions[campaignId][backer];
     }
 
+    function refundEntitlement(uint256 campaignId, address backer)
+        external
+        view
+        returns (uint256)
+    {
+        _campaign(campaignId);
+        return refundEntitlements[campaignId][backer];
+    }
+
+    function refundAllocationsFrozen(uint256 campaignId) external view returns (bool) {
+        return _campaign(campaignId).refundAllocationsFrozen;
+    }
+
+    function milestoneSubmissionDeadline(uint256 campaignId, uint256 milestoneId)
+        external
+        view
+        returns (uint256)
+    {
+        return _milestone(campaignId, milestoneId).submissionDeadline;
+    }
+
+    function milestoneCorrectionDeadline(uint256 campaignId, uint256 milestoneId)
+        external
+        view
+        returns (uint256)
+    {
+        return _milestone(campaignId, milestoneId).correctionDeadline;
+    }
+
     function milestoneBudget(uint256 campaignId, uint256 milestoneId)
         external
         view
@@ -661,6 +782,9 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         campaign.state = VNextTypes.CampaignState.REFUNDING;
         campaign.refundPool = campaign.raised - campaign.paidOut;
         campaign.refundSnapshot = campaign.raised;
+        campaign.refundAllocationCursor = 0;
+        campaign.refundAllocationPrefix = 0;
+        campaign.refundAllocationsFrozen = contributors[campaignId].length == 0;
         emit CampaignRefundsOpened(campaignId, campaign.refundPool, campaign.refundSnapshot);
     }
 
@@ -672,6 +796,18 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         for (uint256 i = 0; i < count; i++) {
             total += milestones[campaignId][i].budget;
         }
+    }
+
+    function _createReviewCase(
+        address creator,
+        uint256 campaignId,
+        uint256 milestoneId,
+        uint256 evidenceRevision,
+        uint256 riskValue
+    ) private returns (bytes32) {
+        return reviewEngine.createReviewCase(
+            creator, campaignId, milestoneId, evidenceRevision, riskValue
+        );
     }
 
     function _campaign(uint256 campaignId) private view returns (Campaign storage campaign) {

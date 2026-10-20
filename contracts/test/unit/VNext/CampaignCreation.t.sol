@@ -18,7 +18,7 @@ contract VNextCampaignCreationTest is Test {
         token = new MockUSDC();
         review = new MockReviewFinality();
         escrow = new CampaignEscrowVNext(
-            address(token), address(review), 1, keccak256("policy-v1"), 2 days
+            address(token), address(review), 1, keccak256("policy-v1"), 2 days, 7 days, 7 days
         );
     }
 
@@ -52,6 +52,24 @@ contract VNextCampaignCreationTest is Test {
         budgets[0] = 101e6;
         bytes32[] memory criteria = new bytes32[](1);
         criteria[0] = keccak256("over-budget");
+
+        vm.prank(creator);
+        vm.expectRevert(CampaignEscrowVNext.InvalidTerms.selector);
+        escrow.createCampaign(
+            payout,
+            100e6,
+            block.timestamp + 7 days,
+            budgets,
+            criteria,
+            keccak256("publication-evidence")
+        );
+    }
+
+    function test_BudgetBelowGoalReverts() public {
+        uint256[] memory budgets = new uint256[](1);
+        budgets[0] = 99e6;
+        bytes32[] memory criteria = new bytes32[](1);
+        criteria[0] = keccak256("under-budget");
 
         vm.prank(creator);
         vm.expectRevert(CampaignEscrowVNext.InvalidTerms.selector);

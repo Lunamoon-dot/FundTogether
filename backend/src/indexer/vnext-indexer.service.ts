@@ -20,6 +20,7 @@ import {
   verifyVNextDeployment,
   vnextCampaignAbi,
   vnextClient,
+  vnextRegistryAbi,
   vnextReviewAbi,
   type VNextDeploymentManifest,
 } from "../blockchain/vnext-deployment";
@@ -58,6 +59,14 @@ function eventArgs(event: { args?: readonly unknown[] | Record<string, unknown> 
   return (event.args && !Array.isArray(event.args) ? event.args : {}) as Record<string, unknown>;
 }
 
+type VNextTransaction = Parameters<Parameters<NodePgDatabase<typeof schema>["transaction"]>[0]>[0];
+type VNextQueryClient = NodePgDatabase<typeof schema> | VNextTransaction;
+
+type DecodedVNextEvent = {
+  eventName: string;
+  args: Record<string, unknown>;
+};
+
 @Injectable()
 export class VNextIndexerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(VNextIndexerService.name);
@@ -95,7 +104,7 @@ export class VNextIndexerService implements OnModuleInit, OnModuleDestroy {
   private async sync() {
     if (!this.connection) throw new ServiceUnavailableException("VNext deployment is not configured");
     const { client, manifest } = this.connection;
-    await verifyVNextDeployment(client, manifest);
+    await this.verifyDeployment(client, manifest);
     const streamId = this.streamId();
     const head = await client.getBlock({ blockTag: "latest" });
     const [stream] = await this.db.select().from(indexerStreams).where(eq(indexerStreams.streamId, streamId));
@@ -109,13 +118,32 @@ export class VNextIndexerService implements OnModuleInit, OnModuleDestroy {
     const logs = [
       ...(await client.getLogs({ address: manifest.campaignEscrow, fromBlock, toBlock: head.number })),
       ...(await client.getLogs({ address: manifest.juryReview, fromBlock, toBlock: head.number })),
+      ...(await client.getLogs({ address: manifest.juryRegistry, fromBlock, toBlock: head.number })),
     ].sort((left, right) => Number(left.blockNumber - right.blockNumber) || Number(left.logIndex - right.logIndex));
-    let processed = 0;
-    for (const log of logs) {
+
+    const decodedLogs = logs.map(log => {
+      if (
+        log.removed || log.transactionHash == null || log.logIndex == null
+        || log.blockHash == null || log.blockNumber == null
+      ) {
+        throw new Error("Malformed VNext event identity");
+      }
       const decoded = this.decode(log);
-      if (!decoded) continue;
-      await this.persistEvent(streamId, log, decoded.eventName, decoded.args);
-      processed++;
+      if (!decoded) {
+        throw new Error(`unknown VNext event at ${log.transactionHash}:${log.logIndex}`);
+      }
+      return { log, decoded };
+    });
+
+    let processed = 0;
+    for (let cursor = 0; cursor < decodedLogs.length;) {
+      const blockNumber = decodedLogs[cursor].log.blockNumber!;
+      const blockEvents: Array<{ log: Log; decoded: DecodedVNextEvent }> = [];
+      while (cursor < decodedLogs.length && decodedLogs[cursor].log.blockNumber === blockNumber) {
+        blockEvents.push(decodedLogs[cursor]);
+        cursor++;
+      }
+      processed += await this.persistBlock(streamId, blockEvents);
     }
     await this.db.insert(indexerStreams).values({
       streamId,
@@ -137,8 +165,12 @@ export class VNextIndexerService implements OnModuleInit, OnModuleDestroy {
     return { fromBlock: fromBlock.toString(), toBlock: head.number.toString(), events: processed };
   }
 
+  private verifyDeployment(client: PublicClient, manifest: VNextDeploymentManifest) {
+    return verifyVNextDeployment(client, manifest);
+  }
+
   private decode(log: Log) {
-    for (const abi of [vnextCampaignAbi, vnextReviewAbi]) {
+    for (const abi of [vnextCampaignAbi, vnextReviewAbi, vnextRegistryAbi]) {
       try {
         const [event] = parseEventLogs({ abi, logs: [log], strict: true });
         if (event) return { eventName: event.eventName, args: eventArgs(event) };
@@ -149,31 +181,91 @@ export class VNextIndexerService implements OnModuleInit, OnModuleDestroy {
     return null;
   }
 
-  private async persistEvent(
+  private async persistEvent(streamId: string, log: Log, decoded: DecodedVNextEvent) {
+    return this.db.transaction(async tx => {
+      await this.ensureStream(tx, streamId);
+      const applied = await this.persistEventInTransaction(tx, streamId, log, decoded);
+      await this.updateCheckpoint(tx, streamId, log);
+      return applied;
+    });
+  }
+
+  private async persistBlock(
+    streamId: string,
+    events: Array<{ log: Log; decoded: DecodedVNextEvent }>,
+  ) {
+    return this.db.transaction(async tx => {
+      await this.ensureStream(tx, streamId);
+      let applied = 0;
+      for (const item of events) {
+        if (await this.persistEventInTransaction(tx, streamId, item.log, item.decoded)) applied++;
+      }
+      await this.updateCheckpoint(tx, streamId, events[events.length - 1].log);
+      return applied;
+    });
+  }
+
+  private async ensureStream(tx: VNextQueryClient, streamId: string) {
+    await tx.insert(indexerStreams).values({ streamId, status: "syncing", updatedAt: new Date() }).onConflictDoNothing();
+  }
+
+  private async updateCheckpoint(tx: VNextQueryClient, streamId: string, log: Log) {
+    await tx.insert(indexerStreams).values({
+      streamId,
+      lastBlock: log.blockNumber!.toString(),
+      lastBlockHash: log.blockHash!,
+      headBlock: log.blockNumber!.toString(),
+      status: "synced",
+      updatedAt: new Date(),
+    }).onConflictDoUpdate({
+      target: indexerStreams.streamId,
+      set: {
+        lastBlock: log.blockNumber!.toString(),
+        lastBlockHash: log.blockHash!,
+        headBlock: log.blockNumber!.toString(),
+        status: "synced",
+        updatedAt: new Date(),
+      },
+    });
+  }
+
+  private async persistEventInTransaction(
+    tx: VNextQueryClient,
     streamId: string,
     log: Log,
-    eventName: string,
-    args: Record<string, unknown>,
+    decoded: DecodedVNextEvent,
   ) {
     const transactionHash = log.transactionHash!;
     const logIndex = Number(log.logIndex);
     const blockNumber = log.blockNumber!;
-    await this.db.insert(vnextChainEvents).values({
+    const [inserted] = await tx.insert(vnextChainEvents).values({
       streamId,
       transactionHash,
       logIndex,
       blockHash: log.blockHash!,
       blockNumber: blockNumber.toString(),
-      eventName,
-      args: jsonSafe(args) as Record<string, unknown>,
+      eventName: decoded.eventName,
+      args: jsonSafe(decoded.args) as Record<string, unknown>,
       canonical: true,
-    }).onConflictDoUpdate({
+    }).onConflictDoNothing({
       target: [vnextChainEvents.streamId, vnextChainEvents.transactionHash, vnextChainEvents.logIndex],
-      set: { blockHash: log.blockHash!, blockNumber: blockNumber.toString(), eventName, args: jsonSafe(args) as Record<string, unknown>, canonical: true },
-    });
+    }).returning({ transactionHash: vnextChainEvents.transactionHash });
+    if (!inserted) return false;
 
+    await this.applyPersistentProjection(tx, streamId, log, decoded.eventName, decoded.args);
+    return true;
+  }
+
+  private async applyPersistentProjection(
+    tx: VNextQueryClient,
+    streamId: string,
+    log: Log,
+    eventName: string,
+    args: Record<string, unknown>,
+  ) {
+    const blockNumber = log.blockNumber!;
     if (eventName === "CampaignCreated") {
-      await this.db.insert(vnextCampaignProjections).values({
+      await tx.insert(vnextCampaignProjections).values({
         streamId,
         onchainCampaignId: textArg(args, "campaignId"),
         creator: textArg(args, "creator").toLowerCase(),
@@ -188,8 +280,14 @@ export class VNextIndexerService implements OnModuleInit, OnModuleDestroy {
         lastBlockNumber: blockNumber.toString(),
         lastEventName: eventName,
       }).onConflictDoNothing();
+    } else if (eventName === "PublicationEvidenceSubmitted") {
+      await tx.update(vnextCampaignProjections).set({
+        publicationEvidenceHash: textArg(args, "evidenceHash").toLowerCase(),
+        publicationReviewCaseId: textArg(args, "reviewCaseId").toLowerCase(),
+        lastBlockNumber: blockNumber.toString(), lastEventName: eventName, updatedAt: new Date(),
+      }).where(and(eq(vnextCampaignProjections.streamId, streamId), eq(vnextCampaignProjections.onchainCampaignId, textArg(args, "campaignId"))));
     } else if (eventName === "PublicationFinalized") {
-      await this.db.update(vnextCampaignProjections).set({
+      await tx.update(vnextCampaignProjections).set({
         state: boolArg(args, "successful") ? 1 : 5,
         publicationOutcome: boolArg(args, "successful") ? 1 : 3,
         lastBlockNumber: blockNumber.toString(),
@@ -197,15 +295,28 @@ export class VNextIndexerService implements OnModuleInit, OnModuleDestroy {
         updatedAt: new Date(),
       }).where(and(eq(vnextCampaignProjections.streamId, streamId), eq(vnextCampaignProjections.onchainCampaignId, textArg(args, "campaignId"))));
     } else if (eventName === "ContributionReceived") {
-      await this.db.update(vnextCampaignProjections).set({
+      await tx.update(vnextCampaignProjections).set({
         raised: textArg(args, "cumulativeRaised"), lastBlockNumber: blockNumber.toString(), lastEventName: eventName, updatedAt: new Date(),
       }).where(and(eq(vnextCampaignProjections.streamId, streamId), eq(vnextCampaignProjections.onchainCampaignId, textArg(args, "campaignId"))));
     } else if (eventName === "FundingFinalized") {
-      await this.db.update(vnextCampaignProjections).set({
+      await tx.update(vnextCampaignProjections).set({
         state: boolArg(args, "successful") ? 2 : 5, raised: textArg(args, "raised"), lastBlockNumber: blockNumber.toString(), lastEventName: eventName, updatedAt: new Date(),
       }).where(and(eq(vnextCampaignProjections.streamId, streamId), eq(vnextCampaignProjections.onchainCampaignId, textArg(args, "campaignId"))));
+    } else if (eventName === "CampaignRefundsOpened") {
+      await tx.update(vnextCampaignProjections).set({
+        state: 5, lastBlockNumber: blockNumber.toString(), lastEventName: eventName, updatedAt: new Date(),
+      }).where(and(eq(vnextCampaignProjections.streamId, streamId), eq(vnextCampaignProjections.onchainCampaignId, textArg(args, "campaignId"))));
+    } else if (eventName === "BackerRefundClaimed") {
+      await tx.update(vnextCampaignProjections).set({
+        refunded: sql`${vnextCampaignProjections.refunded} + ${textArg(args, "amount")}`,
+        lastBlockNumber: blockNumber.toString(), lastEventName: eventName, updatedAt: new Date(),
+      }).where(and(eq(vnextCampaignProjections.streamId, streamId), eq(vnextCampaignProjections.onchainCampaignId, textArg(args, "campaignId"))));
+    } else if (eventName === "CampaignCompleted") {
+      await tx.update(vnextCampaignProjections).set({
+        state: 4, lastBlockNumber: blockNumber.toString(), lastEventName: eventName, updatedAt: new Date(),
+      }).where(and(eq(vnextCampaignProjections.streamId, streamId), eq(vnextCampaignProjections.onchainCampaignId, textArg(args, "campaignId"))));
     } else if (eventName === "MilestoneEvidenceSubmitted") {
-      await this.db.insert(vnextMilestoneProjections).values({
+      await tx.insert(vnextMilestoneProjections).values({
         streamId,
         onchainCampaignId: textArg(args, "campaignId"),
         milestoneId: Number(textArg(args, "milestoneId")),
@@ -220,10 +331,20 @@ export class VNextIndexerService implements OnModuleInit, OnModuleDestroy {
         set: { evidenceRevision: textArg(args, "evidenceRevision"), evidenceHash: textArg(args, "evidenceHash").toLowerCase(), reviewCaseId: textArg(args, "reviewCaseId").toLowerCase(), state: 2, lastBlockNumber: blockNumber.toString(), updatedAt: new Date() },
       });
     } else if (eventName === "MilestonePaid") {
-      await this.db.update(vnextMilestoneProjections).set({ paid: true, state: 10, lastBlockNumber: blockNumber.toString(), updatedAt: new Date() }).where(and(eq(vnextMilestoneProjections.streamId, streamId), eq(vnextMilestoneProjections.onchainCampaignId, textArg(args, "campaignId")), eq(vnextMilestoneProjections.milestoneId, Number(textArg(args, "milestoneId")))));
-      await this.db.update(vnextCampaignProjections).set({ paidOut: sql`${vnextCampaignProjections.paidOut} + ${textArg(args, "amount")}`, lastBlockNumber: blockNumber.toString(), lastEventName: eventName, updatedAt: new Date() }).where(and(eq(vnextCampaignProjections.streamId, streamId), eq(vnextCampaignProjections.onchainCampaignId, textArg(args, "campaignId"))));
+      await tx.update(vnextMilestoneProjections).set({ paid: true, state: 10, lastBlockNumber: blockNumber.toString(), updatedAt: new Date() }).where(and(eq(vnextMilestoneProjections.streamId, streamId), eq(vnextMilestoneProjections.onchainCampaignId, textArg(args, "campaignId")), eq(vnextMilestoneProjections.milestoneId, Number(textArg(args, "milestoneId")))));
+      await tx.update(vnextCampaignProjections).set({ paidOut: sql`${vnextCampaignProjections.paidOut} + ${textArg(args, "amount")}`, lastBlockNumber: blockNumber.toString(), lastEventName: eventName, updatedAt: new Date() }).where(and(eq(vnextCampaignProjections.streamId, streamId), eq(vnextCampaignProjections.onchainCampaignId, textArg(args, "campaignId"))));
+    } else if (eventName === "MilestoneRevisionSubmitted") {
+      await tx.update(vnextMilestoneProjections).set({
+        evidenceRevision: textArg(args, "evidenceRevision"), evidenceHash: textArg(args, "evidenceHash").toLowerCase(),
+        state: 2, lastBlockNumber: blockNumber.toString(), updatedAt: new Date(),
+      }).where(and(eq(vnextMilestoneProjections.streamId, streamId), eq(vnextMilestoneProjections.onchainCampaignId, textArg(args, "campaignId")), eq(vnextMilestoneProjections.milestoneId, Number(textArg(args, "milestoneId")))));
+    } else if (eventName === "ChallengeResolved") {
+      await tx.update(vnextMilestoneProjections).set({
+        state: Number(textArg(args, "outcome")) === 1 ? 9 : 14,
+        lastBlockNumber: blockNumber.toString(), updatedAt: new Date(),
+      }).where(and(eq(vnextMilestoneProjections.streamId, streamId), eq(vnextMilestoneProjections.onchainCampaignId, textArg(args, "campaignId")), eq(vnextMilestoneProjections.milestoneId, Number(textArg(args, "milestoneId")))));
     } else if (eventName === "ReviewCaseCreated") {
-      await this.db.insert(vnextReviewProjections).values({
+      await tx.insert(vnextReviewProjections).values({
         streamId,
         reviewCaseId: textArg(args, "reviewCaseId").toLowerCase(),
         rootCaseId: textArg(args, "reviewCaseId").toLowerCase(),
@@ -235,11 +356,11 @@ export class VNextIndexerService implements OnModuleInit, OnModuleDestroy {
         lastBlockNumber: blockNumber.toString(),
       }).onConflictDoNothing();
     } else if (eventName === "JudgeEnrolled") {
-      await this.db.update(vnextReviewProjections).set({ enrolledCount: sql`${vnextReviewProjections.enrolledCount} + 1`, lastBlockNumber: blockNumber.toString(), updatedAt: new Date() }).where(and(eq(vnextReviewProjections.streamId, streamId), eq(vnextReviewProjections.reviewCaseId, textArg(args, "reviewCaseId").toLowerCase())));
+      await tx.update(vnextReviewProjections).set({ enrolledCount: sql`${vnextReviewProjections.enrolledCount} + 1`, lastBlockNumber: blockNumber.toString(), updatedAt: new Date() }).where(and(eq(vnextReviewProjections.streamId, streamId), eq(vnextReviewProjections.reviewCaseId, textArg(args, "reviewCaseId").toLowerCase())));
     } else if (eventName === "ReviewRoundFinalized") {
-      await this.db.update(vnextReviewProjections).set({ outcome: Number(textArg(args, "outcome")), finalized: true, lastBlockNumber: blockNumber.toString(), updatedAt: new Date() }).where(and(eq(vnextReviewProjections.streamId, streamId), eq(vnextReviewProjections.reviewCaseId, textArg(args, "reviewCaseId").toLowerCase())));
+      await tx.update(vnextReviewProjections).set({ outcome: Number(textArg(args, "outcome")), finalized: true, lastBlockNumber: blockNumber.toString(), updatedAt: new Date() }).where(and(eq(vnextReviewProjections.streamId, streamId), eq(vnextReviewProjections.reviewCaseId, textArg(args, "reviewCaseId").toLowerCase())));
     } else if (eventName === "FinalRulingEstablished") {
-      await this.db.update(vnextReviewProjections).set({ outcome: Number(textArg(args, "outcome")), finalized: true, lastBlockNumber: blockNumber.toString(), updatedAt: new Date() }).where(and(eq(vnextReviewProjections.streamId, streamId), eq(vnextReviewProjections.reviewCaseId, textArg(args, "reviewCaseId").toLowerCase())));
+      await tx.update(vnextReviewProjections).set({ outcome: Number(textArg(args, "outcome")), finalized: true, lastBlockNumber: blockNumber.toString(), updatedAt: new Date() }).where(and(eq(vnextReviewProjections.streamId, streamId), eq(vnextReviewProjections.reviewCaseId, textArg(args, "reviewCaseId").toLowerCase())));
     } else if (eventName === "CourtAssigned") {
       const reviewCaseId = textArg(args, "reviewCaseId").toLowerCase();
       const values = ["judgeOne", "judgeTwo", "judgeThree"].map((key, slot) => ({
@@ -252,11 +373,68 @@ export class VNextIndexerService implements OnModuleInit, OnModuleDestroy {
         lastBlockNumber: blockNumber.toString(),
       }));
       for (const assignment of values) {
-        await this.db.insert(vnextJudgeAssignments).values(assignment).onConflictDoUpdate({
+        await tx.insert(vnextJudgeAssignments).values(assignment).onConflictDoUpdate({
           target: [vnextJudgeAssignments.streamId, vnextJudgeAssignments.reviewCaseId, vnextJudgeAssignments.courtId, vnextJudgeAssignments.slot],
           set: { judgeAddress: assignment.judgeAddress, lastBlockNumber: assignment.lastBlockNumber },
         });
       }
     }
+
+    if (eventName === "ReviewRetryOpened") {
+      await this.copyReviewToNewCase(tx, streamId, log, textArg(args, "rootCaseId"), textArg(args, "reviewCaseId"), textArg(args, "retryRoundId"));
+    } else if (eventName === "AppealOpened") {
+      await this.copyReviewToNewCase(tx, streamId, log, textArg(args, "reviewCaseId"), textArg(args, "appealCaseId"), textArg(args, "appealRoundId"));
+    } else if (eventName === "AppealRoundFinalized") {
+      await this.updateReviewFinality(tx, streamId, log, textArg(args, "reviewCaseId"), Number(textArg(args, "outcome")));
+    } else if (eventName === "ReviewCaseSettled") {
+      await this.updateReviewFinality(tx, streamId, log, textArg(args, "reviewCaseId"), Number(textArg(args, "outcome")));
+    } else if (eventName === "UnenrolledCaseStakeReleased" || eventName === "CaseStakeReserved" || eventName === "CaseStakeSettled" || eventName === "JudgeRewardAccrued" || eventName === "JurySnapshotFinalized" || eventName === "CourtFinalized" || eventName === "VoteCommitted" || eventName === "VoteRevealed" || eventName === "JudgeSlashed" || eventName === "JudgeRewardClaimed") {
+      await tx.update(vnextReviewProjections).set({ lastBlockNumber: blockNumber.toString(), updatedAt: new Date() }).where(and(eq(vnextReviewProjections.streamId, streamId), eq(vnextReviewProjections.reviewCaseId, textArg(args, "reviewCaseId").toLowerCase())));
+    }
+
+    if (eventName !== "CampaignCreated" && eventName !== "MilestonePaid" && eventName !== "CampaignRefundsOpened" && eventName !== "BackerRefundClaimed" && eventName !== "CampaignCompleted" && arg(args, "campaignId") !== undefined) {
+      await tx.update(vnextCampaignProjections).set({
+        lastBlockNumber: blockNumber.toString(), lastEventName: eventName, updatedAt: new Date(),
+      }).where(and(eq(vnextCampaignProjections.streamId, streamId), eq(vnextCampaignProjections.onchainCampaignId, textArg(args, "campaignId"))));
+    }
+  }
+
+  private async copyReviewToNewCase(
+    tx: VNextQueryClient,
+    streamId: string,
+    log: Log,
+    previousCaseId: string,
+    newCaseId: string,
+    roundId: string,
+  ) {
+    const [previous] = await tx.select().from(vnextReviewProjections).where(and(
+      eq(vnextReviewProjections.streamId, streamId), eq(vnextReviewProjections.reviewCaseId, previousCaseId.toLowerCase()),
+    ));
+    if (!previous) return;
+    await tx.insert(vnextReviewProjections).values({
+      streamId,
+      reviewCaseId: newCaseId.toLowerCase(),
+      rootCaseId: previous.rootCaseId,
+      campaignId: previous.campaignId,
+      milestoneId: previous.milestoneId,
+      evidenceRevision: previous.evidenceRevision,
+      roundId,
+      creator: previous.creator,
+      enrolledCount: "0",
+      finalized: false,
+      lastBlockNumber: log.blockNumber!.toString(),
+    }).onConflictDoNothing();
+  }
+
+  private async updateReviewFinality(
+    tx: VNextQueryClient,
+    streamId: string,
+    log: Log,
+    reviewCaseId: string,
+    outcome: number,
+  ) {
+    await tx.update(vnextReviewProjections).set({
+      outcome, finalized: true, lastBlockNumber: log.blockNumber!.toString(), updatedAt: new Date(),
+    }).where(and(eq(vnextReviewProjections.streamId, streamId), eq(vnextReviewProjections.reviewCaseId, reviewCaseId.toLowerCase())));
   }
 }
