@@ -105,3 +105,11 @@ test('VNext Judge workspace exposes stake and assigned commit-reveal actions', (
   assert.match(page, /judge-ledger/)
   assert.doesNotMatch(page, /approveCampaign/)
 })
+
+test('VNext Judge review blocks voting until canonical evidence is available', () => {
+  const page = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextJudgePage.tsx'), 'utf8')
+  assert.match(page, /vnextEvidence\(review\.reviewCaseId/)
+  assert.match(page, /availabilityPolicy/)
+  assert.match(page, /TIMEOUT_RETRY_ELIGIBLE/)
+  assert.match(page, /evidenceReady/)
+})

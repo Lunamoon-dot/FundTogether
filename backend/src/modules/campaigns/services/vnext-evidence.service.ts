@@ -19,11 +19,18 @@ import type { AuthenticatedAccount } from "../../auth/auth.types";
 import { VNEXT_CONNECTION, type VNextConnection } from "../../../indexer/vnext-indexer.service";
 import { resolveVNextDossierAccess } from "../../../indexer/vnext-dossier-access";
 import { matchesVNextEvidenceHash, vnextEvidenceSha256 } from "../../../indexer/vnext-evidence-integrity";
+import { vnextReviewAbi } from "../../../blockchain/vnext-deployment";
+import {
+  resolveVNextEvidenceAvailability,
+  type VNextEvidenceObjectState,
+  type VNextEvidenceReviewPhase,
+} from "./vnext-evidence-availability";
 
 const summarySchema = z.strictObject({ summary: z.string().trim().min(1).max(5000) });
 const hashPattern = /^0x[0-9a-fA-F]{64}$/;
 
 type VNextEvidence = typeof schema.vnextCaseEvidence.$inferSelect;
+type VNextReview = typeof schema.vnextReviewProjections.$inferSelect;
 
 const dto = (item: VNextEvidence) => ({
   reviewCaseId: item.reviewCaseId,
@@ -34,6 +41,9 @@ const dto = (item: VNextEvidence) => ({
   summary: item.summary,
   createdAt: item.createdAt,
 });
+
+const ROUND_VOTING = 3;
+const ROUND_FINALIZED = 4;
 
 @Injectable()
 export class VNextEvidenceService {
@@ -95,16 +105,62 @@ export class VNextEvidenceService {
     return evidenceHash;
   }
 
+  private async availabilityPolicy(
+    reviewCaseId: string,
+    review: VNextReview,
+    objectState: VNextEvidenceObjectState,
+  ) {
+    if (!this.connection) throw new ServiceUnavailableException("VNext deployment is not configured");
+    const [roundStatus, enrollmentDeadline, revealDeadline] = await Promise.all([
+      this.connection.client.readContract({ address: this.connection.manifest.juryReview, abi: vnextReviewAbi, functionName: "roundStatus", args: [reviewCaseId as `0x${string}`] }),
+      this.connection.client.readContract({ address: this.connection.manifest.juryReview, abi: vnextReviewAbi, functionName: "enrollmentDeadline", args: [reviewCaseId as `0x${string}`] }),
+      this.connection.client.readContract({ address: this.connection.manifest.juryReview, abi: vnextReviewAbi, functionName: "revealDeadline", args: [reviewCaseId as `0x${string}`] }),
+    ]);
+    const status = Number(roundStatus);
+    const reviewPhase: VNextEvidenceReviewPhase = status >= ROUND_FINALIZED
+      ? "FINALIZED"
+      : status === ROUND_VOTING
+        ? "VOTING"
+        : "ENROLLMENT";
+    const timeoutAtSeconds = reviewPhase === "FINALIZED"
+      ? null
+      : BigInt(String(reviewPhase === "VOTING" ? revealDeadline : enrollmentDeadline));
+    const policy = resolveVNextEvidenceAvailability({
+      objectState,
+      reviewPhase,
+      nowSeconds: BigInt(Math.floor(Date.now() / 1000)),
+      timeoutAtSeconds,
+    });
+    return {
+      status: policy.status,
+      reviewPhase,
+      timeoutAtSeconds: policy.timeoutAtSeconds?.toString() ?? null,
+      reviewCaseId: review.reviewCaseId,
+    };
+  }
+
   async list(reviewCaseIdInput: string, account: AuthenticatedAccount) {
     const reviewCaseId = this.caseId(reviewCaseIdInput);
-    const { streamId, assignments, access, caseIds } = await this.reviewAndAccess(reviewCaseId, account);
+    const { streamId, review, assignments, access, caseIds } = await this.reviewAndAccess(reviewCaseId, account);
     const items = await this.db.select().from(schema.vnextCaseEvidence).where(
       and(eq(schema.vnextCaseEvidence.streamId, streamId), inArray(schema.vnextCaseEvidence.reviewCaseId, caseIds)),
     );
-    const evidence = await Promise.all(items.map(async item => ({
-      ...dto(item),
-      availability: await this.storage.availability(item.objectId),
-    })));
+    const availabilityByObject = new Map<string, Awaited<ReturnType<EvidenceStorageService["availability"]>>>();
+    const evidence = await Promise.all(items.map(async item => {
+      const availability = await this.storage.availability(item.objectId);
+      availabilityByObject.set(item.evidenceHash, availability);
+      return { ...dto(item), availability };
+    }));
+    let canonicalHash: string | null = null;
+    try {
+      canonicalHash = await this.canonicalEvidenceHash(streamId, caseIds);
+    } catch (error) {
+      if (!(error instanceof ConflictException)) throw error;
+    }
+    const objectState: VNextEvidenceObjectState = canonicalHash === null
+      ? "NOT_INDEXED"
+      : availabilityByObject.get(canonicalHash) ?? "MISSING";
+    const availabilityPolicy = await this.availabilityPolicy(reviewCaseId, review, objectState);
     return {
       access,
       assignments: access === "CREATOR"
@@ -113,6 +169,8 @@ export class VNextEvidenceService {
           ? assignments.filter(item => this.wallets(account).includes(item.judgeAddress.toLowerCase()))
           : [],
       evidence,
+      canonicalEvidenceHash: canonicalHash,
+      availabilityPolicy,
     };
   }
 

@@ -36,6 +36,7 @@ export function VNextEvidencePanel({ reviewCaseId, enabled = true }: { reviewCas
     <section className="border-t border-[var(--border-hairline)] pt-3 space-y-2" data-vnext-evidence-case={reviewCaseId}>
       <span className="monograph-card__kicker">PRIVATE CASE EVIDENCE</span>
       <p className="text-sm text-[var(--ink-subtle)] m-0">Evidence bytes được lưu private; hash phải khớp evidence hash canonical của review case.</p>
+      {evidence.data?.availabilityPolicy && evidence.data.availabilityPolicy.status !== 'READY' && <p className="text-sm text-[var(--danger)] m-0">Review evidence policy: {evidence.data.availabilityPolicy.status}{evidence.data.availabilityPolicy.timeoutAtSeconds ? ` · timeout ${evidence.data.availabilityPolicy.timeoutAtSeconds}` : ''}. Hash chỉ chứng minh integrity, không tự tạo PASS/FAIL.</p>}
       {(evidence.data?.access === 'CREATOR' || evidence.data?.access === 'CHALLENGER') && (
         <>
           <label className="text-sm block" htmlFor={`vnext-evidence-summary-${reviewCaseId}`}>Evidence summary</label>

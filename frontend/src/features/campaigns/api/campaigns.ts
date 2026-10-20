@@ -269,6 +269,13 @@ export interface VNextCaseEvidenceResponse {
   access: 'CREATOR' | 'JUDGE' | 'CHALLENGER';
   assignments: VNextJudgeAssignment[];
   evidence: VNextCaseEvidence[];
+  canonicalEvidenceHash: string | null;
+  availabilityPolicy: {
+    reviewCaseId: string;
+    reviewPhase: 'ENROLLMENT' | 'VOTING' | 'FINALIZED';
+    status: 'READY' | 'WAITING_FOR_EVIDENCE' | 'TIMEOUT_RETRY_ELIGIBLE' | 'WAITING_FOR_INDEXER' | 'REVIEW_CLOSED';
+    timeoutAtSeconds: string | null;
+  };
 }
 export interface CampaignChain {
   deployment: DeploymentManifest; status: 'ON_CHAIN_CONFIRMED' | 'ORPHANED' | 'NOT_PUBLISHED'; onchainCampaignId: string | null;

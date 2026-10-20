@@ -126,17 +126,25 @@ function JudgeReviewCard({
     },
     retry: false,
   });
+  const evidence = useQuery({
+    queryKey: ['vnext-judge-case-evidence', review.reviewCaseId, transaction.address],
+    queryFn: ({ signal }) => campaignApi.vnextEvidence(review.reviewCaseId, signal),
+    enabled: Boolean(currentAssignment && transaction.address),
+    retry: false,
+  });
   const computedCommitment = meta.data && transaction.address && validBytes32(salt)
     ? makeCommitment(review, courtId, transaction.address, meta.data.caseNumber, meta.data.protocolVersion, vote, salt)
     : null;
   const now = BigInt(Math.floor(Date.now() / 1000));
   const creatorConflict = Boolean(transaction.address && transaction.address.toLowerCase() === review.creator.toLowerCase());
   const contributorConflict = Boolean(meta.data?.contribution && meta.data.contribution > 0n);
+  const evidenceReady = evidence.data?.availabilityPolicy.status === 'READY';
+  const evidenceBlocked = Boolean(evidence.data && !evidenceReady);
   const canEnroll = Boolean(!currentAssignment && meta.data && meta.data.roundStatus === ROUND_ENROLLMENT_OPEN && now < meta.data.enrollmentDeadline && !creatorConflict && !contributorConflict);
   const canFinalizeSnapshot = Boolean(meta.data && meta.data.roundStatus === ROUND_ENROLLMENT_OPEN && !meta.data.snapshotFinalized && now >= meta.data.enrollmentDeadline && BigInt(review.enrolledCount) >= 3n);
   const canAssignCourt = Boolean(meta.data && meta.data.roundStatus === ROUND_ASSIGNMENT_PENDING && meta.data.snapshotFinalized && !meta.data.courtAssigned);
-  const canCommit = Boolean(currentAssignment && meta.data?.roundStatus === ROUND_VOTING && now >= meta.data.enrollmentDeadline && now < meta.data.commitDeadline && computedCommitment && meta.data.commitment === ZERO_HASH);
-  const canReveal = Boolean(currentAssignment && meta.data?.roundStatus === ROUND_VOTING && now >= meta.data.commitDeadline && now < meta.data.revealDeadline && computedCommitment === meta.data.commitment && !meta.data.revealed && validBytes32(salt));
+  const canCommit = Boolean(evidenceReady && currentAssignment && meta.data?.roundStatus === ROUND_VOTING && now >= meta.data.enrollmentDeadline && now < meta.data.commitDeadline && computedCommitment && meta.data.commitment === ZERO_HASH);
+  const canReveal = Boolean(evidenceReady && currentAssignment && meta.data?.roundStatus === ROUND_VOTING && now >= meta.data.commitDeadline && now < meta.data.revealDeadline && computedCommitment === meta.data.commitment && !meta.data.revealed && validBytes32(salt));
   const canFinalizeCourt = Boolean(currentAssignment && meta.data?.roundStatus === ROUND_VOTING && now >= meta.data.revealDeadline && !meta.data.courtFinalized);
 
   return (
@@ -149,6 +157,7 @@ function JudgeReviewCard({
       {creatorConflict && <p className="text-sm text-[var(--danger)] m-0">Creator conflict: wallet tạo case không được enroll.</p>}
       {contributorConflict && !creatorConflict && <p className="text-sm text-[var(--danger)] m-0">Contributor conflict: wallet đã góp vốn cho campaign không được enroll.</p>}
       {meta.data && <p className="text-sm text-[var(--ink-subtle)] m-0">Case stake tối thiểu: {meta.data.requiredCaseStake.toString()} token units.</p>}
+      {evidenceBlocked && <p className="text-sm text-[var(--danger)] m-0">Evidence chưa sẵn sàng ({evidence.data?.availabilityPolicy.status}); Judge không thể commit/reveal. {evidence.data?.availabilityPolicy.status === 'TIMEOUT_RETRY_ELIGIBLE' ? 'Review đã tới timeout; chỉ dùng protocol retry/fail path.' : 'Chờ storage hoặc indexer xác nhận trước deadline.'}</p>}
       {canEnroll && deployment.juryRegistry && (
         <div className="flex flex-wrap gap-2">
           <button type="button" className="button button--secondary" disabled={transaction.busy} onClick={() => void transaction.send('registry', 'reserveCaseStake', [caseId, meta.data!.requiredCaseStake])}>Reserve case stake</button>

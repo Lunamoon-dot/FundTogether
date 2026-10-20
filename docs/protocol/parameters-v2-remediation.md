@@ -57,6 +57,8 @@ verifier must agree with it before a local acceptance run is considered valid.
 | `maximumAppealRounds` | 2 | Fresh, non-overlapping Judge pool per appeal |
 | `maximumRetriesPerReviewLevel` | 2 | Only protocol failure can retry |
 | `maximumMilestoneCorrections` | 1 | Correction keeps the frozen budget and criteria |
+| `maxEligibleJudges` | 300 | Maximum enrolled Judges in one review case |
+| `settlementBatchWorkUnits` | 32 | Permissionless stake/reward settlement cap per transaction; one unit is one enrolled Judge position |
 | `minoritySlashBps` | `500` (5%) | Only substantive minority slashing; protocol failure does not slashing-score a side |
 | `nonRevealPenalty` | 0 | Missing reveal makes the court invalid; it does not create a substantive FAIL |
 | `appealBond` | 1 MockUSDC (`1000000` units) | Refunded when the appeal family reaches finality |
@@ -80,6 +82,29 @@ verifier must agree with it before a local acceptance run is considered valid.
 6. Event, projection and stream checkpoint writes are one database transaction.
    The event identity is `(streamId, transactionHash, logIndex)` and the stream
    encodes chain ID, escrow address and genesis hash.
+7. Final ruling publication and milestone materialization remain blocked until
+   every root, appeal and retry case in the ruling family has completed the
+   bounded settlement phases.
+
+## Local settlement measurement
+
+The Docker Foundry profile measured `JuryReview.settleCaseBatch` with a
+protocol-failure case and no assigned courts. These are transaction-local gas
+measurements from the `gasleft()` delta, not a public-chain cost guarantee:
+
+```text
+batch 1  -> 122,893 gas
+batch 2  -> 160,394 gas
+batch 10 -> 597,226 gas
+batch 32 -> 1,833,341 gas
+```
+
+A separate regression enrolled 300 Judges and completed settlement through ten
+permissionless calls. The contract caps an oversized request at 32 work units;
+the test passed with `settlementCursor == 300` and `settlementPhase == 3`.
+The supported local limit is therefore 300 enrolled Judges with 32 settlement
+work units per transaction. Production gas pricing, calldata costs and reward
+economics still require a new policy review.
 
 ## Financial boundary
 
