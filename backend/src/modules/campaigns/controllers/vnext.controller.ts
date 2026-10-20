@@ -22,6 +22,7 @@ import {
   buildVNextTransactionStatus,
   normalizeVNextTransactionHash,
 } from "../../../indexer/vnext-transaction-status";
+import { buildVNextJudgeReviews } from "./vnext-judge-reviews";
 
 @Controller("v1/fundtogether/vnext")
 export class VNextController {
@@ -199,18 +200,14 @@ export class VNextController {
       .map(wallet => wallet.address.toLowerCase());
     if (walletAddresses.length === 0) return [];
     const streamId = this.streamId();
-    const assignments = await this.db.select().from(vnextJudgeAssignments).where(
-      and(eq(vnextJudgeAssignments.streamId, streamId), inArray(vnextJudgeAssignments.judgeAddress, walletAddresses)),
-    );
-    const reviewCaseIds = [...new Set(assignments.map(assignment => assignment.reviewCaseId))];
-    if (reviewCaseIds.length === 0) return [];
-    const reviews = await this.db.select().from(vnextReviewProjections).where(
-      and(eq(vnextReviewProjections.streamId, streamId), inArray(vnextReviewProjections.reviewCaseId, reviewCaseIds)),
-    );
-    return reviews.map(review => ({
-      ...review,
-      assignments: assignments.filter(assignment => assignment.reviewCaseId === review.reviewCaseId),
-    }));
+    const [reviews, assignments] = await Promise.all([
+      this.db.select().from(vnextReviewProjections).where(and(
+        eq(vnextReviewProjections.streamId, streamId),
+        eq(vnextReviewProjections.finalized, false),
+      )),
+      this.db.select().from(vnextJudgeAssignments).where(eq(vnextJudgeAssignments.streamId, streamId)),
+    ]);
+    return buildVNextJudgeReviews(reviews, assignments, walletAddresses);
   }
 
   @Get("reviews/:reviewCaseId/assignments")
