@@ -232,4 +232,3 @@ Before claiming completion, verify every gate against current source and output:
 - verifier checks the complete frozen policy matrix;
 - Foundry, focused backend tests, build, generated artifacts and diff checks pass;
 - no claim is made that local evidence equals a production security audit.
-
