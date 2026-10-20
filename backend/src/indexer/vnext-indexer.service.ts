@@ -20,6 +20,7 @@ import {
   verifyVNextDeployment,
   vnextCampaignAbi,
   vnextClient,
+  vnextRegistryAbi,
   vnextReviewAbi,
   type VNextDeploymentManifest,
 } from "../blockchain/vnext-deployment";
@@ -169,7 +170,7 @@ export class VNextIndexerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private decode(log: Log) {
-    for (const abi of [vnextCampaignAbi, vnextReviewAbi]) {
+    for (const abi of [vnextCampaignAbi, vnextReviewAbi, vnextRegistryAbi]) {
       try {
         const [event] = parseEventLogs({ abi, logs: [log], strict: true });
         if (event) return { eventName: event.eventName, args: eventArgs(event) };
@@ -387,7 +388,7 @@ export class VNextIndexerService implements OnModuleInit, OnModuleDestroy {
       await this.updateReviewFinality(tx, streamId, log, textArg(args, "reviewCaseId"), Number(textArg(args, "outcome")));
     } else if (eventName === "ReviewCaseSettled") {
       await this.updateReviewFinality(tx, streamId, log, textArg(args, "reviewCaseId"), Number(textArg(args, "outcome")));
-    } else if (eventName === "UnenrolledCaseStakeReleased" || eventName === "JurySnapshotFinalized" || eventName === "CourtFinalized" || eventName === "VoteCommitted" || eventName === "VoteRevealed" || eventName === "JudgeSlashed" || eventName === "JudgeRewardClaimed") {
+    } else if (eventName === "UnenrolledCaseStakeReleased" || eventName === "CaseStakeReserved" || eventName === "CaseStakeSettled" || eventName === "JudgeRewardAccrued" || eventName === "JurySnapshotFinalized" || eventName === "CourtFinalized" || eventName === "VoteCommitted" || eventName === "VoteRevealed" || eventName === "JudgeSlashed" || eventName === "JudgeRewardClaimed") {
       await tx.update(vnextReviewProjections).set({ lastBlockNumber: blockNumber.toString(), updatedAt: new Date() }).where(and(eq(vnextReviewProjections.streamId, streamId), eq(vnextReviewProjections.reviewCaseId, textArg(args, "reviewCaseId").toLowerCase())));
     }
 

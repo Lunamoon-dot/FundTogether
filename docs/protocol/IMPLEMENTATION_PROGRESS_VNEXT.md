@@ -6,6 +6,7 @@
 
 **Roadmap:** [A–Z VNext build roadmap](../superpowers/plans/2026-10-20-vnext-a-z-build-roadmap.md)
 **Specification:** [Protocol Specification V1](FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_V1.md)
+**Remediation registry:** [Parameter Registry V2](parameters-v2-remediation.md)
 **Runtime boundary:** local Anvil/MockUSDC only; no public-chain acceptance
 
 ## Implemented and verified slices
@@ -24,7 +25,8 @@
 | K | `JuryReview.sol`, `CampaignEscrowVNext.sol` | Appeal/challenge hooks exist; focused review/campaign tests pass |
 | L | `CampaignEscrowVNext.sol` | Payout/refund/challenge tests: 4 passed; conservation/failure-transfer fuzz suite: 3 passed |
 | P | `DeployVNext.s.sol`, `deploy-vnext.cjs`, `verify-vnext-runtime.cjs`, `vnext-deployment.ts` | Foundry script compiles; runtime verifier CLI/parser tests: 4 passed; one-time wiring is executable |
-| Q/R | `vnext-indexer.service.ts`, `vnext-event-projector.ts`, VNext Drizzle schema | Projector tests: 2 passed; migration and idempotent event store added |
+| P0/P1 remediation | `JuryReview.sol`, `JuryRegistry.sol`, `CampaignEscrowVNext.sol` | Retry/settlement/stake/liveness/budget/refund/court-order regressions covered; full Foundry suite: 117 passed |
+| Q/R | `vnext-indexer.service.ts`, `vnext-event-projector.ts`, VNext Drizzle schema | Persistent event/projection/checkpoint transaction; replay/crash/refund/completion tests: 8 passed; real PostgreSQL replay check passed |
 | S/T | `vnext.controller.ts`, `vnext-evidence-integrity.ts` | Read-only projection API, SHA-256 evidence check and focused evidence tests added |
 | U/V/W/X | `VNextProtocolPage.tsx` | Read-only VNext protocol/campaign projection surface added; Creator/Backer/Judge wallet journeys remain incomplete |
 
@@ -56,10 +58,15 @@ The current VNext contract slice can:
   Resolver/Admin approval;
 - finalize funding permissionlessly, open full funding-failure refunds, and
   keep successful funds in contract custody;
+- enforce a frozen 7-day milestone submission and correction window with
+  permissionless timeout-to-refund paths;
+- require the immutable milestone budget total to equal the funding goal;
 - bind milestone evidence revisions to one review case each, allow bounded
   correction after `VERDICT_FAIL`, open eligible Backer challenge cases;
 - pay an exact milestone budget only after final PASS and the challenge window,
-  and open pro-rata refunds on terminal failure;
+  and open deterministic, claim-order-independent refunds on terminal failure;
+- register every review case with a risk-adjusted Judge stake requirement and
+  release unenrolled reservations after the enrollment deadline;
 - preserve `R = P + F + E` in the tested partial-payout/refund and failed-token
   transfer paths.
 
@@ -80,7 +87,7 @@ The following remain incomplete and must not be inferred from the passing slice:
 
 ## Verification record
 
-The contract suite currently reports 92 passing tests, including historical
+The contract suite currently reports 117 passing tests, including historical
 Resolver contracts and the new VNext focused suites. The historical tests are
 kept for regression visibility and are not counted as proof of pure-decentralized
 financial behavior.
@@ -97,12 +104,18 @@ test/unit/VNext/MilestoneEvidence.t.sol 4 passed
 test/unit/VNext/PayoutRefund.t.sol 4 passed
 test/invariant/VNextConservation.t.sol 3 passed (256-case fuzz)
 
-Full command: `forge test` → 92 passed, 0 failed, 0 skipped across 11 suites.
+Full command: `forge test` → 117 passed, 0 failed, 0 skipped across 11 suites.
 The suite includes historical Resolver tests for regression visibility; the
 VNext evidence is the focused VNext/invariant rows above.
 
-Backend focused evidence: VNext projector 2 passed; evidence integrity 2
-passed; `npm run build` completed. Frontend evidence: `npm test` → 199 passed;
+Backend focused evidence: VNext indexer/projector 8 passed; runtime identity 6
+passed; real PostgreSQL VNext replay check passed; `npm run build` completed.
+Runtime acceptance evidence: `node backend/scripts/campaigns/vnext-acceptance.cjs`
+passed on local Anvil chain `31339` after deploying policy V2. It completed a
+two-Backer milestone payout (campaign `4`), a Creator submission-timeout refund
+(campaign `5`), verified the canonical event set, ended with campaign escrow
+balance `0`, and matched both campaign projections in PostgreSQL.
+Frontend evidence: `npm test` → 199 passed;
 `npm run build` completed with only the existing large-bundle warning.
 ```
 

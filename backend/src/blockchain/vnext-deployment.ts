@@ -2,10 +2,12 @@ import { z } from "zod";
 import { createPublicClient, defineChain, http, keccak256, toHex } from "viem";
 import type { Abi, PublicClient } from "viem";
 import campaignArtifact = require("./generated/vnext/CampaignEscrowVNext.json");
+import registryArtifact = require("./generated/vnext/JuryRegistry.json");
 import reviewArtifact = require("./generated/vnext/JuryReview.json");
 import tokenAbiJson = require("./generated/fundtogether/mock-usdc.abi.json");
 
 export const vnextCampaignAbi = campaignArtifact.abi as Abi;
+export const vnextRegistryAbi = registryArtifact.abi as Abi;
 export const vnextReviewAbi = reviewArtifact.abi as Abi;
 export const vnextPolicyHash = keccak256(toHex("fundtogether-vnext-local-v2-remediation"));
 export const vnextCampaignAbiHash = keccak256(

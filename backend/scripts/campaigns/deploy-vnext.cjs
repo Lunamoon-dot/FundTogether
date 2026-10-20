@@ -9,7 +9,8 @@ const registryArtifact = contracts('JuryRegistry.sol/JuryRegistry.json');
 const reviewArtifact = contracts('JuryReview.sol/JuryReview.json');
 const tokenArtifact = contracts('MockUSDC.sol/MockUSDC.json');
 const randomnessArtifact = contracts('MockRandomness.sol/MockRandomness.json');
-const manifestPath = path.join(root, '.local/fundtogether/generated/vnext-deployment.local.json');
+const manifestPath = process.env.FUNDTOGETHER_VNEXT_MANIFEST_PATH
+  || path.join(root, '.local/fundtogether/generated/vnext-deployment.local.json');
 const rpcUrl = process.env.FUNDTOGETHER_RPC_URL || 'http://127.0.0.1:9548';
 const chain = defineChain({
   id: 31339,

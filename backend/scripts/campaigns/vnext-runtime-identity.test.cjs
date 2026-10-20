@@ -3,13 +3,22 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
-const { keccak256 } = require('viem');
+const { keccak256, toHex } = require('viem');
 const {
   parseVNextDeploymentManifest,
   verifyVNextDeployment,
   vnextCampaignAbiHash,
   vnextPolicyHash,
 } = require('../../dist/src/blockchain/vnext-deployment.js');
+
+const root = path.resolve(__dirname, '../../..');
+
+function loadPolicyRegistry() {
+  const source = fs.readFileSync(path.join(root, 'docs/protocol/parameters-v2-remediation.md'), 'utf8');
+  const match = source.match(/<!-- vnext-policy-json\s*([\s\S]*?)\s*-->/);
+  if (!match) throw new Error('VNext remediation policy JSON block is missing');
+  return JSON.parse(match[1]);
+}
 
 const hash = value => `0x${value.toString(16).padStart(64, '0')}`;
 const address = value => `0x${value.toString(16).padStart(40, '0')}`;
@@ -61,6 +70,28 @@ test('VNext manifest fixture can be serialized and read without mutation', () =>
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('VNext runtime identity matches the remediation policy registry', () => {
+  const policy = loadPolicyRegistry();
+  assert.deepEqual({
+    policyVersion: policy.policyVersion,
+    chainId: policy.chainId,
+    tokenDecimals: policy.tokenDecimals,
+    milestoneSubmissionWindowSeconds: policy.milestoneSubmissionWindowSeconds,
+    correctionWindowSeconds: policy.correctionWindowSeconds,
+    minimumStakeFloorUnits: policy.minimumStakeFloorUnits,
+    riskMultiplierBps: policy.riskMultiplierBps,
+  }, {
+    policyVersion: 'fundtogether-vnext-local-v2-remediation',
+    chainId: 31339,
+    tokenDecimals: 6,
+    milestoneSubmissionWindowSeconds: 7 * 24 * 60 * 60,
+    correctionWindowSeconds: 7 * 24 * 60 * 60,
+    minimumStakeFloorUnits: '10000000',
+    riskMultiplierBps: 500,
+  });
+  assert.equal(vnextPolicyHash, keccak256(toHex(policy.policyVersion)));
 });
 
 test('VNext verifier enforces remediation policy values and contract wiring', async () => {

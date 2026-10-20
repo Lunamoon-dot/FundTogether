@@ -52,6 +52,9 @@ async function main() {
         'campaigns_download_tickets', 'campaigns_creator_responses',
         'campaigns_creator_response_feedback', 'campaigns_review_threads',
         'campaigns_review_messages', 'campaigns_review_escalations',
+        'vnext_chain_events', 'vnext_campaign_projections',
+        'vnext_milestone_projections', 'vnext_review_projections',
+        'vnext_judge_assignments',
       ];
       for (const name of required) assert.ok(publicNames.has(name), `missing table ${name}`);
       assert.equal(publicNames.has('campaign_fulfillment_batches'), false);
@@ -71,7 +74,14 @@ async function main() {
       ]) assert.ok(archiveNames.has(name), `missing archive table ${name}`);
 
       const { rows: migrations } = await database.query('SELECT id FROM fundtogether_schema_migrations ORDER BY id');
-      assert.deepEqual(migrations.map((row) => row.id), ['0000_fundtogether_baseline', '0001_campaigns_namespace_cleanup']);
+      assert.deepEqual(migrations.map((row) => row.id), [
+        '0000_fundtogether_baseline', '0001_campaigns_namespace_cleanup',
+        '0002_remove_delivery_estimate', '0003_campaign_pledge_quantities',
+        '0004_creator_studio_wallet', '0005_review_conversation_limits',
+        '0006_historical_dispute_integrity', '0007_campaign_payout_requests',
+        '0008_campaign_completion_surplus', '0009_surplus_claim_reorg_history',
+        '0010_campaign_payout_file_purposes', '0011_vnext_projections',
+      ]);
 
       assert.equal(
         (await database.query("SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='historical_entitlements' AND column_name ~ 'shipping|tracking|delivered_at|confirmed_at'")).rows[0].count,
