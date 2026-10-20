@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAccount, usePublicClient } from 'wagmi';
+import { erc20Abi } from 'viem';
 import type { Abi } from 'viem';
 import campaignArtifact from '../../../../../backend/src/blockchain/generated/vnext/CampaignEscrowVNext.json';
 import reviewArtifact from '../../../../../backend/src/blockchain/generated/vnext/JuryReview.json';
@@ -14,6 +15,7 @@ import { campaignApi } from '../api/campaigns';
 import { useVNextTransaction } from './vnext-transaction';
 import { vnextStageLabel } from './vnext-actions';
 import { VNextEvidencePanel } from './VNextEvidencePanel';
+import { vnextAppealBondApprovalRequired } from './vnext-appeal-bond';
 
 const CAMPAIGN_FUNDING = 1;
 const CAMPAIGN_MILESTONES_RUNNING = 3;
@@ -30,10 +32,73 @@ const MILESTONE_RESUBMIT = 13;
 const MILESTONE_CHALLENGE_WINDOW = 9;
 const campaignAbi = campaignArtifact.abi as Abi;
 const reviewAbi = reviewArtifact.abi as Abi;
+const tokenAbi = erc20Abi as Abi;
 
 function tokenAmount(value: string): bigint | null {
   if (!/^[0-9]+$/.test(value) || value === '0') return null;
   try { return BigInt(value); } catch { return null; }
+}
+
+function VNextAppealBondActions({
+  deployment,
+  actionArgs,
+  label,
+  onRefresh,
+}: {
+  deployment: VNextDeployment;
+  actionArgs: readonly unknown[];
+  label: string;
+  onRefresh: () => void;
+}) {
+  const account = useAccount();
+  const client = usePublicClient({ chainId: 31339 });
+  const transaction = useVNextTransaction(onRefresh);
+  const bond = useQuery({
+    queryKey: ['vnext-appeal-bond', deployment.juryReview],
+    enabled: Boolean(client && deployment.juryReview),
+    queryFn: async () => {
+      if (!client || !deployment.juryReview) throw new Error('Appeal bond client is unavailable');
+      return BigInt(String(await client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'appealBond' })));
+    },
+    retry: false,
+  });
+  const allowance = useQuery({
+    queryKey: ['vnext-appeal-bond-allowance', deployment.tokenAddress, deployment.juryReview, account.address],
+    enabled: Boolean(client && account.address && deployment.tokenAddress && deployment.juryReview),
+    queryFn: async () => {
+      if (!client || !account.address || !deployment.tokenAddress || !deployment.juryReview) throw new Error('Appeal allowance client is unavailable');
+      return BigInt(String(await client.readContract({
+        address: deployment.tokenAddress,
+        abi: tokenAbi,
+        functionName: 'allowance',
+        args: [account.address, deployment.juryReview],
+      })));
+    },
+    retry: false,
+  });
+  const bondAmount = bond.data;
+  const allowanceAmount = allowance.data;
+  const approvalRequired = bondAmount !== undefined && allowanceAmount !== undefined
+    ? vnextAppealBondApprovalRequired(allowanceAmount, bondAmount)
+    : true;
+  const appealReady = bondAmount !== undefined && allowanceAmount !== undefined && !approvalRequired;
+
+  if (!account.address || !deployment.tokenAddress || !deployment.juryReview) return null;
+
+  const approveAppealBond = async () => {
+    if (bondAmount === undefined || !deployment.juryReview) return;
+    await transaction.send('token', 'approve', [deployment.juryReview, bondAmount]);
+    await allowance.refetch();
+  };
+
+  return (
+    <div className="flex flex-wrap gap-2" data-vnext-action="appeal-bond">
+      <span className="text-sm text-[var(--ink-subtle)]">Appeal bond: {bondAmount?.toString() ?? 'đang đọc…'} token units</span>
+      {approvalRequired && <button type="button" className="button button--secondary" disabled={transaction.busy || bondAmount === undefined} onClick={() => void approveAppealBond()}>Approve appeal bond</button>}
+      <button type="button" className="button button--quiet" disabled={transaction.busy || !appealReady} onClick={() => void transaction.send('campaign', 'openAppeal', actionArgs)}>{label}</button>
+      {transaction.stage !== 'idle' && <span className="text-xs text-[var(--ink-subtle)]" role="status">{vnextStageLabel(transaction.stage)}</span>}
+    </div>
+  );
 }
 
 function VNextMilestoneActions({
@@ -128,7 +193,7 @@ function VNextMilestoneActions({
           {[MILESTONE_REVIEW_ENROLLMENT, MILESTONE_BASE_REVIEW, MILESTONE_PROVISIONAL_RULING, MILESTONE_APPEAL_WINDOW].includes(milestone.state) && milestone.reviewCaseId && <>
             <button type="button" className="button button--quiet" disabled={transaction.busy || Boolean(settlementState?.outcome && settlementState.outcome !== 0 && !settlementState.complete)} onClick={() => void transaction.send('campaign', 'syncFinalRuling', [campaignNumber, milestoneNumber])}>Sync final ruling</button>
             {[MILESTONE_PROVISIONAL_RULING, MILESTONE_APPEAL_WINDOW].includes(milestone.state) && <>
-              <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('campaign', 'openAppeal', [campaignNumber, milestoneNumber])}>Open appeal</button>
+              <VNextAppealBondActions deployment={deployment} actionArgs={[campaignNumber, milestoneNumber]} label="Open appeal" onRefresh={onRefresh} />
               <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('review', 'finalizeNoAppeal', [milestone.reviewCaseId as `0x${string}`])}>Finalize no appeal</button>
             </>}
           </>}
@@ -259,8 +324,8 @@ export function VNextActionPanel({
         <div className="space-y-2" data-vnext-action="publication-review">
           <p className="text-sm text-[var(--ink-subtle)] m-0">Publication case {publicationReview?.outcome == null ? 'đang chờ canonical review outcome' : `đã có court result ${publicationReview.outcome}`}. Chỉ final ruling từ review contract mới mở funding.</p>
           {publicationReview?.outcome === 1 && publicationFinalOutcome === 0 && <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('review', 'finalizeNoAppeal', [campaign.publicationReviewCaseId as `0x${string}`])}>Finalize publication review</button>}
-          {publicationReview?.outcome === 2 && publicationFinalOutcome === 0 && creator && <>
-            <button type="button" className="button button--quiet" disabled={transaction.busy || campaignNumber === null} onClick={() => void transaction.send('campaign', 'openAppeal', [campaignNumber!, 2n ** 256n - 1n])}>Open publication appeal</button>
+          {publicationReview?.outcome === 2 && publicationFinalOutcome === 0 && creator && campaignNumber !== null && <>
+            <VNextAppealBondActions deployment={deployment} actionArgs={[campaignNumber!, 2n ** 256n - 1n]} label="Open publication appeal" onRefresh={onRefresh} />
             <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('review', 'finalizeNoAppeal', [campaign.publicationReviewCaseId as `0x${string}`])}>Finalize publication review</button>
           </>}
           {(publicationReview?.outcome === 3 || publicationReview?.outcome === 4) && publicationFinalOutcome === 0 && <>

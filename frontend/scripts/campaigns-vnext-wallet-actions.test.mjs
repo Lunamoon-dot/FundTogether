@@ -132,6 +132,23 @@ test('VNext Judge review blocks voting until canonical evidence is available', (
   assert.match(page, /availabilityPolicy/)
   assert.match(page, /TIMEOUT_RETRY_ELIGIBLE/)
   assert.match(page, /evidenceReady/)
+  const commitStart = page.indexOf('const canCommit')
+  const revealStart = page.indexOf('const canReveal')
+  const finalizeStart = page.indexOf('const canFinalizeCourt')
+  assert.match(page.slice(commitStart, revealStart), /evidenceReady/)
+  assert.doesNotMatch(page.slice(revealStart, finalizeStart), /evidenceReady/)
+  assert.match(page, /vnextSaltStorageKey/)
+  assert.match(page, /Copy salt/)
+})
+
+test('VNext appeals expose the token allowance and approve step before openAppeal', () => {
+  const panel = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextActionPanel.tsx'), 'utf8')
+  assert.match(panel, /allowance/)
+  assert.match(panel, /appealBond/)
+  assert.match(panel, /Approve appeal bond/)
+  assert.match(panel, /vnextAppealBondApprovalRequired/)
+  assert.match(panel, /deployment\.juryReview/)
+  assert.match(panel, /publicationReview\?\.outcome === 2[\s\S]*campaignNumber !== null/)
 })
 
 test('VNext evidence uses a short-lived access ticket instead of a direct file URL', () => {

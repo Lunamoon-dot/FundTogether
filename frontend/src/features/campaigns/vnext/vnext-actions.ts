@@ -13,7 +13,7 @@ const actionRoles: Record<string, VNextActionRole[]> = {
   finalizePublication: ['any'],
   retryPublication: ['any'],
   contribute: ['backer'],
-  approveToken: ['backer', 'judge'],
+  approveToken: ['backer', 'judge', 'creator'],
   finalizeFunding: ['any'],
   freezeRefundAllocations: ['any'],
   claimRefund: ['backer'],

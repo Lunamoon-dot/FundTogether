@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { encodeAbiParameters, keccak256 } from 'viem';
 import type { Abi } from 'viem';
@@ -11,6 +11,7 @@ import { getErrorMessage } from '../../../lib/api/error';
 import { useVNextTransaction } from './vnext-transaction';
 import { vnextStageLabel } from './vnext-actions';
 import { VNextEvidencePanel } from './VNextEvidencePanel';
+import { loadVNextJudgeSecret, saveVNextJudgeSecret, vnextSaltStorageKey } from './vnext-salt-storage';
 
 const reviewAbi = reviewArtifact.abi as Abi;
 const campaignAbi = campaignArtifact.abi as Abi;
@@ -93,6 +94,7 @@ function JudgeReviewCard({
   const transaction = useVNextTransaction(onRefresh);
   const [vote, setVote] = useState<'PASS' | 'FAIL'>('PASS');
   const [salt, setSalt] = useState('');
+  const [loadedSaltKey, setLoadedSaltKey] = useState<string | null>(null);
   const currentAssignment = review.assignments.find(item => item.judgeAddress.toLowerCase() === transaction.address?.toLowerCase());
   const courtId = currentAssignment ? BigInt(currentAssignment.courtId) : 0n;
   const caseId = review.reviewCaseId as `0x${string}`;
@@ -145,6 +147,24 @@ function JudgeReviewCard({
   const computedCommitment = meta.data && transaction.address && validBytes32(salt)
     ? makeCommitment(review, courtId, transaction.address, meta.data.caseNumber, meta.data.protocolVersion, vote, salt)
     : null;
+  const saltKey = currentAssignment && transaction.address
+    ? vnextSaltStorageKey(review.reviewCaseId, courtId, transaction.address)
+    : null;
+  useEffect(() => {
+    if (!saltKey) {
+      setSalt('');
+      setVote('PASS');
+      setLoadedSaltKey(null);
+      return;
+    }
+    const secret = loadVNextJudgeSecret(saltKey);
+    setSalt(secret.salt);
+    setVote(secret.vote);
+    setLoadedSaltKey(saltKey);
+  }, [saltKey]);
+  useEffect(() => {
+    if (saltKey && loadedSaltKey === saltKey && validBytes32(salt)) saveVNextJudgeSecret(saltKey, { salt, vote });
+  }, [loadedSaltKey, salt, saltKey, vote]);
   const creatorConflict = Boolean(transaction.address && transaction.address.toLowerCase() === review.creator.toLowerCase());
   const contributorConflict = Boolean(meta.data?.contribution && meta.data.contribution > 0n);
   const evidenceReady = evidence.data?.availabilityPolicy.status === 'READY';
@@ -153,7 +173,7 @@ function JudgeReviewCard({
   const canFinalizeSnapshot = Boolean(judgeChainTimestamp !== undefined && meta.data && meta.data.roundStatus === ROUND_ENROLLMENT_OPEN && !meta.data.snapshotFinalized && judgeChainTimestamp >= meta.data.enrollmentDeadline && BigInt(review.enrolledCount) >= 3n);
   const canAssignCourt = Boolean(meta.data && meta.data.roundStatus === ROUND_ASSIGNMENT_PENDING && meta.data.snapshotFinalized && !meta.data.courtAssigned);
   const canCommit = Boolean(judgeChainTimestamp !== undefined && evidenceReady && currentAssignment && meta.data?.roundStatus === ROUND_VOTING && judgeChainTimestamp >= meta.data.enrollmentDeadline && judgeChainTimestamp < meta.data.commitDeadline && computedCommitment && meta.data.commitment === ZERO_HASH);
-  const canReveal = Boolean(judgeChainTimestamp !== undefined && evidenceReady && currentAssignment && meta.data?.roundStatus === ROUND_VOTING && judgeChainTimestamp >= meta.data.commitDeadline && judgeChainTimestamp < meta.data.revealDeadline && computedCommitment === meta.data.commitment && !meta.data.revealed && validBytes32(salt));
+  const canReveal = Boolean(judgeChainTimestamp !== undefined && currentAssignment && meta.data?.roundStatus === ROUND_VOTING && judgeChainTimestamp >= meta.data.commitDeadline && judgeChainTimestamp < meta.data.revealDeadline && computedCommitment === meta.data.commitment && !meta.data.revealed && validBytes32(salt));
   const canFinalizeCourt = Boolean(judgeChainTimestamp !== undefined && currentAssignment && meta.data?.roundStatus === ROUND_VOTING && judgeChainTimestamp >= meta.data.revealDeadline && !meta.data.courtFinalized);
 
   return (
@@ -167,7 +187,7 @@ function JudgeReviewCard({
       {contributorConflict && !creatorConflict && <p className="text-sm text-[var(--danger)] m-0">Contributor conflict: wallet đã góp vốn cho campaign không được enroll.</p>}
       {meta.data && <p className="text-sm text-[var(--ink-subtle)] m-0">Case stake tối thiểu: {meta.data.requiredCaseStake.toString()} token units.</p>}
       {meta.error && <p role="alert" className="monograph-alert monograph-alert--error">Không đọc được metadata Judge từ chain: {getErrorMessage(meta.error)}</p>}
-      {evidenceBlocked && <p className="text-sm text-[var(--danger)] m-0">Evidence chưa sẵn sàng ({evidence.data?.availabilityPolicy.status}); Judge không thể commit/reveal. {evidence.data?.availabilityPolicy.status === 'TIMEOUT_RETRY_ELIGIBLE' ? 'Review đã tới timeout; chỉ dùng protocol retry/fail path.' : 'Chờ storage hoặc indexer xác nhận trước deadline.'}</p>}
+      {evidenceBlocked && <p className="text-sm text-[var(--danger)] m-0">Evidence chưa sẵn sàng ({evidence.data?.availabilityPolicy.status}); Judge không thể commit. Reveal vẫn có thể thực hiện nếu commitment và salt hợp lệ. {evidence.data?.availabilityPolicy.status === 'TIMEOUT_RETRY_ELIGIBLE' ? 'Review đã tới timeout; chỉ dùng protocol retry/fail path.' : 'Chờ storage hoặc indexer xác nhận trước deadline.'}</p>}
       {canEnroll && deployment.juryRegistry && (
         <div className="flex flex-wrap gap-2">
           <button type="button" className="button button--secondary" disabled={transaction.busy} onClick={() => void transaction.send('registry', 'reserveCaseStake', [caseId, meta.data!.requiredCaseStake])}>Reserve case stake</button>
@@ -183,6 +203,8 @@ function JudgeReviewCard({
           </select>
           <label className="text-sm block" htmlFor={`vnext-salt-${review.reviewCaseId}`}>Salt bytes32</label>
           <input id={`vnext-salt-${review.reviewCaseId}`} className="font-mono" value={salt} onChange={event => setSalt(event.target.value)} placeholder="0x + 64 hex chars" />
+          <p className="text-xs text-[var(--ink-subtle)] m-0">Salt được lưu cục bộ theo case, court và wallet để khôi phục sau refresh. Không chia sẻ salt trước khi reveal.</p>
+          <button type="button" className="button button--quiet" disabled={!validBytes32(salt)} onClick={() => { if (validBytes32(salt)) void navigator.clipboard?.writeText(salt); }}>Copy salt</button>
           {computedCommitment && <p className="text-xs font-mono break-all m-0">Commitment: {computedCommitment}</p>}
           <div className="flex flex-wrap gap-2">
             <button type="button" className="button button--primary" disabled={!canCommit || transaction.busy} onClick={() => void transaction.send('review', 'commitVote', [caseId, courtId, computedCommitment!])}>Commit vote</button>

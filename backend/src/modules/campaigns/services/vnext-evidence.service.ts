@@ -31,6 +31,8 @@ import {
   hashVNextEvidenceAccessToken,
   isVNextEvidenceAccessTicketExpired,
 } from "./vnext-evidence-access-ticket";
+import { readVNextLatestChainTimestamp } from "./vnext-chain-clock";
+import { canUploadVNextEvidence } from "./vnext-evidence-upload-policy";
 
 const summarySchema = z.strictObject({ summary: z.string().trim().min(1).max(5000) });
 const hashPattern = /^0x[0-9a-fA-F]{64}$/;
@@ -117,10 +119,11 @@ export class VNextEvidenceService {
     objectState: VNextEvidenceObjectState,
   ) {
     if (!this.connection) throw new ServiceUnavailableException("VNext deployment is not configured");
-    const [roundStatus, enrollmentDeadline, revealDeadline] = await Promise.all([
+    const [roundStatus, enrollmentDeadline, revealDeadline, nowSeconds] = await Promise.all([
       this.connection.client.readContract({ address: this.connection.manifest.juryReview, abi: vnextReviewAbi, functionName: "roundStatus", args: [reviewCaseId as `0x${string}`] }),
       this.connection.client.readContract({ address: this.connection.manifest.juryReview, abi: vnextReviewAbi, functionName: "enrollmentDeadline", args: [reviewCaseId as `0x${string}`] }),
       this.connection.client.readContract({ address: this.connection.manifest.juryReview, abi: vnextReviewAbi, functionName: "revealDeadline", args: [reviewCaseId as `0x${string}`] }),
+      readVNextLatestChainTimestamp(this.connection.client),
     ]);
     const status = Number(roundStatus);
     const reviewPhase: VNextEvidenceReviewPhase = status >= ROUND_FINALIZED
@@ -134,7 +137,7 @@ export class VNextEvidenceService {
     const policy = resolveVNextEvidenceAvailability({
       objectState,
       reviewPhase,
-      nowSeconds: BigInt(Math.floor(Date.now() / 1000)),
+      nowSeconds,
       timeoutAtSeconds,
     });
     return {
@@ -186,17 +189,31 @@ export class VNextEvidenceService {
     if (!parsed.success) throw new BadRequestException("Evidence summary is required");
     const { streamId, review, access, caseIds } = await this.reviewAndAccess(reviewCaseId, account);
     if (access !== "CREATOR" && access !== "CHALLENGER") throw new ForbiddenException("Only the Creator or canonical Challenger can upload case evidence");
-    if (review.enrolledCount !== "0" || review.finalized) throw new ConflictException("Evidence is frozen after Judge enrollment");
     const evidenceHash = await this.canonicalEvidenceHash(streamId, caseIds);
-    const mediaType = await validateEvidenceFile(file);
-    const sha256 = vnextEvidenceSha256(file!.buffer);
-    if (!matchesVNextEvidenceHash(file!.buffer, evidenceHash)) throw new ConflictException("Uploaded bytes do not match the canonical evidence hash");
     const [existing] = await this.db.select().from(schema.vnextCaseEvidence).where(and(
       eq(schema.vnextCaseEvidence.streamId, streamId),
       inArray(schema.vnextCaseEvidence.reviewCaseId, caseIds),
       eq(schema.vnextCaseEvidence.evidenceHash, evidenceHash),
     ));
     if (existing) return dto(existing);
+
+    if (!this.connection) throw new ServiceUnavailableException("VNext deployment is not configured");
+    const [roundStatus, commitDeadline, nowSeconds] = await Promise.all([
+      this.connection.client.readContract({ address: this.connection.manifest.juryReview, abi: vnextReviewAbi, functionName: "roundStatus", args: [reviewCaseId as `0x${string}`] }),
+      this.connection.client.readContract({ address: this.connection.manifest.juryReview, abi: vnextReviewAbi, functionName: "commitDeadline", args: [reviewCaseId as `0x${string}`] }),
+      readVNextLatestChainTimestamp(this.connection.client),
+    ]);
+    if (!canUploadVNextEvidence({
+      enrolledCount: BigInt(review.enrolledCount),
+      finalized: review.finalized || Number(roundStatus) >= ROUND_FINALIZED,
+      existingEvidence: false,
+      nowSeconds,
+      commitDeadlineSeconds: BigInt(String(commitDeadline)),
+    })) throw new ConflictException("Evidence upload is closed at the commit deadline");
+
+    const mediaType = await validateEvidenceFile(file);
+    const sha256 = vnextEvidenceSha256(file!.buffer);
+    if (!matchesVNextEvidenceHash(file!.buffer, evidenceHash)) throw new ConflictException("Uploaded bytes do not match the canonical evidence hash");
 
     await this.storage.verifyPrivateBucket();
     const objectId = randomUUID();
