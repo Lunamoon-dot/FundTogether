@@ -85,7 +85,9 @@ test('VNext creator creation uses the campaign contract and keeps publication be
 
 test('VNext Judge workspace exposes stake and assigned commit-reveal actions', () => {
   const page = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextJudgePage.tsx'), 'utf8')
-  assert.match(page, /vnextReviews/)
+  assert.match(page, /vnextAssignedReviews/)
+  assert.doesNotMatch(page, /queryFn: \(\{ signal \}\) => campaignApi\.vnextReviews\(signal\)/)
+  assert.match(page, /vnextAssignedReviews/)
   assert.match(page, /depositStake/)
   assert.match(page, /reserveCaseStake/)
   assert.match(page, /enroll/)

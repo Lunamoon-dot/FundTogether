@@ -189,7 +189,7 @@ function JudgeReviewCard({
 export function VNextJudgePage() {
   const { session } = useAccountSession();
   const deployment = useQuery({ queryKey: ['vnext-deployment'], queryFn: campaignApi.vnextDeployment, retry: false });
-  const reviews = useQuery({ queryKey: ['vnext-reviews'], queryFn: ({ signal }) => campaignApi.vnextReviews(signal), enabled: Boolean(session), retry: false });
+  const reviews = useQuery({ queryKey: ['vnext-assigned-reviews'], queryFn: ({ signal }) => campaignApi.vnextAssignedReviews(signal), enabled: Boolean(session), retry: false });
   const ledger = useQuery({ queryKey: ['vnext-judge-ledger'], queryFn: ({ signal }) => campaignApi.vnextJudgeLedger(signal), enabled: Boolean(session), retry: false });
 
   if (!session) return <p>Đăng nhập bằng wallet để mở Judge workspace. <a href="#/account">Đăng nhập</a></p>;
