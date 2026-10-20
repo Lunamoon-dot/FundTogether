@@ -64,15 +64,18 @@ export class VNextEvidenceService {
       and(eq(schema.vnextReviewProjections.streamId, streamId), eq(schema.vnextReviewProjections.reviewCaseId, reviewCaseId)),
     );
     if (!review) throw new NotFoundException("VNext review projection not found");
-    const assignments = await this.db.select().from(schema.vnextJudgeAssignments).where(
-      and(eq(schema.vnextJudgeAssignments.streamId, streamId), eq(schema.vnextJudgeAssignments.reviewCaseId, reviewCaseId)),
-    );
-    const access = resolveVNextDossierAccess({ ...review, assignments }, this.wallets(account));
-    if (!access) throw new ForbiddenException("Creator or assigned Judge required");
     const relatedReviews = await this.db.select({ reviewCaseId: schema.vnextReviewProjections.reviewCaseId }).from(schema.vnextReviewProjections).where(
       and(eq(schema.vnextReviewProjections.streamId, streamId), eq(schema.vnextReviewProjections.rootCaseId, review.rootCaseId)),
     );
     const caseIds = [...new Set([reviewCaseId, review.rootCaseId, ...relatedReviews.map(item => item.reviewCaseId)])];
+    const [challenge] = await this.db.select({ challenger: schema.vnextChallengeProjections.challenger }).from(schema.vnextChallengeProjections).where(
+      and(eq(schema.vnextChallengeProjections.streamId, streamId), inArray(schema.vnextChallengeProjections.challengeCaseId, caseIds)),
+    );
+    const assignments = await this.db.select().from(schema.vnextJudgeAssignments).where(
+      and(eq(schema.vnextJudgeAssignments.streamId, streamId), eq(schema.vnextJudgeAssignments.reviewCaseId, reviewCaseId)),
+    );
+    const access = resolveVNextDossierAccess({ ...review, challenger: challenge?.challenger, assignments }, this.wallets(account));
+    if (!access) throw new ForbiddenException("Creator, canonical Challenger or assigned Judge required");
     return { streamId, review, assignments, access, caseIds };
   }
 
@@ -82,7 +85,7 @@ export class VNextEvidenceService {
       .where(and(
         eq(schema.vnextChainEvents.streamId, streamId),
         eq(schema.vnextChainEvents.canonical, true),
-        inArray(schema.vnextChainEvents.eventName, ["PublicationEvidenceSubmitted", "MilestoneEvidenceSubmitted"]),
+        inArray(schema.vnextChainEvents.eventName, ["PublicationEvidenceSubmitted", "MilestoneEvidenceSubmitted", "ChallengeOpened"]),
       ));
     const event = events.find(item => reviewCaseIds.includes(String(item.args.reviewCaseId ?? "").toLowerCase()));
     const evidenceHash = String(event?.args.evidenceHash ?? "").toLowerCase();
@@ -98,7 +101,15 @@ export class VNextEvidenceService {
     const items = await this.db.select().from(schema.vnextCaseEvidence).where(
       and(eq(schema.vnextCaseEvidence.streamId, streamId), inArray(schema.vnextCaseEvidence.reviewCaseId, caseIds)),
     );
-    return { access, assignments: access === "CREATOR" ? assignments : assignments.filter(item => this.wallets(account).includes(item.judgeAddress.toLowerCase())), evidence: items.map(dto) };
+    return {
+      access,
+      assignments: access === "CREATOR"
+        ? assignments
+        : access === "JUDGE"
+          ? assignments.filter(item => this.wallets(account).includes(item.judgeAddress.toLowerCase()))
+          : [],
+      evidence: items.map(dto),
+    };
   }
 
   async upload(reviewCaseIdInput: string, account: AuthenticatedAccount, body: unknown, file?: EvidenceUploadFile) {
@@ -106,7 +117,7 @@ export class VNextEvidenceService {
     const parsed = summarySchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException("Evidence summary is required");
     const { streamId, review, access, caseIds } = await this.reviewAndAccess(reviewCaseId, account);
-    if (access !== "CREATOR") throw new ForbiddenException("Only the canonical Creator can upload case evidence");
+    if (access !== "CREATOR" && access !== "CHALLENGER") throw new ForbiddenException("Only the Creator or canonical Challenger can upload case evidence");
     if (review.enrolledCount !== "0" || review.finalized) throw new ConflictException("Evidence is frozen after Judge enrollment");
     const evidenceHash = await this.canonicalEvidenceHash(streamId, caseIds);
     const mediaType = await validateEvidenceFile(file);

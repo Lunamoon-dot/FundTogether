@@ -36,7 +36,7 @@ export function VNextEvidencePanel({ reviewCaseId, enabled = true }: { reviewCas
     <section className="border-t border-[var(--border-hairline)] pt-3 space-y-2" data-vnext-evidence-case={reviewCaseId}>
       <span className="monograph-card__kicker">PRIVATE CASE EVIDENCE</span>
       <p className="text-sm text-[var(--ink-subtle)] m-0">Evidence bytes được lưu private; hash phải khớp evidence hash canonical của review case.</p>
-      {evidence.data?.access === 'CREATOR' && (
+      {(evidence.data?.access === 'CREATOR' || evidence.data?.access === 'CHALLENGER') && (
         <>
           <label className="text-sm block" htmlFor={`vnext-evidence-summary-${reviewCaseId}`}>Evidence summary</label>
           <input id={`vnext-evidence-summary-${reviewCaseId}`} value={summary} onChange={event => setSummary(event.target.value)} placeholder="Mô tả ngắn evidence" />
@@ -49,7 +49,7 @@ export function VNextEvidencePanel({ reviewCaseId, enabled = true }: { reviewCas
           Tải evidence {item.evidenceHash} · {item.sizeBytes} bytes
         </a>
       )) : evidence.isPending ? <p className="text-sm muted m-0">Đang đọc evidence ACL…</p> : <p className="text-sm muted m-0">Chưa có private evidence đã xác minh.</p>}
-      {evidence.error && <p className="text-sm text-[var(--ink-subtle)] m-0">Case evidence chỉ hiển thị cho Creator hoặc Judge được assign.</p>}
+      {evidence.error && <p className="text-sm text-[var(--ink-subtle)] m-0">Case evidence chỉ hiển thị cho Creator, Challenger hợp lệ hoặc Judge được assign.</p>}
       {error && <p className="monograph-alert monograph-alert--error" role="alert">{error}</p>}
     </section>
   );

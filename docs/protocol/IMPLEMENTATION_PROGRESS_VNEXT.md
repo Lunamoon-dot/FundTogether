@@ -103,9 +103,10 @@ The following remain incomplete and must not be inferred from the passing slice:
 - production batch/pull settlement and gas policy for the maximum 300-Judge
   snapshot;
 - complete invariant coverage for all review liveness and multi-court paths;
-- full per-round appeal/retry dossier ACL and availability handling, full Backer
-  balance/refund entitlement read models, on-chain reward economics and
-  production reward settlement policy;
+- appeal/retry dossier ACL now follows the root case and supports the canonical
+  Challenger evidence owner, but inaccessible-evidence timeout policy is not
+  yet wired; on-chain reward economics and production reward settlement policy
+  also remain open;
 - fresh local runtime deployment and end-to-end acceptance.
 
 ## Verification record

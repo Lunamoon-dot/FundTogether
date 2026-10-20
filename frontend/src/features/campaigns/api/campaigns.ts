@@ -254,7 +254,7 @@ export interface VNextCaseEvidence {
   createdAt: string;
 }
 export interface VNextCaseEvidenceResponse {
-  access: 'CREATOR' | 'JUDGE';
+  access: 'CREATOR' | 'JUDGE' | 'CHALLENGER';
   assignments: VNextJudgeAssignment[];
   evidence: VNextCaseEvidence[];
 }
