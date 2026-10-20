@@ -602,17 +602,9 @@ contract VNextJuryReviewTest is Test {
         vm.warp(review.revealDeadline(dustCase) + review.appealWindowDuration());
         review.finalizeNoAppeal(dustCase);
 
-        uint256 firstReward;
-        uint256 secondReward;
-        for (uint256 slot = 0; slot < 3; slot++) {
-            uint256 reward = registry.pendingReward(dustCase, judges[slot]);
-            if (reward > 0) {
-                if (firstReward == 0) firstReward = reward;
-                else secondReward = reward;
-            }
-        }
-        assertEq(firstReward + secondReward, 500_001);
-        assertTrue(firstReward != secondReward);
+        assertEq(registry.pendingReward(dustCase, judgeSeven), 250_001);
+        assertEq(registry.pendingReward(dustCase, judgeEight), 250_000);
+        assertEq(registry.pendingReward(dustCase, judgeNine), 0);
     }
 
     function _depositAndReserveForCaseWithAmount(

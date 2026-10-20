@@ -48,6 +48,15 @@ async function send(client, wallet, request) {
   return receipt;
 }
 
+async function expectRevert(action, label) {
+  try {
+    await action();
+  } catch {
+    return;
+  }
+  throw new Error(`VNext acceptance expected revert: ${label}`);
+}
+
 async function read(client, address, abi, functionName, args = []) {
   return client.readContract({ address, abi, functionName, args });
 }
@@ -127,6 +136,10 @@ async function fundCampaign({ client, wallets, manifest, campaignId, backers, go
     const amount = index === 0 ? half : goal - half;
     await send(client, wallets[backer], { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'contribute', args: [campaignId, amount] });
   }
+  await expectRevert(
+    () => send(client, wallets[backers[0]], { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'finalizeFunding', args: [campaignId] }),
+    'funding cannot finalize before its deadline',
+  );
   const now = (await client.getBlock({ blockTag: 'latest' })).timestamp;
   if (now <= fundingDeadline) await advance(client, Number(fundingDeadline - now + 1n));
   await send(client, wallets[backers[0]], { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'finalizeFunding', args: [campaignId] });
@@ -199,6 +212,10 @@ async function main() {
   const milestoneCaseId = eventArgs(milestoneReceipt, campaignArtifact.abi, 'MilestoneEvidenceSubmitted').reviewCaseId;
   await resolvePass({ client, wallets, addresses, manifest, policy, campaignId: first.id, milestoneId: 0n, evidenceRevision: 1n, caseId: milestoneCaseId });
   await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'syncFinalRuling', args: [first.id, 0n] });
+  await expectRevert(
+    () => send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'resolveChallenge', args: [first.id, 0n] }),
+    'challenge resolution is disabled by local policy',
+  );
   await advance(client, policy.challengeWindowSeconds + 1);
   await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'payMilestone', args: [first.id, 0n] });
 

@@ -141,6 +141,12 @@ contract VNextJuryRegistryTest is Test {
         registry.settleCaseStake(CASE_ID, judge, 0);
     }
 
+    function test_unknownCaseCannotCreditReward() public {
+        vm.prank(controller);
+        vm.expectRevert(JuryRegistry.UnknownCase.selector);
+        registry.creditReward(CASE_ID, judge, 1);
+    }
+
     function test_settlementCannotSlashMoreThanLockedCaseStake() public {
         vm.prank(judge);
         registry.depositStake(50e6);

@@ -103,7 +103,7 @@ financial behavior.
 Those counts predate the policy-freeze delta above; they are retained as
 historical evidence, not as current verification of the changed behavior.
 
-The current VNext tests are:
+The pre-freeze VNext test snapshot was:
 
 ```text
 test/unit/VNext/StateMachine.t.sol  7 passed
@@ -115,17 +115,17 @@ test/unit/VNext/MilestoneEvidence.t.sol 4 passed
 test/unit/VNext/PayoutRefund.t.sol 4 passed
 test/invariant/VNextConservation.t.sol 3 passed (256-case fuzz)
 
-Full command: `forge test` → 117 passed, 0 failed, 0 skipped across 11 suites.
-The suite includes historical Resolver tests for regression visibility; the
-VNext evidence is the focused VNext/invariant rows above.
+The full pre-freeze command was `forge test` → 117 passed, 0 failed, 0
+skipped across 11 suites. The suite includes historical Resolver tests for
+regression visibility; the VNext evidence is the focused VNext/invariant rows
+above. Forge is unavailable in the current worktree, so these counts are not
+current verification of the policy-freeze delta.
 
-Backend focused evidence: VNext indexer/projector 8 passed; runtime identity 6
-passed; real PostgreSQL VNext replay check passed; `npm run build` completed.
-Runtime acceptance evidence: `node backend/scripts/campaigns/vnext-acceptance.cjs`
-passed on local Anvil chain `31339` after deploying policy V2. It completed a
-two-Backer milestone payout (campaign `4`), a Creator submission-timeout refund
-(campaign `5`), verified the canonical event set, ended with campaign escrow
-balance `0`, and matched both campaign projections in PostgreSQL.
+Backend focused evidence from the prior remediation checkout: VNext
+indexer/projector 8 passed; runtime identity 6 passed; real PostgreSQL VNext
+replay check passed; `npm run build` completed. These are historical evidence.
+The prior runtime acceptance evidence used local Anvil chain `31339` after
+deploying policy V2 and is not a current acceptance run for this branch.
 Frontend evidence: `npm test` → 199 passed;
 `npm run build` completed with only the existing large-bundle warning.
 ```
