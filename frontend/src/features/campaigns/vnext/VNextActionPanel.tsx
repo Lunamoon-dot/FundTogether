@@ -239,7 +239,7 @@ export function VNextActionPanel({
       )}
       {indexedBackerPosition.data?.[0] && (
         <p className="text-xs text-[var(--ink-subtle)] m-0" data-vnext-read="indexed-backer-position">
-          Indexed projection: đã ghi nhận {indexedBackerPosition.data[0].contributed} contribution và {indexedBackerPosition.data[0].refunded} refund ở block {indexedBackerPosition.data[0].lastBlockNumber}; đây không thay thế contract state.
+          Contract position: contribution {indexedBackerPosition.data[0].contributed}, refund entitlement {indexedBackerPosition.data[0].refundEntitlement}, claimed {indexedBackerPosition.data[0].refundClaimed ? 'yes' : 'no'}; indexed projection ghi nhận contribution {indexedBackerPosition.data[0].indexedContributed} và refund {indexedBackerPosition.data[0].indexedRefunded} ở block {indexedBackerPosition.data[0].lastBlockNumber}.
         </p>
       )}
 

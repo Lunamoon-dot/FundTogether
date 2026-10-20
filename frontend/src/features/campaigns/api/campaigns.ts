@@ -215,8 +215,11 @@ export interface VNextBackerProjection {
   onchainCampaignId: string;
   backerAddress: string;
   contributed: string;
-  refunded: string;
+  refundEntitlement: string;
   refundClaimed: boolean;
+  refundAllocationsFrozen: boolean;
+  indexedContributed: string;
+  indexedRefunded: string;
   lastBlockNumber: string;
 }
 export interface VNextChallengeProjection {

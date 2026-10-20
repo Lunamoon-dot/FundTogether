@@ -16,6 +16,7 @@ import {
 } from "../../../database/schema";
 import { AuthGuard } from "../../auth/auth.guard";
 import { VNEXT_CONNECTION, type VNextConnection } from "../../../indexer/vnext-indexer.service";
+import { vnextCampaignAbi } from "../../../blockchain/vnext-deployment";
 import {
   buildVNextTransactionStatus,
   normalizeVNextTransactionHash,
@@ -95,15 +96,41 @@ export class VNextController {
   @Get("campaigns/:campaignId/backer")
   @UseGuards(AuthGuard)
   async backerPosition(@Param("campaignId") campaignId: string, @Req() request: Request) {
+    if (!/^[0-9]+$/.test(campaignId)) throw new BadRequestException("Invalid VNext campaign id");
     const walletAddresses = (request.account?.wallets ?? [])
       .filter(wallet => wallet.chainId === 31339)
       .map(wallet => wallet.address.toLowerCase());
     if (walletAddresses.length === 0) return [];
-    return this.db.select().from(vnextBackerProjections).where(and(
+    const indexed = await this.db.select().from(vnextBackerProjections).where(and(
       eq(vnextBackerProjections.streamId, this.streamId()),
       eq(vnextBackerProjections.onchainCampaignId, campaignId),
       inArray(vnextBackerProjections.backerAddress, walletAddresses),
     ));
+    if (!this.connection) throw new NotFoundException("VNext deployment is not configured");
+    const campaignNumber = BigInt(campaignId);
+    const onchain = await Promise.all(walletAddresses.map(async wallet => {
+      const address = wallet as `0x${string}`;
+      const [contribution, entitlement, claimed, allocationsFrozen] = await Promise.all([
+        this.connection!.client.readContract({ address: this.connection!.manifest.campaignEscrow, abi: vnextCampaignAbi, functionName: "contributionOf", args: [campaignNumber, address] }),
+        this.connection!.client.readContract({ address: this.connection!.manifest.campaignEscrow, abi: vnextCampaignAbi, functionName: "refundEntitlement", args: [campaignNumber, address] }),
+        this.connection!.client.readContract({ address: this.connection!.manifest.campaignEscrow, abi: vnextCampaignAbi, functionName: "refundClaimed", args: [campaignNumber, address] }),
+        this.connection!.client.readContract({ address: this.connection!.manifest.campaignEscrow, abi: vnextCampaignAbi, functionName: "refundAllocationsFrozen", args: [campaignNumber] }),
+      ]);
+      const row = indexed.find(item => item.backerAddress === wallet);
+      return {
+        streamId: this.streamId(),
+        onchainCampaignId: campaignId,
+        backerAddress: wallet,
+        contributed: String(contribution),
+        refundEntitlement: String(entitlement),
+        refundClaimed: Boolean(claimed),
+        refundAllocationsFrozen: Boolean(allocationsFrozen),
+        indexedContributed: row?.contributed ?? "0",
+        indexedRefunded: row?.refunded ?? "0",
+        lastBlockNumber: row?.lastBlockNumber ?? "0",
+      };
+    }));
+    return onchain;
   }
 
   @Get("campaigns/:campaignId/challenges")
