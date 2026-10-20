@@ -109,7 +109,7 @@ export interface CreatorProfile {
 }
 
 export interface CreatorVerificationInput {
-  studioWalletLinkId: string;
+  studioWalletLinkId: string | null;
   displayName: string;
   bio: string;
   ipDeclaration: string;
@@ -124,6 +124,44 @@ export interface DeploymentManifest {
   protocolKind: 'CAMPAIGNS'; chainId: 31339; abiVersion: 'campaigns-local-judge-v1'; abiHash: `0x${string}`;
   contractAddress: `0x${string}`; tokenAddress: `0x${string}`; resolver: `0x${string}`; backupResolver: `0x${string}`; judges: `0x${string}`[];
   genesisHash: `0x${string}`; contractCodeHash: `0x${string}`; policyHash: `0x${string}`;
+}
+export interface VNextDeployment {
+  configured: boolean;
+  chainId?: 31339;
+  campaignEscrow?: `0x${string}`;
+  juryRegistry?: `0x${string}`;
+  juryReview?: `0x${string}`;
+  tokenAddress?: `0x${string}`;
+  policyHash?: `0x${string}`;
+  abiVersion?: string;
+}
+export interface VNextCampaignProjection {
+  streamId: string;
+  onchainCampaignId: string;
+  creator: string;
+  payoutWallet: string;
+  termsHash: string;
+  publicationEvidenceHash: string | null;
+  publicationReviewCaseId: string | null;
+  publicationOutcome: number | null;
+  policyVersion: string;
+  goal: string;
+  fundingDeadline: string;
+  raised: string;
+  paidOut: string;
+  refunded: string;
+  state: number;
+  lastBlockNumber: string;
+  lastEventName: string;
+}
+export interface VNextMilestoneProjection {
+  milestoneId: number;
+  evidenceRevision: string;
+  evidenceHash: string | null;
+  reviewCaseId: string | null;
+  finalOutcome: number | null;
+  state: number;
+  paid: boolean;
 }
 export interface CampaignChain {
   deployment: DeploymentManifest; status: 'ON_CHAIN_CONFIRMED' | 'ORPHANED' | 'NOT_PUBLISHED'; onchainCampaignId: string | null;
@@ -147,16 +185,22 @@ export interface OperationSummary {
   contractState: number | null;
   snapshot: CampaignChain['snapshot'];
   bindingTransactionHash: `0x${string}` | null;
+  publicationCase: PublicationJudgeCase | null;
 }
 export type CampaignTransactionAction =
-  | 'approveCampaign' | 'createCampaign' | 'pledge' | 'submitProduction' | 'submitRelease'
+  | 'createPublicationCase' | 'votePublicationCase' | 'expirePublicationCase' | 'createCampaign' | 'pledge' | 'submitProduction' | 'submitRelease'
   | 'reviewProduction' | 'confirmCampaignCompletion' | 'reviewRelease' | 'challengeRelease' | 'resolveChallenge'
   | 'finalizeFunding' | 'startRefunds' | 'claimRefund' | 'requestCompletion' | 'approveCompletion' | 'rejectCompletion' | 'claimSurplus' | 'cancelCampaign'
   | 'requestDisbursement' | 'approveDisbursement' | 'rejectDisbursement';
 export type SyncState = 'PENDING' | 'REVERTED' | 'UNRELATED' | 'INDEXING' | 'ON_CHAIN_CONFIRMED';
 export interface CampaignTerms {
   deployment: DeploymentManifest; creatorWallet: `0x${string}`; commitmentHash: `0x${string}`; goal: string; price: string;
-  fundingDuration: number; chainTimestamp: string; onchainApproved: boolean;
+  fundingDuration: number; chainTimestamp: string; onchainApproved: boolean; publicationCase: PublicationJudgeCase | null;
+}
+export interface PublicationJudgeCase {
+  caseId: string; creator: string; commitmentHash: string; termsHash: string; voteDeadline: string; selectionSeed: string;
+  status: 'OPEN' | 'APPROVED' | 'REJECTED' | 'EXPIRED'; judges: string[];
+  votes: { judge: string; approved: boolean }[]; approveVotes: number; rejectVotes: number; decisionHash: string | null;
 }
 export interface CampaignPreview {
   id: string; status: 'COMMUNITY_REVIEW' | 'APPROVED' | 'PUBLISHED'; commitmentHash: string; config: NonNullable<Campaign['draftConfig']>;
@@ -210,7 +254,7 @@ const fundtogetherBase = '/v1/fundtogether';
 const campaignPath = (id: string) => `${base}/campaigns/${id}`;
 
 export async function listWallets(signal?: AbortSignal) {
-  return (await http.get<{ id: string; address: string; chainId: string; isStudioWallet?: boolean }[]>(`${base}/wallets`, { signal })).data;
+  return (await http.get<{ id: string; address: string; chainId: string }[]>(`${base}/wallets`, { signal })).data;
 }
 
 export async function listTransactionWallets(signal?: AbortSignal) {
@@ -243,14 +287,6 @@ export async function submitCampaignReview(id: string, revision: number, input: 
   return (await http.post<Campaign>(`${campaignPath(id)}/submit-review`, { revision, ...input })).data;
 }
 
-export async function openCommunityReview(id: string) {
-  return (await http.post<Campaign>(`${campaignPath(id)}/open-community-review`, {})).data;
-}
-
-export async function reviewCampaign(id: string, data: { outcome: 'APPROVED' | 'CHANGES_REQUESTED' | 'REJECTED'; decisionReason: string; commitmentHash: string }) {
-  return (await http.post<Campaign>(`${campaignPath(id)}/review`, data)).data;
-}
-
 export async function createCampaignDraft(data: CampaignDraftInput) {
   return (await http.post<Campaign>('/v1/fundtogether/creator/campaigns', data)).data;
 }
@@ -271,13 +307,6 @@ export async function listAdminCreatorProfiles(signal?: AbortSignal) {
   return (await http.get<CreatorProfile[]>('/v1/fundtogether/admin/creators', { signal })).data;
 }
 
-export async function reviewAdminCreatorProfile(
-  profileId: string,
-  data: { outcome: 'VERIFIED' | 'REJECTED'; rejectionReason?: string },
-) {
-  return (await http.post<CreatorProfile>(`/v1/fundtogether/admin/creators/${profileId}/review`, data)).data;
-}
-
 export async function listResolverCampaigns(signal?: AbortSignal) {
   return (await http.get<Campaign[]>('/v1/fundtogether/resolver/campaigns', { signal })).data;
 }
@@ -291,10 +320,14 @@ export const campaignApi = {
   funding: async (signal?: AbortSignal) => (await http.get<CampaignPreview[]>('/v1/fundtogether/public/campaigns/funding', { signal })).data,
   preview: async (id: string, signal?: AbortSignal) => (await http.get<CampaignPreview>(`/v1/fundtogether/public/campaigns/${id}`, { signal })).data,
   deployment: async () => (await http.get<DeploymentManifest>(`${base}/deployment`)).data,
+  vnextDeployment: async () => (await http.get<VNextDeployment>('/v1/fundtogether/vnext/deployment')).data,
+  vnextCampaign: async (id: string, signal?: AbortSignal) => (await http.get<VNextCampaignProjection>(`/v1/fundtogether/vnext/campaigns/${id}`, { signal })).data,
+  vnextMilestones: async (id: string, signal?: AbortSignal) => (await http.get<VNextMilestoneProjection[]>(`/v1/fundtogether/vnext/campaigns/${id}/milestones`, { signal })).data,
   chain: async (id: string, signal?: AbortSignal) => (await http.get<CampaignChain>(`${base}/campaigns/${id}/chain`, { signal })).data,
-  operations: async (scope: 'creator' | 'resolver' | 'admin', signal?: AbortSignal) =>
+  operations: async (scope: 'creator' | 'judge' | 'resolver' | 'admin', signal?: AbortSignal) =>
     (await http.get<OperationSummary[]>(`${base}/operations/${scope}`, { signal })).data,
   terms: async (id: string) => (await http.get<CampaignTerms>(`${base}/campaigns/${id}/publication-terms`)).data,
+  publicationCase: async (id: string, signal?: AbortSignal) => (await http.get<PublicationJudgeCase | null>(`${base}/campaigns/${id}/publication-case`, { signal })).data,
   sync: async (txHash: string, campaignId: string, action: CampaignTransactionAction) =>
     (await http.post<{ txHash: string; state: SyncState }>(`${base}/sync-receipt`, { txHash, campaignId, action })).data,
   evidence: async (id: string, privateView: boolean, signal?: AbortSignal) => (await http.get<Evidence[]>(privateView ? `${base}/campaigns/${id}/evidence` : `/v1/fundtogether/public/campaigns/${id}/evidence`, { signal })).data,

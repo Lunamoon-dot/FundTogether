@@ -81,8 +81,7 @@ function CreateStudioLanding({ onStartCreate }: { onStartCreate: () => void }) {
         <h1 className="studio-landing__title">Khởi tạo Không gian Xuất bản Studio</h1>
         <p className="studio-landing__lead">
           FundTogether là bệ phóng gây quỹ cộng đồng cho các tác phẩm Truyện tranh &amp; Artbook số độc lập.
-          Trước khi mở Xưởng sáng tác để khởi tạo ấn phẩm gọi vốn, hãy thiết lập Hồ sơ Studio để xác lập danh tính xuất bản
-          và thực hiện cam kết 100% bản quyền sở hữu trí tuệ độc lập (Sovereign IP).
+          Hồ sơ tác giả/Studio là metadata tùy chọn để giới thiệu Creator; nó không phải điều kiện để tạo campaign hoặc mở Judge case.
         </p>
 
         <div className="studio-landing__cta-wrap">
@@ -117,7 +116,7 @@ function CreateStudioLanding({ onStartCreate }: { onStartCreate: () => void }) {
           <span className="studio-landing__feature-num">03</span>
           <h3 className="studio-landing__feature-title">Thẩm định &amp; Kích hoạt Xưởng</h3>
           <p className="studio-landing__feature-desc">
-            Hồ sơ được Resolver thẩm định độc lập trong vòng 24–48h. Sau khi được duyệt, Xưởng ấn phẩm sẽ mở khóa để bạn bắt đầu tạo ấn phẩm gọi vốn đầu tiên.
+            Hồ sơ này chỉ là metadata tùy chọn. Publication được quyết định bởi Judge case on-chain, không bởi trạng thái hồ sơ.
           </p>
         </div>
       </div>
@@ -128,7 +127,7 @@ function CreateStudioLanding({ onStartCreate }: { onStartCreate: () => void }) {
           <span className="studio-info-label">BẢO CHỨNG MINH BẠCH</span>
         </div>
         <p className="muted" style={{ margin: 0, fontSize: '13px', lineHeight: 1.6 }}>
-          Mọi ấn phẩm trên FundTogether được lưu ký hợp đồng thông minh MockUSDC trên blockchain Anvil, phát hành file PDF chất lượng cao riêng tư qua chữ ký điện tử xác thực, và được bảo trợ chất lượng bởi Resolver độc lập.
+          Mọi ấn phẩm trên FundTogether được lưu ký hợp đồng thông minh MockUSDC trên blockchain Anvil, phát hành file PDF chất lượng cao riêng tư qua chữ ký điện tử xác thực, và được kiểm tra bởi Judge committee được chọn theo từng case.
         </p>
       </div>
     </div>
@@ -216,16 +215,10 @@ function CreatorProfileForm({
       setFormError('Bạn cần xác nhận cam kết tác phẩm là sản phẩm sáng tạo nguyên bản để nộp hồ sơ.');
       return;
     }
-    if (!selectedStudioWalletLinkId) {
-      setFormError('Bạn cần liên kết và chọn một ví Studio trước khi nộp hồ sơ.');
-      setStep(0);
-      return;
-    }
-
     setBusy(true);
     try {
       await applyCreatorVerification({
-        studioWalletLinkId: selectedStudioWalletLinkId,
+        studioWalletLinkId: selectedStudioWalletLinkId || null,
         displayName: displayName.trim(),
         primaryGenre: primaryGenre.trim() || null,
         bio: bio.trim(),
@@ -235,7 +228,7 @@ function CreatorProfileForm({
         ipDeclaration: ipDeclaration.trim(),
         originalWorkPledge,
       });
-      setSuccessNotice('Đã gửi Hồ sơ Studio để Admin xác minh.');
+      setSuccessNotice('Đã lưu metadata tác giả. Metadata này không quyết định quyền funding.');
       onSaved();
     } catch (error) {
       setFormError(getErrorMessage(error));
@@ -299,7 +292,7 @@ function CreatorProfileForm({
                 <div className="studio-grid-2">
                   <label className="studio-field">
                     <span className="studio-field__label">
-                      Bút danh / Tên Studio xuất bản <span className="studio-field__required">*</span>
+                      Bút danh / Tên Studio xuất bản <span className="studio-field__optional">(tùy chọn)</span>
                     </span>
                     <input
                       required
@@ -342,7 +335,7 @@ function CreatorProfileForm({
                     <option value="">Chọn ví đã liên kết</option>
                     {wallets.map(wallet => <option key={wallet.id} value={wallet.id}>{wallet.address}</option>)}
                   </select>
-                  <span className="studio-field__hint">Ví này được Resolver đối soát khi duyệt Studio. Ví Resolver không thể dùng làm ví Studio.</span>
+                  <span className="studio-field__hint">Ví này chỉ là metadata tùy chọn. Ví nhận tiền campaign được chọn trực tiếp trong hồ sơ campaign.</span>
                   {wallets.length === 0 && <span className="studio-field__hint">Hãy liên kết ví trong phần Tài khoản trước khi nộp hồ sơ.</span>}
                 </label>
               </div>
@@ -508,7 +501,7 @@ function CreatorProfileForm({
               <div className="studio-slide-heading">
                 <h3 className="studio-slide-heading__title">Rà soát thông tin &amp; Nộp hồ sơ</h3>
                 <p className="studio-slide-heading__desc">
-                  Kiểm tra lại toàn bộ dữ liệu trước khi gửi hồ sơ cho ban thẩm định Resolver phê duyệt.
+                  Kiểm tra lại metadata trước khi lưu. Việc lưu metadata không cấp quyền publication.
                 </p>
               </div>
 
@@ -687,11 +680,11 @@ export function Profile({ userId }: { userId: string }) {
   }
 
   const statusBadge = status === 'VERIFIED' ? (
-    <span className="studio-badge studio-badge--verified">✓ Đã xác minh</span>
+    <span className="studio-badge studio-badge--verified">✓ Metadata đã lưu</span>
   ) : status === 'PENDING' ? (
-    <span className="studio-badge studio-badge--pending">⏳ Đang chờ duyệt</span>
+    <span className="studio-badge studio-badge--pending">⏳ Metadata đang cập nhật</span>
   ) : status === 'REJECTED' ? (
-    <span className="studio-badge studio-badge--rejected">⚠️ Cần cập nhật</span>
+    <span className="studio-badge studio-badge--rejected">⚠️ Metadata cần cập nhật</span>
   ) : (
     <span className="studio-badge studio-badge--unregistered">Chưa đăng ký</span>
   );
@@ -729,15 +722,7 @@ export function Profile({ userId }: { userId: string }) {
           </div>
 
           <div className="studio-actions">
-            {status === 'VERIFIED' ? (
-              <a className="button button--primary" href="#/campaigns/creator">
-                Vào Xưởng sáng tác →
-              </a>
-            ) : status === 'PENDING' ? (
-              <span className="studio-badge studio-badge--pending" style={{ padding: '8px 14px' }}>
-                ⏳ Đang chờ duyệt
-              </span>
-            ) : null}
+            <a className="button button--primary" href="#/campaigns/creator">Vào Xưởng sáng tác →</a>
             <button
               type="button"
               className="button button--secondary"
@@ -794,11 +779,10 @@ export function Profile({ userId }: { userId: string }) {
         <div className="studio-pending-alert" role="status">
           <div className="studio-pending-alert__header">
             <span aria-hidden="true">⏳</span>
-            <strong>Hồ sơ Studio đang chờ Admin / Resolver thẩm định</strong>
+            <strong>Metadata tác giả là tùy chọn</strong>
           </div>
           <p>
-            Hồ sơ xuất bản và cam kết 100% bản quyền sở hữu trí tuệ của bạn đã được gửi thành công. Đội ngũ Resolver sẽ thẩm định hồ sơ trong vòng 24–48 giờ.
-            Sau khi được phê duyệt, bạn sẽ có thể vào Xưởng sáng tác để bắt đầu tạo ấn phẩm gọi vốn.
+            Bạn có thể tiếp tục tạo campaign và gửi commitment vào vòng Judge ngay cả khi metadata đang PENDING hoặc REJECTED.
           </p>
         </div>
       )}
@@ -854,12 +838,12 @@ export function Profile({ userId }: { userId: string }) {
                 <span className="studio-info-label">Trạng thái thẩm định</span>
                 <span className="studio-info-value">
                   {status === 'VERIFIED'
-                    ? 'Đã được quản trị viên duyệt IP và hồ sơ xuất bản'
+                    ? 'Metadata đã được lưu'
                     : status === 'PENDING'
-                    ? 'Đang chờ Admin duyệt hồ sơ xuất bản'
+                    ? 'Metadata đang chờ cập nhật'
                     : status === 'REJECTED'
-                    ? 'Hồ sơ cần cập nhật lại thông tin'
-                    : 'Chưa hoàn tất đăng ký hồ sơ'}
+                    ? 'Metadata cần cập nhật'
+                    : 'Chưa có metadata tác giả'}
                 </span>
               </li>
               <li className="studio-info-item">
@@ -875,7 +859,7 @@ export function Profile({ userId }: { userId: string }) {
               <span className="studio-info-label">QUY CHUẨN</span>
             </div>
             <p className="muted" style={{ fontSize: '13px', lineHeight: 1.6, margin: 0 }}>
-              Mỗi ấn phẩm trên FundTogether được lưu ký hợp đồng thông minh MockUSDC, phát hành file PDF chất lượng cao riêng tư qua chữ ký điện tử, và được Resolver bảo trợ chất lượng.
+              Mỗi ấn phẩm trên FundTogether được lưu ký hợp đồng thông minh MockUSDC, phát hành file PDF chất lượng cao riêng tư và đi qua Judge case on-chain ở bước publication.
             </p>
           </div>
         </aside>
@@ -884,7 +868,7 @@ export function Profile({ userId }: { userId: string }) {
         <main className="studio-main">
           {profile.status === 'REJECTED' && (
             <div className="toast toast--error" role="alert" style={{ marginBottom: '16px' }}>
-              <strong>Hồ sơ cần cập nhật:</strong> {profile.rejectionReason || 'Vui lòng kiểm tra lại thông tin hồ sơ và gửi lại để Admin duyệt.'}
+              <strong>Metadata cần cập nhật:</strong> {profile.rejectionReason || 'Bạn có thể sửa metadata, nhưng không bị khóa khỏi campaign.'}
             </div>
           )}
 
@@ -1020,15 +1004,9 @@ export function Profile({ userId }: { userId: string }) {
                   ) : (
                     <div style={{ textAlign: 'center', padding: '24px 16px' }}>
                       <p className="muted" style={{ margin: '0 0 12px' }}>
-                        {status === 'VERIFIED'
-                          ? 'Studio chưa phát hành ấn phẩm nào. Hãy bắt đầu chiến dịch đầu tiên của bạn!'
-                          : 'Sau khi Hồ sơ Studio được phê duyệt, bạn có thể khởi tạo và quản lý các ấn phẩm tại đây.'}
+                        'Chưa có ấn phẩm nào. Hãy bắt đầu campaign đầu tiên của bạn!'
                       </p>
-                      {status === 'VERIFIED' && (
-                        <a className="button button--primary" href="#/campaigns/creator">
-                          Mở Xưởng sáng tác
-                        </a>
-                      )}
+                      <a className="button button--primary" href="#/campaigns/creator">Mở Xưởng sáng tác</a>
                     </div>
                   )}
                 </section>

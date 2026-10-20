@@ -41,8 +41,8 @@ test('pledge flow is hidden after the funding deadline', () => {
 })
 
 test('activation preflight rejects a Creator wallet that is a Resolver wallet', () => {
-  assert.match(transaction, /functionName === 'approveCampaign' \|\| functionName === 'createCampaign'/)
-  assert.match(transaction, /const creatorWallet = functionName === 'approveCampaign' \? String\(args\[0\] \?\? ''\) : actor/)
+  assert.match(transaction, /functionName === 'createCampaign'/)
+  assert.match(transaction, /const creatorWallet = actor/)
   assert.match(transaction, /Ví Creator không được trùng ví Resolver của deployment hiện tại/)
 })
 

@@ -1,5 +1,13 @@
 # Account and wallet linking implementation plan
 
+> **Superseded on 2026-10-20:** The active authentication boundary is now
+> wallet-only SIWE login with first-login account provisioning. This file is
+> retained as historical implementation context; use
+> `docs/auth/WALLET_ONLY_AUTH.md` and current code for behavior.
+
+Everything below records the 2026-10-04 account/password design and its
+historical execution notes; it is not a current implementation specification.
+
 **Current scope amendment — 2026-10-04:** User requested full removal of Privy.
 Step 4 and provider-specific execution notes below are historical and superseded.
 The current implementation has independent accounts/sessions and signed external

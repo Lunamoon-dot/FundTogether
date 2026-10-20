@@ -32,6 +32,8 @@ export function AppShell({
   const isCampaignLibrary = path === '/campaigns/library';
   const isAdmin = path === '/admin' || path.startsWith('/admin?') || path === '/campaigns/admin' || campaignDetail?.workspace === 'admin';
   const isCampaignResolver = path === '/campaigns/resolver' || campaignDetail?.workspace === 'resolver';
+  const isCampaignJudge = path === '/campaigns/judge';
+  const isVNext = path === '/campaigns/vnext' || path.startsWith('/campaigns/vnext/');
   const isAccount = path === '/account' || path === '/workspace';
 
   const hasAdminRole = session?.roles.includes('ADMIN') ?? false;
@@ -65,6 +67,9 @@ export function AppShell({
             <a href="#/campaigns/review" aria-current={isCampaignCommunityReview ? 'page' : undefined}>
               Community Review
             </a>
+            <a href="#/campaigns/vnext" aria-current={isVNext ? 'page' : undefined}>
+              Protocol VNext
+            </a>
             {session && (
               <a href="#/campaigns/library" aria-current={isCampaignLibrary ? 'page' : undefined}>
                 Bộ sưu tập của tôi
@@ -90,6 +95,9 @@ export function AppShell({
                   Thẩm định Resolver
                 </a>
               )}
+              <a href="#/campaigns/judge" aria-current={isCampaignJudge ? 'page' : undefined}>
+                Judge cases
+              </a>
               {hasAdminRole && (
                 <a href="#/admin" aria-current={isAdmin ? 'page' : undefined}>
                   Quản trị Admin

@@ -1,5 +1,10 @@
 # FundTogether — H1 Technical Blueprint (Corrected)
 
+> **Historical pre-reset blueprint:** Superseded on 2026-10-20 by
+> [PURE_DECENTRALIZED_PROTOCOL.md](PURE_DECENTRALIZED_PROTOCOL.md). This file
+> documents the old Resolver-controlled H1 architecture and is retained only
+> for implementation history.
+
 > **Previous filename:** `docs/architecture/CAMPAIGNS_H1_BLUEPRINT.md`.
 >
 > **Status:** `ACTIVE_CAMPAIGN_DIRECTION`

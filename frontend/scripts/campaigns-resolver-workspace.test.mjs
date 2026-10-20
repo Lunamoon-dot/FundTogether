@@ -73,19 +73,21 @@ test('resolver queue and route use the canonical resolver workspace', () => {
   assert.match(consoleSource, /campaignDetailHref\('resolver'/);
 });
 
-test('resolver workspace keeps pre-activation commitment signing reachable', () => {
+test('resolver workspace reads pre-activation Judge status without signing publication', () => {
   const actions = read('campaigns/resolver/CampaignActions.tsx');
 
   assert.match(actions, /section === 'overview'/);
   assert.match(actions, /chain\.status === 'NOT_PUBLISHED' \|\| chain\.status === 'ORPHANED'/);
   assert.match(actions, /<ActivationPanel/);
-  assert.match(actions, /transaction\.transaction\?\.action === 'approveCampaign'/);
+  assert.match(actions, /transaction=\{null\}/);
+  assert.doesNotMatch(actions, /approveCampaign/);
 });
 
-test('resolver activation follows the Campaign contract approveCampaign ABI order', () => {
+test('resolver activation does not expose a fixed approval transaction', () => {
   const page = read('campaigns/resolver/CampaignReviewPage.tsx');
 
-  assert.match(page, /tx\.send\('approveCampaign', \[result\.data\.creatorWallet, result\.data\.commitmentHash, BigInt\(result\.data\.goal\), BigInt\(result\.data\.price\), BigInt\(result\.data\.fundingDuration\)\]/);
+  assert.doesNotMatch(page, /approveCampaign/);
+  assert.match(page, /onActivate=\{\(\) => undefined\}/);
 });
 
 test('resolver sees why no review action exists after creator commits the PDF deadline', () => {

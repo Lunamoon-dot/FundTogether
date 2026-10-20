@@ -1,5 +1,10 @@
 # FundTogether — Digital Comic Download MVP
 
+> **Historical pre-reset document:** This file describes the permissioned
+> Resolver implementation before 2026-10-20. The current target is
+> [SCOPE_V2_DECENTRALIZED.md](SCOPE_V2_DECENTRALIZED.md). Do not use this file
+> as the policy for the pure decentralized protocol.
+
 > **Status:** Approved product scope and local financial policy; R0–R5 implemented with automated local acceptance and main-runtime cutover. Manual wallet/real Creator verification and public launch remain outside that evidence.
 > **Updated:** 2026-10-13. **Version:** `fundtogether-comic-download-mvp-v1`.
 > **Scope:** `COMICS_ARTBOOK` campaigns only, with one controlled PDF download benefit.

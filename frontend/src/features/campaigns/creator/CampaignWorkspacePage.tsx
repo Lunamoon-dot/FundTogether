@@ -104,7 +104,7 @@ export function CreatorCampaignWorkspacePage({ id, session, initialTab = 'overvi
     await work(async () => {
       const result = await publicationTerms.refetch();
       if (!result.data) throw new Error('Chưa đọc được cam kết phát hành; hãy tải lại trang.');
-      if (!result.data.onchainApproved) throw new Error('Primary Resolver chưa ký đúng commitment trên chain.');
+      if (!result.data.onchainApproved) throw new Error('Judge case chưa đạt quorum APPROVED trên chain.');
       await tx.send('createCampaign', [result.data.commitmentHash, BigInt(result.data.goal), BigInt(result.data.price), BigInt(result.data.fundingDuration)], { expectedWallet: result.data.creatorWallet });
     });
   }

@@ -45,7 +45,6 @@ export function ActivationPanel({
   const state = chainLabel(chain);
   const notPublished = chain?.status === 'NOT_PUBLISHED';
   const orphaned = chain?.status === 'ORPHANED';
-  const resolverNeedsToSign = mode === 'resolver' && notPublished && terms && !terms.onchainApproved;
   const creatorCanPublish = mode === 'creator' && notPublished && terms?.onchainApproved;
 
   return (
@@ -69,21 +68,18 @@ export function ActivationPanel({
 
       {orphaned && <p className="campaign-activation-panel__warning" role="alert">Binding có thể đã reorg hoặc thuộc deployment stream cũ. Điều khoản đã duyệt vẫn được giữ, nhưng không tự cho phép tạo campaign mới; hãy đối chiếu receipt và indexer.</p>}
       {orphaned && chain?.bindingTransactionHash && <p>Transaction cần đối chiếu: <code>{chain.bindingTransactionHash}</code></p>}
-      {notPublished && terms && !terms.onchainApproved && mode === 'creator' && <p className="campaign-activation-panel__warning">Primary Resolver chưa ký đúng commitment trên chain. Creator chưa thể tạo campaign.</p>}
-      {notPublished && terms?.onchainApproved && mode === 'resolver' && <p className="campaign-activation-panel__success" role="status">Primary Resolver đã ký commitment; đang chờ Creator tạo campaign.</p>}
+      {notPublished && terms && !terms.onchainApproved && mode === 'creator' && <p className="campaign-activation-panel__warning">Judge case chưa đạt APPROVED. Creator cần chờ đủ quorum trước khi tạo campaign.</p>}
+      {notPublished && terms?.onchainApproved && mode === 'resolver' && <p className="campaign-activation-panel__success" role="status">Judge case đã APPROVED; đang chờ Creator tạo campaign.</p>}
 
       {transaction && (
         <TransactionStatus record={transaction} busy={busy} onReconcile={onReconcile} onRetry={onActivate} />
       )}
 
-      {!transaction && resolverNeedsToSign && (
-        <button type="button" className="button button--primary" disabled={busy} onClick={onActivate}>Ký duyệt đúng commitment trên chain</button>
-      )}
       {!transaction && creatorCanPublish && (
         <button type="button" className="button button--primary" disabled={busy} onClick={onActivate}>Tạo campaign trên chain</button>
       )}
       {!transaction && notPublished && terms?.onchainApproved && mode === 'creator' && (
-        <p className="campaign-activation-panel__success" role="status">Commitment đã được Resolver ký. Bạn có thể tạo campaign trên contract.</p>
+        <p className="campaign-activation-panel__success" role="status">Judge quorum đã APPROVED commitment. Bạn có thể tạo campaign trên contract.</p>
       )}
       {!transaction && notPublished && !terms && <p role="status">Đang tải điều khoản publication đã khóa…</p>}
       {!transaction && chain?.status === 'ON_CHAIN_CONFIRMED' && chain.snapshot?.state === 0 && (

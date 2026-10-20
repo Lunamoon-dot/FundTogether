@@ -7,11 +7,12 @@ import { decodeFunctionData, parseEventLogs } from "viem";
 import type { Log, PublicClient, TransactionReceipt } from "viem";
 import { DRIZZLE_DB } from "../database/database.constants";
 import * as schema from "../database/schema";
-import { chainEvents, campaignChainCampaigns, campaignEntitlements, campaignCompletionDecisions, campaignCompletionRequests, campaignSurplusClaims, campaignPayoutDecisions, campaignPayoutRequests, indexerStreams, platformRoles, campaigns, campaignReviews, walletLinks } from "../database/schema";
+import { chainEvents, campaignChainCampaigns, campaignEntitlements, campaignCompletionDecisions, campaignCompletionRequests, campaignSurplusClaims, campaignPayoutDecisions, campaignPayoutRequests, indexerStreams, platformRoles, campaigns, walletLinks } from "../database/schema";
 import type { CampaignChainSnapshot } from "../database/schema";
 import { campaignAbi, campaignClient, DeploymentManifest, parseDeploymentManifest, verifyDeploymentManifest } from "../blockchain/deployment";
 import { campaignCommitment } from "../modules/campaigns/policies/commitment";
 import { createCampaignDraftSchema } from "../modules/campaigns/schemas/campaign.schema";
+import { derivePublicationJudgeCase } from "../modules/campaigns/policies/publication-judge-case";
 
 export const CAMPAIGN_CONNECTION = Symbol("CAMPAIGN_CONNECTION");
 export interface CampaignConnection { manifest: DeploymentManifest; client: PublicClient }
@@ -33,13 +34,15 @@ function pledgeAmountMatches(args: Record<string, unknown>, price: string) {
 }
 
 export type CampaignTransactionAction =
-  | "approveCampaign" | "createCampaign" | "pledge" | "submitProduction" | "submitRelease"
+  | "createPublicationCase" | "votePublicationCase" | "expirePublicationCase" | "createCampaign" | "pledge" | "submitProduction" | "submitRelease"
   | "reviewProduction" | "confirmCampaignCompletion" | "reviewRelease" | "challengeRelease" | "resolveChallenge"
   | "finalizeFunding" | "startRefunds" | "claimRefund" | "requestCompletion" | "approveCompletion" | "rejectCompletion" | "claimSurplus" | "cancelCampaign"
   | "requestDisbursement" | "approveDisbursement" | "rejectDisbursement";
 
 const expectedEvent: Record<CampaignTransactionAction, string> = {
-  approveCampaign: "CampaignApproved",
+  createPublicationCase: "JudgeCaseCreated",
+  votePublicationCase: "JudgeVoted",
+  expirePublicationCase: "JudgeCaseResolved",
   createCampaign: "CampaignCreated",
   pledge: "Pledged",
   submitProduction: "ProductionSubmitted",
@@ -109,8 +112,12 @@ export class CampaignIndexerService implements OnModuleInit, OnModuleDestroy {
     await verifyDeploymentManifest(client, manifest);
     const termsHash = await client.readContract({ address: manifest.contractAddress, abi: campaignAbi, functionName: "termsHash",
       args: [creator as `0x${string}`, commitment as `0x${string}`, goal, price, duration] }) as `0x${string}`;
-    const approved = await client.readContract({ address: manifest.contractAddress, abi: campaignAbi, functionName: "approvedTerms", args: [termsHash] });
-    return { termsHash, approved: approved === true };
+    const caseCount = await client.readContract({ address: manifest.contractAddress, abi: campaignAbi, functionName: "publicationCaseCount" }) as bigint;
+    if (caseCount === 0n) return { termsHash, approved: false };
+    const caseId = await client.readContract({ address: manifest.contractAddress, abi: campaignAbi, functionName: "publicationCaseId", args: [termsHash] }) as bigint;
+    if (caseId >= caseCount) return { termsHash, approved: false };
+    const publication = await client.readContract({ address: manifest.contractAddress, abi: campaignAbi, functionName: "publicationCase", args: [caseId] }) as readonly unknown[];
+    return { termsHash, approved: Number(publication[12]) === 1 && publication[0]?.toString().toLowerCase() === creator.toLowerCase() && publication[1]?.toString().toLowerCase() === commitment.toLowerCase() };
   }
   async processReceipt(txHash: string) {
     if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) throw new BadRequestException("Invalid transaction hash");
@@ -164,7 +171,7 @@ export class CampaignIndexerService implements OnModuleInit, OnModuleDestroy {
     if (!actor) return { txHash: input.txHash, state: "UNRELATED" as const };
     const resolverAction = input.action === "approveCompletion" || input.action === "rejectCompletion"
       || input.action === "approveDisbursement" || input.action === "rejectDisbursement";
-    if (input.action === "approveCampaign" || resolverAction) {
+    if (resolverAction) {
       const [role] = await this.db.select().from(platformRoles).where(eq(platformRoles.userId, input.userId));
       const resolverWallet = transaction.from.toLowerCase() === manifest.resolver.toLowerCase() || transaction.from.toLowerCase() === manifest.backupResolver.toLowerCase();
       if (!role?.roles.includes("RESOLVER") || !resolverWallet) {
@@ -179,15 +186,18 @@ export class CampaignIndexerService implements OnModuleInit, OnModuleDestroy {
       campaign.frozenSnapshot.config.tiers[0].price,
       String(campaign.frozenSnapshot.config.fundingDuration),
     ];
+    const publicationAction = input.action === "createPublicationCase" || input.action === "votePublicationCase" || input.action === "expirePublicationCase";
     const streamId = this.streamId();
     const [binding] = await this.db.select().from(campaignChainCampaigns).where(and(
       eq(campaignChainCampaigns.streamId, streamId), eq(campaignChainCampaigns.campaignId, input.campaignId), eq(campaignChainCampaigns.canonical, true),
     ));
-    if (input.action === "approveCampaign") {
-      if (String(args[0]).toLowerCase() !== campaign.frozenSnapshot.payoutWallet.address ||
-        expectedTerms.some((value, index) => String(args[index + 1]).toLowerCase() !== value)) {
+    if (input.action === "createPublicationCase") {
+      if (transaction.from.toLowerCase() !== campaign.frozenSnapshot.payoutWallet.address.toLowerCase() ||
+        expectedTerms.some((value, index) => String(args[index]).toLowerCase() !== value)) {
         return { txHash: input.txHash, state: "UNRELATED" as const };
       }
+    } else if (input.action === "votePublicationCase" || input.action === "expirePublicationCase") {
+      if (args.length < 1) return { txHash: input.txHash, state: "UNRELATED" as const };
     } else if (input.action === "createCampaign") {
       if (transaction.from.toLowerCase() !== campaign.frozenSnapshot.payoutWallet.address ||
         expectedTerms.some((value, index) => String(args[index]).toLowerCase() !== value)) {
@@ -202,9 +212,15 @@ export class CampaignIndexerService implements OnModuleInit, OnModuleDestroy {
     const matchingEvent = events.find(event => {
       if (event.eventName !== expectedEvent[input.action]) return false;
       const eventArgs = event.args as Record<string, unknown>;
-      if (input.action === "approveCampaign") {
+      if (input.action === "createPublicationCase") {
         return String(eventArgs.creator).toLowerCase() === campaign.frozenSnapshot!.payoutWallet.address &&
           String(eventArgs.commitmentHash).toLowerCase() === campaign.commitmentHash!.toLowerCase();
+      }
+      if (input.action === "votePublicationCase") {
+        return String(eventArgs.judge).toLowerCase() === transaction.from.toLowerCase() && String(eventArgs.caseId) === String(args[0]);
+      }
+      if (input.action === "expirePublicationCase") {
+        return String(eventArgs.caseId) === String(args[0]) && Number(eventArgs.status) === 3;
       }
       if (input.action === "createCampaign") {
         return String(eventArgs.creator).toLowerCase() === campaign.frozenSnapshot!.payoutWallet.address &&
@@ -290,12 +306,12 @@ export class CampaignIndexerService implements OnModuleInit, OnModuleDestroy {
     }
 
     await this.processReceipt(input.txHash);
-    if (input.action === "approveCampaign") {
-      const [approvalEvent] = await this.db.select({ transactionHash: chainEvents.transactionHash }).from(chainEvents).where(and(
+    if (publicationAction) {
+      const [publicationEvent] = await this.db.select({ transactionHash: chainEvents.transactionHash }).from(chainEvents).where(and(
         eq(chainEvents.streamId, streamId), eq(chainEvents.transactionHash, input.txHash),
-        eq(chainEvents.eventName, "CampaignApproved"), eq(chainEvents.canonical, true),
+        eq(chainEvents.eventName, expectedEvent[input.action]), eq(chainEvents.canonical, true),
       ));
-      return { txHash: input.txHash, state: approvalEvent ? "ON_CHAIN_CONFIRMED" as const : "INDEXING" as const };
+      return { txHash: input.txHash, state: publicationEvent ? "ON_CHAIN_CONFIRMED" as const : "INDEXING" as const };
     }
     const [canonicalBinding] = await this.db.select().from(campaignChainCampaigns).where(and(
       eq(campaignChainCampaigns.streamId, streamId), eq(campaignChainCampaigns.campaignId, input.campaignId), eq(campaignChainCampaigns.canonical, true),
@@ -393,6 +409,15 @@ export class CampaignIndexerService implements OnModuleInit, OnModuleDestroy {
           throw new Error("Campaign log does not match a successful receipt");
       }
       const decoded = parseEventLogs({ abi: campaignAbi, logs, strict: true });
+      const judgeEvents = decoded.map(log => ({
+        eventName: log.eventName,
+        args: log.args as Record<string, unknown>,
+        canonical: true,
+        transactionHash: log.transactionHash,
+        logIndex: log.logIndex,
+        blockNumber: log.blockNumber,
+        blockHash: log.blockHash,
+      }));
       // No destructive reset: orphaned event/entitlement history is retained but cannot grant access.
       await tx.insert(indexerStreams).values({ streamId, status: "syncing" }).onConflictDoNothing();
       await tx.update(chainEvents).set({ canonical: false }).where(eq(chainEvents.streamId, streamId));
@@ -401,6 +426,23 @@ export class CampaignIndexerService implements OnModuleInit, OnModuleDestroy {
       await tx.update(campaignSurplusClaims).set({ canonical: false }).where(eq(campaignSurplusClaims.streamId, streamId));
       const bindings = new Map<string, { campaignId: string; snapshot: CampaignChainSnapshot }>();
       const refunded = new Set<string>();
+      const publicationCommitments = new Set(judgeEvents.filter(event => event.eventName === "JudgeCaseCreated")
+        .map(event => String(event.args.commitmentHash).toLowerCase()));
+      for (const commitmentHash of publicationCommitments) {
+        const publication = derivePublicationJudgeCase(judgeEvents, commitmentHash);
+        if (!publication) continue;
+        const candidates = await tx.select().from(campaigns).where(eq(campaigns.commitmentHash, commitmentHash));
+        const candidate = candidates.find(item => item.category === "COMICS_ARTBOOK" && item.frozenSnapshot &&
+          String(item.frozenSnapshot.payoutWallet.address).toLowerCase() === publication.creator &&
+          campaignCommitment(item.frozenSnapshot) === commitmentHash);
+        if (!candidate) continue;
+        if (publication.status === "APPROVED") {
+          await tx.update(campaigns).set({ status: "APPROVED", updatedAt: new Date() }).where(eq(campaigns.id, candidate.id));
+        } else if (publication.status === "REJECTED" || publication.status === "EXPIRED") {
+          await tx.update(campaigns).set({ status: "DRAFT", frozenAt: null, frozenSnapshot: null, commitmentHash: null,
+            payoutWalletLinkId: null, reviewStartedAt: null, onchainCampaignId: null, updatedAt: new Date() }).where(eq(campaigns.id, candidate.id));
+        }
+      }
       for (const log of decoded) {
         const args = log.args as Record<string, any>;
         await tx.insert(chainEvents).values({ streamId, transactionHash: log.transactionHash!, logIndex: log.logIndex!, blockHash: log.blockHash!, blockNumber: log.blockNumber!.toString(),
@@ -408,6 +450,8 @@ export class CampaignIndexerService implements OnModuleInit, OnModuleDestroy {
           .onConflictDoUpdate({ target: [chainEvents.streamId, chainEvents.transactionHash, chainEvents.logIndex, chainEvents.blockHash], set: { canonical: true } });
         if (log.eventName === "Refunded") refunded.add(`${args.campaignId}:${String(args.backer).toLowerCase()}`);
         if (log.eventName !== "CampaignCreated") continue;
+        const publication = derivePublicationJudgeCase(judgeEvents, String(args.commitmentHash));
+        if (!publication || publication.status !== "APPROVED" || publication.creator !== String(args.creator).toLowerCase()) continue;
         const candidates = await tx.select().from(campaigns).where(and(
           eq(campaigns.commitmentHash, args.commitmentHash),
           inArray(campaigns.status, ONCHAIN_CAMPAIGN_STATUSES),
@@ -420,8 +464,6 @@ export class CampaignIndexerService implements OnModuleInit, OnModuleDestroy {
             BigInt(frozen.config.fundingDuration) + blocks.get(log.blockNumber!.toString())!.timestamp === args.fundingDeadline;
         });
         if (!candidate) continue;
-        const [approval] = await tx.select({ id: campaignReviews.id }).from(campaignReviews).where(and(eq(campaignReviews.campaignId, candidate.id), eq(campaignReviews.commitmentHash, args.commitmentHash), eq(campaignReviews.outcome, "APPROVED")));
-        if (!approval) continue;
         const snapshot = jsonSafe<CampaignChainSnapshot>(await client.readContract({ address: manifest.contractAddress, abi: campaignAbi, functionName: "campaign", args: [args.campaignId], blockNumber: head.number }));
         const key = String(args.campaignId);
         bindings.set(key, { campaignId: candidate.id, snapshot });

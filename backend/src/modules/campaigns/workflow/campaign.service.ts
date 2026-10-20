@@ -15,8 +15,6 @@ import {
 import type {
   CreateCampaignDraftInput,
   CreatorVerificationInput,
-  AdminReviewCreatorInput,
-  ResolverReviewCampaignInput,
 } from "../schemas/campaign.schema";
 import { createCampaignDraftSchema } from "../schemas/campaign.schema";
 import { isCampaignKind, requireCurrentCampaign } from "../policies/campaign-kind.policy";
@@ -34,23 +32,6 @@ export class CampaignWorkflowService {
     private readonly indexerService: HistoricalCampaignIndexerService,
     @Optional() private readonly campaignIndexer?: CampaignIndexerService,
   ) {}
-
-  private async validateStudioWallet(userId: string, walletLinkId: string) {
-    const [wallet] = await this.db.select().from(schema.walletLinks).where(and(
-      eq(schema.walletLinks.id, walletLinkId),
-      eq(schema.walletLinks.userId, userId),
-      eq(schema.walletLinks.chainId, "31339"),
-    ));
-    if (!wallet) throw new BadRequestException("Studio wallet must be a linked wallet on local chain 31339");
-    if (this.campaignIndexer) {
-      const deployment = await this.campaignIndexer.deployment();
-      const resolverWallets = new Set([deployment.resolver, deployment.backupResolver].map(address => address.toLowerCase()));
-      if (resolverWallets.has(wallet.address.toLowerCase())) {
-        throw new BadRequestException("Studio wallet cannot be a Resolver wallet in the current Campaign deployment");
-      }
-    }
-    return wallet;
-  }
 
   private async getCampaignProjection(campaignId: string, onchainCampaignId: string | null, isCurrentCampaign: boolean) {
     if (isCurrentCampaign) {
@@ -70,7 +51,6 @@ export class CampaignWorkflowService {
    * Flow V1: Creator submits identity and rights declaration for Admin verification
    */
   async applyCreatorVerification(userId: string, input: CreatorVerificationInput) {
-    await this.validateStudioWallet(userId, input.studioWalletLinkId);
     const [existing] = await this.db.select().from(creatorProfiles).where(eq(creatorProfiles.userId, userId));
     if (existing && existing.status === "VERIFIED") {
       throw new ConflictException("Creator profile is already verified");
@@ -86,7 +66,7 @@ export class CampaignWorkflowService {
         socialUrl: input.socialUrl === undefined ? existing.socialUrl : input.socialUrl,
         contactEmail: input.contactEmail === undefined ? existing.contactEmail : input.contactEmail,
         originalWorkPledge: input.originalWorkPledge,
-        studioWalletLinkId: input.studioWalletLinkId,
+        studioWalletLinkId: input.studioWalletLinkId ?? null,
         status: "PENDING",
         rejectionReason: null,
         updatedAt: new Date(),
@@ -104,7 +84,7 @@ export class CampaignWorkflowService {
       socialUrl: input.socialUrl ?? null,
       contactEmail: input.contactEmail ?? null,
       originalWorkPledge: input.originalWorkPledge,
-      studioWalletLinkId: input.studioWalletLinkId,
+      studioWalletLinkId: input.studioWalletLinkId ?? null,
       status: "PENDING",
     }).returning();
     return profile;
@@ -114,58 +94,16 @@ export class CampaignWorkflowService {
     return this.db.select().from(creatorProfiles);
   }
 
-
-
-  /**
-   * Flow V1: Admin reviews and verifies Creator profile
-   */
-  async adminReviewCreator(adminUserId: string, profileId: string, input: AdminReviewCreatorInput) {
-    const [role] = await this.db.select().from(schema.platformRoles).where(eq(schema.platformRoles.userId, adminUserId)).limit(1);
-    if (!role?.roles.includes("ADMIN")) {
-      throw new ForbiddenException("ADMIN platform role required to review creator profiles");
-    }
-
-    const [profile] = await this.db.select().from(creatorProfiles).where(eq(creatorProfiles.id, profileId));
-    if (!profile) throw new NotFoundException("Creator profile not found");
-    if (profile.userId === adminUserId) throw new ForbiddenException("Creator cannot verify their own profile");
-    if (input.outcome === "VERIFIED" && profile.originalWorkPledge !== true) {
-      throw new ConflictException("Explicit original-work pledge is required before creator verification");
-    }
-    if (input.outcome === "VERIFIED") {
-      if (!profile.studioWalletLinkId) throw new ConflictException("A linked Studio wallet is required before verification");
-      await this.validateStudioWallet(profile.userId, profile.studioWalletLinkId);
-    }
-
-    const [updated] = await this.db.update(creatorProfiles).set({
-      status: input.outcome,
-      reviewedBy: adminUserId,
-      reviewedAt: new Date(),
-      rejectionReason: input.outcome === "REJECTED" ? input.rejectionReason || "Requirements not met" : null,
-      updatedAt: new Date(),
-    }).where(eq(creatorProfiles.id, profileId)).returning();
-
-    return updated;
-  }
-
   async getCreatorProfile(userId: string) {
     const [profile] = await this.db.select().from(creatorProfiles).where(eq(creatorProfiles.userId, userId));
     return profile || null;
   }
 
-  /**
-   * Create campaign draft - requires verified Creator profile
-   */
+  /** Create a campaign draft; creator profile review is not a publication gate. */
   async createDraft(userId: string, input: CreateCampaignDraftInput) {
     const parsed = createCampaignDraftSchema.safeParse(input);
     if (!parsed.success) {
       throw new BadRequestException({ message: "Invalid Campaign draft", issues: parsed.error.issues });
-    }
-    const [profile] = await this.db.select().from(creatorProfiles).where(eq(creatorProfiles.userId, userId));
-    if (!profile || profile.status !== "VERIFIED") {
-      throw new ForbiddenException("Creator must be verified by Admin before creating a campaign draft (Flow V1)");
-    }
-    if (!profile.studioWalletLinkId) {
-      throw new ForbiddenException("Creator Studio must have a verified linked wallet before creating a campaign draft");
     }
     const config = parsed.data;
     const [campaign] = await this.db.insert(campaigns).values({
@@ -243,50 +181,6 @@ export class CampaignWorkflowService {
   }
 
   /**
-   * Flow V2: Resolver reviews campaign feasibility, budget, and commitments
-   */
-  async resolverReview(resolverUserId: string, campaignId: string, input: ResolverReviewCampaignInput) {
-    const [role] = await this.db.select().from(schema.platformRoles).where(eq(schema.platformRoles.userId, resolverUserId)).limit(1);
-    if (!role?.roles.includes("RESOLVER")) {
-      throw new ForbiddenException("RESOLVER platform role required to review campaigns");
-    }
-
-    const [campaign] = await this.db.select().from(campaigns).where(eq(campaigns.id, campaignId));
-    if (!campaign) throw new NotFoundException("Campaign campaign not found");
-    requireCurrentCampaign(campaign);
-    if (campaign.status !== "UNDER_REVIEW") throw new BadRequestException("Campaign is not pending review");
-
-    return this.db.transaction(async tx => {
-      await tx.insert(campaignReviews).values({
-        campaignId,
-        resolverUserId,
-        outcome: input.outcome,
-        decisionReason: input.decisionReason,
-        commitmentHash: campaign.commitmentHash || "0x00",
-      });
-
-      let nextStatus = campaign.status;
-      let frozenAt = campaign.frozenAt;
-      if (input.outcome === "APPROVED") {
-        nextStatus = "APPROVED";
-      } else if (input.outcome === "CHANGES_REQUESTED") {
-        nextStatus = "DRAFT";
-        frozenAt = null; // Unfreeze to allow editing
-      } else if (input.outcome === "REJECTED") {
-        nextStatus = "STOPPED";
-      }
-
-      const [updated] = await tx.update(campaigns).set({
-        status: nextStatus,
-        frozenAt,
-        updatedAt: new Date(),
-      }).where(eq(campaigns.id, campaignId)).returning();
-
-      return updated;
-    });
-  }
-
-  /**
    * Register on-chain campaign with mandatory cryptographic & deployment verification against the contract.
    * Fails closed if RPC URL or FUNDTOGETHER_CONTRACT_ADDRESS is not configured or has no deployed bytecode.
    */
@@ -296,7 +190,8 @@ export class CampaignWorkflowService {
     if (campaign.creatorUserId !== userId) throw new ForbiddenException("Only creator can register on-chain ID");
     requireCurrentCampaign(campaign);
 
-    // Must be approved by Resolver (Flow V2)
+    // Legacy registration remains available for old records; current publication
+    // authority is the on-chain Judge case checked by CampaignIndexerService.
     if (campaign.status !== "APPROVED") {
       throw new BadRequestException("Campaign must be approved by Resolver before on-chain registration (Flow V2)");
     }
@@ -348,17 +243,11 @@ export class CampaignWorkflowService {
         throw new BadRequestException("On-chain campaign goal does not match database frozen goal");
       }
 
-      const [profile] = await this.db.select().from(creatorProfiles).where(eq(creatorProfiles.userId, userId));
-      if (!profile || profile.status !== "VERIFIED" || !profile.studioWalletLinkId) {
-        throw new BadRequestException("A verified Creator profile with a Studio wallet is required");
-      }
-      const [studioWallet] = await this.db.select().from(schema.walletLinks).where(and(
-        eq(schema.walletLinks.id, profile.studioWalletLinkId),
-        eq(schema.walletLinks.userId, userId),
-        eq(schema.walletLinks.chainId, "31339"),
+      const linkedWallets = await this.db.select().from(schema.walletLinks).where(and(
+        eq(schema.walletLinks.userId, userId), eq(schema.walletLinks.chainId, "31339"),
       ));
-      if (!studioWallet || studioWallet.address.toLowerCase() !== onchainCreator.toLowerCase()) {
-        throw new BadRequestException("On-chain campaign creator must match the verified Studio wallet");
+      if (!linkedWallets.some(wallet => wallet.address.toLowerCase() === onchainCreator.toLowerCase())) {
+        throw new BadRequestException("On-chain campaign creator must match a linked Creator wallet");
       }
     } catch (err: any) {
       if (err instanceof BadRequestException) throw err;
@@ -399,12 +288,13 @@ export class CampaignWorkflowService {
   }
 
   /**
-   * Resolver activates a fully-funded campaign on-chain and indexes the canonical CampaignActivated receipt.
+   * Flow V3: Resolver records production verification on-chain and indexes the canonical ProductionVerified receipt,
+   * which triggers gated digital benefit issuance in HistoricalCampaignIndexerService.
    */
   async activateCampaignOnchain(resolverUserId: string, campaignId: string, txHash: string) {
     const [role] = await this.db.select().from(schema.platformRoles).where(eq(schema.platformRoles.userId, resolverUserId)).limit(1);
     if (!role?.roles.includes("RESOLVER")) {
-      throw new ForbiddenException("RESOLVER platform role required to activate campaign");
+      throw new ForbiddenException("RESOLVER platform role required to activate campaign lifecycle");
     }
 
     const [campaign] = await this.db.select().from(campaigns).where(eq(campaigns.id, campaignId));
@@ -417,7 +307,7 @@ export class CampaignWorkflowService {
     try {
       await this.indexerService.processReceipt(txHash as `0x${string}`);
     } catch (err: any) {
-      throw new BadRequestException(`Failed to verify and index activation receipt: ${err.message}`);
+      throw new BadRequestException(`Failed to verify and index lifecycle activation receipt: ${err.message}`);
     }
 
     const [updated] = await this.db.select().from(campaigns).where(eq(campaigns.id, campaignId));
@@ -427,10 +317,6 @@ export class CampaignWorkflowService {
     return updated;
   }
 
-  /**
-   * Flow V3: Resolver records production verification on-chain and indexes the canonical ProductionVerified receipt,
-   * which triggers gated digital benefit issuance in HistoricalCampaignIndexerService.
-   */
   async recordProductionVerifiedOnchain(resolverUserId: string, campaignId: string, txHash: string) {
     const [role] = await this.db.select().from(schema.platformRoles).where(eq(schema.platformRoles.userId, resolverUserId)).limit(1);
     if (!role?.roles.includes("RESOLVER")) {

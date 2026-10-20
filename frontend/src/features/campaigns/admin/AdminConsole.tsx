@@ -1,10 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   listAdminCreatorProfiles,
-  reviewAdminCreatorProfile,
 } from '../api/campaigns';
-import type { CreatorProfile } from '../api/campaigns';
 import { getErrorMessage } from '../../../lib/api/error';
 import { type ExceptionItem } from '../shared/ui/ExceptionList';
 import { AdminOperationsOverview } from '../shared/ui/AdminOperationsOverview';
@@ -19,25 +17,13 @@ export function AdminConsole({
   userId: string;
   focus?: 'studio' | 'projection' | 'indexer';
 }) {
-  const [busy, setBusy] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
-  const [notice, setNotice] = useState('');
-  const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'VERIFIED' | 'REJECTED'>('ALL');
-  const [rejectingId, setRejectingId] = useState<string | null>(null);
-  const [rejectReason, setRejectReason] = useState('');
-  const [pendingConfirm, setPendingConfirm] = useState<{
-    profile: CreatorProfile;
-    outcome: 'VERIFIED' | 'REJECTED';
-    reason?: string;
-  } | null>(null);
-
   useEffect(() => {
     if (!focus) return;
     const targetId = focus === 'studio' ? 'admin-creators-list' : 'admin-operations-overview';
     document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [focus]);
 
-  const { data: profiles, refetch: refetchProfiles, isPending: profilesPending } = useQuery({
+  const { data: profiles, isPending: profilesPending } = useQuery({
     queryKey: ['campaign-admin-creators', userId],
     queryFn: ({ signal }) => listAdminCreatorProfiles(signal),
   });
@@ -48,35 +34,10 @@ export function AdminConsole({
     refetchInterval: 10_000,
   });
 
-  async function executeReview(profile: CreatorProfile, outcome: 'VERIFIED' | 'REJECTED', reason?: string) {
-    setBusy(true);
-    setErrorMsg('');
-    setNotice('');
-    setPendingConfirm(null);
-    try {
-      await reviewAdminCreatorProfile(profile.id, {
-        outcome,
-        rejectionReason: outcome === 'REJECTED' ? (reason || 'Hồ sơ chưa đạt yêu cầu bản quyền hoặc thông tin chưa rõ ràng.') : undefined,
-      });
-      setNotice(outcome === 'VERIFIED'
-        ? `Đã phê duyệt hồ sơ tác giả "${profile.displayName}" (VERIFIED).`
-        : `Đã từ chối hồ sơ "${profile.displayName}" (REJECTED).`);
-      setRejectingId(null);
-      setRejectReason('');
-      void refetchProfiles();
-    } catch (err) {
-      setErrorMsg(getErrorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   const allProfiles = profiles || [];
   const allCampaigns = operations.data || [];
 
-  const pendingProfilesCount = allProfiles.filter(p => p.status === 'PENDING').length;
-  const verifiedProfilesCount = allProfiles.filter(p => p.status === 'VERIFIED').length;
-  const rejectedProfilesCount = allProfiles.filter(p => p.status === 'REJECTED').length;
+  const profileMetadataCount = allProfiles.length;
 
   const pendingCampaignsCount = allCampaigns.filter(
     c => ['FROZEN', 'UNDER_REVIEW', 'UNDER_REVIEW_PRIVATE', 'COMMUNITY_REVIEW'].includes(c.applicationStatus)
@@ -89,13 +50,12 @@ export function AdminConsole({
   const refundingCampaignsCount = allCampaigns.filter(c => c.contractState === 4).length;
 
   // 4 KPI Metrics
-  const reviewQueueTotal = pendingProfilesCount + pendingCampaignsCount;
-  const exceptionsTotal = rejectedProfilesCount + orphanedBindings.length + approvedWithoutBinding.length + indexerPendingBindings.length;
+  const reviewQueueTotal = pendingCampaignsCount;
+  const exceptionsTotal = orphanedBindings.length + approvedWithoutBinding.length + indexerPendingBindings.length;
 
   // Lifecycle Distribution Counts (from loaded data)
   const lifecycleCounts: Record<string, number> = {
-    'Chờ duyệt IP': pendingProfilesCount,
-    'Đã xác minh IP': verifiedProfilesCount,
+    'Creator metadata': profileMetadataCount,
     'Đang gây quỹ': fundingCampaignsCount,
     'Chờ kích hoạt': pendingActivationCount,
     'Ngoại lệ / hoàn tiền': exceptionsTotal + refundingCampaignsCount,
@@ -103,19 +63,6 @@ export function AdminConsole({
 
   // Operational Exceptions list
   const exceptionItems: ExceptionItem[] = [
-    ...allProfiles.filter(p => p.status === 'PENDING').map(p => ({
-      id: `pending-prof-${p.id}`,
-      label: `Hồ sơ tác giả "${p.displayName}" đang chờ thẩm định cam kết IP`,
-      severity: 'warning' as const,
-      owner: p.displayName,
-      actionHref: `#admin-creators-list`,
-    })),
-    ...allProfiles.filter(p => p.status === 'REJECTED').map(p => ({
-      id: `rejected-prof-${p.id}`,
-      label: `Hồ sơ "${p.displayName}" bị từ chối: ${p.rejectionReason || 'Thông tin bản quyền chưa hợp lệ'}`,
-      severity: 'info' as const,
-      owner: p.displayName,
-    })),
     ...allCampaigns.filter(c => c.contractState === 4).map(c => ({
       id: `refunding-camp-${c.campaignId}`,
       label: `Chiến dịch "${c.title}" đang ở contract state REFUNDING; Backer tự claim hoàn tiền`,
@@ -146,61 +93,19 @@ export function AdminConsole({
     })),
   ];
 
-  const filteredProfiles = filter === 'ALL'
-    ? allProfiles
-    : allProfiles.filter(p => p.status === filter);
-
   return (
     <div className="campaign-container admin-console">
       <h1 className="public-sr-only">Quản Trị Vận Hành & Hồ Sơ Bản Quyền IP</h1>
 
 
-      {errorMsg && <p className="toast toast--error" role="alert">{errorMsg}</p>}
       {operations.error && <p className="toast toast--error" role="alert">{getErrorMessage(operations.error)}</p>}
-      {notice && <p className="toast toast--success" role="status">{notice}</p>}
-
-      {/* Confirmation Modal / Bar */}
-      {pendingConfirm && (
-        <aside className="review-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
-          <div className="review-confirm-dialog">
-            <h3 id="confirm-title">Xác nhận chuyển trạng thái hồ sơ</h3>
-            <p>
-              Bạn sắp chuyển trạng thái hồ sơ của tác giả <strong>"{pendingConfirm.profile.displayName}"</strong> sang{' '}
-              <strong className={pendingConfirm.outcome === 'VERIFIED' ? 'text-success' : 'text-danger'}>
-                {pendingConfirm.outcome}
-              </strong>.
-            </p>
-            {pendingConfirm.reason && (
-              <p className="muted">Lý do: {pendingConfirm.reason}</p>
-            )}
-            <div className="review-confirm-actions">
-              <button
-                type="button"
-                className={`button ${pendingConfirm.outcome === 'VERIFIED' ? 'button--primary' : 'button--secondary'}`}
-                disabled={busy}
-                onClick={() => void executeReview(pendingConfirm.profile, pendingConfirm.outcome, pendingConfirm.reason)}
-              >
-                {busy ? 'Đang xử lý…' : `Xác nhận ${pendingConfirm.outcome === 'VERIFIED' ? 'Phê duyệt' : 'Từ chối'}`}
-              </button>
-              <button
-                type="button"
-                className="button button--quiet"
-                disabled={busy}
-                onClick={() => setPendingConfirm(null)}
-              >
-                Hủy bỏ
-              </button>
-            </div>
-          </div>
-        </aside>
-      )}
 
       {/* Operational KPI summary for screen readers and system status */}
       <section className="kpi-grid admin-kpis public-sr-only" aria-label="Chỉ số vận hành hệ thống">
         <div className="panel kpi-tile">
           <span className="kpi-tile__kicker">Hàng đợi thẩm định</span>
           <strong className="kpi-tile__value">{reviewQueueTotal}</strong>
-          <span className="kpi-tile__note">{pendingProfilesCount} hồ sơ IP · {pendingCampaignsCount} chiến dịch</span>
+          <span className="kpi-tile__note">{profileMetadataCount} hồ sơ metadata · {pendingCampaignsCount} chiến dịch</span>
         </div>
         <div className="panel kpi-tile">
           <span className="kpi-tile__kicker">Chiến dịch đang gây quỹ</span>
@@ -215,7 +120,7 @@ export function AdminConsole({
         <div className="panel kpi-tile">
           <span className="kpi-tile__kicker">Ngoại lệ vận hành</span>
           <strong className="kpi-tile__value">{exceptionsTotal}</strong>
-          <span className="kpi-tile__note">{rejectedProfilesCount} từ chối · {orphanedBindings.length} binding orphaned</span>
+          <span className="kpi-tile__note">{orphanedBindings.length} binding orphaned</span>
         </div>
       </section>
 
@@ -232,50 +137,18 @@ export function AdminConsole({
       <section id="admin-creators-list" className="panel" aria-labelledby="admin-creators-title">
         <div className="admin-section-header">
           <div>
-            <h2 id="admin-creators-title">Hồ Sơ Tác Giả & Cam Kết Bản Quyền IP</h2>
-            <p className="muted">Kiểm tra thông tin studio/bút danh và cam kết sở hữu trí tuệ trước khi cho phép xuất bản.</p>
+            <h2 id="admin-creators-title">Metadata tác giả và IP</h2>
+            <p className="muted">Admin chỉ xem metadata được Creator tự khai báo. Metadata này không cấp quyền đăng funding và không thay thế Judge case.</p>
           </div>
-        </div>
-
-        {/* Filter Tabs */}
-        <div className="admin-filter-tabs">
-          <button
-            type="button"
-            className={`button ${filter === 'ALL' ? 'button--primary' : 'button--quiet'}`}
-            onClick={() => setFilter('ALL')}
-          >
-            Tất cả ({allProfiles.length})
-          </button>
-          <button
-            type="button"
-            className={`button ${filter === 'PENDING' ? 'button--primary' : 'button--quiet'}`}
-            onClick={() => setFilter('PENDING')}
-          >
-            Chờ duyệt ({pendingProfilesCount})
-          </button>
-          <button
-            type="button"
-            className={`button ${filter === 'VERIFIED' ? 'button--primary' : 'button--quiet'}`}
-            onClick={() => setFilter('VERIFIED')}
-          >
-            Đã phê duyệt ({verifiedProfilesCount})
-          </button>
-          <button
-            type="button"
-            className={`button ${filter === 'REJECTED' ? 'button--primary' : 'button--quiet'}`}
-            onClick={() => setFilter('REJECTED')}
-          >
-            Đã từ chối ({rejectedProfilesCount})
-          </button>
         </div>
 
         {profilesPending ? (
           <p className="muted">Đang tải danh sách hồ sơ…</p>
-        ) : filteredProfiles.length === 0 ? (
+        ) : allProfiles.length === 0 ? (
           <p className="muted">Không có hồ sơ nào trong mục này.</p>
         ) : (
           <div className="admin-profile-list">
-            {filteredProfiles.map(p => (
+            {allProfiles.map(p => (
               <article key={p.id} className="admin-profile-card">
                 <div className="admin-profile-card__header">
                   <div className="admin-profile-card__identity">
@@ -289,7 +162,7 @@ export function AdminConsole({
                           : 'status-under-review'
                       }`}
                     >
-                      {p.status === 'PENDING' ? 'CHỜ DUYỆT' : p.status === 'VERIFIED' ? 'ĐÃ PHÊ DUYỆT' : 'BỊ TỪ CHỐI'}
+                        {p.status === 'PENDING' ? 'METADATA MỚI' : p.status === 'VERIFIED' ? 'METADATA ĐÃ LƯU' : 'METADATA CẦN CẬP NHẬT'}
                     </span>
                   </div>
                   <span className="admin-profile-card__date">
@@ -309,7 +182,7 @@ export function AdminConsole({
 
                 <div className="admin-profile-card__block">
                   <strong>Xác nhận tác phẩm nguyên bản:</strong>
-                  <p>{p.originalWorkPledge === true ? '✓ Creator đã xác nhận rõ ràng' : 'Chưa có xác nhận — không được phê duyệt'}</p>
+                  <p>{p.originalWorkPledge === true ? '✓ Creator đã xác nhận rõ ràng' : 'Chưa có xác nhận trong metadata'}</p>
                 </div>
 
                 {p.status === 'REJECTED' && p.rejectionReason && (
@@ -318,59 +191,6 @@ export function AdminConsole({
                   </div>
                 )}
 
-                {/* Actions for PENDING */}
-                {p.status === 'PENDING' && (
-                  <div className="admin-profile-card__actions">
-                    <button
-                      type="button"
-                      className="button button--primary"
-                      disabled={busy || p.originalWorkPledge !== true}
-                      onClick={() => setPendingConfirm({ profile: p, outcome: 'VERIFIED' })}
-                    >
-                      Phê duyệt (VERIFIED)
-                    </button>
-
-                    {rejectingId !== p.id ? (
-                      <button
-                        type="button"
-                        className="button button--secondary"
-                        disabled={busy}
-                        onClick={() => {
-                          setRejectingId(p.id);
-                          setRejectReason('');
-                        }}
-                      >
-                        Từ chối hồ sơ
-                      </button>
-                    ) : (
-                      <div className="admin-profile-card__reject-form">
-                        <input
-                          type="text"
-                          placeholder="Nhập lý do từ chối..."
-                          value={rejectReason}
-                          onChange={e => setRejectReason(e.target.value)}
-                        />
-                        <button
-                          type="button"
-                          className="button button--secondary"
-                          style={{ color: '#dc2626', borderColor: '#fca5a5' }}
-                          disabled={busy}
-                          onClick={() => setPendingConfirm({ profile: p, outcome: 'REJECTED', reason: rejectReason })}
-                        >
-                          Xác nhận từ chối
-                        </button>
-                        <button
-                          type="button"
-                          className="button button--quiet"
-                          disabled={busy}
-                          onClick={() => setRejectingId(null)}
-                        >
-                          Hủy
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
               </article>
             ))}
           </div>
@@ -391,11 +211,8 @@ export function AdminConsole({
             <button
               type="button"
               className="button button--secondary button--sm"
-              disabled={busy}
               onClick={() => {
-                void refetchProfiles();
                 void operations.refetch();
-                setNotice('Đã gửi yêu cầu làm mới dữ liệu quản trị.');
               }}
             >
               Làm mới dữ liệu quản trị
@@ -404,7 +221,7 @@ export function AdminConsole({
 
           <div className="admin-control-box">
             <h4>Giới hạn Thẩm quyền</h4>
-            <p>Admin chỉ có quyền thẩm định cam kết tác giả/IP (Flow V1). Quyết định tài chính và giải ngân thuộc về Resolver Console.</p>
+            <p>Admin chỉ theo dõi metadata, Judge publication cases và projection indexer. Quyết định publication thuộc về Judge case; quyết định lifecycle còn lại là transitional Resolver.</p>
             <a href="#/campaigns/resolver" className="button button--quiet button--sm">
               Mở Resolver Console →
             </a>

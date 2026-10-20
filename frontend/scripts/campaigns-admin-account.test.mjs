@@ -120,10 +120,10 @@ test('AdminConsole renders 4 operational KPI tiles, lifecycle chart, and excepti
   // Grouped admin actions under secondary section
   assert.match(html, /Quản trị hệ thống|Hành động quản trị/i)
 
-  // Explicit pledge is visible and an unattested pending profile cannot be approved.
-  assert.match(html, /Chưa có xác nhận — không được phê duyệt/)
+  // Metadata remains visible, but it is not an approval control.
+  assert.match(html, /Chưa có xác nhận/)
   assert.match(html, /Creator đã xác nhận rõ ràng/)
-  assert.match(html, /<button[^>]*disabled=""[^>]*>Phê duyệt \(VERIFIED\)<\/button>/)
+  assert.doesNotMatch(html, /Phê duyệt \(VERIFIED\)|Từ chối hồ sơ/)
 })
 
 test('classifyAccountError identifies failed layer for provider, rpc, and api session', () => {
@@ -140,7 +140,7 @@ test('classifyAccountError identifies failed layer for provider, rpc, and api se
   assert.match(sessionErr.layerLabel, /Phiên đăng nhập|API Session/i)
 })
 
-test('AccountAccess presents password login, secondary signup, and linked-wallet login as separate surfaces', () => {
+test('AccountAccess presents wallet-only SIWE login', () => {
   const html = renderToStaticMarkup(
     createElement(AppProviders, null,
       createElement(AccountAccess, { session: null, onSession: () => undefined })
@@ -148,12 +148,12 @@ test('AccountAccess presents password login, secondary signup, and linked-wallet
   )
 
   assert.match(html, /account-login/)
-  assert.match(html, /account-login__form/)
-  assert.match(html, /account-login__submit/)
-  assert.match(html, /account-login__switch/)
+  assert.match(html, /Đăng nhập bằng ví/)
+  assert.match(html, /Ký để đăng nhập/)
+  assert.doesNotMatch(html, /Dùng email và mật khẩu/)
+  assert.doesNotMatch(html, /account-login__form/)
+  assert.doesNotMatch(html, /Đăng ký/)
   assert.match(html, /account-login__wallet/)
-  assert.match(html, /account-login__wallet-summary/)
-  assert.match(html, /Đăng nhập bằng ví đã liên kết/)
 })
 
 

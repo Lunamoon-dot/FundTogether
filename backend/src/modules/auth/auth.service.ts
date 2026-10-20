@@ -35,44 +35,6 @@ export class AuthService {
     private readonly database: NodePgDatabase<typeof schema>,
   ) {}
 
-  async register(email: string, password: string) {
-    const passwordHash = await argon2.hash(password, {
-      type: argon2.argon2id,
-      memoryCost: 19456,
-      timeCost: 2,
-      parallelism: 1,
-    });
-    const [user] = await this.database
-      .insert(users)
-      .values({ email: email.trim().toLowerCase(), passwordHash })
-      .onConflictDoNothing()
-      .returning({ id: users.id });
-    if (!user) throw new ConflictException("Email is already registered");
-    return this.createSession(user.id);
-  }
-
-  async login(email: string, password: string) {
-    const [user] = await this.database
-      .select()
-      .from(users)
-      .where(eq(users.email, email.trim().toLowerCase()))
-      .limit(1);
-    if (!user?.passwordHash) {
-      // Keep a comparable password-work cost for unknown and existing emails.
-      await argon2.hash(password, {
-        type: argon2.argon2id,
-        memoryCost: 19456,
-        timeCost: 2,
-        parallelism: 1,
-      });
-      throw new UnauthorizedException("Email or password is incorrect");
-    }
-    if (!(await argon2.verify(user.passwordHash, password))) {
-      throw new UnauthorizedException("Email or password is incorrect");
-    }
-    return this.createSession(user.id);
-  }
-
   async verifySession(token: string) {
     if (!/^[a-f0-9]{64}$/.test(token))
       throw new UnauthorizedException("Session is invalid or expired");
@@ -205,21 +167,53 @@ export class AuthService {
       signature,
     );
     return this.database.transaction(async tx => {
-    const [link] = await tx
-      .select({ userId: walletLinks.userId })
-      .from(walletLinks)
-      .where(
-        and(
-          eq(walletLinks.chainId, String(chainId)),
-          eq(walletLinks.address, address),
-        ),
-      )
-      .limit(1).for("share");
-    if (!link)
-      throw new UnauthorizedException(
-        "Register an account and link this wallet before using wallet login",
-      );
-    return this.createSession(link.userId, tx);
+      const [link] = await tx
+        .select({ userId: walletLinks.userId })
+        .from(walletLinks)
+        .where(
+          and(
+            eq(walletLinks.chainId, String(chainId)),
+            eq(walletLinks.address, address),
+          ),
+        )
+        .limit(1)
+        .for("share");
+      let userId = link?.userId;
+      if (!userId) {
+        const [createdUser] = await tx
+          .insert(users)
+          .values({})
+          .returning({ id: users.id });
+        if (!createdUser) throw new ConflictException("Wallet account could not be created");
+        await tx
+          .insert(walletLinks)
+          .values({
+            userId: createdUser.id,
+            address,
+            chainId: String(chainId),
+            isPrimary: true,
+          })
+          .onConflictDoNothing();
+        const [resolvedLink] = await tx
+          .select({ userId: walletLinks.userId })
+          .from(walletLinks)
+          .where(
+            and(
+              eq(walletLinks.chainId, String(chainId)),
+              eq(walletLinks.address, address),
+            ),
+          )
+          .limit(1)
+          .for("share");
+        if (!resolvedLink) {
+          await tx.delete(users).where(eq(users.id, createdUser.id));
+          throw new ConflictException("Wallet account could not be linked");
+        }
+        userId = resolvedLink.userId;
+        if (userId !== createdUser.id)
+          await tx.delete(users).where(eq(users.id, createdUser.id));
+      }
+      return this.createSession(userId, tx);
     });
   }
 
@@ -275,7 +269,10 @@ export class AuthService {
     }
   }
 
-  private async createSession(userId: string, database: Pick<NodePgDatabase<typeof schema>, "insert"> = this.database) {
+  private async createSession(
+    userId: string,
+    database: Pick<NodePgDatabase<typeof schema>, "insert" | "select"> = this.database,
+  ) {
     const token = randomBytes(32).toString("hex");
     await database
       .insert(authSessions)
@@ -284,18 +281,21 @@ export class AuthService {
         tokenHash: hashToken(token),
         expiresAt: new Date(Date.now() + SESSION_TTL_MS),
       });
-    return { token, account: await this.getAccount(userId) };
+    return { token, account: await this.getAccount(userId, database) };
   }
 
-  private async getAccount(userId: string) {
-    const [user] = await this.database
+  private async getAccount(
+    userId: string,
+    database: Pick<NodePgDatabase<typeof schema>, "select"> = this.database,
+  ) {
+    const [user] = await database
       .select({ id: users.id, email: users.email, roles: platformRoles.roles })
       .from(users)
       .leftJoin(platformRoles, eq(platformRoles.userId, users.id))
       .where(eq(users.id, userId))
       .limit(1);
     if (!user) throw new UnauthorizedException("Account no longer exists");
-    const wallets = await this.database
+    const wallets = await database
       .select({ address: walletLinks.address, chainId: walletLinks.chainId })
       .from(walletLinks)
       .where(eq(walletLinks.userId, userId));

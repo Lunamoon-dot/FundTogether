@@ -1,5 +1,10 @@
 # Randomized Judge Review and Permissionless Creator Publishing
 
+> **Status:** Superseded on 2026-10-20. The new current design is
+> [Pure Decentralized FundTogether Protocol](2026-10-20-pure-decentralized-protocol-design.md).
+> This file is retained because it describes the rejected incremental migration
+> that still kept Resolver authority for later lifecycle actions.
+
 > **Status:** Proposed migration design; implementation has not started.
 > **Date:** 2026-10-20
 > **Scope:** FundTogether's first transition away from fixed Resolver authority.

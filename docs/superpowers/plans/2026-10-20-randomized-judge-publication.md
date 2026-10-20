@@ -1,5 +1,11 @@
 # Randomized Judge Publication Implementation Plan
 
+> **Status:** Superseded on 2026-10-20 by
+> [the pure decentralized protocol plan](2026-10-20-pure-decentralized-protocol.md).
+> This plan is retained as historical planning material; it must not be
+> executed because it preserves transitional Resolver authority and excludes
+> the required stake-backed milestone protocol.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or **superpowers:executing-plans** to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the fixed Resolver publication gate with an on-chain three-Judge publication case, remove Studio verification as a funding prerequisite, and preserve the existing escrow lifecycle for later migration.

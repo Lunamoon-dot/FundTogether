@@ -22,7 +22,7 @@ const tokenErrorAbi = (mockUsdcAbiJson as Abi).filter(item => item.type === 'err
 
 const transactionAction = (functionName: string): CampaignTransactionAction => {
   const actions: CampaignTransactionAction[] = [
-    'approveCampaign', 'createCampaign', 'pledge', 'submitProduction', 'submitRelease',
+    'createPublicationCase', 'votePublicationCase', 'expirePublicationCase', 'createCampaign', 'pledge', 'submitProduction', 'submitRelease',
     'reviewProduction', 'confirmCampaignCompletion', 'reviewRelease', 'challengeRelease', 'resolveChallenge',
     'finalizeFunding', 'startRefunds', 'claimRefund', 'requestCompletion', 'approveCompletion', 'rejectCompletion', 'claimSurplus', 'cancelCampaign',
     'requestDisbursement', 'approveDisbursement', 'rejectDisbursement',
@@ -211,8 +211,8 @@ export function useTransaction(onConfirmed: () => void, context: TransactionCont
       if (deployment.protocolKind !== 'CAMPAIGNS' || deployment.chainId !== 31339 || chainId !== 31339 || deployment.abiVersion !== 'campaigns-local-judge-v1' ||
         deployment.abiHash !== keccak256(toHex(JSON.stringify(campaignAbiJson, null, 2) + '\n')) || genesis.hash !== deployment.genesisHash || !code || keccak256(code) !== deployment.contractCodeHash)
         throw new Error('Deployment hiện tại không khớp mạng, ABI hoặc bytecode đã kiểm tra.');
-      if (functionName === 'approveCampaign' || functionName === 'createCampaign') {
-        const creatorWallet = functionName === 'approveCampaign' ? String(args[0] ?? '') : actor;
+      if (functionName === 'createCampaign') {
+        const creatorWallet = actor;
         const resolverWallets = [deployment.resolver, deployment.backupResolver].map(address => address.toLowerCase());
         if (resolverWallets.includes(creatorWallet.toLowerCase())) {
           throw new Error('Ví Creator không được trùng ví Resolver của deployment hiện tại.');

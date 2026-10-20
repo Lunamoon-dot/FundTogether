@@ -1,17 +1,49 @@
-# Goal — Reward Crowdfunding
+# Goal — FundTogether Pure Decentralized Crowdfunding
 
-FundTogether runs one local MVP product: Reward Crowdfunding for one independent digital comic or artbook.
+FundTogether is a permissionless reward-crowdfunding protocol for one
+independent digital comic or artbook campaign. Any wallet may create a proposal;
+Backers pledge into contract escrow; stake-backed Judge courts review
+publication and production milestones; only canonical review outcomes unlock
+milestone payout.
 
-The target journey is Creator verification, review of one frozen PDF-download benefit, on-chain pledge, controlled production evidence, Resolver-accepted PDF release, entitlement-gated download, completion or refund. Financial truth is the FundTogether Campaign contract, canonical events, and the idempotent Campaign indexer. Physical shipping, tracking and merchandise are not MVP behaviour.
+The target journey is:
 
-Legacy product flows are removed from active source, contracts, local launchers, frontend routes, migrations, and documentation. Existing local archive files and Docker volumes are neither started nor migrated.
+    Creator proposal
+      → frozen terms and evidence commitment
+      → three-Judge publication court
+      → two-of-three PASS
+      → FUNDING and Backer pledges
+      → milestone evidence
+      → three-Judge review
+      → challenge window
+      → exact milestone payout or refund
 
-## Verification baseline
+The Campaign contract is the financial source of truth. PostgreSQL is metadata
+and an indexed projection. MinIO stores private evidence and PDF bytes. The
+backend and Admin surface have no authority to choose outcomes or move funds.
 
-- On 2026-10-13, the fresh FundTogether migration audit, local launcher, backend build, Campaign unit/E2E suites, frontend checks, and Foundry suite passed against the isolated local runtime.
-- Runtime identity is fail-closed: a placeholder manifest, wrong API protocol, or contract-address mismatch cannot be reported ready. The launcher reuses only API/web listeners that match the current Campaign manifest.
-- Campaign R2–R5 have automated local acceptance for frozen review, canonical escrow pledges, private reviewed PDF delivery, community reports, disputes, refunds and physical retirement. After the operator stopped the old API, migration 0005 was applied to the main local database with a fresh audit and backup. The rebuilt API is running: 19 HTTP checks passed, eight physical fixtures are archived, all 32 historical financial rows and contract balances are unchanged, and active shipping columns are gone.
-- The supported local identity is `CAMPAIGNS` on chain `31339`, RPC `9548`, API `3002`, web `5175`, PostgreSQL `5436`, and MinIO `9202/9203`.
-- A transaction is only reflected in the app after receipt validation and canonical event indexing.
+The protocol accepts Sybil, collusion, bribery, inactive-Judge and
+incorrect-majority risk. It does not claim that stake or a content hash proves
+real-world truth.
 
-This is a verified local-pilot baseline, not public-chain, real-asset, legal, or manual wallet acceptance evidence.
+The product remains limited to COMICS_ARTBOOK, one STANDARD digital-download PDF
+tier, local MockUSDC on chain 31339, sequential milestones, challenges and
+refunds. Physical shipping, inventory, NFTs, marketplace behavior, charity
+workflow and public-chain/real-money launch are outside the pilot.
+
+## Current evidence boundary
+
+The current checkout still contains the pre-reset Resolver implementation and
+a partially implemented VNext contract/indexer/read-only UI slice. Its tests
+and runtime evidence are evidence only for the named slices, not proof of a
+fresh end-to-end deployment. The target design and implementation order are
+documented in
+[FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_V1.md](docs/protocol/FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_V1.md),
+[parameters-v1.md](docs/protocol/parameters-v1.md),
+[THREAT_MODEL_VNEXT.md](docs/protocol/THREAT_MODEL_VNEXT.md),
+[STATE_MACHINE_VNEXT.md](docs/protocol/STATE_MACHINE_VNEXT.md),
+[PURE_DECENTRALIZED_PROTOCOL.md](docs/architecture/PURE_DECENTRALIZED_PROTOCOL.md)
+and
+[2026-10-20-vnext-a-z-build-roadmap.md](docs/superpowers/plans/2026-10-20-vnext-a-z-build-roadmap.md)
+and
+[2026-10-20-pure-decentralized-protocol.md](docs/superpowers/plans/2026-10-20-pure-decentralized-protocol.md).

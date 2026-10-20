@@ -1,0 +1,110 @@
+# FundTogether VNext — Implementation Progress
+
+> **Status:** Live implementation ledger for the pure-decentralized target.
+> This is evidence of the listed slices only; it is not a claim that the full
+> protocol is deployed or financially complete.
+
+**Roadmap:** [A–Z VNext build roadmap](../superpowers/plans/2026-10-20-vnext-a-z-build-roadmap.md)
+**Specification:** [Protocol Specification V1](FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_V1.md)
+**Runtime boundary:** local Anvil/MockUSDC only; no public-chain acceptance
+
+## Implemented and verified slices
+
+| Gate | Artifact | Evidence |
+| --- | --- | --- |
+| A | Spec/source-of-truth links | Docs link audit passes |
+| B | `parameters-v1.md` | Registry exists; blocking financial decisions remain explicit |
+| C | `THREAT_MODEL_VNEXT.md` | T01–T13 and fail-closed requirements documented |
+| D | `VNextTypes.sol`, `JuryTypes.sol`, state-machine docs | Focused state tests: 7 passed |
+| E | `IVNextEvents.sol` | `forge build` succeeds; event vocabulary compiles |
+| F | `JuryRegistry.sol` | Focused registry tests: 6 passed; bounded settlement and reward claim |
+| G/H | `JuryReview.sol` | Focused review tests: 9 passed; multi-court, commit–reveal, appeal, retry and final settlement |
+| I | `CampaignEscrowVNext.sol` | Campaign/funding/publication gate tests: 6 passed |
+| J | `CampaignEscrowVNext.sol` | Evidence/revision tests: 4 passed |
+| K | `JuryReview.sol`, `CampaignEscrowVNext.sol` | Appeal/challenge hooks exist; focused review/campaign tests pass |
+| L | `CampaignEscrowVNext.sol` | Payout/refund/challenge tests: 4 passed; conservation/failure-transfer fuzz suite: 3 passed |
+| P | `DeployVNext.s.sol`, `deploy-vnext.cjs`, `verify-vnext-runtime.cjs`, `vnext-deployment.ts` | Foundry script compiles; runtime verifier CLI/parser tests: 4 passed; one-time wiring is executable |
+| Q/R | `vnext-indexer.service.ts`, `vnext-event-projector.ts`, VNext Drizzle schema | Projector tests: 2 passed; migration and idempotent event store added |
+| S/T | `vnext.controller.ts`, `vnext-evidence-integrity.ts` | Read-only projection API, SHA-256 evidence check and focused evidence tests added |
+| U/V/W/X | `VNextProtocolPage.tsx` | Read-only VNext protocol/campaign projection surface added; Creator/Backer/Judge wallet journeys remain incomplete |
+
+## Current executable behavior
+
+The current VNext contract slice can:
+
+- accept a configured stake token and immutable review-controller boundary;
+- deposit and withdraw only available Judge stake;
+- reserve case stake without exceeding available balance;
+- settle a case stake once with a bounded slash amount;
+- create a review case from the configured Campaign caller;
+- enroll non-Creator Judges that already reserved case stake;
+- freeze a randomness-provider seed after enrollment;
+- assign `floor(N / 3)` deterministic three-Judge courts without Judge overlap;
+- enforce court-specific commit authorization;
+- verify commit–reveal vote preimages;
+- mark a court `INVALID` when any assigned Judge fails to reveal;
+- aggregate court results into PASS, FAIL, TIED or protocol failure;
+- open bounded appeal rounds with a fresh, non-overlapping Judge pool and
+  return an appeal bond after finalization;
+- open bounded retry rounds for no-quorum, randomness, invalid-court and tied
+  outcomes; retries use a fresh root-case Judge pool and end in protocol
+  failure after the frozen retry limit;
+- settle Judge locks once, slash only a minority on substantive outcomes and
+  expose pull-claim rewards from the slash pool;
+- create a frozen campaign proposal with a publication review gate; only a
+  canonical publication `FINAL_PASS` opens contribution funding, without
+  Resolver/Admin approval;
+- finalize funding permissionlessly, open full funding-failure refunds, and
+  keep successful funds in contract custody;
+- bind milestone evidence revisions to one review case each, allow bounded
+  correction after `VERDICT_FAIL`, open eligible Backer challenge cases;
+- pay an exact milestone budget only after final PASS and the challenge window,
+  and open pro-rata refunds on terminal failure;
+- preserve `R = P + F + E` in the tested partial-payout/refund and failed-token
+  transfer paths.
+
+## Not implemented yet
+
+The following remain incomplete and must not be inferred from the passing slice:
+
+- non-reveal penalty remains the explicitly frozen local value `0`; production
+  penalty economics and service-fee funding are not approved;
+- full appeal/retry contribution eligibility and evidence availability wiring
+  in the backend;
+- production batch/pull settlement and gas policy for the maximum 300-Judge
+  snapshot;
+- complete invariant coverage for all review liveness and multi-court paths;
+- wallet transaction journeys for Creator, Backer and Judge, including
+  commit–reveal and reward claim;
+- fresh local runtime deployment and end-to-end acceptance.
+
+## Verification record
+
+The contract suite currently reports 92 passing tests, including historical
+Resolver contracts and the new VNext focused suites. The historical tests are
+kept for regression visibility and are not counted as proof of pure-decentralized
+financial behavior.
+
+The current VNext tests are:
+
+```text
+test/unit/VNext/StateMachine.t.sol  7 passed
+test/unit/VNext/JuryRegistry.t.sol  6 passed
+test/unit/VNext/JuryReview.t.sol    9 passed
+test/unit/VNext/CampaignCreation.t.sol  3 passed
+test/unit/VNext/FundingEscrow.t.sol 3 passed
+test/unit/VNext/MilestoneEvidence.t.sol 4 passed
+test/unit/VNext/PayoutRefund.t.sol 4 passed
+test/invariant/VNextConservation.t.sol 3 passed (256-case fuzz)
+
+Full command: `forge test` → 92 passed, 0 failed, 0 skipped across 11 suites.
+The suite includes historical Resolver tests for regression visibility; the
+VNext evidence is the focused VNext/invariant rows above.
+
+Backend focused evidence: VNext projector 2 passed; evidence integrity 2
+passed; `npm run build` completed. Frontend evidence: `npm test` → 199 passed;
+`npm run build` completed with only the existing large-bundle warning.
+```
+
+Every later gate must update this file with the exact command and result. A
+green test is evidence only for the behavior it covers.

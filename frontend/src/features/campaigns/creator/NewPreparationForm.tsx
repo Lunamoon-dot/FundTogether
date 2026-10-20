@@ -81,7 +81,7 @@ export function NewPreparationPanel({ onCreated }: { onCreated: (campaign: Campa
       return;
     }
     if (selectedFiles.length === 0) {
-      setError('Chọn ít nhất một tài liệu mẫu riêng tư để Resolver thẩm định.');
+      setError('Chọn ít nhất một tài liệu mẫu riêng tư để Judge committee thẩm định.');
       return;
     }
 
@@ -123,7 +123,7 @@ export function NewPreparationPanel({ onCreated }: { onCreated: (campaign: Campa
           <span className="campaign-preparation-kicker">FundTogether</span>
           <h3>Tạo campaign trong một hồ sơ duy nhất</h3>
           <p className="muted public-sr-only sr-only">COMICS_ARTBOOK · Truyện tranh / Artbook · một Standard PDF tải xuống.</p>
-          <p className="muted public-sr-only sr-only">Điền 3 nhóm thông tin, lưu một lần ở bước cuối. Sau đó hồ sơ sẽ xuất hiện trong Studio để bạn kiểm tra và khóa gửi Resolver.</p>
+          <p className="muted public-sr-only sr-only">Điền 3 nhóm thông tin, lưu một lần ở bước cuối. Sau đó hồ sơ sẽ xuất hiện trong Studio để bạn kiểm tra và tạo Judge case.</p>
         </div>
         <ol className="campaign-preparation-steps" aria-label="Các bước tạo hồ sơ">
           <li className={step === 0 ? 'is-current' : step > 0 ? 'is-complete' : ''}><span>1</span>Thông tin ấn phẩm</li>
@@ -135,7 +135,7 @@ export function NewPreparationPanel({ onCreated }: { onCreated: (campaign: Campa
       <fieldset disabled={busy} className="campaign-preparation-form">
         <legend>Hồ sơ campaign mới</legend>
         {step === 0 && <section className="campaign-preparation-section">
-          <div className="campaign-preparation-section-heading"><span className="campaign-preparation-section-number">1</span><div><h4>Thông tin ấn phẩm</h4><p>Resolver và backer sẽ biết bạn tạo ấn phẩm gì và họ nhận PDF nào.</p></div></div>
+          <div className="campaign-preparation-section-heading"><span className="campaign-preparation-section-number">1</span><div><h4>Thông tin ấn phẩm</h4><p>Judge committee và backer sẽ biết bạn tạo ấn phẩm gì và họ nhận PDF nào.</p></div></div>
           {textField('title', 'Tên ấn phẩm', false, 'text', true, 5, 200)}
           {textField('pitch', 'Giới thiệu ngắn', false, 'text', true, 10, 500)}
           {textField('story', 'Cốt truyện & Kế hoạch sản xuất: tối thiểu 20 ký tự', true, 'text', true, 20, 20000)}
@@ -147,15 +147,15 @@ export function NewPreparationPanel({ onCreated }: { onCreated: (campaign: Campa
           {textField('goal', 'Mục tiêu gây quỹ (MockUSDC local)')}
           {textField('price', 'Giá gói PDF (MockUSDC local)')}
           <label className="field">Thời gian gây quỹ (ngày)<input type="number" min={1} max={60} required value={fields.durationDays} onChange={event => setField('durationDays', Number(event.target.value))} /></label>
-          <label className="field">Ví Studio đã xác minh (chain 31339)<select required value={payoutWalletLinkId} disabled><option value="">Chọn ví trong Hồ sơ Studio trước</option>{wallets?.filter(wallet => wallet.isStudioWallet || wallet.id === payoutWalletLinkId).map(wallet => <option value={wallet.id} key={wallet.id}>{wallet.address}</option>)}</select></label>
-          {(!wallets || wallets.filter(wallet => wallet.isStudioWallet).length === 0) && <p className="campaign-preparation-help">Liên kết ví và chọn ví Studio trong Hồ sơ Studio trước khi lưu campaign.</p>}
+          <label className="field">Ví Creator nhận tiền (chain 31339)<select required value={payoutWalletLinkId} onChange={event => setField('payoutWalletLinkId', event.target.value)}><option value="">Chọn ví đã liên kết</option>{wallets?.map(wallet => <option value={wallet.id} key={wallet.id}>{wallet.address}</option>)}</select></label>
+          {(!wallets || wallets.length === 0) && <p className="campaign-preparation-help">Hãy liên kết ít nhất một ví Creator trên chain 31339 trong phần Tài khoản.</p>}
         </section>}
         {step === 2 && <section className="campaign-preparation-section">
           <div className="campaign-preparation-section-heading"><span className="campaign-preparation-section-number">3</span><div><h4>Kế hoạch hoàn thiện</h4><p>Nói rõ bạn sẽ hoàn thiện tác phẩm và chứng minh tiến độ như thế nào.</p></div></div>
-          <div className="campaign-input-group"><h5>Nội dung và kế hoạch sản xuất</h5><p className="campaign-preparation-help">Các thông tin này giúp Resolver hiểu sản phẩm, ngân sách và cách kiểm tra tiến độ.</p>{textField('contentOutline', 'Nội dung PDF sẽ hoàn thiện là gì? · tối thiểu 20 ký tự', true, 'text', true, 20, 10000)}{textField('budgetPlan', 'Ngân sách sẽ dùng cho những hạng mục nào? · tối thiểu 20 ký tự', true, 'text', true, 20, 5000)}{textField('evidencePlan', 'Bằng chứng nào sẽ chứng minh tiến độ? · tối thiểu 20 ký tự', true, 'text', true, 20, 5000)}</div>
+          <div className="campaign-input-group"><h5>Nội dung và kế hoạch sản xuất</h5><p className="campaign-preparation-help">Các thông tin này giúp Judge committee hiểu sản phẩm, ngân sách và cách kiểm tra tiến độ.</p>{textField('contentOutline', 'Nội dung PDF sẽ hoàn thiện là gì? · tối thiểu 20 ký tự', true, 'text', true, 20, 10000)}{textField('budgetPlan', 'Ngân sách sẽ dùng cho những hạng mục nào? · tối thiểu 20 ký tự', true, 'text', true, 20, 5000)}{textField('evidencePlan', 'Bằng chứng nào sẽ chứng minh tiến độ? · tối thiểu 20 ký tự', true, 'text', true, 20, 5000)}</div>
           <div className="campaign-input-group">
             <h5>Tài liệu mẫu thẩm định</h5>
-            <p className="campaign-preparation-help">Bắt buộc chọn ít nhất một file PDF, PNG hoặc JPEG. File chỉ dành cho Resolver, không công khai.</p>
+            <p className="campaign-preparation-help">Bắt buộc chọn ít nhất một file PDF, PNG hoặc JPEG. File chỉ dành cho Judge được phân công, không công khai.</p>
             <p className="campaign-preparation-help">File được giữ trong bản nháp này; sẽ được tải lên khi lưu bản nháp.</p>
             <div className="campaign-uploader">
               <div className="campaign-uploader__action">

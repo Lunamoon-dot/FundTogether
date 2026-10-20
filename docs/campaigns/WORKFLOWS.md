@@ -1,5 +1,10 @@
 # FundTogether — Digital PDF local workflow
 
+> **Historical pre-reset document:** This file describes the old Resolver/Admin
+> workflow. The current target is
+> [WORKFLOWS_V2_DECENTRALIZED.md](WORKFLOWS_V2_DECENTRALIZED.md); the old
+> Resolver actions below are not current protocol authority.
+
 Phạm vi: COMICS_ARTBOOK, một DIGITAL_DOWNLOAD PDF, một standard tier.
 Chính sách được người dùng chốt: [FINANCIAL_POLICY_V1.md](FINANCIAL_POLICY_V1.md).
 Chỉ Anvil chain 31339 và MockUSDC; không public chain hoặc tài sản thật.

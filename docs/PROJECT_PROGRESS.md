@@ -1,7 +1,78 @@
 # FundTogether — project progress
 
+> **Pre-reset evidence notice (2026-10-20):** This progress log records the
+> previous Resolver-controlled local implementation. Partial publication-Judge
+> changes may exist in the working tree, but the test results remain historical
+> or incomplete evidence and do not prove the current pure decentralized target.
+> See [the current protocol architecture](architecture/PURE_DECENTRALIZED_PROTOCOL.md).
+
 > **Status:** Current implementation evidence log. A recorded PASS applies only
 > to the named command, date and environment; it is not public-launch approval.
+
+## 2026-10-20 VNext implementation status
+
+- Added the pure-decentralized VNext contract core for permissionless campaign
+  proposal/publication review, funding escrow, stake-backed multi-court review,
+  milestone evidence, bounded appeal/retry, challenge, exact-budget payout and
+  terminal pro-rata refunds. The contract suite reports `92/92` passing tests,
+  including the focused VNext and conservation suites; historical Resolver
+  suites remain visible for regression only.
+- Added the VNext deployment manifest/parser, read-only runtime verifier,
+  idempotent event projector/schema, read-only API and SHA-256 evidence
+  integrity helper. Backend focused VNext tests report `4/4` and the backend
+  build passes. Frontend tests report `199/199` and the production build
+  passes with the existing large-bundle warning.
+- Not yet accepted: fresh Anvil/PostgreSQL/MinIO deployment, runtime identity
+  verification against RPC `9548`, full indexer replay, and Creator/Backer/Judge
+  wallet journeys. The local MockUSDC policy is a research fixture, not a
+  public-chain or real-money release policy.
+
+The detailed live ledger is [Implementation Progress VNext](protocol/IMPLEMENTATION_PROGRESS_VNEXT.md);
+the remainder of this file is pre-reset historical evidence and must not be
+used as current pure-decentralized acceptance criteria.
+
+## 2026-10-20 Publication Judge migration — incremental implementation
+
+- Replaced the current Campaign publication approval gate with an on-chain
+  randomized three-Judge committee: two votes form quorum, and the resolved
+  `JudgeCaseCreated`/`JudgeVoted`/`JudgeCaseResolved` events are the canonical
+  publication decision. A fixed Resolver no longer approves a Campaign
+  commitment or signs `approveCampaign`.
+- The Creator may create and freeze a Campaign without a `VERIFIED` Creator
+  profile or a Studio wallet. A linked Creator wallet on chain `31339` is still
+  required to pin the payout wallet and sign the eventual `createCampaign`.
+  Studio profile data remains optional metadata only.
+- Added Judge case API projections, assigned-Judge evidence ACL, Creator case
+  creation UI, Judge vote/expiry UI, and removed the Admin profile-review
+  mutation plus pre-publication Resolver review UI. Resolver remains only for
+  transitional post-publication lifecycle actions.
+- Verification so far: Foundry contract tests `53/53` before the policy-hash
+  redeploy, backend build passed, and frontend static tests `199/199` plus the
+  production build passed. The local Campaign chain was redeployed with
+  manifest `campaigns-local-judge-v1`; full backend HTTP/runtime acceptance is
+  still blocked because Docker Desktop is not running in this environment.
+- This is an incremental publication migration, not completion of the pure
+  decentralized target. Stake economics, permissionless milestone courts and
+  fully permissionless payout/refund remain deferred policy work.
+
+## 2026-10-20 Wallet-only authentication Phase 1
+
+- Removed email/password registration and login from the active Auth controller,
+  frontend API client and Account page. SIWE wallet verification is now the
+  only login path.
+- A first successful SIWE login atomically provisions a wallet-owned user and
+  primary wallet link when the `(chainId, address)` pair is new. Existing links
+  keep their original account and server-side roles; no email merge or wallet
+  reassignment is performed.
+- Local account seeding and the browser acceptance fixture now authenticate by
+  signing SIWE with the matching Anvil wallet. Generated email values are
+  fixture metadata only; private keys and seed phrases remain outside docs.
+- Transitional password-based wallet unlink remains documented as a guard for
+  old records, not as a login or recovery method. Wallet rotation/recovery is
+  deferred.
+- Focused verification passed: backend auth `19/19` tests and frontend account
+  acceptance `7/7`. Full suites and local runtime acceptance remain separate
+  verification steps.
 
 ## 2026-10-19 Role-oriented Campaign workspaces
 

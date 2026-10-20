@@ -1,83 +1,109 @@
-# FundTogether — project overview
+# FundTogether — Project Overview
 
-> **Status:** Current architecture and implemented-product overview.
+> **Status:** Current target architecture, decided 2026-10-20. The VNext
+> contract/backend/frontend slices are partially implemented; the local
+> runtime is still pre-migration.
 
-The repository supports **FundTogether** only. Reward Crowdfunding is
-the funding model; it is not a module, database or deployment namespace.
+FundTogether is a permissionless reward-crowdfunding protocol for independent
+digital comics and artbooks. It uses one standard digital-download PDF tier,
+MockUSDC escrow, milestone evidence, stake-backed Judge courts, payout and
+refund.
 
 ## Decentralization boundary
 
-The current architecture is hybrid, not a decentralized verification
-protocol. The Campaign contract owns escrow custody and deterministic financial
-transitions; PostgreSQL and private object storage hold application and
-evidence data; Resolver roles remain trusted human authorities for review and
-dispute decisions; Community Review is advisory and does not vote or authorize
-fund movement.
+The target architecture is pure decentralized review and settlement:
 
-This means the current product provides auditable on-chain settlement and
-contract-enforced consequences for authorized decisions. It does not prove the
-truth of off-chain evidence, remove the need for a trusted reviewer, or
-implement review-to-earn, reviewer staking, reviewer voting or decentralized
-governance. Those are deferred research directions, not current behavior.
+- any wallet may create a campaign proposal;
+- Judge eligibility and stake are protocol rules;
+- a three-Judge court resolves by two-of-three majority;
+- publication, milestone, completion and challenge outcomes are canonical
+  contract state;
+- payout and refund are permissionless contract actions once conditions are met;
+- Resolver, Admin, backend and database rows cannot override the protocol.
 
-New campaign creation is **FundTogether**, a `COMICS_ARTBOOK` draft/review flow with one `STANDARD` tier and one `DIGITAL_DOWNLOAD` PDF. The server stores the normalized `FUNDTOGETHER_V1` / `fundtogether-comic-download-mvp-v1` configuration in `campaigns.draft_config`; the creator account is server-owned. Unknown fields, alternate categories/benefit types/formats, finite inventory and physical/shipping/address/tracking input are rejected.
+The protocol accepts Sybil, collusion, bribery, inactive-Judge and
+incorrect-majority risk. Stake and evidence hashes do not prove off-chain truth;
+they provide economic participation and content-integrity commitments.
 
-The standard tier lives in the versioned draft configuration. R2 adds private sample evidence, content/budget/evidence plans and verified linked-wallet selection; delivery dates are not part of the draft commitment. Revision-checked updates and row locks protect freeze/review from concurrent changes. A versioned SHA-256 snapshot binds identity, wallet, PDF/tier terms and evidence hashes; correction decisions preserve the reviewed snapshot in history. The wallet binding cannot be removed while frozen/approved. Creator self-review and Admin self-verification are rejected.
+## Authentication boundary
 
-The `/v1/fundtogether/campaigns` routes own preparation, review, publication preflight, canonical receipt sync, evidence and download access. After `submit-review`, the server records when Resolver review starts and keeps the campaign in private `UNDER_REVIEW_PRIVATE` until a Resolver explicitly opens `COMMUNITY_REVIEW`; there is no fixed deadline or automatic review transition. Resolver closes the review according to the agreed policy: `APPROVED`, `CHANGES_REQUESTED`, or `REJECTED`. `CHANGES_REQUESTED` returns the Creator to editable `DRAFT` while retaining review history, so the freeze/submit correction loop can repeat on one canonical campaign row. Public Campaign surfaces are separated into `/review` (only `COMMUNITY_REVIEW`), `/activation`, and `/funding`: only a canonical indexed contract binding in `FUNDING` is pledge-visible. `COMMENT` feedback is visible as an anonymized public comment to the community, Creator and Resolver; `ISSUE` and `FILE_UNAVAILABLE` feedback remains visible only to its author, Creator and Resolver. Active feedback is scoped to the current commitment/sample snapshot while audit-only delivery issues remain visible to Resolver. Identity declarations, object keys, sample bytes and final PDF remain private.
+Account login remains wallet-only. The browser requests a one-time SIWE nonce,
+the connected wallet signs it, and the backend verifies origin, domain, chain
+and signature before resolving or creating the wallet-owned account. This
+proves wallet control only. It does not prove one-human identity or grant
+review authority.
 
-`campaigns-local-escrow-v4` uses a separate contract, ABI, manifest and indexer stream. A wallet may submit repeated fixed-price pledges and may buy multiple package units in one transaction; each canonical pledge log grants one quantity-bearing versioned entitlement. Primary Resolver approves exact reviewed terms on chain and Creator consumes that approval. Only Primary or Backup Resolver may finalize funding after the deadline; production review alone does not enable downloads. After Resolver accepts production evidence, Creator explicitly confirms campaign completion and sets the release deadline on chain. Accepted final-PDF hashes enable account-bound 60-second backend download tickets with fresh canonical checks on access. Downloads and optional backer confirmation are separate from payout. See [the Campaign financial policy](campaigns/FINANCIAL_POLICY_V1.md).
+## Target architecture
 
-Historical contract/ABI, terms, financial records, canonical events and refund synchronization are retained. Physical API/UI and runtime shipping encryption are removed. Migration 0005 archives audited delivery records and batches before dropping active delivery columns; unreconciled/changed records abort it. It was applied to the main local database after the operator stopped the old API, and the rebuilt API was started and verified on 2026-10-13. Scope-text screening rejects common explicit physical promises conservatively; it is not semantic/IP verification or a replacement for Resolver review.
+    React frontend
+      → NestJS API
+          → PostgreSQL metadata and indexed projections
+          → MinIO private evidence and final PDF
+          → FundTogether Campaign contract
+              → canonical events
+                  → idempotent indexer
+                      → PostgreSQL read model
 
-## Role-oriented Campaign workspaces
+The contract owns campaign terms required for trust, escrow, Judge stake,
+assignment, votes, quorum, milestone state, challenge, payout and refund.
+PostgreSQL stores application metadata and derived projections. MinIO stores
+private file bytes. A wallet submission is not completion until the canonical
+receipt and indexer projection exist.
 
-Campaign detail is split by responsibility; the route is a presentation and navigation
-boundary, not the financial authority. The canonical hash routes are:
+## Target campaign journey
 
-| Route | Workspace | Allowed responsibility |
-| --- | --- | --- |
-| `#/campaigns/:id` | Public / Backer | Read public campaign state; an authenticated Backer may prepare and submit a pledge when the canonical contract state allows it; inspect that Backer's entitlement, download, challenge and refund actions. |
-| `#/campaigns/creator/:id` | Creator | Read the owned campaign's private dossier; submit production evidence, final PDF, completion dossier and Creator-owned follow-up requests. |
-| `#/campaigns/resolver/:id` | Resolver | Review the campaign dossier and private evidence; approve/request changes/reject review, finalize eligible funding and make the Resolver decisions allowed by the contract. |
-| `#/admin/campaigns/:id` | Admin operations | Inspect publication, indexer and lifecycle projections and operational exceptions. Admin does not inherit Resolver financial authority. |
+    DRAFT
+      → PUBLICATION_REVIEW_OPEN
+      → three-Judge court
+      → two-of-three PASS
+      → FUNDING
+      → Backer pledge
+      → MILESTONE_ACTIVE
+      → evidence submitted
+      → three-Judge review
+      → challenge window
+      → exact milestone payout
+      → next milestone or final settlement
 
-The frontend route gate prevents accidental cross-role navigation, but it is not an
-authorization mechanism. Backend session/role/ownership checks remain authoritative;
-the contract remains authoritative for pledge, escrow, finalization, release and refund
-transitions. Legacy detail URLs redirect to these canonical workspaces before the new
-page mounts, and this split does not change ABI, schema, financial policy or event
-projection semantics.
+FAIL, cancellation, timeout or upheld challenge follows the policy-defined
+correction/refund path. Funding success alone never pays the Creator.
 
-The detailed plan and observed R0–R5 progress are in `docs/plans/2026-10-13-fundtogether-digital-pdf-mvp.md`. The migration statements above are historical upgrade evidence; the current disposable local test runtime was reset on 2026-10-17 with one final-schema baseline, `0000_fundtogether_baseline.sql`, and a fresh Anvil state with newly deployed local contracts. This local reset does not rewrite production migration history or affect any production chain. See PROJECT_PROGRESS for test results and the remaining manual/public-launch limitations.
+## Roles
 
-```text
-React frontend -> NestJS API -> PostgreSQL / MinIO
-                       -> FundTogether Campaign contract -> RPC
-Campaign events -> idempotent indexer -> PostgreSQL projection
-```
+| Role | Target authority |
+| --- | --- |
+| Creator | Proposal, frozen terms and milestone evidence |
+| Backer | Pledge, challenge where eligible and own refund |
+| Judge | Stake, assigned court seat and one vote |
+| Permissionless caller | Eligible timeout, payout or refund transaction |
+| Backend/indexer | Validation, storage, indexing and read projections |
+| Admin/operator | Infrastructure and read-only operations |
 
-Local services use PostgreSQL `5436`, MinIO `9202/9203`, API `3002`, web `5175`, and Campaign RPC `9548`. The supported manifest is `.local/fundtogether/generated/campaigns-deployment.local.json`.
+## Product boundary
 
-Campaign uses `.local/fundtogether/generated/campaigns-deployment.local.json` from a backend working directory, or `CAMPAIGNS_MANIFEST_PATH`. A missing manifest disables Campaign financial access. The full launcher runs the Foundry build, Campaign artifact generation, backend build and `deploy-campaign.cjs --create` before starting the API; the individual commands remain available for diagnostics. Existing manifests are verified without reset, while a manifest from a recreated local Anvil chain is replaced only when the explicit local `--create` path is used.
+The active target remains COMICS_ARTBOOK, one STANDARD tier, one private
+DIGITAL_DOWNLOAD PDF, MockUSDC and local chain 31339. Physical fulfilment,
+shipping, inventory, NFTs, marketplace, charity and public-chain/real-money
+launch are excluded.
 
-Archived local historical data is not part of this runtime and is never started or migrated.
+See [VNext protocol specification V1](protocol/FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_V1.md),
+[Pure decentralized architecture](architecture/PURE_DECENTRALIZED_PROTOCOL.md),
+[target scope](campaigns/SCOPE_V2_DECENTRALIZED.md),
+[target workflows](campaigns/WORKFLOWS_V2_DECENTRALIZED.md) and
+[Financial Policy V2](campaigns/FINANCIAL_POLICY_V2_DECENTRALIZED.md).
 
-## Local runtime
+## Implementation boundary
 
-From the repository root on Windows PowerShell:
+The repository contains both the pre-reset Resolver implementation and a
+partially implemented VNext slice. VNext currently includes the contract core
+for publication/funding, stake-backed multi-court review, milestone evidence,
+appeal/retry, challenge, exact-budget payout and terminal refunds; it also has
+an idempotent projection/indexer slice, read-only API and read-only protocol
+page. Foundry and focused backend/frontend evidence exist, but no fresh local
+Anvil/PostgreSQL/MinIO vertical acceptance has been completed.
 
-```powershell
-& .\backend\scripts\campaigns\start-services.ps1
-```
-
-The command initializes only `.local/fundtogether/`, starts isolated PostgreSQL and MinIO, verifies Windows access to Campaign RPC `127.0.0.1:9548`, builds and verifies the active Campaign manifest, runs the FundTogether baseline migration, and starts the API and web server. It fails closed if an existing RPC/API/web listener does not match the current identity; it never terminates such a listener. Use `-SkipBuild` only when the already-built backend, frontend and Foundry outputs are intentionally being reused.
-
-On 2026-10-13, the verified local deployment was chain `31339`. The API health response must be `CAMPAIGNS`, chain `31339`, and the same Campaign contract address before web readiness is reported.
-
-If Windows cannot reach Anvil after WSL starts it, set the following in `%USERPROFILE%\.wslconfig`, run `wsl --shutdown`, then reopen Docker Desktop and retry:
-
-```ini
-[wsl2]
-localhostForwarding=true
-```
+Admin/profile verification is not a target funding gate. Any Resolver UI or
+role still present in the checkout is transitional implementation residue; it
+does not represent authority in the target protocol. Creator, Backer and Judge
+wallet journeys, production batch settlement and runtime E2E remain roadmap
+work.

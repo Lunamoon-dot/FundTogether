@@ -1,5 +1,10 @@
 # Campaign R3 — approved local financial policy v1
 
+> **Historical pre-reset policy:** Superseded on 2026-10-20 by
+> [FINANCIAL_POLICY_V2_DECENTRALIZED.md](FINANCIAL_POLICY_V2_DECENTRALIZED.md).
+> The Resolver, Backup Resolver and Admin authority described below belongs to
+> the old local runtime and must not be used for new protocol design.
+
 Status: **APPROVED LOCAL POLICY**, 2026-10-13. The user selected option 1
 (approve the entire local proposal), adding that Resolver decides and community
 participates in checking the detailed requests. R2–R5 now have automated local

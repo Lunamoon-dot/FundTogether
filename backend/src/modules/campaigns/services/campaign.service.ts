@@ -9,10 +9,11 @@ import { campaigns as campaigns, campaignSamples as samples, creatorProfiles as 
 import { EvidenceStorageService } from "../../evidence/evidence-storage.service";
 import { EvidenceUploadFile, validateEvidenceFile } from "../../evidence/evidence-file-validation";
 import { currentReviewTargets } from "../../delivery/policies/delivery.policy";
-import { campaignPreparationSchema, campaignReviewSchema, campaignRevisionSchema, campaignSubmitReviewSchema, campaignUpdateSchema } from "../schemas/preparation.schema";
+import { campaignPreparationSchema, campaignRevisionSchema, campaignSubmitReviewSchema, campaignUpdateSchema } from "../schemas/preparation.schema";
 import { createCampaignDraftSchema } from "../schemas/campaign.schema";
 import { campaignCommitment, CampaignSnapshot } from "../policies/commitment";
 import { CampaignIndexerService } from "../../../indexer/campaign-indexer.service";
+import { derivePublicationJudgeCase } from "../policies/publication-judge-case";
 
 type Transaction = Parameters<Parameters<NodePgDatabase<typeof schema>["transaction"]>[0]>[0];
 type Campaign = typeof campaigns.$inferSelect;
@@ -49,23 +50,30 @@ export class CampaignService {
     if (revision !== undefined && campaign.revision !== revision) throw new ConflictException("Draft changed; reload before continuing");
   }
 
-  private async resolver(db: NodePgDatabase<typeof schema> | Transaction, userId: string) {
-    const [role] = await db.select().from(platformRoles).where(eq(platformRoles.userId, userId));
-    if (!role?.roles.includes("RESOLVER")) throw new ForbiddenException("RESOLVER platform role required");
+  private async assignedJudge(campaign: Campaign, userId: string) {
+    if (!this.indexer || !campaign.commitmentHash) return false;
+    const events = await this.db.select().from(schema.chainEvents).where(and(
+      eq(schema.chainEvents.streamId, this.indexer.streamId()),
+      eq(schema.chainEvents.canonical, true),
+    ));
+    const publicationCase = derivePublicationJudgeCase(events as any, campaign.commitmentHash);
+    if (!publicationCase) return false;
+    const linked = await this.db.select({ address: walletLinks.address }).from(walletLinks).where(and(
+      eq(walletLinks.userId, userId), eq(walletLinks.chainId, "31339"),
+    ));
+    return publicationCase.judges.some(judge => linked.some(wallet => wallet.address.toLowerCase() === judge.toLowerCase()));
   }
 
   async linkedWallets(userId: string) {
     const wallets = await this.db.select({ id: walletLinks.id, chainId: walletLinks.chainId, address: walletLinks.address })
       .from(walletLinks).where(and(eq(walletLinks.userId, userId), eq(walletLinks.chainId, "31339")));
-    const [profile] = await this.db.select({ studioWalletLinkId: profiles.studioWalletLinkId })
-      .from(profiles).where(eq(profiles.userId, userId));
     const deployment = this.indexer ? await this.indexer.deployment() : null;
     const resolverWallets = new Set(deployment
       ? [deployment.resolver, deployment.backupResolver].map(address => address.toLowerCase())
       : []);
     return wallets
       .filter(wallet => !resolverWallets.has(wallet.address.toLowerCase()))
-      .map(wallet => ({ ...wallet, isStudioWallet: wallet.id === profile?.studioWalletLinkId }));
+      .map(wallet => ({ ...wallet }));
   }
 
   async transactionWallets(userId: string) {
@@ -74,14 +82,9 @@ export class CampaignService {
   }
 
   private async references(tx: Transaction, campaign: Campaign, preparation: z.output<typeof campaignPreparationSchema>) {
-    const [profile] = await tx.select({ studioWalletLinkId: profiles.studioWalletLinkId })
-      .from(profiles).where(eq(profiles.userId, campaign.creatorUserId));
-    if (!profile?.studioWalletLinkId || profile.studioWalletLinkId !== preparation.payoutWalletLinkId) {
-      throw new BadRequestException("Campaign must use the Creator's verified Studio wallet");
-    }
     const [wallet] = await tx.select().from(walletLinks).where(and(eq(walletLinks.id, preparation.payoutWalletLinkId),
       eq(walletLinks.userId, campaign.creatorUserId), eq(walletLinks.chainId, "31339"))).for("share");
-    if (!wallet) throw new BadRequestException("Choose your verified linked wallet on local chain 31339");
+    if (!wallet) throw new BadRequestException("Choose a linked Creator wallet on local chain 31339");
     if (this.indexer) {
       const deployment = await this.indexer.deployment();
       const resolverWallets = new Set([deployment.resolver, deployment.backupResolver].map(address => address.toLowerCase()));
@@ -149,7 +152,11 @@ export class CampaignService {
 
   private async canReadSamples(campaign: Campaign, userId: string) {
     if (campaign.creatorUserId === userId) return;
-    await this.resolver(this.db, userId);
+    const [role] = await this.db.select().from(platformRoles).where(eq(platformRoles.userId, userId));
+    const operationalReviewer = role?.roles.includes("RESOLVER") || role?.roles.includes("ADMIN");
+    if (!operationalReviewer && !(await this.assignedJudge(campaign, userId))) {
+      throw new ForbiddenException("Assigned Judge, Resolver, or Admin required");
+    }
     if (!["UNDER_REVIEW_PRIVATE", "COMMUNITY_REVIEW", "APPROVED", "STOPPED"].includes(campaign.status) || !campaign.frozenSnapshot)
       throw new ForbiddenException("Samples have not been submitted for review");
   }
@@ -182,15 +189,12 @@ export class CampaignService {
       const config = parse(createCampaignDraftSchema, campaign.draftConfig);
       const preparation = parse(campaignPreparationSchema, campaign.reviewPreparation);
       const [profile] = await tx.select().from(profiles).where(eq(profiles.userId, userId)).for("share");
-      if (profile?.status !== "VERIFIED" || profile.originalWorkPledge !== true) {
-        throw new ForbiddenException("Creator verification and explicit original-work pledge are required");
-      }
       const { wallet, evidence } = await this.references(tx, campaign, preparation);
       await this.storage.verifyPrivateBucket();
       for (const sample of evidence) await this.readBytes(sample);
       const { payoutWalletLinkId: _, sampleIds: __, ...terms } = preparation;
       const snapshot: CampaignSnapshot = { commitmentVersion: "campaigns-review-v1", config,
-        creator: { userId, profileId: profile.id, displayName: profile.displayName, ipDeclaration: profile.ipDeclaration },
+        creator: { userId, profileId: profile?.id ?? null, displayName: profile?.displayName ?? "Creator", ipDeclaration: profile?.ipDeclaration ?? "" },
         payoutWallet: { linkId: wallet.id, chainId: wallet.chainId, address: wallet.address.toLowerCase() },
         preparation: terms, samples: evidence.map(sampleDto) };
       const [updated] = await tx.update(campaigns).set({ frozenSnapshot: snapshot, commitmentHash: campaignCommitment(snapshot),
@@ -227,43 +231,6 @@ export class CampaignService {
           submissionRevision: input.revision, commitmentHash: campaign.commitmentHash!, responseBody: input.responseBody }).returning({ id: creatorResponses.id });
         if (input.relatedFeedbackIds.length) await tx.insert(responseFeedback).values(input.relatedFeedbackIds.map(feedbackId => ({ responseId: response.id, feedbackId })));
       }
-      return updated;
-    });
-  }
-
-  async openCommunityReview(id: string, userId: string) {
-    return this.db.transaction(async tx => {
-      await this.resolver(tx, userId);
-      const campaign = await this.campaign(tx, id, true);
-      if (campaign.creatorUserId === userId) throw new ForbiddenException("Creator cannot open their own campaign review");
-      if (campaign.status !== "UNDER_REVIEW_PRIVATE" || !campaign.frozenSnapshot || !campaign.commitmentHash ||
-        campaignCommitment(campaign.frozenSnapshot) !== campaign.commitmentHash)
-        throw new ConflictException("A current private frozen commitment is required");
-      const [updated] = await tx.update(campaigns).set({ status: "COMMUNITY_REVIEW", updatedAt: new Date() })
-        .where(eq(campaigns.id, id)).returning();
-      return updated;
-    });
-  }
-
-  async review(id: string, userId: string, body: unknown) {
-    const input = parse(campaignReviewSchema, body);
-    return this.db.transaction(async tx => {
-      await this.resolver(tx, userId);
-      const campaign = await this.campaign(tx, id, true);
-      if (campaign.creatorUserId === userId) throw new ForbiddenException("Creator cannot review their own campaign");
-      if (campaign.status !== "COMMUNITY_REVIEW" || !campaign.frozenSnapshot || !campaign.commitmentHash ||
-        campaign.commitmentHash !== input.commitmentHash || campaignCommitment(campaign.frozenSnapshot) !== input.commitmentHash)
-        throw new ConflictException("Review must target the current frozen commitment");
-      await tx.insert(reviews).values({ campaignId: id, resolverUserId: userId, outcome: input.outcome,
-        decisionReason: input.decisionReason, commitmentHash: input.commitmentHash, frozenSnapshot: campaign.frozenSnapshot });
-      const correction = input.outcome === "CHANGES_REQUESTED";
-      const [updated] = await tx.update(campaigns).set({
-        status: correction ? "DRAFT" : input.outcome === "REJECTED" ? "STOPPED" : "APPROVED",
-        ...(correction ? { frozenAt: null, frozenSnapshot: null, commitmentHash: null } : {}),
-        ...(input.outcome !== "APPROVED" ? { payoutWalletLinkId: null } : {}),
-        ...(correction ? { reviewStartedAt: null } : {}),
-        revision: campaign.revision + 1, updatedAt: new Date(),
-      }).where(eq(campaigns.id, id)).returning();
       return updated;
     });
   }

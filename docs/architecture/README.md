@@ -1,9 +1,13 @@
 # Architecture
 
-- [Campaign H1 blueprint](CAMPAIGNS_H1_BLUEPRINT.md) — kiến trúc hiện hành đã hiệu chỉnh về đúng scope một PDF.
-- [Project overview](../PROJECT_OVERVIEW.md) — tổng quan runtime và source-of-truth boundaries.
+- [VNext protocol specification V1](../protocol/FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_V1.md) — detailed
+  court, appeal, milestone and accounting reference.
+- [Pure decentralized protocol](PURE_DECENTRALIZED_PROTOCOL.md) — current
+  target architecture decided 2026-10-20.
+- [Project overview](../PROJECT_OVERVIEW.md) — system boundaries and status.
+- [Campaign H1 blueprint](CAMPAIGNS_H1_BLUEPRINT.md) — pre-reset Resolver
+  architecture retained for historical comparison only.
 
-Kiến trúc hiện tại dùng một namespace kỹ thuật thống nhất: `fundtogether` cho
-runtime và `campaigns` cho domain. Không có API, module, bảng, env, manifest,
-contract artifact hay compatibility route đang chạy dưới namespace `reward`.
-
+The current target uses the fundtogether/campaigns technical namespace. No
+namespace or compatibility route should be treated as financial authority by
+itself.

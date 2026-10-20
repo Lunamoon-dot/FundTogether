@@ -159,10 +159,8 @@ describe("Campaign freeze/review: real HTTP, PostgreSQL and private object stora
     expect((await current()).commitmentHash).toBeNull();
   });
 
-  it("keeps unsubmitted drafts out of Resolver lists and prevents Admin self-verification", async () => {
+  it("keeps unsubmitted drafts out of the Resolver lifecycle list", async () => {
     expect((await app.get(CampaignWorkflowService).listAllForResolver()).some(c => c.id === id)).toBe(false);
-    const [profile] = await db.insert(schema.creatorProfiles).values({ userId: adminUser, displayName: "Admin artist", bio: "An administrator who also draws", ipDeclaration: "I own the work I produce" }).returning();
-    await expect(app.get(CampaignWorkflowService).adminReviewCreator(adminUser, profile.id, { outcome: "VERIFIED" })).rejects.toMatchObject({ status: 403 });
   });
 
   it("rejects samples from another campaign and rejects retired delivery fields", async () => {

@@ -82,10 +82,13 @@ describe("Campaign canonical ledger on isolated PostgreSQL and real local Anvil"
     };
     const commitment = campaignCommitment(snapshot);
     const [campaignRecord] = await db.insert(schema.campaigns).values({ creatorUserId: owner.id, title: config.title, pitch: config.pitch, story: config.story, category: config.category,
-      goal: config.goal, fundingDuration: config.fundingDuration, draftConfig: config, frozenSnapshot: snapshot, commitmentHash: commitment, status: "APPROVED", frozenAt: new Date(), payoutWalletLinkId: link.id }).returning();
+      goal: config.goal, fundingDuration: config.fundingDuration, draftConfig: config, frozenSnapshot: snapshot, commitmentHash: commitment, status: "UNDER_REVIEW_PRIVATE", frozenAt: new Date(), payoutWalletLinkId: link.id }).returning();
     campaignId = campaignRecord.id;
-    await db.insert(schema.campaignReviews).values({ campaignId, resolverUserId: reviewer.id, outcome: "APPROVED", decisionReason: "Reviewed samples and frozen terms", commitmentHash: commitment, frozenSnapshot: snapshot });
-    await send(accounts[1], "approveCampaign", [accounts[3], commitment, 20000000n, 10000000n, 86400n]);
+    await send(accounts[3], "createPublicationCase", [commitment, 20000000n, 10000000n, 86400n]);
+    const firstJudge = await client.readContract({ address, abi: campaignAbi, functionName: "publicationJudge", args: [0n, 0] });
+    const secondJudge = await client.readContract({ address, abi: campaignAbi, functionName: "publicationJudge", args: [0n, 1] });
+    await send(firstJudge, "votePublicationCase", [0n, true]);
+    await send(secondJudge, "votePublicationCase", [0n, true]);
     await send(accounts[3], "createCampaign", [commitment, 20000000n, 10000000n, 86400n]);
     await send(accounts[0], "mint", [accounts[4], 100000000n], tokenAddress, token.abi);
     await send(accounts[4], "approve", [address, 100000000n], tokenAddress, token.abi);

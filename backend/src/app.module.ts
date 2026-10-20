@@ -29,6 +29,8 @@ import { CompletionController } from "./modules/completion/controllers/completio
 import { CompletionService } from "./modules/completion/services/completion.service";
 import { PayoutController } from "./modules/payout/controllers/payout.controller";
 import { PayoutService } from "./modules/payout/services/payout.service";
+import { loadVNextConnection, VNEXT_CONNECTION, VNextIndexerService } from "./indexer/vnext-indexer.service";
+import { VNextController } from "./modules/campaigns/controllers/vnext.controller";
 
 @Module({
   imports: [
@@ -53,6 +55,7 @@ import { PayoutService } from "./modules/payout/services/payout.service";
     AdminController,
     CompletionController,
     PayoutController,
+    VNextController,
     HealthController,
   ],
   providers: [
@@ -60,7 +63,9 @@ import { PayoutService } from "./modules/payout/services/payout.service";
     ReviewConversationService,
     PublicationService,
     { provide: CAMPAIGN_CONNECTION, useFactory: loadCampaignConnection },
+    { provide: VNEXT_CONNECTION, useFactory: loadVNextConnection },
     CampaignIndexerService,
+    VNextIndexerService,
     CampaignService,
     CommitmentService,
     HistoricalCampaignIndexerService,

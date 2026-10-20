@@ -1,6 +1,14 @@
 # FundTogether Campaign — Local fixture accounts
 
-Tài liệu này mô tả cách tạo fixture cho môi trường Anvil local. Mật khẩu đăng nhập và private key không được lưu trong repository hoặc tài liệu. Không dùng các fixture local cho mạng thật.
+> **Historical pre-reset fixture guide:** The account roles below describe the
+> old Resolver/Admin runtime. The new protocol requires separate Judge stake
+> fixtures and a new local seed policy before runtime migration. Do not use the
+> Resolver accounts below as protocol authority.
+
+Tài liệu này mô tả cách tạo fixture cho môi trường Anvil local. Đăng nhập chỉ
+dùng ví Anvil tương ứng và chữ ký SIWE. Private key, seed phrase và mật khẩu
+không được lưu trong repository hoặc tài liệu. Không dùng fixture local cho
+mạng thật.
 
 ## Runtime local
 
@@ -29,13 +37,10 @@ Chạy từ thư mục gốc:
 npm run seed:accounts --prefix backend
 ```
 
-Lệnh này tạo/cập nhật **6 tài khoản đăng nhập**, liên kết đúng ví Anvil theo
-`accountIndex`, cấp role nếu có, và mint 10,000 MockUSDC cho mỗi ví. Lần chạy
-đầu tiên tạo mật khẩu ngẫu nhiên trong file bị ignore:
-
-```text
-.local/fundtogether/local-accounts.json
-```
+Lệnh này tạo/cập nhật **6 tài khoản ví**, liên kết đúng ví Anvil theo
+`accountIndex`, cấp role nếu có, và mint 10,000 MockUSDC cho mỗi ví. Email
+fixture chỉ là nhãn metadata để operator nhận diện account; nó không dùng để
+đăng nhập.
 
 Sau khi seed hoàn tất, script cũng sinh bảng Markdown dễ đọc ở:
 
@@ -43,17 +48,16 @@ Sau khi seed hoàn tất, script cũng sinh bảng Markdown dễ đọc ở:
 .local/fundtogether/LOCAL_ACCOUNTS.md
 ```
 
-File local này ghi trực tiếp email, password và địa chỉ ví Anvil đã liên kết.
-Đây là file tiện dụng để đăng nhập local, không được commit hoặc gửi qua chat.
+File local này ghi email label, role, địa chỉ ví công khai và chain ID. Không
+ghi private key/seed phrase vào file hoặc gửi qua chat.
 
 Script lấy các địa chỉ unlocked hiện tại từ Anvil theo thứ tự account, liên kết
 chúng vào PostgreSQL và mint MockUSDC local. Nếu reset Anvil, chạy lại script để
-đồng bộ lại wallet links và số dư. Password được giữ ổn định qua các lần chạy
-miễn là không xóa `local-accounts.json`; địa chỉ ví phụ thuộc vào Anvil hiện tại.
+đồng bộ lại wallet links và số dư. Địa chỉ ví phụ thuộc vào Anvil hiện tại.
 
 ### Bảng tài khoản và ví
 
-| Index | Vai trò | Email đăng nhập | Ví được liên kết |
+| Index | Vai trò | Email label | Ví được liên kết |
 |---:|---|---|---|
 | 0 | Admin | `admin@fundtogether.com` | Anvil `eth_accounts[0]` |
 | 1 | Primary Resolver | `resolver@fundtogether.com` | Anvil `eth_accounts[1]` |
@@ -62,14 +66,11 @@ miễn là không xóa `local-accounts.json`; địa chỉ ví phụ thuộc và
 | 4 | Backer 1 | `backer1@fundtogether.com` | Anvil `eth_accounts[4]` |
 | 5 | Backer 2 | `backer2@fundtogether.com` | Anvil `eth_accounts[5]` |
 
-Password gốc nằm trong `accounts[<email>].password` của
-`.local/fundtogether/local-accounts.json`; bảng dễ đọc nằm trong
-`.local/fundtogether/LOCAL_ACCOUNTS.md`. Nếu cần tạo lại bảng sau khi reset
-Anvil, chạy lại lệnh seed ở trên. Để in bảng đầy đủ trực tiếp trong PowerShell,
-chạy sau khi Anvil và database đã sẵn sàng:
+Bảng dễ đọc nằm trong `.local/fundtogether/LOCAL_ACCOUNTS.md`. Nếu cần tạo lại
+bảng sau khi reset Anvil, chạy lại lệnh seed ở trên. Để in bảng đầy đủ trực
+tiếp trong PowerShell, chạy sau khi Anvil và database đã sẵn sàng:
 
 ```powershell
-$credentials = (Get-Content .local/fundtogether/local-accounts.json | ConvertFrom-Json).accounts
 $rpcResult = Invoke-RestMethod -Uri 'http://127.0.0.1:9548' -Method Post -ContentType 'application/json' -Body (@{
   jsonrpc = '2.0'; id = 1; method = 'eth_accounts'; params = @()
 } | ConvertTo-Json -Compress)
@@ -82,21 +83,20 @@ $fixtures = @(
   @{ Index = 5; Role = 'Backer 2'; Email = 'backer2@fundtogether.com' }
 )
 $fixtures | ForEach-Object {
-  $entry = $credentials.PSObject.Properties[$_.Email].Value
   [pscustomobject]@{
     Index = $_.Index
     Role = $_.Role
     Email = $_.Email
-    Password = $entry.password
     Wallet = $rpcResult.result[$_.Index]
     ChainId = 31339
   }
 } | Format-Table -AutoSize
 ```
 
-Lệnh trên chỉ in **private application passwords** và **public wallet
-addresses**; nó không in private key hoặc seed phrase. Không chụp hoặc dán
-output này vào commit, issue hay chat.
+Lệnh trên chỉ in email label và **public wallet addresses**; nó không in
+private key hoặc seed phrase. Không chụp hoặc dán output này vào commit, issue
+hay chat. Tại `#/account`, kết nối đúng ví rồi ký thông điệp SIWE để đăng nhập;
+ví mới sẽ tự tạo account, ví đã seed sẽ vào account tương ứng.
 
 ## MetaMask và Campaign flow
 

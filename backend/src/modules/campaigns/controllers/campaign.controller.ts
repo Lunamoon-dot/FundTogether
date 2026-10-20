@@ -47,13 +47,6 @@ export class CampaignController {
   @Post("campaigns/:id/submit-review")
   submit(@Param("id", new ParseUUIDPipe()) id: string, @Req() req: Request, @Body() body: unknown) { return this.campaigns.submit(id, req.account!.userId, body); }
 
-  @Post("campaigns/:id/open-community-review")
-  openCommunityReview(@Param("id", new ParseUUIDPipe()) id: string, @Req() req: Request) {
-    return this.campaigns.openCommunityReview(id, req.account!.userId);
-  }
-
-  @Post("campaigns/:id/review")
-  review(@Param("id", new ParseUUIDPipe()) id: string, @Req() req: Request, @Body() body: unknown) { return this.campaigns.review(id, req.account!.userId, body); }
 }
 
 @Controller("v1/fundtogether/public/campaigns")

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import type { FormEvent } from 'react'
 import { ArchivalConnectButton } from './ArchivalConnectButton'
 import { useAccount, useConfig, useDisconnect } from 'wagmi'
 import { getAccount, getConnectorClient } from 'wagmi/actions'
@@ -11,9 +10,7 @@ import {
   getNonce,
   getSession,
   linkWallet,
-  login,
   logout,
-  register,
   verifySiwe,
   unlinkWallet,
 } from '../../lib/api/auth'
@@ -42,9 +39,6 @@ export function AccountAccess({
   const { address, chainId, connector } = useAccount()
   const config = useConfig()
   const { disconnect } = useDisconnect()
-  const [mode, setMode] = useState<'login' | 'register'>('login')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [accountError, setAccountError] = useState<ClassifiedAccountError | null>(null)
@@ -120,7 +114,7 @@ export function AccountAccess({
       if (mounted.current) {
         const classified = classifyAccountError(cause);
         const customMessage = cause instanceof BaseError && cause.walk(item => item instanceof UserRejectedRequestError) instanceof UserRejectedRequestError
-          ? 'Bạn đã từ chối ký trong ví. Chưa liên kết ví; có thể thử lại khi sẵn sàng.'
+          ? 'Bạn đã từ chối ký trong ví. Chưa đăng nhập; có thể thử lại khi sẵn sàng.'
           : cause instanceof BaseError && cause.walk(item => item instanceof ResourceUnavailableRpcError) instanceof ResourceUnavailableRpcError
             ? 'Ví chưa sẵn sàng hoặc đang có yêu cầu khác. Mở extension, xử lý yêu cầu đang chờ rồi thử lại.'
             : getErrorMessage(cause) === 'Wallet is already linked to another account'
@@ -138,17 +132,6 @@ export function AccountAccess({
         setWalletStage('')
       }
     }
-  }
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    void run(async () => {
-      const account = await (mode === 'register'
-        ? register(email, password)
-        : login(email, password))
-      setPassword('')
-      onSession(account)
-    })
   }
 
   function verifyExternalWallet() {
@@ -423,85 +406,22 @@ export function AccountAccess({
   return (
     <section className="wallet-card account-login" aria-labelledby="account-login-title">
       <div className="account-login__intro">
-        <h2 id="account-login-title">{mode === 'register' ? 'Tạo tài khoản' : 'Đăng nhập'}</h2>
+        <h2 id="account-login-title">Đăng nhập bằng ví</h2>
         <p className="wallet-note account-login__description">
-          Dùng email và mật khẩu. Bạn có thể thêm ví sau khi đăng nhập.
+          FundTogether dùng ví và chữ ký SIWE làm phương thức đăng nhập duy nhất. Ví mới sẽ tự tạo tài khoản và giữ nguyên quyền sở hữu ví.
         </p>
       </div>
-      <form className="form-grid account-login__form" onSubmit={submit}>
-        <label>
-          Email
-          <input
-            type="email"
-            autoComplete="email"
-            maxLength={254}
-            required
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            disabled={busy}
-          />
-        </label>
-        <label>
-          Mật khẩu
-          <input
-            type="password"
-            autoComplete={
-              mode === 'register' ? 'new-password' : 'current-password'
-            }
-            minLength={12}
-            maxLength={128}
-            required
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            disabled={busy}
-          />
-        </label>
-        {mode === 'register' && (
-          <p className="wallet-note account-login__password-note">Mật khẩu tối thiểu 12 ký tự.</p>
-        )}
-        {(error || accountError) && (
-          <div className="account-error-banner account-login__error" role="alert">
-            <span className={`account-error-layer-badge account-error-layer-badge--${accountError?.layer ?? 'session'}`}>
-              {accountError?.layerLabel ?? 'Phiên đăng nhập / API (Session)'}
-            </span>
-            <p className="form-error">{error || accountError?.message}</p>
-          </div>
-        )}
-        <button className="button button--primary account-login__submit" disabled={busy}>
-          {busy
-            ? 'Đang xử lý…'
-            : mode === 'register'
-              ? 'Tạo tài khoản'
-              : 'Đăng nhập'}
-        </button>
-      </form>
-      <div className="account-login__switch">
-        <span>{mode === 'login' ? 'Chưa có tài khoản?' : 'Đã có tài khoản?'}</span>
-        <button
-          type="button"
-          className="button button--quiet account-login__switch-action"
-          disabled={busy}
-          onClick={() => {
-            setMode(mode === 'login' ? 'register' : 'login')
-            setError('')
-            setPassword('')
-          }}
-        >
-          {mode === 'login' ? 'Đăng ký' : 'Đăng nhập'}
-        </button>
-      </div>
-      <div className="account-login__divider" aria-hidden="true"><span>Hoặc</span></div>
-      <details className="account-login__wallet">
-        <summary className="account-login__wallet-summary">
-          <span className="account-login__wallet-copy">
-            <strong>Đăng nhập bằng ví đã liên kết</strong>
-            <small>Sử dụng ví đã gắn với tài khoản để xác thực nhanh hơn.</small>
+      {(error || accountError) && (
+        <div className="account-error-banner account-login__error" role="alert">
+          <span className={`account-error-layer-badge account-error-layer-badge--${accountError?.layer ?? 'session'}`}>
+            {accountError?.layerLabel ?? 'Phiên đăng nhập / API (Session)'}
           </span>
-          <span className="account-login__wallet-arrow" aria-hidden="true">→</span>
-        </summary>
+          <p className="form-error">{error || accountError?.message}</p>
+        </div>
+      )}
+      <div className="account-login__wallet">
         <p className="wallet-note">
-          Dành cho ví đã gắn với một tài khoản, bao gồm tài khoản ví từ bản phát
-          triển trước.
+          Kết nối đúng ví, sau đó ký thông điệp SIWE. Không nhập hoặc gửi private key/seed phrase vào ứng dụng.
         </p>
         <div className="signin-row account-login__wallet-actions">
           <ArchivalConnectButton label="Kết nối ví" />
@@ -515,7 +435,7 @@ export function AccountAccess({
         </div>
         {walletStatus && <p className="wallet-note" role="status">{walletStatus}</p>}
         {walletRecovery}
-      </details>
+      </div>
     </section>
   )
 }

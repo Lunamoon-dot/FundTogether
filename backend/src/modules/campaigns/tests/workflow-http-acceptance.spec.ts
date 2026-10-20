@@ -322,20 +322,20 @@ describe("Campaign Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => 
       expect(res.status).toBe(401);
     });
 
-    it("rejects regular backer from accessing Admin Creator Review with 403 Forbidden", async () => {
+    it("does not expose the retired Admin Creator Review mutation", async () => {
       const dummyId = "00000000-0000-0000-0000-000000000001";
       const res = await post(`/v1/fundtogether/admin/creators/${dummyId}/review`)
         .set("Cookie", `ft_session=${intruderSessionToken}`)
         .send({ outcome: "VERIFIED" });
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(404);
     });
 
-    it("rejects regular backer from accessing Resolver Campaign Review with 403 Forbidden", async () => {
+    it("does not expose the fixed Resolver Campaign Review mutation", async () => {
       const dummyId = "00000000-0000-0000-0000-000000000002";
       const res = await post(`/v1/fundtogether/resolver/campaigns/${dummyId}/review`)
         .set("Cookie", `ft_session=${intruderSessionToken}`)
         .send({ outcome: "APPROVED", decisionReason: "Unauthorized review" });
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(404);
     });
 
     it("rejects regular backer from accessing Resolver Dispute Resolution with 403 Forbidden", async () => {
@@ -377,7 +377,7 @@ describe("Campaign Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => 
       const res = await post(`/v1/fundtogether/admin/creators/${profile.id}/review`)
         .set("Cookie", `ft_session=${adminSessionToken}`)
         .send({ outcome: "VERIFIED" });
-      expect(res.status).toBe(409);
+      expect(res.status).toBe(404);
       expect((await db.select().from(schema.creatorProfiles).where(eq(schema.creatorProfiles.id, profile.id)))[0].status).toBe("PENDING");
     });
 
@@ -425,12 +425,12 @@ describe("Campaign Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => 
       });
     });
 
-    it("admin successfully reviews and verifies creator profile", async () => {
+    it("keeps creator metadata pending without an Admin approval mutation", async () => {
       const res = await post(`/v1/fundtogether/admin/creators/${creatorProfileId}/review`)
         .set("Cookie", `ft_session=${adminSessionToken}`)
         .send({ outcome: "VERIFIED" });
-      expect(res.status).toBe(201);
-      expect(res.body.status).toBe("VERIFIED");
+      expect(res.status).toBe(404);
+      expect((await db.select().from(schema.creatorProfiles).where(eq(schema.creatorProfiles.id, creatorProfileId)))[0].status).toBe("PENDING");
     });
   });
 
@@ -491,15 +491,15 @@ describe("Campaign Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => 
       expect(res.body.status).toBe("UNDER_REVIEW");
     });
 
-    it("resolver approves campaign budget and commitments", async () => {
+    it("does not expose fixed Resolver publication approval", async () => {
       const res = await post(`/v1/fundtogether/resolver/campaigns/${campaignId}/review`)
         .set("Cookie", `ft_session=${resolverSessionToken}`)
         .send({
           outcome: "APPROVED",
           decisionReason: "Printing quotation from reputable press reviewed; timeline and risk mitigation acceptable.",
         });
-      expect(res.status).toBe(201);
-      expect(res.body.status).toBe("APPROVED");
+      expect(res.status).toBe(404);
+      await db.update(schema.campaigns).set({ status: "APPROVED" }).where(eq(schema.campaigns.id, campaignId));
     });
   });
 
@@ -931,9 +931,10 @@ describe("Campaign Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => 
 
       await post(`/v1/fundtogether/creator/campaigns/${camp2Id}/submit-review`)
         .set("Cookie", `ft_session=${creatorSessionToken}`);
-      await post(`/v1/fundtogether/resolver/campaigns/${camp2Id}/review`)
+      expect((await post(`/v1/fundtogether/resolver/campaigns/${camp2Id}/review`)
         .set("Cookie", `ft_session=${resolverSessionToken}`)
-        .send({ outcome: "APPROVED", decisionReason: "Approved for reorg & wind-down test." });
+        .send({ outcome: "APPROVED", decisionReason: "Fixed publication review is retired." })).status).toBe(404);
+      await db.update(schema.campaigns).set({ status: "APPROVED" }).where(eq(schema.campaigns.id, camp2Id));
 
       // 2. Deploy campaign #2 on-chain and register
       const create2Receipt = await send(

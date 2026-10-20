@@ -63,7 +63,7 @@ function PreparationForm({ campaign, onChange, initialStep }: { campaign: Campai
   async function save(event: React.FormEvent) {
     event.preventDefault();
     if (selected.length === 0) {
-      setError('Chọn ít nhất một tài liệu mẫu riêng tư để Resolver thẩm định.');
+      setError('Chọn ít nhất một tài liệu mẫu riêng tư để Judge committee thẩm định.');
       return;
     }
     const requiredFieldError = getPreparationRequiredFieldError(payoutWalletLinkId);
@@ -120,7 +120,7 @@ function PreparationForm({ campaign, onChange, initialStep }: { campaign: Campai
       <div className="campaign-preparation-intro">
         <div>
           <span className="campaign-preparation-kicker">Hồ sơ campaign</span>
-          <h3>Hoàn thiện bản thảo trước khi gửi Resolver</h3>
+          <h3>Hoàn thiện bản thảo trước khi tạo Judge case</h3>
           <p className="muted">Điền theo 3 nhóm dưới đây, dùng mũi tên để quay lại hoặc đi tiếp. Ở bước 3 mới lưu bản nháp hoặc khóa cam kết; chưa có pledge và chưa có giao dịch tiền.</p>
         </div>
         <ol className="campaign-preparation-steps" aria-label="Các bước hoàn thiện hồ sơ">
@@ -135,7 +135,7 @@ function PreparationForm({ campaign, onChange, initialStep }: { campaign: Campai
         {step === 0 && <section className="campaign-preparation-section">
           <div className="campaign-preparation-section-heading">
             <span className="campaign-preparation-section-number">1</span>
-            <div><h4>Thông tin ấn phẩm</h4><p>Giúp Resolver hiểu bạn đang tạo ấn phẩm gì và người ủng hộ sẽ nhận PDF nào.</p></div>
+            <div><h4>Thông tin ấn phẩm</h4><p>Giúp Judge committee hiểu bạn đang tạo ấn phẩm gì và người ủng hộ sẽ nhận PDF nào.</p></div>
           </div>
           {textField('title', 'Tên ấn phẩm')}{textField('pitch', 'Giới thiệu ngắn')}{textField('story', 'Câu chuyện và kế hoạch sản xuất', true)}
           {textField('benefitTitle', 'Tên file PDF')}{textField('benefitDescription', 'PDF sẽ bao gồm nội dung gì?', true)}
@@ -148,10 +148,10 @@ function PreparationForm({ campaign, onChange, initialStep }: { campaign: Campai
           </div>
           {textField('goal', 'Mục tiêu gây quỹ (MockUSDC local)')}{textField('price', 'Giá gói PDF (MockUSDC local)')}
           <label className="field">Thời gian gây quỹ (ngày)<input type="number" min={1} max={60} value={fields.durationDays} onChange={e => { setFields(old => ({ ...old, durationDays: Number(e.target.value) })); setDirty(true); }} /></label>
-          <label className="field">Ví Studio đã xác minh (chain 31339)<select required value={payoutWalletLinkId} disabled>
-            <option value="">Chọn ví trong Hồ sơ Studio trước</option>{wallets?.filter(wallet => wallet.isStudioWallet || wallet.id === payoutWalletLinkId).map(wallet => <option value={wallet.id} key={wallet.id}>{wallet.address}</option>)}
+          <label className="field">Ví Creator nhận tiền (chain 31339)<select required value={payoutWalletLinkId} onChange={event => { setFields(old => ({ ...old, payoutWalletLinkId: event.target.value })); setDirty(true); }}>
+            <option value="">Chọn ví đã liên kết</option>{wallets?.map(wallet => <option value={wallet.id} key={wallet.id}>{wallet.address}</option>)}
           </select></label>
-          {(!wallets || wallets.filter(wallet => wallet.isStudioWallet).length === 0) && <p className="campaign-preparation-help">Liên kết ví và chọn ví Studio trong Hồ sơ Studio trước khi khóa hồ sơ.</p>}
+          {(!wallets || wallets.length === 0) && <p className="campaign-preparation-help">Hãy liên kết ít nhất một ví Creator trên chain 31339 trong phần Tài khoản.</p>}
         </section>}
 
         {step === 2 && <section className="campaign-preparation-section">
@@ -161,14 +161,14 @@ function PreparationForm({ campaign, onChange, initialStep }: { campaign: Campai
           </div>
           <div className="campaign-input-group">
             <h5>Nội dung và kế hoạch sản xuất</h5>
-            <p className="campaign-preparation-help">Các thông tin này giúp Resolver hiểu sản phẩm, ngân sách và cách kiểm tra tiến độ.</p>
+            <p className="campaign-preparation-help">Các thông tin này giúp Judge committee hiểu sản phẩm, ngân sách và cách kiểm tra tiến độ.</p>
             {textField('contentOutline', 'Nội dung PDF sẽ hoàn thiện là gì? · tối thiểu 20 ký tự', true, 'text', true, 20, 10000)}
             {textField('budgetPlan', 'Ngân sách sẽ dùng cho những hạng mục nào? · tối thiểu 20 ký tự', true, 'text', true, 20, 5000)}
             {textField('evidencePlan', 'Bằng chứng nào sẽ chứng minh tiến độ? · tối thiểu 20 ký tự', true, 'text', true, 20, 5000)}
           </div>
           <div className="campaign-input-group">
             <h5>Tài liệu mẫu thẩm định</h5>
-            <p className="campaign-preparation-help">Bắt buộc chọn ít nhất một file PDF, PNG hoặc JPEG. File chỉ dành cho Resolver, không công khai.</p>
+            <p className="campaign-preparation-help">Bắt buộc chọn ít nhất một file PDF, PNG hoặc JPEG. File chỉ dành cho Judge được phân công, không công khai.</p>
             <div className="campaign-uploader">
               <div className="campaign-uploader__action">
                 <label htmlFor="edit-draft-sample-file" className="campaign-uploader__btn">
@@ -221,7 +221,7 @@ function PreparationForm({ campaign, onChange, initialStep }: { campaign: Campai
           {step === 2 && <div className="campaign-preparation-actions">
             {error && <p className="toast toast--error campaign-preparation-action-error" role="alert">{error}</p>}
             {preparationAction === 'SAVE' && <div><button className="button button--primary" type="submit">Lưu bản thảo để tiếp tục</button><p>Lưu bản nháp thành công rồi mới có thể khóa cam kết.</p></div>}
-            {preparationAction === 'LOCK' && <div><button className="button button--secondary" type="button" disabled={busy} onClick={() => void run(() => freezeCampaign(campaign.id, campaign.revision ?? 0), 'Đã khóa cam kết PDF.')}>Khóa cam kết để gửi Resolver</button><p>Bản nháp đã lưu. Khóa sẽ tạo snapshot bất biến để gửi Resolver.</p></div>}
+            {preparationAction === 'LOCK' && <div><button className="button button--secondary" type="button" disabled={busy} onClick={() => void run(() => freezeCampaign(campaign.id, campaign.revision ?? 0), 'Đã khóa cam kết PDF.')}>Khóa cam kết để tạo Judge case</button><p>Bản nháp đã lưu. Khóa sẽ tạo snapshot bất biến cho Judge committee.</p></div>}
           </div>}
         </div>
       </fieldset>
@@ -230,7 +230,7 @@ function PreparationForm({ campaign, onChange, initialStep }: { campaign: Campai
       <div className="frozen-submit-box__info">
         <div className="frozen-submit-box__desc">
           <strong>Hồ sơ sẵn sàng thẩm định</strong>
-          <p>Gửi hồ sơ riêng cho Resolver. Hồ sơ chưa xuất hiện với backer; chỉ Resolver mới có thể mở community review sau khi kiểm tra bước đầu.</p>
+          <p>Gửi hồ sơ riêng để tạo Judge case. Hồ sơ chưa xuất hiện với backer; chỉ các Judge được chọn ngẫu nhiên mới có quyền bỏ phiếu.</p>
         </div>
       </div>
       {needsCreatorResponse && <section className="campaign-creator-response" aria-labelledby={`campaign-creator-response-title-${campaign.id}`}>
@@ -256,12 +256,12 @@ function PreparationForm({ campaign, onChange, initialStep }: { campaign: Campai
       <div className="frozen-submit-box__action">
         <button className="button button--primary" disabled={busy} onClick={() => {
           const response = responseBody.trim();
-          if (needsCreatorResponse && response.length < 10) { setError('Hãy viết phản hồi chung tối thiểu 10 ký tự trước khi gửi lại Resolver.'); return; }
+          if (needsCreatorResponse && response.length < 10) { setError('Hãy viết phản hồi chung tối thiểu 10 ký tự trước khi tạo lại Judge case.'); return; }
           void run(() => submitCampaignReview(campaign.id, campaign.revision ?? 0, {
             ...(response ? { responseBody: response } : {}),
             ...(relatedFeedbackIds.length ? { relatedFeedbackIds } : {}),
-          }), 'Đã gửi hồ sơ riêng cho Resolver.')
-        }}>Gửi Resolver thẩm định</button>
+          }), 'Đã gửi hồ sơ riêng cho Judge committee.')
+        }}>Tạo Judge case</button>
       </div>
     </div>}
     {campaign.status === 'UNDER_REVIEW_PRIVATE' && (
@@ -276,7 +276,7 @@ function PreparationForm({ campaign, onChange, initialStep }: { campaign: Campai
           </div>
           <div className="preparation-status-banner__content">
             <strong>Đang thẩm định hồ sơ</strong>
-            <p>Hồ sơ đã gửi riêng cho Resolver. Campaign chưa xuất hiện với backer và chưa nhận phản hồi cộng đồng.</p>
+            <p>Hồ sơ đã gửi riêng cho Judge committee. Campaign chưa xuất hiện với backer và chưa nhận phản hồi cộng đồng.</p>
           </div>
         </div>
         <span className="preparation-status-banner__badge">

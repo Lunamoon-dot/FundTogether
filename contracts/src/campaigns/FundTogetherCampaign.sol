@@ -18,7 +18,7 @@ contract FundTogetherCampaign is ReentrancyGuard {
     uint256 public constant JUDGE_COUNT = 3;
     uint256 public constant JUDGE_QUORUM = 2;
     uint256 public constant JUDGE_VOTING_WINDOW = 7 days;
-    bytes32 public constant policyHash = keccak256("campaigns-local-escrow-v6");
+    bytes32 public constant policyHash = keccak256("campaigns-local-escrow-v7");
     IERC20 public immutable supportedToken;
     address public immutable resolver;
     address public immutable backupResolver;

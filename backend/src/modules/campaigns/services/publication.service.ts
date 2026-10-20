@@ -3,9 +3,10 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { DRIZZLE_DB } from "../../../database/database.constants";
 import * as schema from "../../../database/schema";
-import { chainEvents, campaignChainCampaigns, platformRoles, campaigns as campaignsTable, creatorProfiles, campaignReviews, walletLinks } from "../../../database/schema";
+import { chainEvents, campaignChainCampaigns, platformRoles, campaigns as campaignsTable, walletLinks } from "../../../database/schema";
 import { campaignCommitment } from "../policies/commitment";
 import { CampaignIndexerService } from "../../../indexer/campaign-indexer.service";
+import { derivePublicationJudgeCase } from "../policies/publication-judge-case";
 
 export function derivePublication<TBinding extends { onchainCampaignId: string; canonical: boolean; snapshot: { state: number } },
   TEvent extends { transactionHash: string; args: Record<string, unknown>; canonical: boolean }>(bindings: TBinding[], createdEvents: TEvent[]) {
@@ -47,11 +48,13 @@ export class PublicationService {
     return new Set(bindings.filter(item => item.streamId !== currentStream).map(item => item.campaignId));
   }
 
-  async operations(scope: "creator" | "resolver" | "admin", userId: string) {
+  async operations(scope: "creator" | "judge" | "resolver" | "admin", userId: string) {
     if (scope !== "creator") {
-      const [role] = await this.db.select().from(platformRoles).where(eq(platformRoles.userId, userId));
-      const requiredRole = scope === "admin" ? "ADMIN" : "RESOLVER";
-      if (!role?.roles.includes(requiredRole)) throw new ForbiddenException(`${requiredRole} required`);
+      if (scope !== "judge") {
+        const [role] = await this.db.select().from(platformRoles).where(eq(platformRoles.userId, userId));
+        const requiredRole = scope === "admin" ? "ADMIN" : "RESOLVER";
+        if (!role?.roles.includes(requiredRole)) throw new ForbiddenException(`${requiredRole} required`);
+      }
     }
 
     const campaignRecords = await this.db.select({
@@ -59,6 +62,7 @@ export class PublicationService {
       title: campaignsTable.title,
       creatorUserId: campaignsTable.creatorUserId,
       applicationStatus: campaignsTable.status,
+      commitmentHash: campaignsTable.commitmentHash,
     }).from(campaignsTable).where(scope === "creator"
       ? and(eq(campaignsTable.category, "COMICS_ARTBOOK"), eq(campaignsTable.creatorUserId, userId))
       : eq(campaignsTable.category, "COMICS_ARTBOOK"));
@@ -70,10 +74,20 @@ export class PublicationService {
       this.db.select().from(chainEvents).where(and(eq(chainEvents.streamId, streamId), eq(chainEvents.eventName, "CampaignCreated")))
         .orderBy(desc(chainEvents.blockNumber), desc(chainEvents.logIndex)),
     ]);
+    const judgeEvents = scope === "judge"
+      ? await this.db.select().from(chainEvents).where(and(eq(chainEvents.streamId, streamId), eq(chainEvents.canonical, true)))
+        .orderBy(asc(chainEvents.blockNumber), asc(chainEvents.logIndex))
+      : [];
+    const judgeWallets = scope === "judge"
+      ? await this.db.select({ address: walletLinks.address }).from(walletLinks).where(and(eq(walletLinks.userId, userId), eq(walletLinks.chainId, "31339")))
+      : [];
 
     return campaignRecords.map(campaign => {
       const campaignBindings = bindings.filter(binding => binding.campaignId === campaign.id);
       const publication = derivePublication(campaignBindings, createdEvents);
+      const publicationCase = campaign.commitmentHash
+        ? derivePublicationJudgeCase(judgeEvents as any, campaign.commitmentHash)
+        : null;
       return {
         campaignId: campaign.id,
         title: campaign.title,
@@ -84,17 +98,33 @@ export class PublicationService {
         contractState: publication.binding?.snapshot.state ?? null,
         snapshot: publication.binding?.snapshot ?? null,
         bindingTransactionHash: publication.bindingTransactionHash,
+        publicationCase,
       };
-    });
+    }).filter(item => scope !== "judge" || item.publicationCase?.judges.some(judge => judgeWallets.some(wallet => wallet.address.toLowerCase() === judge.toLowerCase())));
   }
 
   async terms(id: string, userId: string) {
     const [campaign] = await this.db.select().from(campaignsTable).where(eq(campaignsTable.id, id));
     if (!campaign) throw new NotFoundException("Campaign campaign not found");
-    if (campaign.creatorUserId !== userId) {
+    const streamId = this.indexer.streamId();
+    const judgeEvents = await this.db.select().from(chainEvents).where(and(eq(chainEvents.streamId, streamId), eq(chainEvents.canonical, true)));
+    const publicationCase = campaign.commitmentHash
+      ? derivePublicationJudgeCase(judgeEvents as any, campaign.commitmentHash)
+      : null;
+    const isCreator = campaign.creatorUserId === userId;
+    let authorized = isCreator;
+    if (!authorized) {
       const [role] = await this.db.select().from(platformRoles).where(eq(platformRoles.userId, userId));
-      if (!role?.roles.includes("RESOLVER")) throw new ForbiddenException("Creator or Resolver required");
+      authorized = Boolean(role?.roles.includes("RESOLVER") || role?.roles.includes("ADMIN"));
+      if (!authorized && publicationCase) {
+        const linked = await this.db.select({ address: walletLinks.address }).from(walletLinks).where(and(
+          eq(walletLinks.userId, userId), eq(walletLinks.chainId, "31339"),
+        ));
+        authorized = publicationCase.judges.some(judge => linked.some(wallet => wallet.address.toLowerCase() === judge.toLowerCase()));
+      }
     }
+    if (!authorized) throw new ForbiddenException("Creator, assigned Judge, or Resolver required");
+    const deployment = await this.indexer.deployment();
     const frozen = campaign.frozenSnapshot;
     const currentBindings = campaign.status === "PUBLISHED"
       ? await this.db.select({ canonical: campaignChainCampaigns.canonical }).from(campaignChainCampaigns).where(and(
@@ -102,27 +132,25 @@ export class PublicationService {
       ))
       : [];
     const canRebindPublished = campaign.status === "PUBLISHED" && currentBindings.length === 0;
-    if (campaign.category !== "COMICS_ARTBOOK" || (campaign.status !== "APPROVED" && !canRebindPublished) || !frozen || !campaign.commitmentHash || campaignCommitment(frozen) !== campaign.commitmentHash)
-      throw new ConflictException("An approved, intact Campaign commitment is required");
-    const [review] = await this.db.select().from(campaignReviews).where(and(eq(campaignReviews.campaignId, id),
-      eq(campaignReviews.outcome, "APPROVED"), eq(campaignReviews.commitmentHash, campaign.commitmentHash)));
-    if (!review?.frozenSnapshot || campaignCommitment(review.frozenSnapshot) !== campaign.commitmentHash || review.resolverUserId === campaign.creatorUserId)
-      throw new ConflictException("An independent approval of the exact commitment is required");
-    const [profile] = await this.db.select().from(creatorProfiles).where(eq(creatorProfiles.userId, campaign.creatorUserId));
+    if (campaign.category !== "COMICS_ARTBOOK" || (!["FROZEN", "UNDER_REVIEW_PRIVATE", "COMMUNITY_REVIEW", "APPROVED"].includes(campaign.status) && !canRebindPublished) || !frozen || !campaign.commitmentHash || campaignCommitment(frozen) !== campaign.commitmentHash)
+      throw new ConflictException("A current frozen Campaign commitment is required");
     const [wallet] = await this.db.select().from(walletLinks).where(and(eq(walletLinks.id, frozen.payoutWallet.linkId), eq(walletLinks.userId, campaign.creatorUserId)));
-    if (profile?.status !== "VERIFIED" || !wallet || wallet.address.toLowerCase() !== frozen.payoutWallet.address || wallet.chainId !== "31339")
-      throw new ConflictException("Creator and frozen payout wallet must remain verified");
-    const deployment = await this.indexer.deployment();
+    if (!wallet || wallet.address.toLowerCase() !== frozen.payoutWallet.address || wallet.chainId !== "31339")
+      throw new ConflictException("Creator and frozen payout wallet must remain linked on chain 31339");
     if (isResolverWallet(frozen.payoutWallet.address, deployment)) {
       throw new ConflictException("Creator payout wallet is a Resolver wallet in the current Campaign deployment; recreate the campaign with the Creator wallet");
     }
     const now = await this.indexer.chainTime();
     if (BigInt(frozen.config.tiers[0].price) > BigInt(frozen.config.goal)) throw new ConflictException("Standard price cannot exceed goal under the approved local policy");
-    const onchainApproval = await this.indexer.isTermsApproved(frozen.payoutWallet.address, campaign.commitmentHash,
-      BigInt(frozen.config.goal), BigInt(frozen.config.tiers[0].price), BigInt(frozen.config.fundingDuration));
+    const onchainApproval = publicationCase?.status === "APPROVED";
     return { deployment, creatorWallet: frozen.payoutWallet.address, commitmentHash: campaign.commitmentHash,
       goal: frozen.config.goal, price: frozen.config.tiers[0].price, fundingDuration: frozen.config.fundingDuration,
-      chainTimestamp: now.toString(), onchainApproved: onchainApproval.approved };
+      chainTimestamp: now.toString(), onchainApproved: onchainApproval, publicationCase };
+  }
+
+  async publicationCase(id: string, userId: string) {
+    const result = await this.terms(id, userId);
+    return result.publicationCase;
   }
 
   async chainCampaign(id: string) {

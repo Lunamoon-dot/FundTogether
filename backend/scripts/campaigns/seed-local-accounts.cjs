@@ -1,7 +1,5 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { randomBytes } = require('node:crypto');
-const argon2 = require('argon2');
 const { Client } = require('pg');
 const { createPublicClient, createWalletClient, defineChain, http, parseAbi } = require('viem');
 
@@ -48,41 +46,38 @@ const ACCOUNT_DEFINITIONS = [
     platformRoles: [],
     targetMockUsdc: 10000n,
   },
+  {
+    roleName: 'Judge 1',
+    email: 'judge1@fundtogether.com',
+    accountIndex: 6,
+    platformRoles: ['JUDGE'],
+    targetMockUsdc: 10000n,
+  },
+  {
+    roleName: 'Judge 2',
+    email: 'judge2@fundtogether.com',
+    accountIndex: 7,
+    platformRoles: ['JUDGE'],
+    targetMockUsdc: 10000n,
+  },
+  {
+    roleName: 'Judge 3',
+    email: 'judge3@fundtogether.com',
+    accountIndex: 8,
+    platformRoles: ['JUDGE'],
+    targetMockUsdc: 10000n,
+  },
+  {
+    roleName: 'Judge 4',
+    email: 'judge4@fundtogether.com',
+    accountIndex: 9,
+    platformRoles: ['JUDGE'],
+    targetMockUsdc: 10000n,
+  },
 ];
 
-function loadAccounts(root) {
-  const configuredPath = process.env.FUNDTOGETHER_LOCAL_ACCOUNTS_FILE;
-  const file = configuredPath
-    ? (path.isAbsolute(configuredPath) ? configuredPath : path.resolve(root, configuredPath))
-    : path.join(root, '.local/fundtogether/local-accounts.json');
-  let credentials;
-  if (fs.existsSync(file)) {
-    credentials = JSON.parse(fs.readFileSync(file, 'utf8'));
-  } else {
-    credentials = {
-      warning: 'Local-only fixture. Do not commit, publish, or reuse outside isolated Anvil.',
-      accounts: Object.fromEntries(ACCOUNT_DEFINITIONS.map(account => [account.email, {
-        password: randomBytes(24).toString('hex'),
-      }])),
-    };
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, `${JSON.stringify(credentials, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
-  }
-  if (!credentials || typeof credentials.accounts !== 'object') throw new Error(`Invalid local account credentials file: ${file}`);
-  let credentialsChanged = false;
-  for (const definition of ACCOUNT_DEFINITIONS) {
-    if (!credentials.accounts[definition.email]) {
-      credentials.accounts[definition.email] = { password: randomBytes(24).toString('hex') };
-      credentialsChanged = true;
-    }
-  }
-  if (credentialsChanged) fs.writeFileSync(file, `${JSON.stringify(credentials, null, 2)}\n`, { mode: 0o600 });
-  const accounts = ACCOUNT_DEFINITIONS.map(definition => {
-    const password = credentials.accounts[definition.email]?.password;
-    if (typeof password !== 'string' || password.length < 12) throw new Error(`Missing local password for ${definition.email} in ${file}`);
-    return { ...definition, password };
-  });
-  return { accounts, file };
+function loadAccounts() {
+  return ACCOUNT_DEFINITIONS;
 }
 
 function loadEnvConfig(root) {
@@ -129,6 +124,7 @@ function loadEnvConfig(root) {
     chainId,
     resolver: manifest?.resolver || null,
     backupResolver: manifest?.backupResolver || null,
+    judges: manifest?.judges || null,
   };
 }
 
@@ -142,23 +138,31 @@ function assertDeploymentRoles(config, rpcAccounts) {
       throw new Error(`${label} wallet does not match the Campaign deployment; reset and redeploy the local chain before seeding accounts`);
     }
   }
+  if (!Array.isArray(config.judges) || config.judges.length !== 4) {
+    throw new Error('Campaign deployment does not define the four local Judge wallets; reset and redeploy the local chain before seeding accounts');
+  }
+  for (let index = 0; index < config.judges.length; index++) {
+    if (config.judges[index].toLowerCase() !== rpcAccounts[index + 6].toLowerCase()) {
+      throw new Error(`Judge ${index + 1} wallet does not match the Campaign deployment; reset and redeploy the local chain before seeding accounts`);
+    }
+  }
 }
 
 function writeLocalAccountsMarkdown(root, config, accounts) {
   const file = path.join(root, '.local/fundtogether/LOCAL_ACCOUNTS.md');
   const rows = accounts.map(account =>
-    `| ${account.accountIndex} | ${account.roleName} | \`${account.email}\` | \`${account.password}\` | \`${account.address}\` | ${config.chainId} |`
+    `| ${account.accountIndex} | ${account.roleName} | \`${account.email}\` | \`${account.address}\` | ${config.chainId} |`
   ).join('\n');
-  const content = `# FundTogether local login accounts
+  const content = `# FundTogether local wallet accounts
 
-> LOCAL ONLY. This file contains test passwords. Do not commit, publish, or share it.
+> LOCAL ONLY. Wallet addresses are public fixture identifiers. Never put private keys or seed phrases here.
 
-| Index | Role | Email | Password | Linked wallet | Chain ID |
-|---:|---|---|---|---|---:|
+| Index | Role | Email label | Linked wallet | Chain ID |
+|---:|---|---|---|---:|
 ${rows}
 
-Use the email and password for application login at \`http://localhost:5175/#/account\`.
-The wallet column is the public Anvil address linked to the same application account.
+Use the matching unlocked Anvil wallet at \`http://localhost:5175/#/account\` and sign the SIWE message.
+The email column is metadata for fixture identification; it is not a login credential.
 `;
   fs.writeFileSync(file, content, { mode: 0o600 });
   return file;
@@ -171,25 +175,18 @@ async function seedDatabase(config, accounts) {
 
   try {
     for (const acc of accounts) {
-      const passwordHash = await argon2.hash(acc.password, {
-        type: argon2.argon2id,
-        memoryCost: 19456,
-        timeCost: 2,
-        parallelism: 1,
-      });
-
       let userRes = await db.query('SELECT id FROM users WHERE email = $1', [acc.email]);
       let userId;
       if (userRes.rows.length === 0) {
         const insertRes = await db.query(
-          'INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id',
-          [acc.email, passwordHash]
+          'INSERT INTO users (email, password_hash) VALUES ($1, NULL) RETURNING id',
+          [acc.email]
         );
         userId = insertRes.rows[0].id;
         console.log(`  + Created user: ${acc.email} (${userId})`);
       } else {
         userId = userRes.rows[0].id;
-        await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, userId]);
+        await db.query('UPDATE users SET password_hash = NULL WHERE id = $1', [userId]);
         console.log(`  ✓ Updated user: ${acc.email} (${userId})`);
       }
 
@@ -314,8 +311,7 @@ async function main() {
   const rpcAccounts = await publicClient.request({ method: 'eth_accounts' });
   if (!rpcAccounts || rpcAccounts.length < ACCOUNT_DEFINITIONS.length) throw new Error('Anvil returned too few unlocked accounts');
   assertDeploymentRoles(config, rpcAccounts);
-  const credentials = loadAccounts(root);
-  const accounts = credentials.accounts.map(definition => ({ ...definition, address: rpcAccounts[definition.accountIndex] }));
+  const accounts = loadAccounts().map(definition => ({ ...definition, address: rpcAccounts[definition.accountIndex] }));
 
   console.log('===============================================================');
   console.log(' FundTogether: Local Accounts Seeding & Token Provisioning');
@@ -327,8 +323,7 @@ async function main() {
 
   console.log('\n===============================================================');
   console.log(' All accounts are ready in PostgreSQL and funded on Anvil!');
-  console.log(` Local login credentials: ${credentials.file}`);
-  console.log(` Local login summary: ${localAccountsMarkdown}`);
+  console.log(` Wallet login fixture summary: ${localAccountsMarkdown}`);
   console.log('===============================================================\n');
 }
 

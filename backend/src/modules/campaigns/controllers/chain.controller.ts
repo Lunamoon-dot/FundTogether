@@ -6,7 +6,7 @@ import { CampaignIndexerService } from "../../../indexer/campaign-indexer.servic
 import { PublicationService } from "../services/publication.service";
 
 const campaignTransactionActionSchema = z.enum([
-  "approveCampaign", "createCampaign", "pledge", "submitProduction", "submitRelease",
+  "createPublicationCase", "votePublicationCase", "expirePublicationCase", "createCampaign", "pledge", "submitProduction", "submitRelease",
   "reviewProduction", "confirmCampaignCompletion", "reviewRelease", "challengeRelease", "resolveChallenge",
   "finalizeFunding", "startRefunds", "claimRefund", "requestCompletion", "approveCompletion", "rejectCompletion", "claimSurplus", "cancelCampaign",
   "requestDisbursement", "approveDisbursement", "rejectDisbursement",
@@ -31,6 +31,10 @@ export class ChainController {
   @UseGuards(AuthGuard)
   terms(@Param("id", new ParseUUIDPipe()) id: string, @Req() req: Request) { return this.publication.terms(id, req.account!.userId); }
 
+  @Get("campaigns/:id/publication-case")
+  @UseGuards(AuthGuard)
+  publicationCase(@Param("id", new ParseUUIDPipe()) id: string, @Req() req: Request) { return this.publication.publicationCase(id, req.account!.userId); }
+
   @Get("operations/creator")
   @UseGuards(AuthGuard)
   creatorOperations(@Req() req: Request) { return this.publication.operations("creator", req.account!.userId); }
@@ -38,6 +42,10 @@ export class ChainController {
   @Get("operations/resolver")
   @UseGuards(AuthGuard)
   resolverOperations(@Req() req: Request) { return this.publication.operations("resolver", req.account!.userId); }
+
+  @Get("operations/judge")
+  @UseGuards(AuthGuard)
+  judgeOperations(@Req() req: Request) { return this.publication.operations("judge", req.account!.userId); }
 
   @Get("operations/admin")
   @UseGuards(AuthGuard)
