@@ -469,7 +469,7 @@ sequences.
 authorization, I4 stake coverage, I5 Judge uniqueness, I6 court integrity, I7
 slash bound, I8 finality, I9 refund solvency and I10 terminal liveness.
 
-- [ ] Run `forge test --match-path test/invariant/VNext*.t.sol -vvv`.
+- [x] Run `forge test --match-path test/invariant/VNext*.t.sol -vvv`.
 - [ ] Run fuzz tests with a recorded seed and configured depth.
 - [ ] Include arbitrary caller, repeated caller and deadline-jump sequences.
 - [ ] Save failing seeds as regression tests, never lower the invariant.

@@ -33,9 +33,10 @@ tests. Full web/API/browser acceptance remains separate.
 | J | `CampaignEscrowVNext.sol` | Evidence/revision tests: 6 passed |
 | K | `JuryReview.sol`, `CampaignEscrowVNext.sol` | Appeal hooks exist; the active local policy keeps the challenge window passive and disables challenge entrypoints |
 | L | `CampaignEscrowVNext.sol` | Payout/refund/challenge tests: 9 passed; conservation/failure-transfer fuzz suite: 3 passed |
-| O | `JuryReview.sol`, `JuryRegistry.sol`, `CampaignEscrowVNext.sol`, `parameters-v2-remediation.md` | Gas profiles for batches 1/2/10/32, 300-Judge capped settlement, resumable partial batches, and wallet-isolated reward/refund claims are covered; external-call ordering review remains open |
+| O | `JuryReview.sol`, `JuryRegistry.sol`, `CampaignEscrowVNext.sol`, `parameters-v2-remediation.md` | Gas profiles for batches 1/2/10/32, 300-Judge capped settlement, resumable partial batches, wallet-isolated reward/refund claims, and SafeERC20/state-ordering review are recorded |
+| N (partial) | `contracts/test/invariant/VNextCampaignInvariant.t.sol`, `VNextJuryInvariant.t.sol` | Stateful conservation/payout and court uniqueness/stake invariants pass at 256 runs × 128,000 calls per harness; recorded-seed state-machine coverage remains open |
 | P | `DeployVNext.s.sol`, `deploy-vnext.cjs`, `verify-vnext-runtime.cjs`, `vnext-deployment.ts` | Foundry script compiles; runtime verifier/policy identity tests: 6 passed; one-time wiring is executable |
-| P0/P1 remediation | `JuryReview.sol`, `JuryRegistry.sol`, `CampaignEscrowVNext.sol` | Retry/settlement/stake/liveness/budget/refund/court-order regressions covered; current full Foundry suite: 132 passed |
+| P0/P1 remediation | `JuryReview.sol`, `JuryRegistry.sol`, `CampaignEscrowVNext.sol` | Retry/settlement/stake/liveness/budget/refund/court-order regressions covered; current full Foundry suite: 134 passed |
 | Q/R | `vnext-indexer.service.ts`, `vnext-event-projector.ts`, `IVNextEvents.sol`, VNext Drizzle schema | Persistent event/projection/checkpoint transaction; milestone review state/case-pointer events now project retry, appeal, ruling, correction and timeout transitions; Backer contribution/refund, challenge, court-summary and Judge ledger projections added; replay/crash/refund/completion tests remain the verification boundary |
 | S/T/X | `vnext.controller.ts`, `vnext-evidence.service.ts`, `vnext-evidence.controller.ts`, `vnext.schema.ts` | Read-only projection API now exposes authenticated Backer/Judge indexed read models, assigned-Judge review reads, challenge history, indexer checkpoint/lag status, plus private VNext case-evidence upload/read ACL, canonical hash verification, short-lived user-bound evidence tickets and explicit storage-timeout/retry status |
 | U/V/W/X | `VNextProtocolPage.tsx`, `VNextCreateCampaignPanel.tsx`, `VNextActionPanel.tsx`, `VNextJudgePage.tsx`, `VNextEvidencePanel.tsx` | VNext Creator campaign creation/publication finalization, private evidence, Backer actions and Judge stake/commit–reveal/reward surface added; Judge workspace now requests assigned cases only; isolated runtime acceptance passes, while full browser journey remains incomplete |
@@ -180,7 +181,9 @@ frontend: VNext static journey tests remain covered by the 207-test suite; the
 route regression keeps `/campaigns/vnext` out of the legacy public campaign
 detail matcher
 backend: `npm run build` -> success; isolated migration audit -> PASS
-backend: focused VNext Jest invocation with `--testMatch="**/*.spec.ts"` -> 10 suites, 37 passed, 0 failed
+backend: focused VNext Jest invocation with `--testMatch="**/*.spec.ts"` -> 11 suites, 38 passed, 0 failed
+backend: real PostgreSQL crash/replay test -> 1 suite, 1 passed; event,
+projection and checkpoint rollback was verified before exactly-once replay
 backend: VNext runtime boot -> `GET /health` returned `200`, protocol
 `FUNDTOGETHER_VNEXT`, chain `31339`, campaign escrow
 `0xdc64a140aa3e981100a9beca4e685f962f0cf6c9`
@@ -193,7 +196,7 @@ contracts: focused Gate O additions -> `BatchSettlement` 3 passed,
 `JuryRegistry` 14 passed, `PayoutRefund` 9 passed; full `forge test
 --summary` -> 132 passed, 0 failed, 0 skipped
 contracts: Docker Foundry forge build -> success (solc 0.8.24); full
-forge test -> 132 passed, 0 failed, 0 skipped; generated VNext ABIs refreshed.
+forge test -> 134 passed, 0 failed, 0 skipped; generated VNext ABIs refreshed.
 The host still lacks native Forge/Anvil; contract checks are container-backed.
 The acceptance run used a temporary Docker Anvil plus a newly created isolated
 PostgreSQL database and passed the persistent projection assertions; the
