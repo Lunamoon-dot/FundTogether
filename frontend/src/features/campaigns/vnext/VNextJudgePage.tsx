@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { encodeAbiParameters, keccak256 } from 'viem';
 import type { Abi } from 'viem';
 import { usePublicClient } from 'wagmi';
@@ -103,7 +103,8 @@ function JudgeReviewCard({
     enabled: Boolean(client && deployment.juryReview && deployment.campaignEscrow && transaction.address),
     queryFn: async () => {
       if (!client || !deployment.juryReview || !deployment.campaignEscrow || !transaction.address) throw new Error('VNext review client is unavailable');
-      const [caseNumber, protocolVersion, requiredCaseStake, commitment, revealed, roundStatus, enrollmentDeadline, commitDeadline, revealDeadline, courtAssigned, courtFinalized, contribution] = await Promise.all([
+      const juryReviewAddress = deployment.juryReview;
+      const [caseNumber, protocolVersion, requiredCaseStake, commitment, revealed, roundStatus, enrollmentDeadline, commitDeadline, revealDeadline, courtCount, courtFinalized, contribution] = await Promise.all([
         client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'caseNumber', args: [caseId] }),
         client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'protocolVersion' }),
         client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'requiredCaseStake', args: [caseId] }),
@@ -113,15 +114,26 @@ function JudgeReviewCard({
         client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'enrollmentDeadline', args: [caseId] }),
         client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'commitDeadline', args: [caseId] }),
         client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'revealDeadline', args: [caseId] }),
-        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'courtAssigned', args: [caseId, courtId] }),
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'courtCount', args: [caseId] }),
         currentAssignment ? client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'courtFinalized', args: [caseId, courtId] }) : false,
         client.readContract({ address: deployment.campaignEscrow, abi: campaignAbi, functionName: 'contributionOf', args: [BigInt(review.campaignId), transaction.address] }),
       ]);
+      const assignedCourtState = courtCount === 0n ? [] : await client.multicall({
+          contracts: Array.from({ length: Number(courtCount as bigint) }, (_, index) => ({
+            address: juryReviewAddress,
+            abi: reviewAbi,
+            functionName: 'courtAssigned',
+            args: [caseId, BigInt(index)] as const,
+          })),
+          allowFailure: false,
+        });
+      const assignedCourtIds = assignedCourtState.flatMap((assigned, index) => assigned ? [index] : []);
       return {
         caseNumber: BigInt(caseNumber as bigint), protocolVersion: BigInt(protocolVersion as bigint), requiredCaseStake: BigInt(requiredCaseStake as bigint),
         commitment: commitment as `0x${string}`, revealed: Boolean(revealed), roundStatus: Number(roundStatus),
         enrollmentDeadline: BigInt(enrollmentDeadline as bigint), commitDeadline: BigInt(commitDeadline as bigint), revealDeadline: BigInt(revealDeadline as bigint),
-        snapshotFinalized: Number(roundStatus) >= ROUND_ASSIGNMENT_PENDING, courtAssigned: Boolean(courtAssigned), courtFinalized: Boolean(courtFinalized),
+        snapshotFinalized: Number(roundStatus) >= ROUND_ASSIGNMENT_PENDING,
+        courtCount: Number(courtCount as bigint), assignedCourtIds, courtFinalized: Boolean(courtFinalized),
         contribution: BigInt(contribution as bigint),
       };
     },
@@ -171,7 +183,10 @@ function JudgeReviewCard({
   const evidenceBlocked = Boolean(evidence.data && !evidenceReady);
   const canEnroll = Boolean(judgeChainTimestamp !== undefined && !currentAssignment && meta.data && meta.data.roundStatus === ROUND_ENROLLMENT_OPEN && judgeChainTimestamp < meta.data.enrollmentDeadline && !creatorConflict && !contributorConflict);
   const canFinalizeSnapshot = Boolean(judgeChainTimestamp !== undefined && meta.data && meta.data.roundStatus === ROUND_ENROLLMENT_OPEN && !meta.data.snapshotFinalized && judgeChainTimestamp >= meta.data.enrollmentDeadline && BigInt(review.enrolledCount) >= 3n);
-  const canAssignCourt = Boolean(meta.data && meta.data.roundStatus === ROUND_ASSIGNMENT_PENDING && meta.data.snapshotFinalized && !meta.data.courtAssigned);
+  const unassignedCourtIds = meta.data
+    ? Array.from({ length: meta.data.courtCount }, (_, index) => index).filter(index => !meta.data!.assignedCourtIds.includes(index))
+    : [];
+  const canAssignCourt = Boolean(meta.data?.snapshotFinalized && unassignedCourtIds.length > 0);
   const canCommit = Boolean(judgeChainTimestamp !== undefined && evidenceReady && currentAssignment && meta.data?.roundStatus === ROUND_VOTING && judgeChainTimestamp >= meta.data.enrollmentDeadline && judgeChainTimestamp < meta.data.commitDeadline && computedCommitment && meta.data.commitment === ZERO_HASH);
   const canReveal = Boolean(judgeChainTimestamp !== undefined && currentAssignment && meta.data?.roundStatus === ROUND_VOTING && judgeChainTimestamp >= meta.data.commitDeadline && judgeChainTimestamp < meta.data.revealDeadline && computedCommitment === meta.data.commitment && !meta.data.revealed && validBytes32(salt));
   const canFinalizeCourt = Boolean(judgeChainTimestamp !== undefined && currentAssignment && meta.data?.roundStatus === ROUND_VOTING && judgeChainTimestamp >= meta.data.revealDeadline && !meta.data.courtFinalized);
@@ -218,7 +233,9 @@ function JudgeReviewCard({
       {currentAssignment && <VNextEvidencePanel reviewCaseId={review.reviewCaseId} />}
       <div className="flex flex-wrap gap-2">
         {meta.data?.roundStatus === ROUND_ENROLLMENT_OPEN && <button type="button" className="button button--quiet" disabled={!canFinalizeSnapshot || transaction.busy} onClick={() => void transaction.send('review', 'finalizeSnapshot', [caseId])}>Finalize snapshot</button>}
-        {meta.data?.roundStatus === ROUND_ASSIGNMENT_PENDING && <button type="button" className="button button--quiet" disabled={!canAssignCourt || transaction.busy} onClick={() => void transaction.send('review', 'assignCourt', [caseId, 0n])}>Assign court 0</button>}
+        {unassignedCourtIds.length > 0 && <div className="flex flex-wrap gap-2" data-vnext-action="assign-courts">
+          {unassignedCourtIds.map(unassignedCourtId => <button key={unassignedCourtId} type="button" className="button button--quiet" disabled={!canAssignCourt || transaction.busy} onClick={() => void transaction.send('review', 'assignCourt', [caseId, BigInt(unassignedCourtId)])}>Assign court {unassignedCourtId}</button>)}
+        </div>}
         {currentAssignment && <button type="button" className="button button--quiet" disabled={!canFinalizeCourt || transaction.busy} onClick={() => void transaction.send('review', 'finalizeCourt', [caseId, courtId])}>Finalize court</button>}
       </div>
       {transaction.stage !== 'idle' && <p className="text-sm m-0" role="status">{vnextStageLabel(transaction.stage)}{transaction.txHash ? ` · ${transaction.txHash}` : ''}</p>}
@@ -229,9 +246,14 @@ function JudgeReviewCard({
 
 export function VNextJudgePage() {
   const { session } = useAccountSession();
+  const queryClient = useQueryClient();
   const deployment = useQuery({ queryKey: ['vnext-deployment'], queryFn: campaignApi.vnextDeployment, retry: false });
   const reviews = useQuery({ queryKey: ['vnext-assigned-reviews'], queryFn: ({ signal }) => campaignApi.vnextAssignedReviews(signal), enabled: Boolean(session), retry: false });
   const ledger = useQuery({ queryKey: ['vnext-judge-ledger'], queryFn: ({ signal }) => campaignApi.vnextJudgeLedger(signal), enabled: Boolean(session), retry: false });
+  const refreshJudgeWorkspace = () => {
+    void reviews.refetch();
+    void queryClient.invalidateQueries({ queryKey: ['vnext-judge-case-meta'] });
+  };
 
   if (!session) return <p>Đăng nhập bằng wallet để mở Judge workspace. <a href="#/account">Đăng nhập</a></p>;
   if (deployment.isPending || reviews.isPending) return <p role="status" className="muted">Đang tải VNext Judge workspace…</p>;
@@ -249,7 +271,7 @@ export function VNextJudgePage() {
       </section>
       <JudgeStakePanel deployment={deployment.data} />
       {reviews.data?.length ? reviews.data.map(review => (
-        <JudgeReviewCard key={review.reviewCaseId} review={review} deployment={deployment.data!} onRefresh={() => void reviews.refetch()} />
+        <JudgeReviewCard key={review.reviewCaseId} review={review} deployment={deployment.data!} onRefresh={refreshJudgeWorkspace} />
       )) : <p className="muted" role="status">Chưa có review case trong projection hiện tại.</p>}
     </div>
   );
