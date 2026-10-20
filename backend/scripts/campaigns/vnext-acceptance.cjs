@@ -206,7 +206,7 @@ async function fundCampaign({ client, wallets, manifest, campaignId, backers, go
   await send(client, wallets[backers[0]], { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'finalizeFunding', args: [campaignId] });
 }
 
-async function syncPersistentProjection({ client, manifest, campaignIds }) {
+async function syncPersistentProjection({ client, manifest, campaigns }) {
   const env = { ...readEnvironment(path.join(root, '.local/fundtogether/backend.env')), ...process.env };
   const databaseUrl = env.FUNDTOGETHER_VNEXT_DATABASE_URL || env.DATABASE_URL;
   if (!databaseUrl) throw new Error('VNext acceptance requires FUNDTOGETHER_VNEXT_DATABASE_URL or DATABASE_URL');
@@ -220,6 +220,7 @@ async function syncPersistentProjection({ client, manifest, campaignIds }) {
     const indexer = new VNextIndexerService(db, { manifest, client });
     await indexer.runOnce();
     const streamId = indexer.streamId();
+    const campaignIds = campaigns.map(campaign => campaign.campaignId);
     const projectionSnapshot = async () => (await db.select().from(schema.vnextCampaignProjections))
       .filter(row => row.streamId === streamId && campaignIds.some(campaignId => row.onchainCampaignId === campaignId.toString()))
       .sort((left, right) => left.onchainCampaignId.localeCompare(right.onchainCampaignId))
@@ -232,14 +233,13 @@ async function syncPersistentProjection({ client, manifest, campaignIds }) {
         lastEventName: row.lastEventName,
         lastBlockNumber: row.lastBlockNumber,
       }));
-    for (const campaignId of campaignIds) {
+    for (const expected of campaigns) {
       const rows = await db.select().from(schema.vnextCampaignProjections);
-      const row = findCampaignProjection(rows, streamId, campaignId);
-      assert.ok(row, `missing persistent projection for campaign ${campaignId}`);
-      const expectedState = campaignId === campaignIds[0] ? 4 : 5;
-      assert.equal(row.state, expectedState);
-      if (expectedState === 4) assert.equal(row.paidOut, '100000000');
-      if (expectedState === 5) assert.equal(row.refunded, '100000000');
+      const row = findCampaignProjection(rows, streamId, expected.campaignId);
+      assert.ok(row, `missing persistent projection for campaign ${expected.campaignId}`);
+      assert.equal(row.state, expected.state);
+      assert.equal(row.paidOut, expected.paidOut);
+      assert.equal(row.refunded, expected.refunded);
     }
     const beforeReplay = await projectionSnapshot();
     await indexer.runOnce();
@@ -386,7 +386,18 @@ async function main() {
   }).filter(Boolean));
   for (const eventName of ['MilestonePaid', 'CampaignCompleted', 'CampaignRefundsOpened', 'BackerRefundClaimed', 'ReviewRetryOpened', 'AppealOpened', 'FinalRulingEstablished', 'MilestoneRevisionSubmitted']) assert.ok(names.has(eventName), `missing canonical event ${eventName}`);
 
-  await syncPersistentProjection({ client, manifest, campaignIds: [first.id, second.id] });
+  await syncPersistentProjection({
+    client,
+    manifest,
+    campaigns: [
+      { campaignId: first.id, state: 4, paidOut: '100000000', refunded: '0' },
+      { campaignId: second.id, state: 5, paidOut: '0', refunded: '100000000' },
+      { campaignId: noQuorum.id, state: 0, paidOut: '0', refunded: '0' },
+      { campaignId: tieCampaign.id, state: 0, paidOut: '0', refunded: '0' },
+      { campaignId: appealCampaign.id, state: 1, paidOut: '0', refunded: '0' },
+      { campaignId: correctionCampaign.id, state: 4, paidOut: '100000000', refunded: '0' },
+    ],
+  });
   console.log(JSON.stringify({ status: 'PASS', protocolKind: manifest.protocolKind, chainId: manifest.chainId, payoutCampaignId: first.id.toString(), refundCampaignId: second.id.toString(), contractBalance: '0' }, null, 2));
 }
 
