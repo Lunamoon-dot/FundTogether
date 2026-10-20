@@ -2,6 +2,8 @@ import type React from 'react';
 import type { AccountSession } from '../../lib/api/auth';
 import { resolveCampaignDetailRoute } from './campaignRoutes';
 import './PublicArea.css';
+import { WorkspaceShell } from '../campaigns/shared/workspace/WorkspaceShell';
+import { resolveWorkspaceRole } from '../campaigns/shared/workspace/workspaceRole';
 
 export interface PublicAreaProps {
   path: string;
@@ -28,12 +30,19 @@ export function AppShell({
   const isCampaignCreatorProfile = path === '/campaigns/creator/profile';
   const isCampaignCreatorWorkspace = isCampaignCreatorStudio || isCampaignCreatorDraft || campaignDetail?.workspace === 'creator';
   const isCampaignLibrary = path === '/campaigns/library';
-  const isAdmin = path === '/admin' || path === '/campaigns/admin' || campaignDetail?.workspace === 'admin';
+  const isAdmin = path === '/admin' || path.startsWith('/admin?') || path === '/campaigns/admin' || campaignDetail?.workspace === 'admin';
   const isCampaignResolver = path === '/campaigns/resolver' || campaignDetail?.workspace === 'resolver';
+  const isCampaignJudge = path === '/campaigns/judge';
+  const isVNext = path === '/campaigns/vnext' || path.startsWith('/campaigns/vnext/');
   const isAccount = path === '/account' || path === '/workspace';
 
   const hasAdminRole = session?.roles.includes('ADMIN') ?? false;
   const hasResolverRole = session?.roles.includes('RESOLVER') ?? false;
+
+  const workspaceRole = resolveWorkspaceRole(path, campaignDetail);
+  if (workspaceRole) {
+    return <WorkspaceShell role={workspaceRole} path={path} detail={campaignDetail} session={session}>{children}</WorkspaceShell>;
+  }
 
   return (
     <div className="public-area campaign-shell">
@@ -58,6 +67,9 @@ export function AppShell({
             <a href="#/campaigns/review" aria-current={isCampaignCommunityReview ? 'page' : undefined}>
               Community Review
             </a>
+            <a href="#/campaigns/vnext" aria-current={isVNext ? 'page' : undefined}>
+              Protocol VNext
+            </a>
             {session && (
               <a href="#/campaigns/library" aria-current={isCampaignLibrary ? 'page' : undefined}>
                 Bộ sưu tập của tôi
@@ -68,17 +80,24 @@ export function AppShell({
           {session && (
             <div className="campaign-shell__nav-group">
               <span className="campaign-shell__nav-heading">Không gian làm việc</span>
-              <a href="#/campaigns/creator" aria-current={isCampaignCreatorWorkspace ? 'page' : undefined}>
-                Xưởng ấn phẩm
-              </a>
-              <a href="#/campaigns/creator/profile" aria-current={isCampaignCreatorProfile ? 'page' : undefined}>
-                Hồ sơ Studio
-              </a>
+              {!hasResolverRole && (
+                <>
+                  <a href="#/campaigns/creator" aria-current={isCampaignCreatorWorkspace ? 'page' : undefined}>
+                    Xưởng ấn phẩm
+                  </a>
+                  <a href="#/campaigns/creator/profile" aria-current={isCampaignCreatorProfile ? 'page' : undefined}>
+                    Hồ sơ Studio
+                  </a>
+                </>
+              )}
               {hasResolverRole && (
                 <a href="#/campaigns/resolver" aria-current={isCampaignResolver ? 'page' : undefined}>
                   Thẩm định Resolver
                 </a>
               )}
+              <a href="#/campaigns/judge" aria-current={isCampaignJudge ? 'page' : undefined}>
+                Judge cases
+              </a>
               {hasAdminRole && (
                 <a href="#/admin" aria-current={isAdmin ? 'page' : undefined}>
                   Quản trị Admin

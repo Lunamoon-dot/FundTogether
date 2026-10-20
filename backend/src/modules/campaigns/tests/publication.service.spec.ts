@@ -2,6 +2,7 @@ import { derivePublication, isResolverWallet } from "../services/publication.ser
 import { PublicationService } from "../services/publication.service";
 import { campaignCommitment } from "../policies/commitment";
 import { campaignDraft } from "./fixtures/draft.fixture";
+import { derivePublicationJudgeCase } from "../policies/publication-judge-case";
 
 describe("derivePublication", () => {
   const event = (campaignId: string, canonical: boolean, transactionHash: string) => ({
@@ -66,6 +67,56 @@ describe("isResolverWallet", () => {
   });
 });
 
+describe("derivePublicationJudgeCase", () => {
+  const creator = "0x0000000000000000000000000000000000000001";
+  const commitment = `0x${"a".repeat(64)}`;
+  const otherCommitment = `0x${"b".repeat(64)}`;
+  const event = (eventName: string, args: Record<string, unknown>, transactionHash: string, canonical = true) => ({
+    eventName, args, transactionHash, logIndex: 0, blockNumber: "1", blockHash: `0x${"1".repeat(64)}`, canonical,
+  });
+
+  const created = (value = commitment) => event("JudgeCaseCreated", {
+    caseId: "7", creator, commitmentHash: value, termsHash: `0x${"c".repeat(64)}`, voteDeadline: "200", selectionSeed: `0x${"d".repeat(64)}`,
+  }, `0x${"1".repeat(64)}`);
+
+  it("reduces an open case and ignores a replayed non-canonical event", () => {
+    const result = derivePublicationJudgeCase([
+      created(),
+      event("JudgeSelected", { caseId: "7", seat: 1, judge: "0x0000000000000000000000000000000000000011" }, `0x${"2".repeat(64)}`),
+      event("JudgeSelected", { caseId: "7", seat: 0, judge: "0x0000000000000000000000000000000000000010" }, `0x${"3".repeat(64)}`),
+      event("JudgeSelected", { caseId: "7", seat: 2, judge: "0x0000000000000000000000000000000000000012" }, `0x${"4".repeat(64)}`),
+      event("JudgeVoted", { caseId: "7", judge: "0x0000000000000000000000000000000000000010", approved: true }, `0x${"5".repeat(64)}`),
+      event("JudgeVoted", { caseId: "7", judge: "0x0000000000000000000000000000000000000010", approved: false }, `0x${"5".repeat(64)}`),
+      event("JudgeVoted", { caseId: "7", judge: "0x0000000000000000000000000000000000000011", approved: false }, `0x${"6".repeat(64)}`, false),
+    ], commitment);
+
+    expect(result).toMatchObject({ caseId: "7", creator, commitmentHash: commitment, voteDeadline: "200", status: "OPEN", approveVotes: 1, rejectVotes: 0 });
+    expect(result?.judges).toEqual([
+      "0x0000000000000000000000000000000000000010",
+      "0x0000000000000000000000000000000000000011",
+      "0x0000000000000000000000000000000000000012",
+    ]);
+    expect(result?.votes).toEqual([{ judge: "0x0000000000000000000000000000000000000010", approved: true }]);
+  });
+
+  it.each([
+    ["APPROVED", 1, { status: "APPROVED", decisionHash: `0x${"e".repeat(64)}`, approveVotes: 2, rejectVotes: 1 }],
+    ["REJECTED", 2, { status: "REJECTED", decisionHash: `0x${"f".repeat(64)}`, approveVotes: 1, rejectVotes: 2 }],
+    ["EXPIRED", 3, { status: "EXPIRED", decisionHash: `0x${"9".repeat(64)}`, approveVotes: 1, rejectVotes: 1 }],
+  ])("derives a canonical %s resolution only from JudgeCaseResolved", (status, numericStatus, expected) => {
+    const result = derivePublicationJudgeCase([
+      created(),
+      event("JudgeCaseResolved", { caseId: "7", status: numericStatus, decisionHash: expected.decisionHash, approveVotes: expected.approveVotes, rejectVotes: expected.rejectVotes }, `0x${"8".repeat(64)}`),
+    ], commitment);
+    expect(result).toMatchObject(expected);
+  });
+
+  it("returns null for a different commitment or without a matching creation event", () => {
+    expect(derivePublicationJudgeCase([created(otherCommitment)], commitment)).toBeNull();
+    expect(derivePublicationJudgeCase([event("JudgeSelected", { caseId: "7", seat: 0, judge: creator }, `0x${"2".repeat(64)}`)], commitment)).toBeNull();
+  });
+});
+
 describe("PublicationService.terms", () => {
   const creatorWallet = "0x90f79bf6eb2c4f870365e785982e1f101e93b906";
   const deployment = {
@@ -106,7 +157,7 @@ describe("PublicationService.terms", () => {
 
   it("allows a published record to prepare publication terms when the current stream has no canonical binding", async () => {
     const { campaign, review } = fixture();
-    const { service: publication } = service([[campaign], [], [review], [{ status: "VERIFIED" }], [{ address: creatorWallet, chainId: "31339" }]]);
+    const { service: publication } = service([[campaign], [], [], [{ address: creatorWallet, chainId: "31339" }]]);
 
     await expect(publication.terms("campaign", "creator")).resolves.toMatchObject({
       commitmentHash: campaign.commitmentHash,
@@ -117,8 +168,8 @@ describe("PublicationService.terms", () => {
 
   it("does not rebind a published record when the current stream already has a binding", async () => {
     const { campaign } = fixture();
-    const { service: publication } = service([[campaign], [{ canonical: true }]]);
+    const { service: publication } = service([[campaign], [], [{ canonical: true }]]);
 
-    await expect(publication.terms("campaign", "creator")).rejects.toThrow("An approved, intact Campaign commitment is required");
+    await expect(publication.terms("campaign", "creator")).rejects.toThrow("A current frozen Campaign commitment is required");
   });
 });

@@ -144,7 +144,7 @@ export function DisbursementPanel({ campaignId, userId, mode, chain, transaction
   }
 
   return (
-    <section className="monograph-card space-y-4" aria-labelledby="disbursement-title">
+    <section id="resolver-focus-disbursement" className="monograph-card space-y-4" aria-labelledby="disbursement-title">
       <span className="monograph-card__kicker">DISBURSEMENT REQUEST · PRIVATE REVIEW</span>
       <h2 id="disbursement-title" className="monograph-card__title">Yêu cầu giải ngân</h2>
       <p className="monograph-card__desc">Creator nêu mục đích, lý do, bảng phân bổ và số tiền cần dùng. Resolver quyết định; Backer và Resolver đều xem được hồ sơ.</p>

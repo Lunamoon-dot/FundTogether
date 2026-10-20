@@ -1,11 +1,26 @@
 # Campaign R3 — approved local financial policy v1
 
+> **Historical pre-reset policy:** Superseded on 2026-10-20 by
+> [FINANCIAL_POLICY_V2_DECENTRALIZED.md](FINANCIAL_POLICY_V2_DECENTRALIZED.md).
+> The Resolver, Backup Resolver and Admin authority described below belongs to
+> the old local runtime and must not be used for new protocol design.
+
 Status: **APPROVED LOCAL POLICY**, 2026-10-13. The user selected option 1
 (approve the entire local proposal), adding that Resolver decides and community
 participates in checking the detailed requests. R2–R5 now have automated local
 acceptance and main-runtime verification; exact evidence and limitations are in
 [PROJECT_PROGRESS.md](../PROJECT_PROGRESS.md). No public/real-asset launch is
 authorized. Financial policy version: `campaigns-local-escrow-v6`.
+
+## Research limitation
+
+This policy secures custody and constrains financial transitions on the local
+Campaign contract, but it does not decentralize evidence verification. Resolver
+roles remain trusted decision-makers, while Community Review remains advisory.
+The policy must not be described as decentralized governance, trustless
+verification or a reviewer-reward mechanism. Any reviewer pool, voting,
+staking/reward or challenge-governance proposal requires a separate, evaluated
+policy and is not enabled by this version.
 
 ## Approved local policy
 

@@ -1,8 +1,26 @@
 # FundTogether — Digital PDF local workflow
 
+> **Historical pre-reset document:** This file describes the old Resolver/Admin
+> workflow. The current target is
+> [WORKFLOWS_V2_DECENTRALIZED.md](WORKFLOWS_V2_DECENTRALIZED.md); the old
+> Resolver actions below are not current protocol authority.
+
 Phạm vi: COMICS_ARTBOOK, một DIGITAL_DOWNLOAD PDF, một standard tier.
 Chính sách được người dùng chốt: [FINANCIAL_POLICY_V1.md](FINANCIAL_POLICY_V1.md).
 Chỉ Anvil chain 31339 và MockUSDC; không public chain hoặc tài sản thật.
+
+## Ranh giới tin cậy và phi tập trung
+
+Workflow hiện tại là mô hình **Resolver có quyền quyết định + contract thực
+thi**. Smart contract giữ escrow và áp dụng các điều kiện tài chính đã mã hóa,
+nhưng không tự xác minh sự thật của bằng chứng ngoài chuỗi. Resolver vẫn là bên
+được tin cậy để quyết định review, release, completion và dispute; Backup
+Resolver chỉ là cơ chế takeover/fallback.
+
+Community Review chỉ cung cấp phản hồi advisory. MVP hiện tại không có reviewer
+pool, trả thưởng theo review/vote, staking/slashing, commit–reveal hay quyền
+vote cộng đồng để tự phê duyệt giải ngân. Những cơ chế đó là hướng nghiên cứu
+để đánh giá sau, không phải hành vi đã triển khai.
 
 ## 1. Danh tính, cam kết và community
 

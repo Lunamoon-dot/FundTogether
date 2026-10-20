@@ -11,6 +11,10 @@ contract CampaignEscrowTest is Test {
     address private creator = makeAddr("campaigns-creator");
     address private resolver = makeAddr("campaigns-resolver");
     address private backup = makeAddr("campaigns-backup");
+    address private judgeOne = makeAddr("campaigns-judge-one");
+    address private judgeTwo = makeAddr("campaigns-judge-two");
+    address private judgeThree = makeAddr("campaigns-judge-three");
+    address private judgeFour = makeAddr("campaigns-judge-four");
     address private alice = makeAddr("campaigns-alice");
     address private bob = makeAddr("campaigns-bob");
     bytes32 private constant TERMS = keccak256("frozen-pdf-terms");
@@ -24,7 +28,12 @@ contract CampaignEscrowTest is Test {
     function setUp() public {
         vm.chainId(31339);
         token = new MockUSDC();
-        escrow = new FundTogetherCampaign(address(token), resolver, backup);
+        address[] memory judges = new address[](4);
+        judges[0] = judgeOne;
+        judges[1] = judgeTwo;
+        judges[2] = judgeThree;
+        judges[3] = judgeFour;
+        escrow = new FundTogetherCampaign(address(token), resolver, backup, judges);
         token.mint(alice, 1000e6);
         token.mint(bob, 1000e6);
         vm.prank(alice);
@@ -33,28 +42,141 @@ contract CampaignEscrowTest is Test {
         token.approve(address(escrow), type(uint256).max);
     }
 
-    function create(uint256 goal) private returns (uint256 id) {
-        vm.prank(resolver);
-        escrow.approveCampaign(creator, TERMS, goal, 10e6, 1 days);
+    function createPublicationCase(bytes32 terms, uint256 goal, uint256 price, uint256 duration)
+        private
+        returns (uint256 caseId)
+    {
         vm.prank(creator);
-        id = escrow.createCampaign(TERMS, goal, 10e6, 1 days);
+        caseId = escrow.createPublicationCase(terms, goal, price, duration);
+    }
+
+    function approvePublication(bytes32 terms, uint256 goal, uint256 price)
+        private
+        returns (uint256 id)
+    {
+        uint256 caseId = createPublicationCase(terms, goal, price, 1 days);
+        vm.prank(escrow.publicationJudge(caseId, 0));
+        escrow.votePublicationCase(caseId, true);
+        vm.prank(escrow.publicationJudge(caseId, 1));
+        escrow.votePublicationCase(caseId, true);
+        vm.prank(creator);
+        id = escrow.createCampaign(terms, goal, price, 1 days);
+    }
+
+    function test_creatorCanOpenPublicationCaseWithoutStudioState() public {
+        uint256 caseId = createPublicationCase(TERMS, 10e6, 10e6, 1 days);
+
+        assertEq(caseId, 0);
+        assertEq(escrow.publicationCaseId(TERMS), caseId);
+    }
+
+    function test_publicationCaseSelectsThreeUniqueNonCreatorJudges() public {
+        uint256 caseId = createPublicationCase(TERMS, 10e6, 10e6, 1 days);
+        address first = escrow.publicationJudge(caseId, 0);
+        address second = escrow.publicationJudge(caseId, 1);
+        address third = escrow.publicationJudge(caseId, 2);
+
+        assertTrue(first != address(0));
+        assertTrue(second != address(0));
+        assertTrue(third != address(0));
+        assertTrue(first != creator);
+        assertTrue(second != creator);
+        assertTrue(third != creator);
+        assertTrue(first != second);
+        assertTrue(first != third);
+        assertTrue(second != third);
+    }
+
+    function test_creatorCannotCreateCampaignBeforePublicationApproval() public {
+        createPublicationCase(TERMS, 10e6, 10e6, 1 days);
+
+        vm.prank(creator);
+        vm.expectRevert(FundTogetherCampaign.NotApproved.selector);
+        escrow.createCampaign(TERMS, 10e6, 10e6, 1 days);
+    }
+
+    function test_onlyAssignedJudgeCanVoteAndEachJudgeVotesOnce() public {
+        uint256 caseId = createPublicationCase(TERMS, 10e6, 10e6, 1 days);
+
+        vm.prank(alice);
+        vm.expectRevert();
+        escrow.votePublicationCase(caseId, true);
+
+        address assignedJudge = escrow.publicationJudge(caseId, 0);
+        vm.prank(assignedJudge);
+        escrow.votePublicationCase(caseId, true);
+
+        vm.prank(assignedJudge);
+        vm.expectRevert();
+        escrow.votePublicationCase(caseId, false);
+    }
+
+    function test_twoApprovalsPermitExactCampaignCreationAndNoFundsMove() public {
+        uint256 caseId = createPublicationCase(TERMS, 10e6, 10e6, 1 days);
+        uint256 balanceBefore = token.balanceOf(address(escrow));
+
+        vm.prank(escrow.publicationJudge(caseId, 0));
+        escrow.votePublicationCase(caseId, true);
+        vm.prank(escrow.publicationJudge(caseId, 1));
+        escrow.votePublicationCase(caseId, true);
+
+        vm.prank(creator);
+        uint256 campaignId = escrow.createCampaign(TERMS, 10e6, 10e6, 1 days);
+
+        assertEq(campaignId, 0);
+        assertEq(token.balanceOf(address(escrow)), balanceBefore);
+    }
+
+    function test_twoRejectionsPreventCampaignCreation() public {
+        uint256 caseId = createPublicationCase(TERMS, 10e6, 10e6, 1 days);
+
+        vm.prank(escrow.publicationJudge(caseId, 0));
+        escrow.votePublicationCase(caseId, false);
+        vm.prank(escrow.publicationJudge(caseId, 1));
+        escrow.votePublicationCase(caseId, false);
+
+        vm.prank(creator);
+        vm.expectRevert(FundTogetherCampaign.NotApproved.selector);
+        escrow.createCampaign(TERMS, 10e6, 10e6, 1 days);
+    }
+
+    function test_voteAfterResolutionIsRejected() public {
+        uint256 caseId = createPublicationCase(TERMS, 10e6, 10e6, 1 days);
+
+        vm.prank(escrow.publicationJudge(caseId, 0));
+        escrow.votePublicationCase(caseId, true);
+        vm.prank(escrow.publicationJudge(caseId, 1));
+        escrow.votePublicationCase(caseId, true);
+
+        vm.prank(escrow.publicationJudge(caseId, 2));
+        vm.expectRevert();
+        escrow.votePublicationCase(caseId, true);
+    }
+
+    function test_expiredPublicationCaseDoesNotPermitFunding() public {
+        uint256 caseId = createPublicationCase(TERMS, 10e6, 10e6, 1 days);
+        vm.warp(block.timestamp + 7 days + 1);
+
+        escrow.expirePublicationCase(caseId);
+
+        vm.prank(creator);
+        vm.expectRevert(FundTogetherCampaign.NotApproved.selector);
+        escrow.createCampaign(TERMS, 10e6, 10e6, 1 days);
+    }
+
+    function create(uint256 goal) private returns (uint256 id) {
+        id = approvePublication(TERMS, goal, 10e6);
     }
 
     function createWithTerms(bytes32 terms, uint256 goal) private returns (uint256 id) {
-        vm.prank(resolver);
-        escrow.approveCampaign(creator, terms, goal, 10e6, 1 days);
-        vm.prank(creator);
-        id = escrow.createCampaign(terms, goal, 10e6, 1 days);
+        id = approvePublication(terms, goal, 10e6);
     }
 
     function createWithPrice(bytes32 terms, uint256 goal, uint256 price)
         private
         returns (uint256 id)
     {
-        vm.prank(resolver);
-        escrow.approveCampaign(creator, terms, goal, price, 1 days);
-        vm.prank(creator);
-        id = escrow.createCampaign(terms, goal, price, 1 days);
+        id = approvePublication(terms, goal, price);
     }
 
     function fund() private returns (uint256 id) {
@@ -578,16 +700,17 @@ contract CampaignEscrowTest is Test {
         assertEq(token.balanceOf(alice), 1000e6);
     }
 
-    function test_rolesCannotSelfApproveAndDeploymentIsLocalOnly() public {
-        vm.prank(resolver);
-        vm.expectRevert(FundTogetherCampaign.InvalidInput.selector);
-        escrow.approveCampaign(resolver, TERMS, 10e6, 10e6, 1 days);
-        vm.prank(alice);
-        vm.expectRevert(FundTogetherCampaign.Unauthorized.selector);
-        escrow.approveCampaign(creator, TERMS, 10e6, 10e6, 1 days);
+    function test_deploymentIsLocalOnlyAndJudgePoolIsAvailable() public {
+        assertEq(escrow.judgePoolLength(), 4);
+        assertTrue(escrow.isEligibleJudge(judgeOne));
+        assertTrue(!escrow.isEligibleJudge(creator));
         vm.chainId(1);
         vm.expectRevert(FundTogetherCampaign.LocalOnly.selector);
-        new FundTogetherCampaign(address(token), resolver, backup);
+        address[] memory judges = new address[](3);
+        judges[0] = judgeOne;
+        judges[1] = judgeTwo;
+        judges[2] = judgeThree;
+        new FundTogetherCampaign(address(token), resolver, backup, judges);
     }
 
     function test_rejectedEvidenceCanBeCorrectedAndStaleHashesCannotBeReviewed() public {
@@ -648,10 +771,7 @@ contract CampaignEscrowTest is Test {
 
     function testFuzz_custodyConservationOnCancel(uint96 price) public {
         price = uint96(bound(price, 1, 1000e6));
-        vm.prank(resolver);
-        escrow.approveCampaign(creator, TERMS, price, price, 1 days);
-        vm.prank(creator);
-        uint256 id = escrow.createCampaign(TERMS, price, price, 1 days);
+        uint256 id = approvePublication(TERMS, price, price);
         vm.prank(alice);
         escrow.pledge(id, 1);
         vm.prank(bob);

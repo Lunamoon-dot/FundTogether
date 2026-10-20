@@ -32,7 +32,8 @@ test('Creator workspace keeps payout requests in production and funding follow-u
   assert.ok(productionStart > overviewStart)
   assert.doesNotMatch(page.slice(overviewStart, productionStart), /DisbursementPanel/)
   assert.match(page.slice(productionStart), /DisbursementPanel/)
-  assert.match(page, /ledger=\{activeTab === 'overview'\s*\?/)
+  assert.match(page, /InternalCampaignFrame/)
+  assert.doesNotMatch(page, /CampaignDetailFrame|CampaignOverview|CampaignLedger/)
   assert.doesNotMatch(page, /PledgePreflight|claimRefund|claimSurplus|reviewProduction|approveDisbursement|rejectDisbursement|approveCompletion|rejectCompletion/)
 })
 
@@ -54,6 +55,21 @@ test('production evidence action exposes its wallet preflight result beside the 
   assert.match(page, /productionTransactionMessage/)
   assert.match(page, /type="button"[^>]*onClick=\{\(\) => void tx\.send\(/)
   assert.match(page, /disabled=\{busy \|\| !productionFunded \|\| activeId === null\}/)
+})
+
+test('completion action exposes its wallet preflight result beside the action', () => {
+  const page = read('creator/CampaignWorkspacePage.tsx')
+
+  assert.match(page, /completionTransactionMessage/)
+  assert.match(page, /confirmCampaignCompletion/)
+})
+
+test('completion deadline follows the canonical chain clock', () => {
+  const page = read('creator/CampaignWorkspacePage.tsx')
+
+  assert.match(page, /chainTimestamp/)
+  assert.match(page, /completionMinimumDate/)
+  assert.match(page, /min=\{completionMinimumDate\}/)
 })
 
 test('Creator Studio uses the canonical Creator campaign workspace route', () => {

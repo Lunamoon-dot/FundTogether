@@ -64,7 +64,7 @@ describe("account authentication", () => {
           if (!result) throw new Error("Unexpected table read in auth fixture");
           return Promise.resolve(result).then(resolve);
         }
-        return Promise.resolve(readsByTable ? [] : rows.shift() ?? []).then(resolve);
+        return Promise.resolve(rows.shift() ?? []).then(resolve);
       };
       return builder;
     };
@@ -85,31 +85,6 @@ describe("account authentication", () => {
     );
   });
 
-  it("registers a normalized email and creates an opaque session without a wallet", async () => {
-    rows.push([user], [], [user], []);
-    const result = await service.register(
-      " Donor@Example.com ",
-      "long-test-password",
-    );
-    expect(result.account).toEqual({
-      userId: user.id,
-      email: user.email,
-      roles: [],
-      wallets: [],
-    });
-    expect(result.token).toMatch(/^[a-f0-9]{64}$/);
-    expect(inserted[0]).toMatchObject({
-      email: user.email,
-      passwordHash: "password-hash",
-    });
-    expect(inserted[1]).toMatchObject({ userId: user.id });
-    expect(JSON.stringify(inserted)).not.toContain(result.token);
-    expect(argon2.hash).toHaveBeenCalledWith(
-      "long-test-password",
-      expect.objectContaining({ type: 2, memoryCost: 19456, timeCost: 2 }),
-    );
-  });
-
   it("returns platform roles with the authenticated account", async () => {
     rows.push([{ ...user, roles: ["RESOLVER"] }], []);
     await expect((service as any).getAccount(user.id)).resolves.toEqual({
@@ -120,11 +95,43 @@ describe("account authentication", () => {
     });
   });
 
-  it("rejects duplicate email rather than merging accounts", async () => {
+  it("provisions a wallet-owned account on the first successful SIWE login", async () => {
+    const address = `0x${"1".repeat(40)}`;
+    jest.spyOn(service as any, "verifyWalletMessage").mockResolvedValue({ address, chainId: 31339 });
+    readsByTable = new Map<unknown, unknown[][]>([
+      [walletLinks, [[], [{ userId: "wallet-user" }], [{ address, chainId: "31339" }]]],
+      [users, [[{ id: "wallet-user", email: null, roles: null }]]],
+    ]);
+    rows.push([{ id: "wallet-user" }], [], []);
+
+    const result = await service.verifySiwe("signed-message", "0xsignature");
+
+    expect(result.account).toEqual({
+      userId: "wallet-user",
+      email: null,
+      roles: [],
+      wallets: [{ address, chainId: 31339 }],
+    });
+    expect(result.token).toMatch(/^[a-f0-9]{64}$/);
+    expect(inserted[0]).toEqual({});
+    expect(inserted[1]).toMatchObject({ userId: "wallet-user", address, chainId: "31339", isPrimary: true });
+    expect(inserted[2]).toMatchObject({ userId: "wallet-user" });
+  });
+
+  it("keeps an existing wallet attached to its original account", async () => {
+    const address = `0x${"2".repeat(40)}`;
+    jest.spyOn(service as any, "verifyWalletMessage").mockResolvedValue({ address, chainId: 31339 });
+    readsByTable = new Map<unknown, unknown[][]>([
+      [walletLinks, [[{ userId: user.id }], [{ address, chainId: "31339" }]]],
+      [users, [[{ ...user, roles: null }]]],
+    ]);
     rows.push([]);
-    await expect(
-      service.register(user.email, "long-test-password"),
-    ).rejects.toBeInstanceOf(ConflictException);
+
+    const result = await service.verifySiwe("signed-message", "0xsignature");
+
+    expect(result.account.userId).toBe(user.id);
+    expect(database.insert).toHaveBeenCalledTimes(1);
+    expect(inserted[0]).toMatchObject({ userId: user.id });
   });
 
   describe("unlink wallet with account password", () => {
@@ -186,15 +193,6 @@ describe("account authentication", () => {
       await expect(service.unlinkWallet(user.id, token, address, 31339, "password")).resolves.toMatchObject({ userId: user.id });
       expect(database.delete).not.toHaveBeenCalled();
     });
-  });
-
-  it("rejects incorrect passwords without issuing a session", async () => {
-    rows.push([user]);
-    jest.mocked(argon2.verify).mockResolvedValue(false);
-    await expect(
-      service.login(user.email, "wrong-password"),
-    ).rejects.toBeInstanceOf(UnauthorizedException);
-    expect(database.insert).not.toHaveBeenCalled();
   });
 
   it("rejects a missing, expired or revoked session", async () => {

@@ -10,8 +10,9 @@ const { ACCOUNT_DEFINITIONS, assertDeploymentRoles } = require('./seed-local-acc
 
 const hash = n => `0x${n.toString(16).padStart(64, '0')}`;
 const address = n => `0x${n.toString(16).padStart(40, '0')}`;
+const judges = [address(10), address(11), address(12), address(13)];
 const manifest = () => ({ protocolKind: 'CAMPAIGNS', chainId: 31339, rpcUrl: 'http://127.0.0.1:9548',
-  contractAddress: address(1), tokenAddress: address(2), resolver: address(3), backupResolver: address(4),
+  contractAddress: address(1), tokenAddress: address(2), resolver: address(3), backupResolver: address(4), judges,
   genesisHash: hash(5), contractCodeHash: hash(6), tokenCodeHash: hash(7), deploymentBlockNumber: '2',
   deploymentBlockHash: hash(8), tokenDecimals: 6, confirmations: 1, abiVersion: '1', abiHash: hashJson([]), policyHash: hashJson(policy) });
 
@@ -37,13 +38,21 @@ test('Campaign artifact rejects stale Foundry source metadata before exporting A
 });
 
 test('Campaign deployment keeps the Creator fixture separate from resolver wallets', () => {
-  const accounts = [address(1), address(2), address(3), address(4)];
+  const accounts = Array.from({ length: 10 }, (_, index) => address(index + 1));
   const roles = deploymentRoles(accounts);
   assert.equal(roles.deployer, accounts[0]);
   assert.equal(roles.resolver, accounts[1]);
   assert.equal(roles.backupResolver, accounts[2]);
+  assert.deepEqual(roles.judges, accounts.slice(6, 10));
   assert.notEqual(accounts[3], roles.resolver);
   assert.notEqual(accounts[3], roles.backupResolver);
+});
+
+test('Campaign deployment rejects an undersized or duplicate Judge pool', () => {
+  assert.throws(() => deploymentRoles(Array.from({ length: 9 }, (_, index) => address(index + 1))), /Judge/);
+  const accounts = Array.from({ length: 10 }, (_, index) => address(index + 1));
+  accounts[7] = accounts[6];
+  assert.throws(() => deploymentRoles(accounts), /Judge/);
 });
 
 test('Local fixture keeps Admin separate from Resolver accounts', () => {
@@ -54,20 +63,25 @@ test('Local fixture keeps Admin separate from Resolver accounts', () => {
     { accountIndex: 3, email: 'creator@fundtogether.com', platformRoles: [] },
     { accountIndex: 4, email: 'backer1@fundtogether.com', platformRoles: [] },
     { accountIndex: 5, email: 'backer2@fundtogether.com', platformRoles: [] },
+    { accountIndex: 6, email: 'judge1@fundtogether.com', platformRoles: ['JUDGE'] },
+    { accountIndex: 7, email: 'judge2@fundtogether.com', platformRoles: ['JUDGE'] },
+    { accountIndex: 8, email: 'judge3@fundtogether.com', platformRoles: ['JUDGE'] },
+    { accountIndex: 9, email: 'judge4@fundtogether.com', platformRoles: ['JUDGE'] },
   ]);
 });
 
 test('Local seeding rejects a manifest deployed with a different resolver mapping', () => {
-  const accounts = [address(1), address(2), address(3), address(4), address(5), address(6)];
-  assert.doesNotThrow(() => assertDeploymentRoles({ resolver: accounts[1], backupResolver: accounts[2] }, accounts));
-  assert.throws(() => assertDeploymentRoles({ resolver: accounts[0], backupResolver: accounts[1] }, accounts), /does not match/);
+  const accounts = Array.from({ length: 10 }, (_, index) => address(index + 1));
+  const roleManifest = { resolver: accounts[1], backupResolver: accounts[2], judges: accounts.slice(6, 10) };
+  assert.doesNotThrow(() => assertDeploymentRoles(roleManifest, accounts));
+  assert.throws(() => assertDeploymentRoles({ ...roleManifest, judges: [accounts[5], ...accounts.slice(7, 10)] }, accounts), /does not match/);
 });
 
 test('Deployment verification rejects an outdated local account mapping', async () => {
-  const accounts = [address(1), address(2), address(3)];
+  const accounts = Array.from({ length: 10 }, (_, index) => address(index + 1));
   const client = { request: async () => accounts };
-  await assert.doesNotReject(verifyFixtureRoleMapping(client, { resolver: accounts[1], backupResolver: accounts[2] }));
-  await assert.rejects(verifyFixtureRoleMapping(client, { resolver: accounts[0], backupResolver: accounts[1] }), /outdated local account mapping/);
+  await assert.doesNotReject(verifyFixtureRoleMapping(client, { resolver: accounts[1], backupResolver: accounts[2], judges: accounts.slice(6, 10) }));
+  await assert.rejects(verifyFixtureRoleMapping(client, { resolver: accounts[0], backupResolver: accounts[1], judges: accounts.slice(6, 10) }), /outdated local account mapping/);
 });
 
 test('FundTogether manifest rejects a wrong protocol, endpoint, or deployment identity', () => {

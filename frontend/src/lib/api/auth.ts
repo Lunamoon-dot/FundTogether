@@ -24,22 +24,6 @@ export async function getSession() {
   return data
 }
 
-export async function register(email: string, password: string) {
-  const { data } = await http.post<AccountSession>('/auth/register', {
-    email,
-    password,
-  })
-  return data
-}
-
-export async function login(email: string, password: string) {
-  const { data } = await http.post<AccountSession>('/auth/login', {
-    email,
-    password,
-  })
-  return data
-}
-
 export async function getNonce() {
   const { data } = await http.get<WalletChallenge>('/auth/nonce')
   return data

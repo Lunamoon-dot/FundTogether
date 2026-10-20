@@ -1,5 +1,9 @@
 # FundTogether — Workflow hiện tại và mô hình triển khai post-MVP
 
+> **Historical pre-reset document:** This workflow describes the old
+> Resolver-controlled Campaign and is superseded by the pure decentralized
+> protocol documents. It is retained for traceability, not as current authority.
+
 > **Cập nhật:** 2026-10-17  
 > **Phạm vi:** FundTogether Campaign — `COMICS_ARTBOOK`, một `STANDARD` tier, một quyền `DIGITAL_DOWNLOAD` dạng PDF.  
 > **Cách hiểu:** `post-MVP` là mô hình phát triển sau khi MVP đã có workflow local có thể kiểm chứng; đây không phải tên của một runtime hoặc một deployment namespace.

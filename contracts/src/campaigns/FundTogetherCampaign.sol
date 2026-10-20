@@ -15,7 +15,10 @@ contract FundTogetherCampaign is ReentrancyGuard {
     uint256 public constant PRODUCTION_GRACE = 30 days;
     uint256 public constant RELEASE_GRACE = 7 days;
     uint256 public constant DISPUTE_TIMEOUT = 30 days;
-    bytes32 public constant policyHash = keccak256("campaigns-local-escrow-v6");
+    uint256 public constant JUDGE_COUNT = 3;
+    uint256 public constant JUDGE_QUORUM = 2;
+    uint256 public constant JUDGE_VOTING_WINDOW = 7 days;
+    bytes32 public constant policyHash = keccak256("campaigns-local-escrow-v7");
     IERC20 public immutable supportedToken;
     address public immutable resolver;
     address public immutable backupResolver;
@@ -33,6 +36,19 @@ contract FundTogetherCampaign is ReentrancyGuard {
     enum SurplusChoice {
         REFUND_TO_BACKER,
         DONATE_TO_CREATOR
+    }
+
+    enum JudgeVote {
+        NONE,
+        APPROVE,
+        REJECT
+    }
+
+    enum JudgeCaseStatus {
+        OPEN,
+        APPROVED,
+        REJECTED,
+        EXPIRED
     }
 
     struct Campaign {
@@ -73,9 +89,34 @@ contract FundTogetherCampaign is ReentrancyGuard {
         uint256 openedAt;
         bool resolved;
     }
+
+    struct PublicationCase {
+        address creator;
+        bytes32 commitmentHash;
+        bytes32 termsHash;
+        uint256 goal;
+        uint256 price;
+        uint256 duration;
+        uint256 createdAt;
+        uint256 voteDeadline;
+        bytes32 selectionSeed;
+        bytes32 decisionHash;
+        uint8 approveVotes;
+        uint8 rejectVotes;
+        JudgeCaseStatus status;
+        bool consumed;
+    }
+
     uint256 public campaignCount;
+    uint256 public publicationCaseCount;
     mapping(uint256 => Campaign) private campaigns;
-    mapping(bytes32 => bool) public approvedTerms;
+    mapping(address => bool) private eligibleJudges;
+    address[] private judgePool;
+    mapping(uint256 => PublicationCase) private publicationCases;
+    mapping(uint256 => address[JUDGE_COUNT]) private publicationJudges;
+    mapping(uint256 => mapping(address => JudgeVote)) private publicationVotes;
+    mapping(bytes32 => uint256) private publicationCaseIds;
+    mapping(bytes32 => bool) private publicationCaseExists;
     mapping(address => mapping(bytes32 => bool)) public usedCommitments;
     mapping(uint256 => mapping(address => uint256)) public pledged;
     mapping(uint256 => mapping(address => bool)) public refunded;
@@ -97,8 +138,22 @@ contract FundTogetherCampaign is ReentrancyGuard {
     error PayoutRequestMismatch();
     error NoSurplus();
 
-    event CampaignApproved(
-        address indexed creator, bytes32 indexed commitmentHash, bytes32 termsHash
+    event JudgeCaseCreated(
+        uint256 indexed caseId,
+        address indexed creator,
+        bytes32 indexed commitmentHash,
+        bytes32 termsHash,
+        uint256 voteDeadline,
+        bytes32 selectionSeed
+    );
+    event JudgeSelected(uint256 indexed caseId, uint8 indexed seat, address indexed judge);
+    event JudgeVoted(uint256 indexed caseId, address indexed judge, bool approved);
+    event JudgeCaseResolved(
+        uint256 indexed caseId,
+        JudgeCaseStatus status,
+        bytes32 decisionHash,
+        uint8 approveVotes,
+        uint8 rejectVotes
     );
     event CampaignCreated(
         uint256 indexed campaignId,
@@ -191,15 +246,25 @@ contract FundTogetherCampaign is ReentrancyGuard {
         uint256 amount
     );
 
-    constructor(address token, address primary, address backup) {
+    constructor(address token, address primary, address backup, address[] memory judges) {
         if (block.chainid != 31339) revert LocalOnly();
         if (
             token == address(0) || token.code.length == 0 || primary == address(0)
                 || backup == address(0) || primary == backup
         ) revert InvalidInput();
+        if (judges.length < JUDGE_COUNT) revert InvalidInput();
         supportedToken = IERC20(token);
         resolver = primary;
         backupResolver = backup;
+        for (uint256 i = 0; i < judges.length; i++) {
+            address judge = judges[i];
+            if (
+                judge == address(0) || judge == primary || judge == backup
+                    || judge == address(this) || eligibleJudges[judge]
+            ) revert InvalidInput();
+            eligibleJudges[judge] = true;
+            judgePool.push(judge);
+        }
     }
 
     function campaign(uint256 id) external view returns (Campaign memory) {
@@ -216,19 +281,108 @@ contract FundTogetherCampaign is ReentrancyGuard {
         return keccak256(abi.encode(policyHash, creator, commitment, goal, price, duration));
     }
 
-    function approveCampaign(
-        address creator,
+    function judgePoolLength() external view returns (uint256) {
+        return judgePool.length;
+    }
+
+    function judgePoolAt(uint256 index) external view returns (address) {
+        return judgePool[index];
+    }
+
+    function isEligibleJudge(address judge) external view returns (bool) {
+        return eligibleJudges[judge];
+    }
+
+    function publicationCaseId(bytes32 termsHashValue) external view returns (uint256) {
+        return publicationCaseIds[termsHashValue];
+    }
+
+    function publicationCase(uint256 caseId) external view returns (PublicationCase memory) {
+        return _publicationCase(caseId);
+    }
+
+    function publicationJudge(uint256 caseId, uint8 seat) external view returns (address) {
+        if (seat >= JUDGE_COUNT) revert InvalidInput();
+        _publicationCase(caseId);
+        return publicationJudges[caseId][seat];
+    }
+
+    function createPublicationCase(
         bytes32 commitment,
         uint256 goal,
         uint256 price,
         uint256 duration
-    ) external {
-        if (msg.sender != resolver) revert Unauthorized();
-        _validateTerms(creator, commitment, goal, price, duration);
-        if (usedCommitments[creator][commitment]) revert NotApproved();
-        bytes32 hash = termsHash(creator, commitment, goal, price, duration);
-        approvedTerms[hash] = true;
-        emit CampaignApproved(creator, commitment, hash);
+    ) external returns (uint256 caseId) {
+        _validateTerms(msg.sender, commitment, goal, price, duration);
+        bytes32 hash = termsHash(msg.sender, commitment, goal, price, duration);
+        if (publicationCaseExists[hash] || usedCommitments[msg.sender][commitment]) {
+            revert NotApproved();
+        }
+
+        uint256 eligibleCount;
+        for (uint256 i = 0; i < judgePool.length; i++) {
+            if (judgePool[i] != msg.sender) eligibleCount++;
+        }
+        if (eligibleCount < JUDGE_COUNT) revert InvalidInput();
+
+        caseId = publicationCaseCount++;
+        bytes32 selectionSeed = keccak256(
+            abi.encode(blockhash(block.number - 1), block.prevrandao, msg.sender, commitment, caseId)
+        );
+        PublicationCase storage publication = publicationCases[caseId];
+        publication.creator = msg.sender;
+        publication.commitmentHash = commitment;
+        publication.termsHash = hash;
+        publication.goal = goal;
+        publication.price = price;
+        publication.duration = duration;
+        publication.createdAt = block.timestamp;
+        publication.voteDeadline = block.timestamp + JUDGE_VOTING_WINDOW;
+        publication.selectionSeed = selectionSeed;
+        publication.status = JudgeCaseStatus.OPEN;
+        publicationCaseIds[hash] = caseId;
+        publicationCaseExists[hash] = true;
+
+        emit JudgeCaseCreated(
+            caseId, msg.sender, commitment, hash, publication.voteDeadline, selectionSeed
+        );
+
+        uint256 start = uint256(selectionSeed) % judgePool.length;
+        uint8 selected;
+        for (uint256 offset = 0; offset < judgePool.length && selected < JUDGE_COUNT; offset++) {
+            address judge = judgePool[(start + offset) % judgePool.length];
+            if (judge == msg.sender) continue;
+            publicationJudges[caseId][selected] = judge;
+            emit JudgeSelected(caseId, selected, judge);
+            selected++;
+        }
+        if (selected != JUDGE_COUNT) revert InvalidInput();
+    }
+
+    function votePublicationCase(uint256 caseId, bool approve) external {
+        PublicationCase storage publication = _publicationCase(caseId);
+        if (publication.status != JudgeCaseStatus.OPEN) revert WrongState();
+        if (block.timestamp >= publication.voteDeadline) revert Expired();
+        if (!_isAssignedJudge(caseId, msg.sender)) revert Unauthorized();
+        if (publicationVotes[caseId][msg.sender] != JudgeVote.NONE) revert WrongState();
+
+        publicationVotes[caseId][msg.sender] = approve ? JudgeVote.APPROVE : JudgeVote.REJECT;
+        if (approve) publication.approveVotes++;
+        else publication.rejectVotes++;
+        emit JudgeVoted(caseId, msg.sender, approve);
+
+        if (publication.approveVotes >= JUDGE_QUORUM) {
+            _resolvePublicationCase(publication, caseId, JudgeCaseStatus.APPROVED);
+        } else if (publication.rejectVotes >= JUDGE_QUORUM) {
+            _resolvePublicationCase(publication, caseId, JudgeCaseStatus.REJECTED);
+        }
+    }
+
+    function expirePublicationCase(uint256 caseId) external {
+        PublicationCase storage publication = _publicationCase(caseId);
+        if (publication.status != JudgeCaseStatus.OPEN) revert WrongState();
+        if (block.timestamp < publication.voteDeadline) revert TooEarly();
+        _resolvePublicationCase(publication, caseId, JudgeCaseStatus.EXPIRED);
     }
 
     function createCampaign(
@@ -239,8 +393,14 @@ contract FundTogetherCampaign is ReentrancyGuard {
     ) external returns (uint256 id) {
         _validateTerms(msg.sender, commitment, goal, price, duration);
         bytes32 hash = termsHash(msg.sender, commitment, goal, price, duration);
-        if (!approvedTerms[hash] || usedCommitments[msg.sender][commitment]) revert NotApproved();
-        delete approvedTerms[hash];
+        uint256 caseId = publicationCaseIds[hash];
+        if (
+            !publicationCaseExists[hash] || usedCommitments[msg.sender][commitment]
+                || publicationCases[caseId].creator != msg.sender
+                || publicationCases[caseId].status != JudgeCaseStatus.APPROVED
+                || publicationCases[caseId].consumed
+        ) revert NotApproved();
+        publicationCases[caseId].consumed = true;
         usedCommitments[msg.sender][commitment] = true;
         id = campaignCount++;
         Campaign storage c = campaigns[id];
@@ -563,6 +723,47 @@ contract FundTogetherCampaign is ReentrancyGuard {
     function _campaign(uint256 id) private view returns (Campaign storage c) {
         if (id >= campaignCount) revert InvalidInput();
         return campaigns[id];
+    }
+
+    function _publicationCase(uint256 caseId)
+        private
+        view
+        returns (PublicationCase storage publication)
+    {
+        if (caseId >= publicationCaseCount) revert InvalidInput();
+        return publicationCases[caseId];
+    }
+
+    function _isAssignedJudge(uint256 caseId, address judge) private view returns (bool) {
+        for (uint8 seat = 0; seat < JUDGE_COUNT; seat++) {
+            if (publicationJudges[caseId][seat] == judge) return true;
+        }
+        return false;
+    }
+
+    function _resolvePublicationCase(
+        PublicationCase storage publication,
+        uint256 caseId,
+        JudgeCaseStatus status
+    ) private {
+        publication.status = status;
+        publication.decisionHash = keccak256(
+            abi.encode(
+                policyHash,
+                caseId,
+                publication.termsHash,
+                status,
+                publication.approveVotes,
+                publication.rejectVotes
+            )
+        );
+        emit JudgeCaseResolved(
+            caseId,
+            status,
+            publication.decisionHash,
+            publication.approveVotes,
+            publication.rejectVotes
+        );
     }
 
     function _validateTerms(

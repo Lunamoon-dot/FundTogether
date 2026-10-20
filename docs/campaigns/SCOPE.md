@@ -1,5 +1,10 @@
 # FundTogether — Digital Comic Download MVP
 
+> **Historical pre-reset document:** This file describes the permissioned
+> Resolver implementation before 2026-10-20. The current target is
+> [SCOPE_V2_DECENTRALIZED.md](SCOPE_V2_DECENTRALIZED.md). Do not use this file
+> as the policy for the pure decentralized protocol.
+
 > **Status:** Approved product scope and local financial policy; R0–R5 implemented with automated local acceptance and main-runtime cutover. Manual wallet/real Creator verification and public launch remain outside that evidence.
 > **Updated:** 2026-10-13. **Version:** `fundtogether-comic-download-mvp-v1`.
 > **Scope:** `COMICS_ARTBOOK` campaigns only, with one controlled PDF download benefit.
@@ -10,6 +15,20 @@
 FundTogether MVP is a local MockUSDC crowdfunding pilot for an independent digital comic or artbook. A backer supports a campaign and, after the approved release gate, receives access to one PDF through their authenticated FundTogether account.
 
 The purpose is to evaluate verifiable funding, production-evidence review, and digital-delivery transparency. It is not an investment, marketplace, publishing platform, DRM product, or logistics system.
+
+### Trust and decentralization boundary
+
+The MVP uses on-chain escrow and deterministic settlement, but its evidence
+and decision layer remains permissioned. Admin/Resolver roles review identity,
+campaign, production, release and dispute evidence; the Primary/Backup
+Resolver arrangement is a fallback authority, not decentralized governance.
+Community feedback is advisory and cannot approve payment, create entitlement or
+lock escrow.
+
+The MVP therefore must not be presented as decentralized verification,
+trustless governance or review-to-earn. Reviewer selection, paid voting,
+staking/slashing, commit–reveal and decentralized dispute resolution are
+deferred research candidates and are not implemented in this scope.
 
 ### Exactly in scope
 

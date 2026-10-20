@@ -28,7 +28,6 @@ test('active UI lives under the campaigns namespace', () => {
     'campaigns/creator/PreparationForm.tsx',
     'campaigns/creator/NewPreparationForm.tsx',
     'campaigns/resolver/Console.tsx',
-    'campaigns/resolver/ReviewPanel.tsx',
     'campaigns/admin/AdminConsole.tsx',
     'campaigns/admin/CampaignOperationsPage.tsx',
     'campaigns/backer/Library.tsx',

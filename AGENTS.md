@@ -1,92 +1,71 @@
 # FundTogether — Project Instructions
 
-## Mandatory first read — research direction
+## Mandatory first read
 
-Before reasoning about FundTogether, proposing a change or finalizing a decision,
-read `docs/research-direction.md` and `docs/PROJECT_OVERVIEW.md` first.
-The current project direction was explicitly locked on 2026-10-08 and updated through 2026-10-13.
+Before reasoning about FundTogether, read docs/research-direction.md and
+docs/PROJECT_OVERVIEW.md and
+docs/protocol/FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_V1.md. They define the current
+pure-decentralized target; older Resolver policies and plans are historical
+unless explicitly marked current.
 
-Align decisions with its research goals, narrow scope and evaluation criteria:
-- Current product scope is **FundTogether**: a deliberately narrow **Reward Crowdfunding** pilot for independent digital comics and artbooks (`COMICS_ARTBOOK`).
-- Core capabilities: Evidence-backed creator/IP review, one standard digital-download tier (PDF), escrowed pledges in MockUSDC, production-evidence review, private PDF release, disputes and refunds.
-- **Out of scope:** Physical fulfilment, shipping/logistics, inventory tiers, and legacy charity/donation crowdfunding workflows. The repository does not retain active legacy charity workflow implementation.
+## Product direction
 
-## Project architecture
+- FundTogether is permissionless reward crowdfunding for independent digital
+  comics and artbooks.
+- Any wallet may create a campaign proposal.
+- Backers pledge MockUSDC into contract escrow.
+- Permissionless stake-backed Judge courts review publication, milestones,
+  completion and challenges.
+- A reference court has three Judges and resolves by two-of-three majority.
+- Funding success does not release money. Creator milestone evidence must pass a
+  Judge case and its challenge condition before exact milestone payout.
+- No Primary Resolver, Backup Resolver, Admin or backend operator is a
+  financial or review authority in the target protocol.
+- Accepted risks include Sybil wallets, collusion, bribery, inactive Judges and
+  incorrect majority outcomes.
+- The detailed protocol separates base and appeal pools, uses commit–reveal,
+  distinguishes substantive verdict failure from protocol failure, and requires
+  accounting invariants before contract implementation.
 
-```text
-React frontend (Vite/TS) ↔ NestJS API ↔ PostgreSQL (Drizzle) / MinIO (S3 storage)
-          │                     │
-          └─────────────────────┴────── Blockchain / Anvil (MockUSDC escrow)
-                                           │
-                         Idempotent indexer ┘
-```
+The product remains one COMICS_ARTBOOK campaign model, one STANDARD tier and one
+DIGITAL_DOWNLOAD PDF. Physical fulfilment, shipping, inventory, NFT,
+marketplace, charity and real-money/public-chain launch are out of scope.
 
-- **Frontend:** Owns user experience, forms, API state, wallet interaction (Wagmi + Viem + RainbowKit), and transaction status display. Uses hash-based routing.
-- **Backend:** NestJS owning SIWE authentication, creator/IP declarations, drafts, evidence review, S3-compatible private storage, and blockchain-derived projections.
-- **Smart contracts:** Foundry-managed contracts owning critical financial state: escrow pledges, deadlines, resolver approval, disputes, payouts, and refunds.
-- **PostgreSQL:** Stores application metadata, draft configs, and indexed blockchain projections. Blockchain remains the source of truth for financial transitions.
-- **MinIO:** S3-compatible object storage holding private final-PDF releases and sample evidence. Backers receive short-lived authenticated download tickets.
+## Architecture
 
-## Current technology stack
+    React frontend ↔ NestJS API ↔ PostgreSQL / MinIO
+          │                  │
+          └────────────── Campaign contract / RPC
+                                  │
+                         idempotent event indexer
 
-### Frontend
-- React 19 + TypeScript + Vite
-- TanStack Query for server state
-- Wagmi + Viem for wallet and contract interaction
-- RainbowKit for wallet connection modal
-- Hash-based client routing (`window.location.hash`)
-- Tailwind CSS
+- Frontend owns UX, forms, wallet interaction and explicit transaction states.
+- Backend owns SIWE, validation, private storage and read APIs. It must not
+  choose a Judge outcome or create financial truth from PostgreSQL.
+- Smart contracts own escrow, stake, court assignment, votes, quorum,
+  milestones, challenges, payouts and refunds.
+- PostgreSQL stores metadata and indexed projections.
+- MinIO stores private evidence and final PDF bytes.
+- The indexer consumes canonical events idempotently.
 
-### Backend
-- NestJS + TypeScript
-- PostgreSQL + Drizzle ORM
-- Zod schema validation
-- SIWE (Sign-In with Ethereum) for wallet authentication
-- MinIO (S3-compatible) for private PDF and evidence storage
-- Idempotent event indexer synchronizing on-chain events to database
+## Workflow rules
 
-### Smart contracts & local runtime
-- Foundry (Solidity contracts + tests + fuzzing)
-- Local Anvil RPC node (chain `31339`)
-- Local ports: PostgreSQL `5436`, MinIO `9202/9203`, API `3002`, Web `5175`, Anvil RPC `9548`
-
-## Campaign core journeys
-
-1. **Creator journey:**
-   - Connect wallet & sign in via SIWE.
-   - Complete Step 0: Creator profile & IP Declaration (author/studio pen name, bio, 100% IP ownership pledge).
-   - Draft campaign: comic/artbook title, pitch, story, funding goal (MockUSDC), duration, and 1 standard PDF reward.
-   - Submit sample evidence and production plan, then freeze draft for review.
-
-2. **Resolver journey (Admin/Resolver):**
-   - Inspect frozen draft, IP declaration, and sample evidence.
-   - Approve or request correction/reject on-chain with documented reasoning.
-
-3. **Backer journey:**
-   - Browse approved campaigns in the Campaign feed.
-   - Approve MockUSDC token and pledge into the escrow contract.
-   - Indexer records canonical pledge and issues versioned entitlement.
-
-4. **Production, Delivery & Settlement:**
-   - Creator submits production progress evidence and final PDF hash.
-   - Resolver verifies and accepts the final PDF release.
-   - Backers access private PDF download with short-lived authenticated tickets.
-   - If campaign succeeds and challenge window passes: Creator settles payout.
-   - If campaign is cancelled or dispute upheld: Backers claim full escrow refund.
-
-## Working rules
-
-- Read nearby files, `docs/research-direction.md`, and `docs/PROJECT_OVERVIEW.md` before making changes.
-- Never reintroduce legacy charity/organization crowdfunding or physical shipping logic into the Campaign product flow.
-- Integer-safe token amounts and `bigint` only; never use floating point for financial calculations.
-- Track transaction lifecycle explicitly: wallet request → submitted → canonical receipt → indexer projection.
-- Validate inputs on the server even when the frontend validates them.
-- Keep tests passing: Backend Jest suite, Frontend test runner (`npm test`), and Foundry tests.
+- Distinguish on-chain state, off-chain metadata, indexed projection and file
+  storage.
+- A submitted transaction is not a successful financial action. Track wallet
+  request, submitted, mined, canonical receipt and indexed projection.
+- Use integer-safe token amounts and bigint; never use floating point for money.
+- Store evidence bytes off-chain and commit hashes when integrity matters.
+- Never trust a client-supplied wallet address for authentication; use SIWE.
+- A campaign can move funds only through explicit contract state transitions.
+- Test unauthorized calls, invalid transitions, duplicate actions, timeouts,
+  no-quorum paths, conservation and failed token transfers.
 
 ## Current status
 
-- **Scope:** Reward Crowdfunding only (FundTogether — Comics & Artbooks). Legacy physical delivery and charity workflows are retired/archived.
-- **Backend:** NestJS application with domain modules under `src/modules`, controllers, services, indexers, storage, and migrations 0000–0005 fully verified (195/195 Jest tests pass).
-- **Frontend:** Campaign feed, Creator Studio, Resolver console, Backer library, and Web3 integration verified (29/29 tests pass).
-- **Contracts:** Foundry campaign escrow contracts, fuzzing, and deployment manifests verified.
-- **Local runtime:** Fully automated launcher via `backend/scripts/campaigns/start-services.ps1`.
+The current code and local runtime have not yet migrated to the pure
+decentralized protocol. Existing Resolver-based tests and docs are historical
+evidence and must not be presented as target behavior. Follow the detailed
+specification and implementation plan only after the stake, randomness,
+reward/slashing, no-quorum, appeal, evidence availability and multi-court
+policies are versioned.

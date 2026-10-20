@@ -1,16 +1,18 @@
-# FundTogether
+# FundTogether Campaign documentation
 
-Đây là bộ tài liệu sản phẩm hiện hành cho pilot truyện tranh/artbook số.
+The current target is the pure decentralized protocol:
 
-| Tài liệu | Vai trò |
+| Document | Role |
 | --- | --- |
-| [SCOPE.md](SCOPE.md) | Phạm vi MVP và cấu hình một PDF |
-| [WORKFLOWS.md](WORKFLOWS.md) | Luồng end-to-end và quyền theo vai trò |
-| [FINANCIAL_POLICY_V1.md](FINANCIAL_POLICY_V1.md) | Quy tắc escrow, deadline, completion settlement, surplus, dispute và refund |
-| [MANUAL_TEST_GUIDE.md](MANUAL_TEST_GUIDE.md) | Nghiệm thu local bằng trình duyệt/ví |
-| [glossary.md](glossary.md) | Từ vựng và quy tắc đặt tên |
+| [VNext protocol specification V1](../protocol/FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_V1.md) | Detailed protocol rules, state machines, events and invariants |
+| [SCOPE_V2_DECENTRALIZED.md](SCOPE_V2_DECENTRALIZED.md) | Current product scope |
+| [WORKFLOWS_V2_DECENTRALIZED.md](WORKFLOWS_V2_DECENTRALIZED.md) | Current Creator, Backer and Judge workflows |
+| [FINANCIAL_POLICY_V2_DECENTRALIZED.md](FINANCIAL_POLICY_V2_DECENTRALIZED.md) | Current escrow, stake, court, payout and refund direction |
+| [glossary.md](glossary.md) | Shared terms |
+| [MANUAL_TEST_GUIDE.md](MANUAL_TEST_GUIDE.md) | Historical pre-reset runtime guide |
+| [FINANCIAL_POLICY_V1.md](FINANCIAL_POLICY_V1.md) | Historical Resolver policy |
+| [SCOPE.md](SCOPE.md) | Historical permissioned MVP scope |
 
-Các chuỗi `/v1/fundtogether`, `campaigns`, `CampaignModule` và `FUNDTOGETHER_V1` là
-biên kỹ thuật hiện hành. Dữ liệu lịch sử dùng namespace `historical` riêng và
-không được đưa vào wire route của Campaign hiện tại.
-
+The protocol specification and V2 documents are target design, not executable
+evidence. The old documents are retained to explain the pre-reset runtime and
+must not be mixed into the new protocol acceptance criteria.

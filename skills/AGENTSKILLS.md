@@ -763,6 +763,14 @@ Consider:
 
 This project is a Web3 crowdfunding system.
 
+The current FundTogether direction is a pure decentralized reward-crowdfunding
+protocol: permissionless campaign proposals, stake-backed Judge courts,
+two-of-three reference quorum, milestone evidence before payout, and
+permissionless refunds. Resolver/Admin authority is pre-reset history, not a
+valid target assumption. The protocol accepts Sybil, collusion, bribery and
+incorrect-majority risk; do not restore a trusted reviewer merely to remove
+those risks.
+
 Core concepts may include:
 
 - campaigns,

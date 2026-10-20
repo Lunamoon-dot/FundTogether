@@ -1,5 +1,33 @@
 # FundTogether — Cơ chế hiện tại và hướng dẫn test tay
 
+> **Historical pre-reset guide (2026-10-20):** The steps in this file exercise
+> the old Resolver/Admin runtime. They are not acceptance criteria for the pure
+> decentralized protocol. Use the V2 architecture, policy and implementation
+> plan to write the replacement Judge/milestone test guide.
+
+## Current executable migration smoke path
+
+The current Campaign publication slice is smaller than the historical cases
+below. Use this path for the code that exists now:
+
+1. Creator signs in with a wallet linked to chain `31339` and creates a
+   `COMICS_ARTBOOK` draft. No `VERIFIED` Creator profile or Studio approval is
+   required.
+2. Creator saves the single Standard PDF preparation, uploads private sample
+   evidence, freezes the commitment, and submits it for a Judge case.
+3. The contract selects three Judges for that commitment. Only the assigned
+   Judges can read the private evidence and vote once; two matching votes
+   resolve the case. A timeout is explicit and does not silently approve.
+4. Only an on-chain `JudgeCaseResolved` result with `APPROVED` status enables
+   the Creator's `createCampaign` transaction. Admin profile review and fixed
+   Resolver `approveCampaign` are not part of this path.
+5. After the campaign is canonical, Resolver lifecycle checks remain
+   transitional: production/PDF review, challenge handling and settlement.
+
+The historical H01–H20, F and N cases below describe the pre-reset Resolver
+workflow and are retained only for traceability. Do not report them as current
+Judge-court acceptance.
+
 Ngày đối chiếu code/runtime: **15/10/2026**. Phạm vi: **MVP local, chain 31339, MockUSDC**.
 
 ## 1. MVP đang hoàn thiện đến đâu?
@@ -211,7 +239,10 @@ Dùng hai ngày gợi ý cho campaign 1 ngày gây quỹ. Chạy lại trước 
 
 ### 3.3. Các tài khoản test
 
-Tạo tài khoản email/password ở `#/account`. Dùng profile trình duyệt riêng để tránh dùng chung session/ví; nếu dùng một profile, đăng xuất và ngắt ví trước khi đổi actor.
+Đăng nhập bằng ví tại `#/account`: kết nối đúng ví test và ký SIWE. Ví mới sẽ
+tự tạo account; ví đã seed sẽ vào account tương ứng. Dùng profile trình duyệt
+riêng để tránh dùng chung session/ví; nếu dùng một profile, đăng xuất và ngắt
+ví trước khi đổi actor.
 
 | Mã | Tài khoản | Ví / điều kiện |
 | --- | --- | --- |
@@ -222,9 +253,13 @@ Tạo tài khoản email/password ở `#/account`. Dùng profile trình duyệt 
 | U | Community / người không pledge | Tài khoản thường; không cần ví để gửi nhận xét |
 | RB | Backup, dùng cho case mở rộng | Role `RESOLVER`, liên kết đúng `deployment.backupResolver` |
 
-Nếu thiếu staff role, operator dùng mục 9.1 sau khi tài khoản đã đăng ký. Đăng xuất/đăng nhập lại để UI nhận role. Không chọn role trên giao diện là tự được cấp quyền.
+Nếu thiếu staff role, operator dùng mục 9.1 sau khi account wallet đã được tạo.
+Đăng xuất/đăng nhập lại để UI nhận role. Không chọn role trên giao diện là tự
+được cấp quyền.
 
-Trong từng tài khoản cần giao dịch: vào `#/account` → `Connect Wallet` → chọn đúng provider/ví → **Liên kết ví ngoài** → ký SIWE. Kiểm tra ví có trong danh sách “Ví đã liên kết với tài khoản”. Chỉ thấy địa chỉ ở nút Connect chưa đủ.
+Trong từng tài khoản cần giao dịch: vào `#/account` → `Connect Wallet` → chọn
+đúng provider/ví → **Ký để đăng nhập**. Kiểm tra ví có trong danh sách “Ví đã
+liên kết với tài khoản”. Chỉ thấy địa chỉ ở nút Connect chưa đủ.
 
 Primary/Backup phải là ví test mà người test có thể ký và khớp manifest. Nếu không có ví đó, đánh dấu `BLOCKED: thiếu ví Resolver`; ví MetaMask ngẫu nhiên không thay thế được. Không sửa manifest hoặc giả chữ ký để tiếp tục. Không đưa seed/private key vào file hướng dẫn, ảnh hoặc biên bản.
 
@@ -404,7 +439,7 @@ Log local ở `.local/fundtogether/runtime/api.log`, `api-error.log`, `web.log`,
 
 Các lệnh bên dưới dùng để chuẩn bị/test, **chưa được chạy khi tạo tài liệu này**. Chạy tại repo root. Chúng không phải bước người dùng sản phẩm phải làm hàng ngày. Không chạy test tự động có reorg/tua giờ đồng thời với nghiệm thu tay.
 
-### 9.1. Cấp một staff role cho tài khoản test đã đăng ký
+### 9.1. Cấp một staff role cho tài khoản test đã đăng nhập bằng ví
 
 Chỉ operator DB thực hiện. Script thêm đúng một role, giữ các role đang có; không xác minh Creator thay ADMIN và không cấp quyền ví trên contract.
 
@@ -512,7 +547,7 @@ Không dùng `challengeDeadline`/`disputeDeadline` bằng0 khi chưa có release
 ## 10. Tài liệu và mã nguồn đối chiếu
 
 - [Phạm vi MVP](SCOPE.md), [policy local được duyệt](FINANCIAL_POLICY_V1.md), [workflow](WORKFLOWS.md), [kết quả kiểm chứng](../PROJECT_PROGRESS.md).
-- [Contract Campaign](../../contracts/src/campaigns/FundTogetherCampaign.sol), [màn hình campaign](../../frontend/src/features/campaigns/public/Page.tsx), [form freeze/preparation](../../frontend/src/features/campaigns/creator/PreparationForm.tsx), [Resolver review](../../frontend/src/features/campaigns/resolver/ReviewPanel.tsx), [ranh giới ký và sync](../../frontend/src/features/campaigns/transactions/useTransaction.ts).
+- [Contract Campaign](../../contracts/src/campaigns/FundTogetherCampaign.sol), [màn hình campaign](../../frontend/src/features/campaigns/public/Page.tsx), [form freeze/preparation](../../frontend/src/features/campaigns/creator/PreparationForm.tsx), [Judge case UI](../../frontend/src/features/campaigns/judge/JudgePublicationPanel.tsx), [ranh giới ký và sync](../../frontend/src/features/campaigns/transactions/useTransaction.ts).
 - [Delivery/ACL/ticket](../../backend/src/modules/delivery/services/delivery.service.ts), [preflight publish](../../backend/src/modules/campaigns/services/publication.service.ts), [schema campaign](../../backend/src/modules/campaigns/schemas/campaign.schema.ts).
 
 Các hướng dẫn charity/A/B trong `docs/archive` có thể dùng cổng, role hoặc quy tắc tiền khác; không dùng chúng để nghiệm thu Campaign. Khu vực `#/campaigns/history` chỉ giữ lịch sử, không phải campaign mới để chạy test này.

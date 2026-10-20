@@ -5,7 +5,7 @@ import type { CampaignPreparation } from "../schemas/preparation.schema";
 export interface CampaignSnapshot {
   commitmentVersion: "campaigns-review-v1";
   config: CreateCampaignDraftInput;
-  creator: { userId: string; profileId: string; displayName: string; ipDeclaration: string };
+  creator: { userId: string; profileId: string | null; displayName: string; ipDeclaration: string };
   payoutWallet: { linkId: string; chainId: string; address: string };
   preparation: Omit<CampaignPreparation, "payoutWalletLinkId" | "sampleIds">;
   samples: { id: string; sha256: string; mediaType: string; sizeBytes: number }[];

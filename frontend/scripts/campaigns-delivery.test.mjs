@@ -25,10 +25,10 @@ function render(component, props, entries = []) {
   const html = renderToStaticMarkup(createElement(WagmiProvider, { config }, createElement(QueryClientProvider, { client }, createElement(component, props))))
   client.clear(); return html
 }
-function campaign(access, state = 3, mode = 'public', snapshotOverrides = {}, previewOverrides = {}) {
+function campaign(access, state = 3, mode = 'public', snapshotOverrides = {}, previewOverrides = {}, initialTab) {
   const component = mode === 'creator' ? CreatorCampaignWorkspacePage : PublicCampaignPage
   const session = { userId: 'owner', roles: [], wallets: [] }
-  const props = { id: 'campaign', session }
+  const props = { id: 'campaign', session, ...(initialTab ? { initialTab } : {}) }
   return render(component, props, [
     [['campaign-campaign-public', 'campaign'], { ...preview, ...previewOverrides }],
     [['campaign-campaign-chain', 'campaign'], { status: 'ON_CHAIN_CONFIRMED', onchainCampaignId: '0', deployment: {}, challenges: [], snapshot: { state, raised: '10000001', escrowed: '10000001', fundingDeadline: '1791900000', releaseDeadline: '1794900000', challengeDeadline: '1795000000', openDisputes: '0', productionApproved: true, productionHash: hash, ...snapshotOverrides } }],
@@ -39,6 +39,20 @@ function campaign(access, state = 3, mode = 'public', snapshotOverrides = {}, pr
     [['campaign-campaign-feedback', 'campaign', 'owner'], { items: [], canSubmit: true }],
   ])
 }
+
+test('creator sees final PDF as the next step after committing the release deadline', () => {
+  const html = campaign('PENDING_RELEASE', 1, 'creator', {
+    productionApproved: true,
+    releaseDeadline: '1794900000',
+    pdfHash: `0x${'0'.repeat(64)}`,
+    creatorPaid: '100000000',
+    goal: '100000000',
+  }, {}, 'production')
+
+  assert.match(html, /Bước tiếp theo: gửi PDF cuối/)
+  assert.match(html, /Creator đã chốt hạn phát hành PDF/)
+  assert.doesNotMatch(html, /Xác nhận hoàn thành campaign/)
+})
 function publishedFundingCampaign() {
   return render(PublicCampaignPage, { id: 'campaign', session: null }, [
     [['campaign-campaign-public', 'campaign'], { ...preview, status: 'PUBLISHED', surface: 'FUNDING' }],

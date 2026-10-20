@@ -18,6 +18,8 @@
     "test:campaigns": "npm run test -- --runInBand src/blockchain/deployment.spec.ts src/modules/campaigns/tests/commitment.spec.ts src/modules/campaigns/tests/publication.service.spec.ts src/modules/delivery/tests/delivery.policy.spec.ts src/modules/campaigns/tests/http.spec.ts src/modules/review/tests/review-http.spec.ts src/indexer/tests/campaign-indexer.integration.spec.ts src/modules/delivery/tests/pdf.spec.ts src/modules/delivery/tests/delivery-http.spec.ts",
     "start:fundtogether": "node scripts/campaigns/run-backend.cjs",
     "db:fundtogether:migrate": "node scripts/campaigns/migrate-isolated.cjs",
+    "vnext:verify-runtime": "node scripts/campaigns/verify-vnext-runtime.cjs",
+    "test:vnext-runtime": "node --test scripts/campaigns/vnext-runtime-identity.test.cjs",
     "test:workflow": "npm run test -- --runInBand src/modules/campaigns/tests/workflow-campaign.schema.spec.ts src/modules/pledges/tests/workflow-pledge.schema.spec.ts src/modules/campaigns/tests/workflow-commitment.service.spec.ts src/indexer/tests/historical-campaign-indexer.service.spec.ts src/modules/campaigns/tests/commitment.spec.ts",
     "test:fundtogether:e2e": "node scripts/campaigns/campaign-scenarios-e2e.cjs && npm run test -- --runInBand src/modules/campaigns/tests/workflow-http-acceptance.spec.ts src/modules/campaigns/tests/http.spec.ts src/modules/review/tests/review-http.spec.ts",
     "lint": "eslint \"{src,test}/**/*.ts\" --fix",

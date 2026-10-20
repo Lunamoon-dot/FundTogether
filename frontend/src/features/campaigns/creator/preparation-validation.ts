@@ -16,12 +16,12 @@ export function getPreparationFieldError(field: keyof PreparationTextFields, val
 }
 
 export function getPreparationRequiredFieldError(payoutWalletLinkId: string): string | undefined {
-  if (!payoutWalletLinkId.trim()) return 'Hồ sơ Studio chưa có ví đại diện đã xác minh.';
+  if (!payoutWalletLinkId.trim()) return 'Cần chọn một ví Creator đã liên kết trên chain 31339.';
   return undefined;
 }
 
-export function getDefaultPayoutWalletLinkId(currentId: string, wallets: Array<{ id: string; isStudioWallet?: boolean }>): string {
-  return currentId || wallets.find(wallet => wallet.isStudioWallet)?.id || (wallets.length === 1 ? wallets[0].id : '');
+export function getDefaultPayoutWalletLinkId(currentId: string, wallets: Array<{ id: string }>): string {
+  return currentId || (wallets.length === 1 ? wallets[0].id : '');
 }
 
 export function getPreparationAction(hasSavedPreparation: boolean, dirty: boolean): 'SAVE' | 'LOCK' {

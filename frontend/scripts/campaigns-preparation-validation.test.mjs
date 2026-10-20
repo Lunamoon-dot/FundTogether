@@ -24,7 +24,7 @@ test('returns an inline error for a short field after it loses focus', () => {
 })
 
 test('reports only a missing payout wallet before saving', () => {
-  assert.equal(getPreparationRequiredFieldError(''), 'Hồ sơ Studio chưa có ví đại diện đã xác minh.')
+  assert.equal(getPreparationRequiredFieldError(''), 'Cần chọn một ví Creator đã liên kết trên chain 31339.')
   assert.equal(getPreparationRequiredFieldError('wallet-id'), undefined)
 })
 

@@ -5,7 +5,6 @@ import { ResolverGuard } from "../../auth/roles.guard";
 import { CampaignWorkflowService } from "./campaign.service";
 import { PledgeService } from "../../pledges/workflow/pledge.service";
 import {
-  resolverReviewCampaignSchema,
   resolverActivateCampaignSchema,
   resolverVerifyProductionSchema,
 } from "../schemas/campaign.schema";
@@ -29,19 +28,6 @@ export class ResolverController {
     return this.pledges.listDisputesForResolver();
   }
 
-  @Post("campaigns/:id/review")
-  reviewCampaign(
-    @Param("id", new ParseUUIDPipe()) id: string,
-    @Body() body: unknown,
-    @Req() req: Request,
-  ) {
-    const parsed = resolverReviewCampaignSchema.safeParse(body);
-    if (!parsed.success) {
-      throw new BadRequestException({ message: "Invalid resolver review payload", issues: parsed.error.issues });
-    }
-    return this.campaigns.resolverReview(req.account!.userId, id, parsed.data);
-  }
-
   @Post("campaigns/:id/activate")
   activateCampaign(
     @Param("id", new ParseUUIDPipe()) id: string,
@@ -50,7 +36,7 @@ export class ResolverController {
   ) {
     const parsed = resolverActivateCampaignSchema.safeParse(body);
     if (!parsed.success) {
-      throw new BadRequestException({ message: "Invalid campaign activation payload", issues: parsed.error.issues });
+      throw new BadRequestException({ message: "Invalid campaign lifecycle activation payload", issues: parsed.error.issues });
     }
     return this.campaigns.activateCampaignOnchain(req.account!.userId, id, parsed.data.txHash);
   }

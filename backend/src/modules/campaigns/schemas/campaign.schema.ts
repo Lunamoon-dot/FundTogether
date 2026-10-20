@@ -48,7 +48,7 @@ export const registerCampaignOnchainSchema = z.strictObject({
 });
 
 export const creatorVerificationInputSchema = z.strictObject({
-  studioWalletLinkId: z.string().uuid(),
+  studioWalletLinkId: z.string().uuid().optional().nullable(),
   displayName: z.string().trim().min(3).max(150),
   bio: z.string().trim().min(10).max(2000),
   ipDeclaration: z.string().trim().min(10).max(2000),
@@ -60,24 +60,13 @@ export const creatorVerificationInputSchema = z.strictObject({
 });
 
 
-export const adminReviewCreatorSchema = z.strictObject({
-  outcome: z.enum(["VERIFIED", "REJECTED"]),
-  rejectionReason: z.string().max(1000).optional(),
-});
-
-export const resolverReviewCampaignSchema = z.strictObject({
-  outcome: z.enum(["APPROVED", "CHANGES_REQUESTED", "REJECTED"]),
-  decisionReason: z.string().trim().min(10).max(2000),
-});
-
-
-export const resolverActivateCampaignSchema = z.strictObject({
-  txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, "Must be a 32-byte transaction hash"),
-});
-
 export const resolverVerifyProductionSchema = z.strictObject({
   txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, "Must be a 32-byte transaction hash"),
   productionReportHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, "Must be a 32-byte hex hash").optional(),
+});
+
+export const resolverActivateCampaignSchema = z.strictObject({
+  txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, "Must be a 32-byte transaction hash"),
 });
 
 export const completeCampaignSchema = z.strictObject({
@@ -92,10 +81,8 @@ export type CampaignTierInput = z.infer<typeof campaignTierInputSchema>;
 export type CreateCampaignDraftInput = z.infer<typeof createCampaignDraftSchema>;
 export type RegisterCampaignOnchainInput = z.infer<typeof registerCampaignOnchainSchema>;
 export type CreatorVerificationInput = z.infer<typeof creatorVerificationInputSchema>;
-export type AdminReviewCreatorInput = z.infer<typeof adminReviewCreatorSchema>;
-export type ResolverReviewCampaignInput = z.infer<typeof resolverReviewCampaignSchema>;
-export type ResolverActivateCampaignInput = z.infer<typeof resolverActivateCampaignSchema>;
 export type ResolverVerifyProductionInput = z.infer<typeof resolverVerifyProductionSchema>;
+export type ResolverActivateCampaignInput = z.infer<typeof resolverActivateCampaignSchema>;
 export type CompleteCampaignInput = z.infer<typeof completeCampaignSchema>;
 export type SyncReceiptInput = z.infer<typeof syncCampaignReceiptSchema>;
 

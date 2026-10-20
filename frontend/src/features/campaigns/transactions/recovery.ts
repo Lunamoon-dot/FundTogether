@@ -31,7 +31,7 @@ function storage(): Storage | null {
 
 function isTransactionAction(value: unknown): value is CampaignTransactionAction {
   return typeof value === 'string' && [
-    'approveCampaign', 'createCampaign', 'pledge', 'submitProduction', 'submitRelease',
+    'createPublicationCase', 'votePublicationCase', 'expirePublicationCase', 'createCampaign', 'pledge', 'submitProduction', 'submitRelease',
     'reviewProduction', 'reviewRelease', 'challengeRelease', 'resolveChallenge',
     'finalizeFunding', 'startRefunds', 'claimRefund', 'requestCompletion', 'approveCompletion', 'rejectCompletion', 'claimSurplus', 'cancelCampaign',
   ].includes(value);

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createCampaignDraftSchema, digitalText, resolverReviewCampaignSchema } from "./campaign.schema";
+import { createCampaignDraftSchema, digitalText } from "./campaign.schema";
 
 export const campaignPreparationSchema = z.strictObject({
   payoutWalletLinkId: z.string().uuid(),
@@ -34,8 +34,5 @@ export const campaignReviewEscalationSchema = z.strictObject({ reason: z.string(
 export const campaignReviewEscalationOutcomeSchema = z.strictObject({
   outcome: z.enum(["RESOLVED", "DISMISSED", "FORMAL_DISPUTE"]),
   note: z.string().trim().min(10).max(3000),
-});
-export const campaignReviewSchema = resolverReviewCampaignSchema.extend({
-  commitmentHash: z.string().regex(/^0x[0-9a-f]{64}$/),
 });
 export type CampaignPreparation = z.infer<typeof campaignPreparationSchema>;

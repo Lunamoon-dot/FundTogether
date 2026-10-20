@@ -143,6 +143,37 @@ export function CompletionSettlementPanel({ campaignId, userId, mode, chain, tra
       {requests.error && <p className="monograph-alert monograph-alert--error">Không đọc được dossier hoàn thành.</p>}
       {claims.error && <p className="monograph-alert monograph-alert--error">Không đọc được lịch sử claim surplus.</p>}
 
+      {mode === 'resolver' && snapshot.state === CAMPAIGN_CHAIN_STATE.ACTIVE && (
+        <p className="monograph-alert monograph-alert--info">
+          <strong>Chưa có hồ sơ hoàn thành để duyệt.</strong>{' '}
+          {snapshot.productionApproved
+            ? 'Đang chờ Creator gửi PDF cuối ở bước Sản xuất & bằng chứng.'
+            : 'Đang chờ Creator gửi và được duyệt bằng chứng sản xuất trước khi gửi PDF cuối.'}
+        </p>
+      )}
+      {mode === 'resolver' && snapshot.state === CAMPAIGN_CHAIN_STATE.RELEASE_REVIEW && (
+        <p className="monograph-alert monograph-alert--info">
+          <strong>PDF cuối đang chờ duyệt.</strong> Hãy xử lý bản phát hành tại mục Sản xuất &amp; bằng chứng; nút duyệt hoàn thành chỉ mở sau hồ sơ completion riêng.
+        </p>
+      )}
+      {mode === 'resolver' && snapshot.state === CAMPAIGN_CHAIN_STATE.RELEASED && !eligible && (
+        <p className="monograph-alert monograph-alert--info">
+          {snapshot.openDisputes !== '0'
+            ? 'Chưa thể chốt hoàn thành vì campaign còn tranh chấp mở.'
+            : 'PDF cuối đã được duyệt. Đang chờ hết thời gian challenge trước khi Creator có thể gửi hồ sơ hoàn thành.'}
+        </p>
+      )}
+      {mode === 'resolver' && snapshot.state === CAMPAIGN_CHAIN_STATE.RELEASED && eligible && !latest && (
+        <p className="monograph-alert monograph-alert--info">
+          PDF cuối đã qua thời gian challenge. Đang chờ Creator gửi hồ sơ hoàn thành để Resolver xem và ký quyết định.
+        </p>
+      )}
+      {mode === 'public' && snapshot.state !== CAMPAIGN_CHAIN_STATE.COMPLETED && (
+        <p className="monograph-alert monograph-alert--info">
+          <strong>Chưa thể nhận phần thừa.</strong> Resolver cần duyệt hồ sơ hoàn thành trước. Khi campaign chuyển sang COMPLETED, nút claim sẽ xuất hiện ngay tại đây trong Tổng quan.
+        </p>
+      )}
+
       {latest && (
         <article className="border border-[var(--border-hairline)] rounded p-3 space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2"><strong>Revision #{latest.revision} · {latest.status}</strong><span>Goal: {money(snapshot.goal)}</span></div>
@@ -179,10 +210,16 @@ export function CompletionSettlementPanel({ campaignId, userId, mode, chain, tra
       {snapshot.state === CAMPAIGN_CHAIN_STATE.COMPLETED && <div className="space-y-2">
         <p className="monograph-alert monograph-alert--success">Campaign đã hoàn thành canonical. Creator nhận đúng goal {money(snapshot.goal)}; surplus pool hiện còn {money(snapshot.surplusPool)}.</p>
         <p className="text-sm">Đã claim: {money(snapshot.surplusClaimed)} · Số Backer đã claim: {snapshot.surplusClaimantCount}/{snapshot.backerCount}</p>
+        {mode === 'public' && !entitlement && <p className="monograph-alert monograph-alert--info">Campaign đã mở quyết toán nhưng tài khoản hiện tại không có pledge canonical. Hãy đăng nhập bằng tài khoản và ví đã dùng để pledge; nút claim nằm tại đây trong Tổng quan.</p>}
         {mode === 'public' && entitlement && (
           ownClaim
             ? <p className="text-sm text-[var(--ink-subtle)]">Bạn đã chọn {ownClaim.choice === 'REFUND_TO_BACKER' ? 'hoàn về ví Backer' : 'gửi cho Creator'}: {money(ownClaim.amount)}.</p>
-            : <div className="space-y-2"><p className="text-sm">Phần surplus theo đóng góp của bạn: <strong>{claimable.isPending ? 'Đang tính…' : money(String(claimable.data ?? 0n))}</strong></p><div className="flex flex-wrap gap-2"><button disabled={!canClaim || transaction.busy} className="button button--primary" type="button" onClick={() => void claim(0)}>Nhận về ví của tôi</button><button disabled={!canClaim || transaction.busy} className="button button--secondary" type="button" onClick={() => void claim(1)}>Gửi cho Creator</button></div></div>
+            : <div className="space-y-2">
+              <p className="text-sm">Phần surplus theo đóng góp của bạn: <strong>{claimable.isPending ? 'Đang tính…' : money(String(claimable.data ?? 0n))}</strong></p>
+              {!claimable.isPending && (claimable.data ?? 0n) === 0n
+                ? <p className="text-sm text-[var(--ink-subtle)]">Không còn phần surplus có thể claim cho ví pledge này.</p>
+                : <div className="flex flex-wrap gap-2"><button disabled={!canClaim || transaction.busy} className="button button--primary" type="button" onClick={() => void claim(0)}>Nhận về ví của tôi</button><button disabled={!canClaim || transaction.busy} className="button button--secondary" type="button" onClick={() => void claim(1)}>Gửi cho Creator</button></div>}
+            </div>
         )}
         {mode !== 'public' && claims.data && claims.data.length > 0 && <div className="space-y-1">{claims.data.map((claim: CampaignSurplusClaim) => <p className="text-sm border-t pt-2" key={claim.id}>{claim.backerWallet} · {claim.choice === 'REFUND_TO_BACKER' ? 'Backer nhận lại' : 'Creator nhận'} · {money(claim.amount)}</p>)}</div>}
       </div>}

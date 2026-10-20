@@ -188,9 +188,9 @@ describe("Campaign real HTTP + PostgreSQL draft boundary", () => {
     expect((await post(`/v1/fundtogether/creator/campaigns/${id}/onchain`, stranger).send({ onchainCampaignId: "0", txHash: hash })).status).toBe(403);
   });
 
-  it("blocks review and physical writes even if a stored status is forced forward", async () => {
+  it("does not expose fixed publication review and blocks physical writes", async () => {
     await db.update(schema.campaigns).set({ status: "UNDER_REVIEW" }).where(eq(schema.campaigns.id, id));
-    expect((await post(`/v1/fundtogether/resolver/campaigns/${id}/review`, resolver).send({ outcome: "APPROVED", decisionReason: "Approved for testing only" })).status).toBe(409);
+    expect((await post(`/v1/fundtogether/resolver/campaigns/${id}/review`, resolver).send({ outcome: "APPROVED", decisionReason: "Fixed publication review is retired" })).status).toBe(404);
     await db.update(schema.campaigns).set({ status: "PRODUCTION_VERIFIED" }).where(eq(schema.campaigns.id, id));
     expect((await request(app.getHttpServer()).get("/v1/fundtogether/public/campaigns")).body).toEqual([]);
     expect((await request(app.getHttpServer()).get(`/v1/fundtogether/public/campaigns/${id}`)).status).toBe(404);

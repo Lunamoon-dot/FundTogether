@@ -5,15 +5,18 @@ export interface AdminOperationsOverviewProps {
   lifecycleCounts: Record<string, number>;
   exceptionItems: ExceptionItem[];
   className?: string;
+  id?: string;
 }
 
 export function AdminOperationsOverview({
   lifecycleCounts,
   exceptionItems,
   className = '',
+  id,
 }: AdminOperationsOverviewProps) {
   return (
     <section
+      id={id}
       className={`panel admin-overview admin-operations-card ${className}`.trim()}
       aria-labelledby="admin-overview-title"
     >

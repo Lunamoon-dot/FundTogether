@@ -18,7 +18,7 @@ export const authSessions = pgTable(
 
 export const authChallenges = pgTable("auth_challenges", {
   nonce: varchar("nonce", { length: 32 }).primaryKey(),
-  // Null denotes legacy wallet login; linking is bound to an app session.
+  // Null denotes an unauthenticated wallet login; linking is bound to an app session.
   sessionHash: varchar("session_hash", { length: 64 }).references(
     () => authSessions.tokenHash,
     { onDelete: "cascade" },

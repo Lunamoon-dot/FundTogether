@@ -19,12 +19,6 @@ import { AuthGuard } from "./auth.guard";
 import { AuthService, SESSION_TTL_MS } from "./auth.service";
 import { readSessionCookie, sessionCookieName } from "./auth-cookie";
 
-const credentialsSchema = z
-  .object({
-    email: z.string().trim().toLowerCase().email().max(254),
-    password: z.string().min(12).max(128),
-  })
-  .strict();
 const verifyBodySchema = z
   .object({
     message: z.string().min(1).max(4096),
@@ -48,37 +42,6 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
   ) {}
-
-  @Post("register")
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  async register(
-    @Body() body: unknown,
-    @Req() request: Request,
-    @Res({ passthrough: true }) response: Response,
-  ) {
-    const input = this.parse(credentialsSchema, body);
-    return this.establishSession(
-      await this.authService.register(input.email, input.password),
-      request,
-      response,
-    );
-  }
-
-  @Post("login")
-  @HttpCode(200)
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  async login(
-    @Body() body: unknown,
-    @Req() request: Request,
-    @Res({ passthrough: true }) response: Response,
-  ) {
-    const input = this.parse(credentialsSchema, body);
-    return this.establishSession(
-      await this.authService.login(input.email, input.password),
-      request,
-      response,
-    );
-  }
 
   @Get("nonce")
   @Header("Cache-Control", "no-store")
@@ -171,7 +134,7 @@ export class AuthController {
   }
 
   private async establishSession(
-    session: Awaited<ReturnType<AuthService["login"]>>,
+    session: Awaited<ReturnType<AuthService["verifySiwe"]>>,
     request: Request,
     response: Response,
   ) {

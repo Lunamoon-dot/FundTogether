@@ -3,6 +3,7 @@ import { CommunityReviewPage, Feed } from '../campaigns/public/Feed';
 import { AppShell, type PublicAreaProps } from './AppShell';
 import { resolveCampaignDetailRoute } from './campaignRoutes';
 import './PublicArea.css';
+import { VNextProtocolPage } from '../campaigns/vnext/VNextProtocolPage';
 
 const AccountAccess = lazy(() => import('../auth/AccountAccess').then(module => ({ default: module.AccountAccess })));
 const PublicCampaignPage = lazy(() => import('../campaigns/public/CampaignPage').then(module => ({ default: module.PublicCampaignPage })));
@@ -14,6 +15,7 @@ const Studio = lazy(() => import('../campaigns/creator/Studio').then(module => (
 const Profile = lazy(() => import('../campaigns/creator/Profile').then(module => ({ default: module.Profile })));
 const HistoricalEntitlements = lazy(() => import('../campaigns/historical/HistoricalEntitlements').then(module => ({ default: module.HistoricalEntitlements })));
 const ResolverConsole = lazy(() => import('../campaigns/resolver/Console').then(module => ({ default: module.Console })));
+const JudgeConsole = lazy(() => import('../campaigns/judge/JudgeConsole').then(module => ({ default: module.JudgeConsole })));
 const AdminConsole = lazy(() => import('../campaigns/admin/AdminConsole').then(module => ({ default: module.AdminConsole })));
 
 export type { PublicAreaProps };
@@ -36,8 +38,11 @@ export function PublicArea(props: PublicAreaProps) {
   const isCampaignCreatorProfile = path === '/campaigns/creator/profile';
   const isCampaignCreator = isCampaignCreatorStudio || isCampaignCreatorDraft || isCampaignCreatorProfile;
   const isCampaignLibrary = path === '/campaigns/library';
-  const isAdmin = path === '/admin' || path === '/campaigns/admin';
+  const isAdmin = path === '/admin' || path.startsWith('/admin?') || path === '/campaigns/admin';
   const isCampaignResolver = path === '/campaigns/resolver';
+  const isCampaignJudge = path === '/campaigns/judge';
+  const isVNext = path === '/campaigns/vnext' || path.startsWith('/campaigns/vnext/');
+  const vnextCampaignId = path.startsWith('/campaigns/vnext/') ? path.slice('/campaigns/vnext/'.length) : undefined;
   const campaignDetail = resolveCampaignDetailRoute(path);
   const history = path === '/campaigns/history';
   const historicalEntitlements = path === '/campaigns/history/entitlements';
@@ -54,6 +59,7 @@ export function PublicArea(props: PublicAreaProps) {
         <Feed key={history ? 'funded' : 'feed'} initialFilter={history ? 'funded' : 'all'} />
       )}
       {isCampaignCommunityReview && <CommunityReviewPage />}
+      {isVNext && <VNextProtocolPage campaignId={vnextCampaignId || undefined} />}
       {campaignDetail && (
         campaignDetail.legacy ? (
           <LegacyCampaignRedirect href={campaignDetail.canonicalHref} />
@@ -82,6 +88,7 @@ export function PublicArea(props: PublicAreaProps) {
               id={campaignDetail.campaignId}
               session={session}
               initialTab={campaignDetail.initialTab}
+              focus={campaignDetail.focus}
             />
           ) : !session ? (
             <p>Đăng nhập để mở Resolver workspace. <a href="#/account">Đăng nhập</a></p>
@@ -115,7 +122,15 @@ export function PublicArea(props: PublicAreaProps) {
           <p>Đăng nhập để xem bộ sưu tập của bạn.</p>
         )
       )}
-      {isAdmin && session && hasAdminRole && <AdminConsole key={session.userId} userId={session.userId} />}
+      {isAdmin && session && hasAdminRole && (
+        <AdminConsole
+          key={session.userId}
+          userId={session.userId}
+          focus={path === '/admin?focus=studio' || path === '/admin?focus=projection' || path === '/admin?focus=indexer'
+            ? path.slice('/admin?focus='.length) as 'studio' | 'projection' | 'indexer'
+            : undefined}
+        />
+      )}
       {isAdmin && !session && (
         <p>
           Đăng nhập để vào trang quản trị. <a href="#/account">Đăng nhập</a>
@@ -139,6 +154,8 @@ export function PublicArea(props: PublicAreaProps) {
           Tài khoản cần có quyền RESOLVER để truy cập trang này.
         </p>
       )}
+      {isCampaignJudge && session && <JudgeConsole key={session.userId} userId={session.userId} />}
+      {isCampaignJudge && !session && <p>Đăng nhập để xem các Judge case được giao. <a href="#/account">Đăng nhập</a></p>}
       {isCampaignCreator && !session && (
         <p>
           Đăng nhập để mở Creator Studio. <a href="#/account">Đăng nhập</a>
@@ -171,6 +188,8 @@ export function PublicArea(props: PublicAreaProps) {
         !isCampaignLibrary &&
         !isAdmin &&
         !isCampaignResolver &&
+        !isCampaignJudge &&
+        !isVNext &&
         !account && (
           <section className="panel public-empty">
             <h1>Không tìm thấy trang</h1>

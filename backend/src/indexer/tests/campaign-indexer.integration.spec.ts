@@ -56,11 +56,12 @@ describe("Campaign canonical ledger on isolated PostgreSQL and real local Anvil"
     const campaignArtifact = JSON.parse(readFileSync(resolve(root, "contracts/out/FundTogetherCampaign.sol/FundTogetherCampaign.json"), "utf8"));
     const tokenReceipt = await client.waitForTransactionReceipt({ hash: await wallet(accounts[0]).deployContract({ abi: token.abi, bytecode: token.bytecode.object }) });
     expect(tokenReceipt.status).toBe("success"); tokenAddress = tokenReceipt.contractAddress!;
-    const deployment = await client.waitForTransactionReceipt({ hash: await wallet(accounts[0]).deployContract({ abi: campaignArtifact.abi, bytecode: campaignArtifact.bytecode.object, args: [tokenAddress, accounts[1], accounts[2]] }) });
+    const judges = accounts.slice(6, 10);
+    const deployment = await client.waitForTransactionReceipt({ hash: await wallet(accounts[0]).deployContract({ abi: campaignArtifact.abi, bytecode: campaignArtifact.bytecode.object, args: [tokenAddress, accounts[1], accounts[2], judges] }) });
     expect(deployment.status).toBe("success"); address = deployment.contractAddress!;
-    connection = { client: client as PublicClient, manifest: parseDeploymentManifest({ protocolKind: "CAMPAIGNS", chainId: 31339, rpcUrl: "http://127.0.0.1:9548", abiVersion: "campaigns-local-v6",
+    connection = { client: client as PublicClient, manifest: parseDeploymentManifest({ protocolKind: "CAMPAIGNS", chainId: 31339, rpcUrl: "http://127.0.0.1:9548", abiVersion: "campaigns-local-judge-v1",
       abiHash: campaignAbiHash, policyHash: campaignPolicyHash, tokenDecimals: 6, confirmations: 1, contractAddress: address, tokenAddress,
-      resolver: accounts[1], backupResolver: accounts[2], genesisHash: (await client.getBlock({ blockNumber: 0n })).hash,
+      resolver: accounts[1], backupResolver: accounts[2], judges, genesisHash: (await client.getBlock({ blockNumber: 0n })).hash,
       contractCodeHash: keccak256((await client.getCode({ address }))!), tokenCodeHash: keccak256((await client.getCode({ address: tokenAddress }))!),
       deploymentBlockNumber: deployment.blockNumber.toString(), deploymentBlockHash: deployment.blockHash,
     }) };
@@ -81,10 +82,13 @@ describe("Campaign canonical ledger on isolated PostgreSQL and real local Anvil"
     };
     const commitment = campaignCommitment(snapshot);
     const [campaignRecord] = await db.insert(schema.campaigns).values({ creatorUserId: owner.id, title: config.title, pitch: config.pitch, story: config.story, category: config.category,
-      goal: config.goal, fundingDuration: config.fundingDuration, draftConfig: config, frozenSnapshot: snapshot, commitmentHash: commitment, status: "APPROVED", frozenAt: new Date(), payoutWalletLinkId: link.id }).returning();
+      goal: config.goal, fundingDuration: config.fundingDuration, draftConfig: config, frozenSnapshot: snapshot, commitmentHash: commitment, status: "UNDER_REVIEW_PRIVATE", frozenAt: new Date(), payoutWalletLinkId: link.id }).returning();
     campaignId = campaignRecord.id;
-    await db.insert(schema.campaignReviews).values({ campaignId, resolverUserId: reviewer.id, outcome: "APPROVED", decisionReason: "Reviewed samples and frozen terms", commitmentHash: commitment, frozenSnapshot: snapshot });
-    await send(accounts[1], "approveCampaign", [accounts[3], commitment, 20000000n, 10000000n, 86400n]);
+    await send(accounts[3], "createPublicationCase", [commitment, 20000000n, 10000000n, 86400n]);
+    const firstJudge = await client.readContract({ address, abi: campaignAbi, functionName: "publicationJudge", args: [0n, 0] });
+    const secondJudge = await client.readContract({ address, abi: campaignAbi, functionName: "publicationJudge", args: [0n, 1] });
+    await send(firstJudge, "votePublicationCase", [0n, true]);
+    await send(secondJudge, "votePublicationCase", [0n, true]);
     await send(accounts[3], "createCampaign", [commitment, 20000000n, 10000000n, 86400n]);
     await send(accounts[0], "mint", [accounts[4], 100000000n], tokenAddress, token.abi);
     await send(accounts[4], "approve", [address, 100000000n], tokenAddress, token.abi);

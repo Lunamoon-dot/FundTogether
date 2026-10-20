@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { formatUnits } from 'viem';
-import { getCreatorProfile, listCreatorCampaigns } from '../api/campaigns';
+import { listCreatorCampaigns } from '../api/campaigns';
 import { NewPreparationPanel } from './NewPreparationForm';
 import { PreparationPanel } from './PreparationForm';
 import { CreatorPipeline } from '../shared/ui/CreatorPipeline';
@@ -13,17 +13,13 @@ import type { Campaign } from '../api/campaigns';
 import { getErrorMessage } from '../../../lib/api/error';
 import { campaignApi } from '../api/campaigns';
 import { campaignDetailHref } from '../../explore/campaignRoutes';
+import { JudgePublicationPanel } from '../judge/JudgePublicationPanel';
 import '../shared/styles.css';
 
 export function Studio({ userId, path }: { userId: string; path?: string }) {
   const tab: 'studio' | 'draft' = path === '/campaigns/creator/draft' || path === '/campaigns/creator/new'
     ? 'draft'
     : 'studio';
-
-  const { data: profile, isPending: profilePending } = useQuery({
-    queryKey: ['my-campaign-creator-profile', userId],
-    queryFn: ({ signal }) => getCreatorProfile(signal),
-  });
 
   const { data: campaignData, isPending, error, refetch } = useQuery({
     queryKey: ['my-campaign-campaigns', userId],
@@ -63,47 +59,11 @@ export function Studio({ userId, path }: { userId: string; path?: string }) {
       <h1 className="public-sr-only">Xưởng ấn phẩm</h1>
 
 
-      {tab === 'studio' && !profilePending && profile?.status !== 'VERIFIED' && (
-        <section className="panel studio-onboarding-panel">
-          <h2>{profile ? 'Hoàn thiện Hồ sơ Studio' : 'Khởi tạo Hồ sơ Studio'}</h2>
-          <p className="muted">Bạn cần được Admin xác minh danh tính xuất bản và cam kết bản quyền IP trước khi tạo ấn phẩm.</p>
-          <div className="pt-2">
-            <a className="button button--primary studio-cta-btn" href="#/campaigns/creator/profile">
-              <span className="studio-cta-btn__icon" aria-hidden="true">✦</span>
-              <span>{profile ? 'Mở Hồ sơ Studio' : 'Khởi tạo Studio (Create Studio)'}</span>
-              <span className="studio-cta-btn__arrow" aria-hidden="true">→</span>
-            </a>
-          </div>
-        </section>
-      )}
-
       {tab === 'draft' && (
-        profilePending ? (
-          <p role="status" className="muted">Đang kiểm tra Hồ sơ Studio…</p>
-        ) : profile?.status !== 'VERIFIED' ? (
-          <section className="panel" style={{ textAlign: 'center', padding: '36px 20px' }}>
-            <h2 style={{ marginBottom: '8px' }}>Chưa xác minh Hồ sơ Studio / Tác giả</h2>
-            <p className="muted" style={{ maxWidth: '540px', margin: '0 auto 24px auto', lineHeight: '1.6' }}>
-              {profile?.status === 'PENDING'
-                ? 'Hồ sơ Studio của bạn đang chờ Admin thẩm định và phê duyệt (Flow V1). Vui lòng đợi phê duyệt để có thể khởi tạo bản thảo.'
-                : profile?.status === 'REJECTED'
-                ? `Hồ sơ Studio bị từ chối (${profile.rejectionReason || 'Vui lòng kiểm tra lại thông tin'}). Vui lòng cập nhật lại hồ sơ Studio.`
-                : 'Để đảm bảo tính minh bạch và bảo hộ quyền sở hữu trí tuệ, bạn cần tạo Hồ sơ Tác giả & cam kết Bản quyền IP (Bước 0) trước khi có thể khởi tạo bản thảo gọi vốn.'}
-            </p>
-            <div>
-              <a className="button button--primary studio-cta-btn" href="#/campaigns/creator/profile">
-                <span className="studio-cta-btn__icon" aria-hidden="true">✦</span>
-                <span>{profile ? 'Mở Hồ sơ Studio' : 'Khởi tạo Studio (Create Studio)'}</span>
-                <span className="studio-cta-btn__arrow" aria-hidden="true">→</span>
-              </a>
-            </div>
-          </section>
+        newlyCreatedCampaign ? (
+          <PreparationPanel campaign={newlyCreatedCampaign} initialStep={2} onChange={refreshNewlyCreatedCampaign} />
         ) : (
-          newlyCreatedCampaign ? (
-            <PreparationPanel campaign={newlyCreatedCampaign} initialStep={2} onChange={refreshNewlyCreatedCampaign} />
-          ) : (
-            <NewPreparationPanel onCreated={handleNewCampaignCreated} />
-          )
+          <NewPreparationPanel onCreated={handleNewCampaignCreated} />
         )
       )}
 
@@ -158,11 +118,7 @@ export function Studio({ userId, path }: { userId: string; path?: string }) {
               <h2>Dự án của bạn ({campaigns.length})</h2>
               <p className="studio-projects-header__hint">Theo dõi hồ sơ, thẩm định và tiến độ từng ấn phẩm.</p>
             </div>
-            {profile?.status === 'VERIFIED' && (
-              <a href="#/campaigns/creator/draft" className="button button--primary studio-projects-header__cta">
-                Tạo bản thảo mới
-              </a>
-            )}
+            <a href="#/campaigns/creator/draft" className="button button--primary studio-projects-header__cta">Tạo bản thảo mới</a>
           </div>
           {isPending ? (
             <p className="muted">Đang tải danh sách…</p>
@@ -213,13 +169,16 @@ export function Studio({ userId, path }: { userId: string; path?: string }) {
                       {projectedChainState === 0 && <p className="studio-project-card__message muted">Campaign đang gây quỹ trên chain. Hiện chưa có việc nào cần Creator xử lý.</p>}
                       {projectedChainState === 1 && <a className="button button--primary studio-project-card__action" href={campaignDetailHref('creator', c.id, 'production')}>Cập nhật tiến độ sản xuất →</a>}
                       {projectedChainState === null && !activationPending && <p className="studio-project-card__message muted">Standard PDF · Hoàn thiện hồ sơ và gửi thẩm định; bản thảo chưa nhận pledge.</p>}
-                      {projectedChainState === null && c.status === 'UNDER_REVIEW_PRIVATE' && <p className="studio-project-card__message muted">Hồ sơ đang được Resolver kiểm tra riêng; chưa mở community review.</p>}
+                      {projectedChainState === null && c.status === 'UNDER_REVIEW_PRIVATE' && <p className="studio-project-card__message muted">Hồ sơ đang chờ Judge case; chưa mở pledge cho backer.</p>}
                       {operation?.publicationStatus === 'ORPHANED' && <p className="studio-project-card__message muted">Có binding cũ nhưng chưa canonical. Không tạo campaign mới; hãy mở chi tiết để đối chiếu.</p>}
-                      {activationPending && <p className="studio-project-card__message muted">Hồ sơ đã duyệt nhưng chưa có campaign canonical; mở workspace để kiểm tra chữ ký Resolver, sau đó Creator ký tạo campaign trên contract.</p>}
+                      {activationPending && <p className="studio-project-card__message muted">Judge case đã APPROVED nhưng chưa có campaign canonical; Creator có thể ký tạo campaign trên contract.</p>}
                       {activationPending && c.frozenSnapshot && ['COMMUNITY_REVIEW', 'APPROVED', 'PUBLISHED'].includes(c.status) && (
                         <a className="button button--secondary studio-project-card__action" href={c.status === 'COMMUNITY_REVIEW' ? campaignDetailHref('creator', c.id, 'activity') : campaignDetailHref('creator', c.id)}>
                           {c.status === 'COMMUNITY_REVIEW' ? 'Xem góp ý cộng đồng →' : c.status === 'PUBLISHED' ? 'Mở workspace kích hoạt →' : 'Mở chi tiết campaign →'}
                         </a>
+                      )}
+                      {projectedChainState === null && c.frozenSnapshot && ['FROZEN', 'UNDER_REVIEW_PRIVATE', 'COMMUNITY_REVIEW', 'APPROVED'].includes(c.status) && (
+                        <JudgePublicationPanel campaignId={c.id} userId={userId} status={c.status} onRefresh={() => void refetch()} />
                       )}
                     </div>
                   </div>

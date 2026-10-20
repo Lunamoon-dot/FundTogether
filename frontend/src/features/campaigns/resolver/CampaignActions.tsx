@@ -69,6 +69,9 @@ export function ResolverCampaignActions({
     : evidence.find(item => item.evidenceHash === state?.productionHash);
   const pendingProduction = Boolean(state && state.state === CAMPAIGN_CHAIN_STATE.ACTIVE
     && state.productionHash !== `0x${'0'.repeat(64)}` && !state.productionApproved);
+  const waitingForFinalPdf = Boolean(state && state.state === CAMPAIGN_CHAIN_STATE.ACTIVE
+    && state.productionApproved && BigInt(state.releaseDeadline) > 0n
+    && state.pdfHash === `0x${'0'.repeat(64)}`);
 
   async function resolveChallenge(challengeBacker: string, upheld: boolean) {
     if (activeId === null || reason.trim().length < 10) return;
@@ -84,16 +87,11 @@ export function ResolverCampaignActions({
 
   if (!state || activeId === null || chain.status !== 'ON_CHAIN_CONFIRMED') {
     if (section === 'overview' && (chain.status === 'NOT_PUBLISHED' || chain.status === 'ORPHANED')) {
-      if (!connectedResolver) {
-        return <div className="monograph-alert monograph-alert--warning" role="alert">
-          Ví hiện tại không phải Primary hoặc Backup Resolver. Các nút ký đã khóa; hãy chuyển đúng ví rồi kiểm tra lại.
-        </div>;
-      }
       return <ActivationPanel
         mode="resolver"
         terms={terms}
         chain={chain}
-        transaction={transaction.transaction?.action === 'approveCampaign' ? transaction.transaction : null}
+        transaction={null}
         busy={busy}
         onRefresh={onRefresh}
         onActivate={onActivate}
@@ -114,6 +112,7 @@ export function ResolverCampaignActions({
       <span className="monograph-card__kicker">RESOLVER REVIEW · PRODUCTION</span>
       <h2 id="resolver-production-actions-title" className="monograph-card__title">Duyệt bằng chứng sản xuất</h2>
       <p className="monograph-card__desc">Resolver kiểm tra file riêng tư và hash canonical trước khi duyệt hoặc từ chối bước sản xuất/PDF cuối.</p>
+      {waitingForFinalPdf && <div className="monograph-alert monograph-alert--info" role="status"><strong>Đang chờ Creator gửi PDF cuối.</strong> Creator đã chốt hạn phát hành PDF nhưng chưa gửi PDF/hash release, nên hiện chưa có quyết định nào cần Resolver ký.</div>}
       {state.state === CAMPAIGN_CHAIN_STATE.RELEASED && <p className="monograph-alert monograph-alert--info">PDF đã được duyệt. Hãy theo dõi challenge trước khi xử lý hồ sơ hoàn thành.</p>}
       {reviewableEvidence && <article className="border border-[var(--border-hairline)] rounded p-3 space-y-2">
         <strong>{reviewableEvidence.purpose === 'FINAL_PDF' ? 'PDF cuối đang chờ duyệt' : 'Bằng chứng sản xuất đang chờ duyệt'}</strong>
@@ -137,7 +136,7 @@ export function ResolverCampaignActions({
   }
 
   if (section === 'activity') {
-    return <section className="monograph-card space-y-4" aria-labelledby="resolver-challenges-title">
+    return <section id="resolver-focus-disputes" className="monograph-card space-y-4" aria-labelledby="resolver-challenges-title">
       <span className="monograph-card__kicker">RESOLVER REVIEW · CHALLENGES</span>
       <h2 id="resolver-challenges-title" className="monograph-card__title">Tranh chấp &amp; khiếu nại</h2>
       <label className="block text-xs font-mono uppercase tracking-wider text-[var(--ink-lead)]">Lý do quyết định
@@ -159,7 +158,7 @@ export function ResolverCampaignActions({
       mode="resolver"
       terms={terms}
       chain={chain}
-      transaction={transaction.transaction?.action === 'approveCampaign' ? transaction.transaction : null}
+      transaction={null}
       busy={busy}
       onRefresh={onRefresh}
       onActivate={onActivate}

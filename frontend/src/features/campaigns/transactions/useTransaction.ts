@@ -22,7 +22,7 @@ const tokenErrorAbi = (mockUsdcAbiJson as Abi).filter(item => item.type === 'err
 
 const transactionAction = (functionName: string): CampaignTransactionAction => {
   const actions: CampaignTransactionAction[] = [
-    'approveCampaign', 'createCampaign', 'pledge', 'submitProduction', 'submitRelease',
+    'createPublicationCase', 'votePublicationCase', 'expirePublicationCase', 'createCampaign', 'pledge', 'submitProduction', 'submitRelease',
     'reviewProduction', 'confirmCampaignCompletion', 'reviewRelease', 'challengeRelease', 'resolveChallenge',
     'finalizeFunding', 'startRefunds', 'claimRefund', 'requestCompletion', 'approveCompletion', 'rejectCompletion', 'claimSurplus', 'cancelCampaign',
     'requestDisbursement', 'approveDisbursement', 'rejectDisbursement',
@@ -208,11 +208,11 @@ export function useTransaction(onConfirmed: () => void, context: TransactionCont
       if (!links.some(link => link.address.toLowerCase() === actor.toLowerCase())) throw new Error('Ví đang kết nối chưa được liên kết bằng chữ ký với tài khoản này.');
       if (options.expectedWallet && options.expectedWallet.toLowerCase() !== actor.toLowerCase()) throw new Error('Hãy chọn đúng ví có thẩm quyền cho thao tác này.');
       const [chainId, genesis, code] = await Promise.all([client.getChainId(), client.getBlock({ blockNumber: 0n }), client.getCode({ address: deployment.contractAddress })]);
-      if (deployment.protocolKind !== 'CAMPAIGNS' || deployment.chainId !== 31339 || chainId !== 31339 || deployment.abiVersion !== 'campaigns-local-v6' ||
+      if (deployment.protocolKind !== 'CAMPAIGNS' || deployment.chainId !== 31339 || chainId !== 31339 || deployment.abiVersion !== 'campaigns-local-judge-v1' ||
         deployment.abiHash !== keccak256(toHex(JSON.stringify(campaignAbiJson, null, 2) + '\n')) || genesis.hash !== deployment.genesisHash || !code || keccak256(code) !== deployment.contractCodeHash)
         throw new Error('Deployment hiện tại không khớp mạng, ABI hoặc bytecode đã kiểm tra.');
-      if (functionName === 'approveCampaign' || functionName === 'createCampaign') {
-        const creatorWallet = functionName === 'approveCampaign' ? String(args[0] ?? '') : actor;
+      if (functionName === 'createCampaign') {
+        const creatorWallet = actor;
         const resolverWallets = [deployment.resolver, deployment.backupResolver].map(address => address.toLowerCase());
         if (resolverWallets.includes(creatorWallet.toLowerCase())) {
           throw new Error('Ví Creator không được trùng ví Resolver của deployment hiện tại.');

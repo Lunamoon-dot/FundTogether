@@ -7,6 +7,7 @@ const { pathToFileURL } = require('node:url');
 const { Client } = require('pg');
 const { eq } = require('drizzle-orm');
 const { createPublicClient, createWalletClient, defineChain, http, keccak256 } = require('viem');
+const { SiweMessage } = require('siwe');
 const { PDFDocument } = require('pdf-lib');
 const root = path.resolve(__dirname, '../../..');
 const { migrateCampaignDatabase } = require('./migrate-isolated.cjs');
@@ -34,11 +35,12 @@ async function runBrowserScenario() {
   const contract = JSON.parse(fs.readFileSync(path.join(root, 'contracts/out/FundTogetherCampaign.sol/FundTogetherCampaign.json')));
   const tokenReceipt = await client.waitForTransactionReceipt({ hash: await wallet(accounts[0]).deployContract({ abi: token.abi, bytecode: token.bytecode.object }) });
   const tokenAddress = tokenReceipt.contractAddress;
-  const receipt = await client.waitForTransactionReceipt({ hash: await wallet(accounts[0]).deployContract({ abi: contract.abi, bytecode: contract.bytecode.object, args: [tokenAddress, accounts[1], accounts[2]] }) });
+  const judges = accounts.slice(6, 10);
+  const receipt = await client.waitForTransactionReceipt({ hash: await wallet(accounts[0]).deployContract({ abi: contract.abi, bytecode: contract.bytecode.object, args: [tokenAddress, accounts[1], accounts[2], judges] }) });
   const address = receipt.contractAddress;
   const { campaignAbiHash, campaignPolicyHash, parseDeploymentManifest } = require('../../dist/src/blockchain/deployment');
-  const manifest = parseDeploymentManifest({ protocolKind: 'CAMPAIGNS', chainId: 31339, rpcUrl: 'http://127.0.0.1:9548', abiVersion: 'campaigns-local-v6', abiHash: campaignAbiHash, policyHash: campaignPolicyHash,
-    tokenDecimals: 6, confirmations: 1, contractAddress: address, tokenAddress, resolver: accounts[1], backupResolver: accounts[2], genesisHash: (await client.getBlock({ blockNumber: 0n })).hash,
+  const manifest = parseDeploymentManifest({ protocolKind: 'CAMPAIGNS', chainId: 31339, rpcUrl: 'http://127.0.0.1:9548', abiVersion: 'campaigns-local-judge-v1', abiHash: campaignAbiHash, policyHash: campaignPolicyHash,
+    tokenDecimals: 6, confirmations: 1, contractAddress: address, tokenAddress, resolver: accounts[1], backupResolver: accounts[2], judges, genesisHash: (await client.getBlock({ blockNumber: 0n })).hash,
     contractCodeHash: keccak256(await client.getCode({ address })), tokenCodeHash: keccak256(await client.getCode({ address: tokenAddress })), deploymentBlockNumber: String(receipt.blockNumber), deploymentBlockHash: receipt.blockHash });
   const manifestPath = path.join(output, 'deployment.json'); fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
   Object.assign(process.env, env, { DATABASE_URL: database.toString(), WEB_ORIGIN: webOrigin, AUTH_DOMAIN: '127.0.0.1:5186', AUTH_CHAIN_ID: '31339',
@@ -51,10 +53,7 @@ async function runBrowserScenario() {
   db = app.get(require('../../dist/src/database/database.constants').DRIZZLE_DB);
   const schema = require('../../dist/src/database/schema');
   storage = app.get(require('../../dist/src/modules/evidence/evidence-storage.service').EvidenceStorageService);
-  const password = 'local-browser-fixture-password';
-  const passwordHash = await require('argon2').hash(password);
-  const actors = await db.insert(schema.users).values(['creator', 'resolver', 'backer', 'backer2', 'community'].map(name => ({ email: `${name}@browser.test`, passwordHash }))).returning();
-  await db.insert(schema.platformRoles).values({ userId: actors[1].id, roles: ['RESOLVER'] });
+  const actors = ['creator', 'resolver', 'backer', 'backer2', 'community'].map(name => ({ name, email: `${name}@browser.test` }));
   process.env.VITE_FUNDTOGETHER_API_URL = apiUrl;
   const viteModule = await import(pathToFileURL(require.resolve('vite', { paths: [path.join(root, 'frontend')] })).href);
   vite = await viteModule.createServer({ root: path.join(root, 'frontend'), mode: 'fundtogether', server: { host: '127.0.0.1', port: 5186, strictPort: true }, logLevel: 'error' }); await vite.listen();
@@ -63,8 +62,8 @@ async function runBrowserScenario() {
   const pages = [];
   for (const [index, actor] of actors.entries()) {
     const context = await browser.newContext({ viewport: { width: 1365, height: 900 } });
+    const account = accounts[index === 0 ? 3 : index === 1 ? 1 : index === 2 ? 4 : index === 3 ? 5 : 6];
     if (index < 4) {
-      const account = accounts[index === 0 ? 3 : index === 1 ? 1 : index === 2 ? 4 : 5];
       await context.addInitScript(({ account }) => {
         const handlers = new Map();
         const provider = { isMetaMask: true,
@@ -82,14 +81,31 @@ async function runBrowserScenario() {
         window.addEventListener('eip6963:requestProvider', announce); announce();
       }, { account });
     }
-    const login = await context.request.post(`${apiUrl}/auth/login`, { headers: { Origin: webOrigin }, data: { email: actor.email, password } }); assert.equal(login.status(), 200, await login.text());
+    const challengeResponse = await context.request.get(`${apiUrl}/auth/nonce`, { headers: { Origin: webOrigin } });
+    assert.equal(challengeResponse.status(), 200, await challengeResponse.text());
+    const challenge = await challengeResponse.json();
+    const message = new SiweMessage({
+      domain: challenge.domain,
+      address: account,
+      statement: 'Sign in to FundTogether.',
+      uri: challenge.uri,
+      version: '1',
+      chainId: challenge.chainId,
+      nonce: challenge.nonce,
+    }).prepareMessage();
+    const signature = await wallet(account).signMessage({ message });
+    const login = await context.request.post(`${apiUrl}/auth/verify`, { headers: { Origin: webOrigin }, data: { message, signature } });
+    assert.equal(login.status(), 200, await login.text());
+    const sessionResponse = await context.request.get(`${apiUrl}/auth/session`, { headers: { Origin: webOrigin } });
+    assert.equal(sessionResponse.status(), 200, await sessionResponse.text());
+    actor.id = (await sessionResponse.json()).userId;
+    if (index === 1) await db.insert(schema.platformRoles).values({ userId: actor.id, roles: ['RESOLVER'] });
     const page = await context.newPage(); page.setDefaultTimeout(20000); pages.push(page);
     await page.goto(`${webOrigin}/#/account`);
     await page.getByRole('button', { name: /Đăng xuất/ }).waitFor();
     if (index < 4) {
       await page.getByRole('button', { name: /Connect Wallet|Kết nối ví/ }).click();
       await page.getByRole('button', { name: /Campaign Test Wallet/ }).click();
-      await page.getByRole('button', { name: /Liên kết ví/ }).click();
       await page.getByRole('heading', { name: /Ví đã liên kết với tài khoản/ }).waitFor();
     }
   }

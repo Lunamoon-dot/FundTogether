@@ -1,4 +1,57 @@
 # FundTogether — Product & Website Surface Map
+
+> **Pre-reset UX snapshot:** This inventory describes the Resolver/Admin
+> product surface before the 2026-10-20 protocol reset. The current target
+> replaces those decision surfaces with Creator, Backer and Judge court flows;
+> see [the target workflows](docs/campaigns/WORKFLOWS_V2_DECENTRALIZED.md) and
+> [the VNext protocol specification](docs/protocol/FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_V1.md).
+> Existing UI claims below are not evidence that the new protocol is implemented.
+
+## VNext implementation boundary — 2026-10-20
+
+The current code contains a partial VNext contract core and indexed read-only
+surface. The implemented protocol path is now:
+
+```text
+Creator draft → freeze commitment → create Judge case
+  → three randomly assigned Judges → 2-of-3 quorum
+  → Creator createCampaign → FUNDING
+```
+
+Creator/Studio metadata is optional and Admin has no approval mutation.
+Pre-publication Resolver review and fixed `approveCampaign` signing are removed.
+The VNext contract slice also contains milestone evidence, bounded correction,
+appeal/retry, challenge, payout and refund hooks, while backend projections and
+the read-only VNext page expose canonical state. Creator/Backer/Judge wallet
+transactions, full evidence availability handling and fresh runtime E2E remain
+deferred. Any Resolver behavior still present after publication is transitional
+implementation residue, not target authority. The older inventory below is
+retained as a historical UX handoff and must not be used as current acceptance
+criteria.
+
+## Current target surface map
+
+The current target replaces centralized decision screens with protocol-facing
+surfaces:
+
+| Surface | Target responsibility |
+| --- | --- |
+| Creator workspace | Create proposal, freeze terms, submit milestone evidence and follow canonical case/payout state |
+| Backer campaign detail | Inspect terms, pledge into escrow, observe milestones, challenge where eligible and claim own refund |
+| Judge workspace | Inspect assigned dossier, lock stake, cast one vote and follow canonical quorum/result |
+| Admin operations | Read-only infrastructure, indexer and projection health; no review or fund authority |
+| Public campaign | Show the frozen commitment, court result, escrow state, milestone progress and refund boundary |
+
+The target workflow is permissionless and contract-led. A submitted vote is not
+PASS until the canonical court result is resolved; a funding goal is not payout;
+and a database status is never a financial authority.
+
+Current product source documents: [scope V2](docs/campaigns/SCOPE_V2_DECENTRALIZED.md),
+[workflows V2](docs/campaigns/WORKFLOWS_V2_DECENTRALIZED.md) and
+[financial policy V2](docs/campaigns/FINANCIAL_POLICY_V2_DECENTRALIZED.md),
+with detailed court and accounting rules in
+[Protocol Specification V1](docs/protocol/FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_V1.md).
+
 > **Tài liệu:** Product inventory, UX handoff và scope contract
 > **Cập nhật:** 2026-10-16
 > **Phạm vi:** Campaign `COMICS_ARTBOOK` · một `DIGITAL_DOWNLOAD` PDF · MockUSDC local
@@ -1060,7 +1113,7 @@ creator/IP và theo dõi vận hành; không approve release, payout, refund ho�
 
 | Capability | Chi tiết phải có | Authority |
 | --- | --- | --- |
-| Auth/session | Email/password, SIWE, refresh, return-to-origin | Backend + signature verification |
+| Auth/session | Wallet-only SIWE, one-time nonce, opaque session cookie, return-to-origin | Backend + signature verification |
 | Wallet linking | Link/unlink, chain check, Resolver guard, recovery | Backend + wallet signature |
 | Creator profile | Bio, IP declaration, status, rejection reason | Admin review |
 | Draft/review | Typed config, revision, save, freeze, submit, correction | Backend + Resolver |

@@ -43,10 +43,14 @@ function generateCampaign(root = path.resolve(__dirname, '../../..')) {
     'requestDisbursement(uint256,bytes32,uint256)', 'approveDisbursement(uint256,bytes32,bytes32)', 'rejectDisbursement(uint256,bytes32,bytes32)',
     'rejectCompletion(uint256,bytes32,bytes32)', 'claimSurplus(uint256,uint8)', 'claimableSurplus(uint256,address)',
     'claimRefund(uint256)', 'startRefunds(uint256)',
-    'approveCampaign(address,bytes32,uint256,uint256,uint256)', 'createCampaign(bytes32,uint256,uint256,uint256)',
+    'createPublicationCase(bytes32,uint256,uint256,uint256)', 'votePublicationCase(uint256,bool)',
+    'expirePublicationCase(uint256)', 'publicationCase(uint256)', 'publicationCaseId(bytes32)',
+    'publicationJudge(uint256,uint8)', 'judgePoolLength()', 'judgePoolAt(uint256)', 'isEligibleJudge(address)',
+    'createCampaign(bytes32,uint256,uint256,uint256)',
     'reviewProduction(uint256,bytes32,bool)', 'confirmCampaignCompletion(uint256,uint256)', 'reviewRelease(uint256,bytes32,bytes32,bool)', 'resolveChallenge(uint256,address,bool,bytes32)']) {
     if (!signatures.includes(signature)) throw new Error(`Campaign ABI mismatch: ${signature}`);
   }
+  if (signatures.includes('approveCampaign(address,bytes32,uint256,uint256,uint256)')) throw new Error('Campaign ABI still exposes fixed Resolver publication approval');
   if (signatures.includes('payout(uint256)')) throw new Error('Campaign ABI still exposes permissionless payout');
   if (signatures.some(signature => /shipping|fulfillment|tier\(/i.test(signature))) throw new Error('Unsupported flow in Campaign ABI');
   const runtimeBytes = (artifact.deployedBytecode.object.length - 2) / 2;
@@ -56,7 +60,7 @@ function generateCampaign(root = path.resolve(__dirname, '../../..')) {
   for (const signature of ['requestPayout(uint256,bytes32,uint256)', 'approvePayout(uint256,bytes32,bytes32)', 'rejectPayout(uint256,bytes32,bytes32)']) {
     if (signatures.includes(signature)) throw new Error(`Campaign ABI still exposes retired payout function: ${signature}`);
   }
-  return { artifact, tokenArtifact, runtimeBytes, abiHash: hashJson(artifact.abi), policyHash: keccak256(toHex('campaigns-local-escrow-v6')) };
+  return { artifact, tokenArtifact, runtimeBytes, abiHash: hashJson(artifact.abi), policyHash: keccak256(toHex('campaigns-local-escrow-v7')) };
 }
 
 if (require.main === module) {

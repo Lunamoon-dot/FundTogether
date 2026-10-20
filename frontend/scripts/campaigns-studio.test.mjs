@@ -13,7 +13,6 @@ const { Studio } = await server.ssrLoadModule('/src/features/campaigns/creator/S
 const { Profile } = await server.ssrLoadModule('/src/features/campaigns/creator/Profile.tsx')
 const { PreparationPanel } = await server.ssrLoadModule('/src/features/campaigns/creator/PreparationForm.tsx')
 const { NewPreparationPanel } = await server.ssrLoadModule('/src/features/campaigns/creator/NewPreparationForm.tsx')
-const { ResolverReview } = await server.ssrLoadModule('/src/features/campaigns/resolver/ReviewPanel.tsx')
 const { CreatorPipeline } = await server.ssrLoadModule('/src/features/campaigns/shared/ui/CreatorPipeline.tsx')
 const { isCreatorActionable } = await server.ssrLoadModule('/src/features/campaigns/shared/ui/creatorTaskUtils.ts')
 const { CreatorTaskCard } = await server.ssrLoadModule('/src/features/campaigns/shared/ui/CreatorTaskCard.tsx')
@@ -76,8 +75,8 @@ function renderResolver(campaigns = [], disputes = [], cases = [], operations = 
 
 test('Resolver console uses compact, role-aware empty states', () => {
   const html = renderResolver()
-  assert.match(html, /Chiến dịch cần xử lý <span[^>]*>0<\/span>/)
-  assert.match(html, /Không có chiến dịch nào cần thẩm định lúc này\./)
+  assert.match(html, /Campaign cần xử lý <span[^>]*>0<\/span>/)
+  assert.match(html, /Không có campaign on-chain nào cần xử lý lúc này\./)
   assert.doesNotMatch(html, /Khiếu nại cần phân xử/)
   assert.doesNotMatch(html, /Flow V2 – V4/)
   assert.doesNotMatch(html, /tài khoản hiện tại không có quyền RESOLVER/)
@@ -95,7 +94,7 @@ test('Resolver console shows canonical on-chain campaigns when the review list i
     snapshot: null,
     bindingTransactionHash: null,
   }])
-  assert.match(html, /Campaign on-chain cần xử lý/)
+  assert.match(html, /Campaign cần xử lý/)
   assert.match(html, /nuôi Huy/)
   assert.match(html, /Mở workspace on-chain/)
   assert.match(html, /href="#\/campaigns\/resolver\/campaign-1"/)
@@ -121,20 +120,10 @@ test('Resolver console contains only the active Campaign review flow', async () 
   assert.doesNotMatch(source, /cọc in|nhà in|vận chuyển|giao hàng/i)
 })
 
-test('Resolver console makes the decision panel primary and community feedback secondary', () => {
-  const campaign = { ...reviewCampaign('COMMUNITY_REVIEW'), category: 'COMICS_ARTBOOK' }
-  const html = renderResolver([campaign])
-  assert.match(html, /Quyết định Resolver/)
-  assert.match(html, /Phản hồi cộng đồng/)
-  assert.match(html, /resolver-community-details/)
-  assert.ok(html.indexOf('Quyết định Resolver') < html.indexOf('Phản hồi cộng đồng'))
-})
-
-test('approved Campaign expose the on-chain action directly in the Resolver queue', () => {
-  const campaign = { ...reviewCampaign('APPROVED'), category: 'COMICS_ARTBOOK' }
-  const html = renderResolver([campaign])
-  assert.match(html, /Mở trang xử lý on-chain →/)
-  assert.match(html, /href="#\/campaigns\/resolver\/campaign"/)
+test('Resolver console does not expose a fixed publication decision panel', () => {
+  const html = renderResolver([{ ...reviewCampaign('COMMUNITY_REVIEW'), category: 'COMICS_ARTBOOK' }])
+  assert.doesNotMatch(html, /Quyết định Resolver|Mở community review|Duyệt hồ sơ PDF/)
+  assert.match(html, /Creator publication được quyết định trong Judge cases/)
 })
 
 test('published but unbound Campaign exposes activation workspace from Creator Studio', () => {
@@ -143,7 +132,7 @@ test('published but unbound Campaign exposes activation workspace from Creator S
     campaignId: 'campaign', publicationStatus: 'NOT_PUBLISHED', contractState: null,
   }])
   assert.match(html, /chưa có campaign canonical/)
-  assert.match(html, /Creator ký tạo campaign trên contract/)
+  assert.match(html, /Judge case đã APPROVED/)
   assert.match(html, /href="#\/campaigns\/creator\/campaign"/)
 })
 
@@ -159,15 +148,6 @@ test('published but unbound Campaign appears as a Creator activation task', () =
   assert.doesNotMatch(html, /href="#\/campaigns\/creator\?edit=campaign"/)
   assert.doesNotMatch(html, />PUBLISHED</)
   assert.match(html, /Được duyệt: 1/)
-})
-
-test('published but unbound Campaign is actionable from the Resolver queue', () => {
-  const campaign = { ...reviewCampaign('PUBLISHED'), category: 'COMICS_ARTBOOK' }
-  const html = renderResolver([campaign], [], [], [{
-    campaignId: 'campaign', publicationStatus: 'NOT_PUBLISHED', contractState: null,
-  }])
-  assert.match(html, /Mở trang xử lý on-chain →/)
-  assert.match(html, /href="#\/campaigns\/resolver\/campaign"/)
 })
 
 test('funded production task opens the campaign production workspace', () => {
@@ -269,12 +249,12 @@ test('saving a new draft keeps the creator in the step-three editor', async () =
   assert.doesNotMatch(source, /window\.location\.hash = '#\/campaigns\/creator'/)
 })
 
-test('creator publication waits for the Resolver approval that exists on chain', async () => {
+test('creator publication waits for the randomized Judge quorum that exists on chain', async () => {
   const source = await readFile(new URL('../src/features/campaigns/creator/CampaignWorkspacePage.tsx', import.meta.url), 'utf8')
   const activation = await readFile(new URL('../src/features/campaigns/shared/ui/ActivationPanel.tsx', import.meta.url), 'utf8')
   assert.match(source, /onchainApproved/)
-  assert.match(source, /Primary Resolver chưa ký đúng commitment trên chain/)
-  assert.match(activation, /Ký duyệt đúng commitment trên chain/)
+  assert.match(source, /Judge case chưa đạt quorum APPROVED trên chain/)
+  assert.match(activation, /Judge case chưa đạt APPROVED/)
 })
 
 test('new Campaign wizard offers one PDF without a physical, inventory or add-tier input', () => {
@@ -382,22 +362,6 @@ function reviewCampaign(status = 'COMMUNITY_REVIEW') {
     samples: [{ id: 'sample', mediaType: 'image/png', sizeBytes: 100, sha256: `0x${'2'.repeat(64)}` }],
   } }
 }
-
-test('Resolver sees the frozen evidence/terms and must enter a decision reason', () => {
-  const html = renderToStaticMarkup(createElement(ResolverReview, { campaign: reviewCampaign(), onChange() {} }))
-  for (const term of ['Twelve chapters', 'Art and editing work', 'Page proofs', 'A 120-page illustrated comic.', 'I hold publication rights.', '10.000001', '9007199254.740993']) assert.ok(html.includes(term))
-  assert.match(html, /<textarea/)
-  assert.match(html, /disabled=""[^>]*>Duyệt hồ sơ PDF/)
-  assert.doesNotMatch(html, /approveAndDisburse|activateCampaign|Giải ngân|Giao nhận/)
-})
-
-test('reviewed or rejected Campaign have no second decision action', () => {
-  for (const status of ['APPROVED', 'STOPPED']) {
-    const html = renderToStaticMarkup(createElement(ResolverReview, { campaign: reviewCampaign(status), onChange() {} }))
-    assert.doesNotMatch(html, /<textarea|Duyệt hồ sơ PDF|Yêu cầu sửa/)
-    assert.match(html, /chưa cho phép nhận pledge/)
-  }
-})
 
 test('switching creator accounts cannot render the previous account cached draft', () => {
   const html = render([{ id: 'private', category: 'COMICS_ARTBOOK', title: 'CONFIDENTIAL DRAFT FROM OWNER', goal: '10000000', status: 'DRAFT', tiers: [] }], 'stranger')
