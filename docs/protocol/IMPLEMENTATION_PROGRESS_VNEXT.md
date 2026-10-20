@@ -24,9 +24,9 @@
 | J | `CampaignEscrowVNext.sol` | Evidence/revision tests: 4 passed |
 | K | `JuryReview.sol`, `CampaignEscrowVNext.sol` | Appeal/challenge hooks exist; focused review/campaign tests pass |
 | L | `CampaignEscrowVNext.sol` | Payout/refund/challenge tests: 4 passed; conservation/failure-transfer fuzz suite: 3 passed |
-| P | `DeployVNext.s.sol`, `deploy-vnext.cjs`, `verify-vnext-runtime.cjs`, `vnext-deployment.ts` | Foundry script compiles; runtime verifier/policy identity tests: 6 passed; one-time wiring is executable |
-| P0/P1 remediation | `JuryReview.sol`, `JuryRegistry.sol`, `CampaignEscrowVNext.sol` | Retry/settlement/stake/liveness/budget/refund/court-order regressions covered; full Foundry suite: 117 passed |
-| Q/R | `vnext-indexer.service.ts`, `vnext-event-projector.ts`, VNext Drizzle schema | Persistent event/projection/checkpoint transaction; replay/crash/refund/completion tests: 8 passed; real PostgreSQL replay check passed |
+| P | `DeployVNext.s.sol`, `deploy-vnext.cjs`, `verify-vnext-runtime.cjs`, `vnext-deployment.ts` | Foundry script compiles; runtime verifier/policy identity tests: 8 passed; one-time wiring is executable |
+| P0/P1 remediation | `JuryReview.sol`, `JuryRegistry.sol`, `CampaignEscrowVNext.sol` | Retry/settlement/stake/liveness/budget/refund/court-order regressions covered; current full Foundry suite: 128 passed |
+| Q/R | `vnext-indexer.service.ts`, `vnext-event-projector.ts`, VNext Drizzle schema | Persistent event/projection/checkpoint transaction; current post-remediation projector/indexer tests: 10 passed |
 | S/T | `vnext.controller.ts`, `vnext-evidence-integrity.ts` | Read-only projection API, SHA-256 evidence check and focused evidence tests added |
 | U/V/W/X | `VNextProtocolPage.tsx` | Read-only VNext protocol/campaign projection surface added; Creator/Backer/Judge wallet journeys remain incomplete |
 
@@ -85,39 +85,52 @@ The following remain incomplete and must not be inferred from the passing slice:
   commit–reveal and reward claim;
 - fresh local runtime deployment and end-to-end acceptance.
 
-## Verification record
+## Post-PR #10 remediation gate evidence — 2026-10-20
 
-The contract suite currently reports 117 passing tests, including historical
-Resolver contracts and the new VNext focused suites. The historical tests are
-kept for regression visibility and are not counted as proof of pure-decentralized
-financial behavior.
-
-The current VNext tests are:
+This is fresh evidence from the isolated remediation worktree. It covers the
+listed local slices only; it is not a production deployment or a complete
+security audit.
 
 ```text
-test/unit/VNext/StateMachine.t.sol  7 passed
-test/unit/VNext/JuryRegistry.t.sol  6 passed
-test/unit/VNext/JuryReview.t.sol    9 passed
-test/unit/VNext/CampaignCreation.t.sol  3 passed
-test/unit/VNext/FundingEscrow.t.sol 3 passed
-test/unit/VNext/MilestoneEvidence.t.sol 4 passed
-test/unit/VNext/PayoutRefund.t.sol 4 passed
-test/invariant/VNextConservation.t.sol 3 passed (256-case fuzz)
+contracts: forge test
+  128 passed, 0 failed, 0 skipped, 11 suites
 
-Full command: `forge test` → 117 passed, 0 failed, 0 skipped across 11 suites.
-The suite includes historical Resolver tests for regression visibility; the
-VNext evidence is the focused VNext/invariant rows above.
+backend: npm run build
+  exit 0
 
-Backend focused evidence: VNext indexer/projector 8 passed; runtime identity 6
-passed; real PostgreSQL VNext replay check passed; `npm run build` completed.
-Runtime acceptance evidence: `node backend/scripts/campaigns/vnext-acceptance.cjs`
-passed on local Anvil chain `31339` after deploying policy V2. It completed a
-two-Backer milestone payout (campaign `4`), a Creator submission-timeout refund
-(campaign `5`), verified the canonical event set, ended with campaign escrow
-balance `0`, and matched both campaign projections in PostgreSQL.
-Frontend evidence: `npm test` → 199 passed;
-`npm run build` completed with only the existing large-bundle warning.
+backend: npm run test:vnext-runtime
+  8 passed, 0 failed
+
+backend: focused VNext projector/indexer Jest command
+  2 suites passed; 10 tests passed, 0 failed
+
+repository: git diff --check
+  exit 0
 ```
+
+The fresh gate evidence establishes that:
+
+- milestone timeout and evidence submission are guarded by campaign state, the
+  first unpaid milestone and non-zero deadlines; the valid path is tested only
+  after successful funding;
+- `MilestoneConfigured` and `MilestoneStateChanged` carry the canonical
+  milestone projection payload, and persistent/in-memory handlers are
+  idempotent; zero bytes32 values are normalized before nullable projection
+  writes;
+- runtime verification retains deployment identity and `policyHash` checks,
+  then compares the complete frozen campaign/review getter and constant matrix,
+  including `maxEligibleJudges`;
+- event identity remains `(stream_id, transaction_hash, log_index)`, while
+  block identity remains `(stream_id, block_hash, log_index)`; no index redesign
+  was made for the withdrawn `logIndex` false positive;
+- no Resolver, Admin or backend financial/review authority was added by this
+  remediation.
+
+The live Anvil/PostgreSQL acceptance script was not rerun in this isolated
+worktree because its local `.local/fundtogether/backend.env` and running
+services are not present here. Earlier runtime acceptance output must therefore
+not be reused as post-remediation evidence. A production security audit,
+public-chain deployment and real-money acceptance remain out of scope.
 
 Every later gate must update this file with the exact command and result. A
 green test is evidence only for the behavior it covers.

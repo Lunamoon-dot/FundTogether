@@ -134,10 +134,9 @@ git commit -m "fix: project canonical VNext milestone states"
 **Files:**
 - Modify: `backend/src/blockchain/vnext-deployment.ts`
 - Modify: `backend/scripts/campaigns/vnext-runtime-identity.test.cjs`
-- Modify: `backend/scripts/campaigns/vnext-acceptance.cjs`
 - Modify: `docs/protocol/parameters-v2-remediation.md`
 - Test: `backend/scripts/campaigns/vnext-runtime-identity.test.cjs`
-- Regenerate if required: `backend/src/blockchain/generated/vnext/JuryReview.json`
+- Regenerate: `backend/src/blockchain/generated/vnext/CampaignEscrowVNext.json`
 
 **Interfaces:**
 - `verifyVNextDeployment(client, manifest)` reads campaign and review getters/constants and fails closed on any mismatch.
@@ -186,7 +185,7 @@ git commit -m "test: verify complete VNext local policy"
 - Modify: `docs/protocol/IMPLEMENTATION_PROGRESS_VNEXT.md`
 - Modify: `docs/protocol/README.md` if the status table requires the new gate evidence
 
-- [ ] **Step 1: Run contract and focused backend verification**
+- [x] **Step 1: Run contract and focused backend verification**
 
 Run:
 
@@ -201,15 +200,18 @@ npm run test -- --runInBand --testMatch '**/src/**/*.spec.ts' --testPathPatterns
 
 Expected: all Foundry tests pass, runtime identity tests pass, focused indexer tests pass, and no generated artifact or migration check fails.
 
-- [ ] **Step 2: Run static checks and inspect the diff**
+- [x] **Step 2: Run static checks and inspect the diff**
 
 Run `git diff --check`, inspect `git diff origin/main...HEAD`, confirm no Resolver/Admin authority was added, and confirm the unique event indexes are unchanged.
 
-- [ ] **Step 3: Record evidence without overclaiming**
+- [x] **Step 3: Record evidence without overclaiming**
 
 Update implementation progress with exact command results and retain the distinction between local acceptance evidence and production security audit status.
 
-- [ ] **Step 4: Commit documentation**
+- [x] **Step 4: Commit documentation**
+
+`docs/protocol/README.md` required no change because it already links the
+implementation progress record and states the local-evidence boundary.
 
 ```powershell
 git add docs/protocol/IMPLEMENTATION_PROGRESS_VNEXT.md docs/protocol/README.md
