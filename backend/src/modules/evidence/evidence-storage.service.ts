@@ -1,5 +1,5 @@
 import { Injectable, OnModuleDestroy, ServiceUnavailableException } from "@nestjs/common";
-import type { ConfigService } from "@nestjs/config";
+import { ConfigService } from "@nestjs/config";
 import {
   CreateBucketCommand, DeleteObjectCommand, GetBucketPolicyCommand,
   GetObjectCommand, HeadBucketCommand, HeadObjectCommand, PutObjectCommand, S3Client,

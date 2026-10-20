@@ -1,3 +1,6 @@
+import "reflect-metadata";
+import { describe, expect, it } from "@jest/globals";
+import { ConfigService } from "@nestjs/config";
 import { EvidenceStorageService } from "./evidence-storage.service";
 
 function serviceFor(send: (command: { input?: { Key?: string } }) => Promise<unknown>) {
@@ -37,5 +40,11 @@ describe("EvidenceStorageService availability", () => {
       throw Object.assign(new Error("timeout"), { name: "TimeoutError" });
     });
     await expect(service.availability("object-3")).resolves.toBe("UNAVAILABLE");
+  });
+});
+
+describe("EvidenceStorageService runtime injection", () => {
+  it("keeps ConfigService as a runtime constructor dependency", () => {
+    expect(Reflect.getMetadata("design:paramtypes", EvidenceStorageService)).toEqual([ConfigService]);
   });
 });
