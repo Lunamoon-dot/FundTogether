@@ -53,6 +53,7 @@ contract VNextConservationTest is Test {
         _openFunding(campaignId);
         _fund(backerOne, 60e6, campaignId);
         _fund(backerTwo, 40e6, campaignId);
+        vm.warp(block.timestamp + 7 days);
         escrow.finalizeFunding(campaignId);
 
         bytes32 firstCase = _submit(campaignId, 0, "milestone-one");
@@ -132,6 +133,7 @@ contract VNextConservationTest is Test {
         failingToken.approve(address(failingEscrow), 100e6);
         failingEscrow.contribute(campaignId, 100e6);
         vm.stopPrank();
+        vm.warp(block.timestamp + 7 days);
         failingEscrow.finalizeFunding(campaignId);
         vm.prank(creator);
         bytes32 caseId = failingEscrow.submitMilestoneEvidence(campaignId, 0, keccak256("evidence"));

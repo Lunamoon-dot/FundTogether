@@ -33,6 +33,10 @@ contract VNextJuryReviewTest is Test {
     address private judgeFour = makeAddr("vnext-review-judge-four");
     address private judgeFive = makeAddr("vnext-review-judge-five");
     address private judgeSix = makeAddr("vnext-review-judge-six");
+    address private judgeSeven = makeAddr("vnext-review-judge-seven");
+    address private judgeEight = makeAddr("vnext-review-judge-eight");
+    address private judgeNine = makeAddr("vnext-review-judge-nine");
+    mapping(uint256 => mapping(address => uint256)) private mockContributions;
     bytes32 private constant SALT_ONE = keccak256("salt-one");
     bytes32 private constant SALT_TWO = keccak256("salt-two");
     bytes32 private constant SALT_THREE = keccak256("salt-three");
@@ -70,6 +74,10 @@ contract VNextJuryReviewTest is Test {
         review.enroll(caseId);
         vm.prank(judgeThree);
         review.enroll(caseId);
+    }
+
+    function contributionOf(uint256 campaignId, address backer) external view returns (uint256) {
+        return mockContributions[campaignId][backer];
     }
 
     function _depositAndReserve(address judge) private {
@@ -526,5 +534,97 @@ contract VNextJuryReviewTest is Test {
 
         assertTrue(appealCaseId != bytes32(0));
         assertTrue(registry.caseRegistered(appealCaseId));
+    }
+
+    function test_campaignContributorCannotEnroll() public {
+        _depositAndReserve(judgeFour);
+        mockContributions[7][judgeFour] = 1;
+
+        vm.prank(judgeFour);
+        vm.expectRevert(JuryReview.CreatorConflict.selector);
+        review.enroll(caseId);
+    }
+
+    function test_rewardDustIsAllocatedToFirstCanonicalWinners() public {
+        bytes32 dustCase = review.createReviewCase(creator, 7, 2, 1, 100e6);
+        randomness.setSeed(dustCase, keccak256("dust-seed"));
+        _depositAndReserveForCaseWithAmount(judgeSeven, dustCase, 10_000_000);
+        _depositAndReserveForCaseWithAmount(judgeEight, dustCase, 10_000_000);
+        _depositAndReserveForCaseWithAmount(judgeNine, dustCase, 10_000_020);
+        vm.prank(judgeSeven);
+        review.enroll(dustCase);
+        vm.prank(judgeEight);
+        review.enroll(dustCase);
+        vm.prank(judgeNine);
+        review.enroll(dustCase);
+
+        vm.warp(review.enrollmentDeadline(dustCase));
+        review.finalizeSnapshot(dustCase);
+        review.assignCourt(dustCase, 0);
+
+        address[3] memory judges;
+        for (uint256 slot = 0; slot < 3; slot++) {
+            judges[slot] = review.courtJudge(dustCase, 0, slot);
+            JuryTypes.Vote vote =
+                registry.caseStake(dustCase, judges[slot]) == 10_000_020
+                    ? JuryTypes.Vote.FAIL
+                    : JuryTypes.Vote.PASS;
+            bytes32 salt = bytes32(uint256(slot + 101));
+            bytes32 commitment = JuryTypes.voteCommitment(
+                block.chainid,
+                review.protocolVersion(),
+                7,
+                2,
+                1,
+                review.caseNumber(dustCase),
+                review.reviewRound(dustCase),
+                0,
+                judges[slot],
+                vote,
+                salt
+            );
+            vm.prank(judges[slot]);
+            review.commitVote(dustCase, 0, commitment);
+        }
+
+        vm.warp(review.commitDeadline(dustCase));
+        for (uint256 slot = 0; slot < 3; slot++) {
+            JuryTypes.Vote vote =
+                registry.caseStake(dustCase, judges[slot]) == 10_000_020
+                    ? JuryTypes.Vote.FAIL
+                    : JuryTypes.Vote.PASS;
+            vm.prank(judges[slot]);
+            review.revealVote(dustCase, 0, vote, bytes32(uint256(slot + 101)));
+        }
+
+        vm.warp(review.revealDeadline(dustCase));
+        review.finalizeCourt(dustCase, 0);
+        vm.warp(review.revealDeadline(dustCase) + review.appealWindowDuration());
+        review.finalizeNoAppeal(dustCase);
+
+        uint256 firstReward;
+        uint256 secondReward;
+        for (uint256 slot = 0; slot < 3; slot++) {
+            uint256 reward = registry.pendingReward(dustCase, judges[slot]);
+            if (reward > 0) {
+                if (firstReward == 0) firstReward = reward;
+                else secondReward = reward;
+            }
+        }
+        assertEq(firstReward + secondReward, 500_001);
+        assertTrue(firstReward != secondReward);
+    }
+
+    function _depositAndReserveForCaseWithAmount(
+        address judge,
+        bytes32 reviewCaseId,
+        uint256 amount
+    ) private {
+        token.mint(judge, amount);
+        vm.startPrank(judge);
+        token.approve(address(registry), type(uint256).max);
+        registry.depositStake(amount);
+        registry.reserveCaseStake(reviewCaseId, amount);
+        vm.stopPrank();
     }
 }

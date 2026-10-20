@@ -13,6 +13,10 @@ interface IVNextRandomness {
     function randomSeed(bytes32 reviewCaseId) external view returns (bytes32);
 }
 
+interface IVNextCampaignContext {
+    function contributionOf(uint256 campaignId, address backer) external view returns (uint256);
+}
+
 /// @notice VNext review engine for deterministic three-Judge courts.
 /// @dev Court assignment, multi-court aggregation, commit–reveal, appeal
 /// rounds and finality are permissionless after immutable case creation. Judge
@@ -234,6 +238,10 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
         if (block.timestamp >= enrollmentDeadline[reviewCaseId]) revert EnrollmentClosed();
         if (reviewCase.snapshotFinalized) revert SnapshotAlreadyFinalized();
         if (msg.sender == reviewCase.creator) revert CreatorConflict();
+        if (
+            IVNextCampaignContext(campaignEscrow).contributionOf(reviewCase.campaignId, msg.sender)
+                != 0
+        ) revert CreatorConflict();
         if (enrolled[reviewCaseId][msg.sender]) revert CommitmentAlreadySubmitted();
         if (participatedInRoot[reviewCase.rootCaseId][msg.sender]) {
             revert JudgeAlreadyParticipated();
@@ -783,7 +791,9 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
         }
 
         uint256 reward = winners == 0 ? 0 : totalSlash / winners;
-        if (reward > 0) {
+        uint256 rewardDust = winners == 0 ? 0 : totalSlash % winners;
+        if (winners > 0) {
+            uint256 winnerIndex;
             for (uint256 i = 0; i < enrolledJudges[reviewCaseId].length; i++) {
                 address judge = enrolledJudges[reviewCaseId][i];
                 if (!assignedJudge[reviewCaseId][judge]) continue;
@@ -792,7 +802,13 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
                     (outcome == VNextTypes.ReviewOutcome.FINAL_PASS && vote == JuryTypes.Vote.PASS)
                         || (outcome == VNextTypes.ReviewOutcome.VERDICT_FAIL
                             && vote == JuryTypes.Vote.FAIL);
-                if (winner) registry.creditReward(reviewCaseId, judge, reward);
+                if (winner) {
+                    uint256 winnerReward = reward + (winnerIndex < rewardDust ? 1 : 0);
+                    winnerIndex++;
+                    if (winnerReward > 0) {
+                        registry.creditReward(reviewCaseId, judge, winnerReward);
+                    }
+                }
             }
         }
         reviewCaseSettled[reviewCaseId] = true;

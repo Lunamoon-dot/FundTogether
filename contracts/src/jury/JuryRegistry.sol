@@ -147,6 +147,9 @@ contract JuryRegistry is ReentrancyGuard, IVNextEvents {
     function markCaseEnrollment(bytes32 reviewCaseId, address judge) external {
         if (msg.sender != reviewController) revert NotReviewController();
         if (!caseRegistered[reviewCaseId]) revert UnknownCase();
+        if (block.timestamp >= caseEnrollmentDeadline[reviewCaseId]) {
+            revert CaseEnrollmentClosed();
+        }
         if (caseEnrolled[reviewCaseId][judge]) revert CaseAlreadyEnrolled();
         if (caseStake[reviewCaseId][judge] < requiredCaseStake[reviewCaseId]) {
             revert InsufficientCaseStake();
@@ -172,6 +175,7 @@ contract JuryRegistry is ReentrancyGuard, IVNextEvents {
 
     function settleCaseStake(bytes32 reviewCaseId, address judge, uint256 slashedAmount) external {
         if (msg.sender != reviewController) revert NotReviewController();
+        if (!caseRegistered[reviewCaseId]) revert UnknownCase();
         if (caseSettled[reviewCaseId][judge]) revert CaseAlreadySettled();
 
         uint256 lockedForCase = caseStake[reviewCaseId][judge];
@@ -189,6 +193,7 @@ contract JuryRegistry is ReentrancyGuard, IVNextEvents {
 
     function creditReward(bytes32 reviewCaseId, address judge, uint256 amount) external {
         if (msg.sender != reviewController) revert NotReviewController();
+        if (!caseRegistered[reviewCaseId]) revert UnknownCase();
         if (amount == 0) revert InvalidAmount();
         uint256 nextCredited = caseRewardCredited[reviewCaseId] + amount;
         if (nextCredited > caseRewardPool[reviewCaseId]) revert RewardExceedsPool();

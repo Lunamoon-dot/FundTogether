@@ -114,15 +114,21 @@ async function createCampaign({ client, wallet, manifest, goal, evidenceHash, du
     args: [wallet.account.address, goal, fundingDeadline, [goal], [keccak256(toHex(`acceptance:${evidenceHash}`))], evidenceHash],
   });
   const created = eventArgs(receipt, campaignArtifact.abi, 'CampaignCreated');
-  return { id: created.campaignId, publicationCaseId: created.publicationReviewCaseId };
+  return {
+    id: created.campaignId,
+    publicationCaseId: created.publicationReviewCaseId,
+    fundingDeadline: created.fundingDeadline,
+  };
 }
 
-async function fundCampaign({ client, wallets, manifest, campaignId, backers, goal }) {
+async function fundCampaign({ client, wallets, manifest, campaignId, backers, goal, fundingDeadline }) {
   const half = goal / 2n;
   for (const [index, backer] of backers.entries()) {
     const amount = index === 0 ? half : goal - half;
     await send(client, wallets[backer], { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'contribute', args: [campaignId, amount] });
   }
+  const now = (await client.getBlock({ blockTag: 'latest' })).timestamp;
+  if (now <= fundingDeadline) await advance(client, Number(fundingDeadline - now + 1n));
   await send(client, wallets[backers[0]], { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'finalizeFunding', args: [campaignId] });
 }
 
@@ -188,7 +194,7 @@ async function main() {
   const first = await createCampaign({ client, wallet: deployerWallet, manifest, goal, evidenceHash: keccak256(toHex('first-publication')), duration: 30n * 24n * 60n * 60n });
   await resolvePass({ client, wallets, addresses, manifest, policy, campaignId: first.id, milestoneId: (2n ** 256n) - 1n, evidenceRevision: 1n, caseId: first.publicationCaseId });
   await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'finalizePublication', args: [first.id] });
-  await fundCampaign({ client, wallets, manifest, campaignId: first.id, backers: [backerOne, backerTwo], goal });
+  await fundCampaign({ client, wallets, manifest, campaignId: first.id, backers: [backerOne, backerTwo], goal, fundingDeadline: first.fundingDeadline });
   const milestoneReceipt = await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'submitMilestoneEvidence', args: [first.id, 0n, keccak256(toHex('first-milestone'))] });
   const milestoneCaseId = eventArgs(milestoneReceipt, campaignArtifact.abi, 'MilestoneEvidenceSubmitted').reviewCaseId;
   await resolvePass({ client, wallets, addresses, manifest, policy, campaignId: first.id, milestoneId: 0n, evidenceRevision: 1n, caseId: milestoneCaseId });
@@ -199,7 +205,7 @@ async function main() {
   const second = await createCampaign({ client, wallet: deployerWallet, manifest, goal, evidenceHash: keccak256(toHex('second-publication')), duration: 30n * 24n * 60n * 60n });
   await resolvePass({ client, wallets, addresses, manifest, policy, campaignId: second.id, milestoneId: (2n ** 256n) - 1n, evidenceRevision: 1n, caseId: second.publicationCaseId });
   await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'finalizePublication', args: [second.id] });
-  await fundCampaign({ client, wallets, manifest, campaignId: second.id, backers: [backerOne, backerTwo], goal });
+  await fundCampaign({ client, wallets, manifest, campaignId: second.id, backers: [backerOne, backerTwo], goal, fundingDeadline: second.fundingDeadline });
   await advance(client, policy.milestoneSubmissionWindowSeconds + 1);
   await send(client, wallets[backerOne], { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'expireMilestoneSubmission', args: [second.id, 0n] });
   await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'freezeRefundAllocations', args: [second.id, 10n] });

@@ -60,6 +60,7 @@ verifier must agree with it before a local acceptance run is considered valid.
 | `minoritySlashBps` | `500` (5%) | Only substantive minority slashing; protocol failure does not slashing-score a side |
 | `nonRevealPenalty` | 0 | Missing reveal makes the court invalid; it does not create a substantive FAIL |
 | `appealBond` | 1 MockUSDC (`1000000` units) | Refunded when the appeal family reaches finality |
+| `challenge` | Disabled | No challenge-open or challenge-resolution path in the active local policy |
 
 ## Binding remediation decisions
 

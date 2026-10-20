@@ -9,6 +9,13 @@
 **Remediation registry:** [Parameter Registry V2](parameters-v2-remediation.md)
 **Runtime boundary:** local Anvil/MockUSDC only; no public-chain acceptance
 
+**Policy-freeze delta:** The active local policy additionally requires funding
+finalization only after its deadline, an initialized milestone deadline before
+permissionless expiry, contributor conflict exclusion, publication appeals for
+Creator verdict-fail cases, deterministic reward-dust allocation and disabled
+challenge entrypoints. Forge is unavailable in the current Windows checkout,
+so the focused Solidity suite must be rerun before this delta is called green.
+
 ## Implemented and verified slices
 
 | Gate | Artifact | Evidence |
@@ -22,7 +29,7 @@
 | G/H | `JuryReview.sol` | Focused review tests: 9 passed; multi-court, commit–reveal, appeal, retry and final settlement |
 | I | `CampaignEscrowVNext.sol` | Campaign/funding/publication gate tests: 6 passed |
 | J | `CampaignEscrowVNext.sol` | Evidence/revision tests: 4 passed |
-| K | `JuryReview.sol`, `CampaignEscrowVNext.sol` | Appeal/challenge hooks exist; focused review/campaign tests pass |
+| K | `JuryReview.sol`, `CampaignEscrowVNext.sol` | Appeal hooks exist; the active local policy keeps the challenge window passive and disables challenge entrypoints |
 | L | `CampaignEscrowVNext.sol` | Payout/refund/challenge tests: 4 passed; conservation/failure-transfer fuzz suite: 3 passed |
 | P | `DeployVNext.s.sol`, `deploy-vnext.cjs`, `verify-vnext-runtime.cjs`, `vnext-deployment.ts` | Foundry script compiles; runtime verifier/policy identity tests: 6 passed; one-time wiring is executable |
 | P0/P1 remediation | `JuryReview.sol`, `JuryRegistry.sol`, `CampaignEscrowVNext.sol` | Retry/settlement/stake/liveness/budget/refund/court-order regressions covered; full Foundry suite: 117 passed |
@@ -56,13 +63,14 @@ The current VNext contract slice can:
 - create a frozen campaign proposal with a publication review gate; only a
   canonical publication `FINAL_PASS` opens contribution funding, without
   Resolver/Admin approval;
-- finalize funding permissionlessly, open full funding-failure refunds, and
-  keep successful funds in contract custody;
+- finalize funding permissionlessly only after the funding deadline, open full
+  funding-failure refunds, and keep successful funds in contract custody;
 - enforce a frozen 7-day milestone submission and correction window with
   permissionless timeout-to-refund paths;
 - require the immutable milestone budget total to equal the funding goal;
 - bind milestone evidence revisions to one review case each, allow bounded
-  correction after `VERDICT_FAIL`, open eligible Backer challenge cases;
+  correction after `VERDICT_FAIL`, exclude campaign contributors from Judge
+  enrollment and keep challenge entry disabled;
 - pay an exact milestone budget only after final PASS and the challenge window,
   and open deterministic, claim-order-independent refunds on terminal failure;
 - register every review case with a risk-adjusted Judge stake requirement and
@@ -87,10 +95,13 @@ The following remain incomplete and must not be inferred from the passing slice:
 
 ## Verification record
 
-The contract suite currently reports 117 passing tests, including historical
+The pre-freeze contract suite reported 117 passing tests, including historical
 Resolver contracts and the new VNext focused suites. The historical tests are
 kept for regression visibility and are not counted as proof of pure-decentralized
 financial behavior.
+
+Those counts predate the policy-freeze delta above; they are retained as
+historical evidence, not as current verification of the changed behavior.
 
 The current VNext tests are:
 

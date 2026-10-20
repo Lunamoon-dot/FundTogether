@@ -109,4 +109,29 @@ contract VNextCampaignCreationTest is Test {
             uint8(escrow.publicationOutcome(campaignId)), uint8(VNextTypes.ReviewOutcome.FINAL_PASS)
         );
     }
+
+    function test_creatorCanAppealFailedPublication() public {
+        uint256[] memory budgets = new uint256[](1);
+        budgets[0] = 100e6;
+        bytes32[] memory criteria = new bytes32[](1);
+        criteria[0] = keccak256("final");
+
+        vm.prank(creator);
+        uint256 campaignId = escrow.createCampaign(
+            payout,
+            100e6,
+            block.timestamp + 7 days,
+            budgets,
+            criteria,
+            keccak256("publication-evidence")
+        );
+        bytes32 publicationCaseId = escrow.publicationReviewCase(campaignId);
+        review.setReviewResult(publicationCaseId, 2);
+
+        vm.prank(creator);
+        bytes32 appealCaseId = escrow.openAppeal(campaignId, type(uint256).max);
+
+        assertTrue(appealCaseId != bytes32(0));
+        assertEq(escrow.publicationReviewCase(campaignId), appealCaseId);
+    }
 }

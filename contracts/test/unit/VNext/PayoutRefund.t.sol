@@ -49,6 +49,7 @@ contract VNextPayoutRefundTest is Test {
         token.approve(address(escrow), 100e6);
         escrow.contribute(campaignId, 100e6);
         vm.stopPrank();
+        vm.warp(block.timestamp + 7 days);
         escrow.finalizeFunding(campaignId);
     }
 
@@ -96,23 +97,14 @@ contract VNextPayoutRefundTest is Test {
         assertEq(token.balanceOf(address(escrow)), 0);
     }
 
-    function test_activeChallengeBlocksPayoutUntilCanonicalResolution() public {
+    function test_challengeIsDisabledByLocalPolicy() public {
         bytes32 reviewCaseId = _submitEvidence(0, keccak256("evidence-one"));
         review.setFinalOutcome(reviewCaseId, VNextTypes.ReviewOutcome.FINAL_PASS);
         escrow.syncFinalRuling(campaignId, 0);
 
         vm.prank(backer);
-        bytes32 challengeCaseId =
-            escrow.openChallenge(campaignId, 0, keccak256("challenge-evidence"));
-
-        vm.warp(block.timestamp + 2 days);
-        vm.expectRevert(CampaignEscrowVNext.ChallengeActive.selector);
-        escrow.payMilestone(campaignId, 0);
-
-        review.setFinalOutcome(challengeCaseId, VNextTypes.ReviewOutcome.VERDICT_FAIL);
-        escrow.resolveChallenge(campaignId, 0);
-
-        assertEq(uint8(escrow.campaignState(campaignId)), uint8(VNextTypes.CampaignState.REFUNDING));
+        vm.expectRevert(CampaignEscrowVNext.ChallengeNotAllowed.selector);
+        escrow.openChallenge(campaignId, 0, keccak256("challenge-evidence"));
     }
 
     function test_EnforceRefundAllocationBeforeClaim() public {
@@ -209,6 +201,7 @@ contract VNextPayoutRefundTest is Test {
         token.approve(address(escrow), 2);
         escrow.contribute(smallCampaign, 2);
         vm.stopPrank();
+        vm.warp(block.timestamp + 7 days);
         escrow.finalizeFunding(smallCampaign);
 
         bytes32 firstCase = _submitEvidenceFor(smallCampaign, 0, keccak256("small-evidence"));
