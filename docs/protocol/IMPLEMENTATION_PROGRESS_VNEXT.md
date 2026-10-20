@@ -167,8 +167,8 @@ evidence-availability and contract-artifact slices:
 frontend: npm test -> 205 passed, 0 failed
 frontend: npm run build -> success (existing large-bundle warning)
 frontend: VNext static journey tests -> 6 passed, 0 failed after assigned-case read boundary
-backend: explicit VNext Jest config -> 6 suites, 25 passed, 0 failed; npm run build -> success; migration/service tests -> 4 passed
-backend: all 9 campaign script-test files -> 35 passed; vnext-acceptance.test.cjs
+backend: explicit VNext Jest config -> 7 suites, 26 passed, 0 failed; npm run build -> success; migration/service tests -> 4 passed; VNext health identity test passed
+backend: all 10 campaign script-test files -> 36 passed; vnext-acceptance.test.cjs; VNext backend launcher selects the verified manifest and protocol identity
 regression -> 1 passed; migrate-isolated.cjs -> success;
 deploy-vnext.cjs --create -> success; vnext-scenarios-e2e.cjs
 (implementation: vnext-acceptance.cjs) -> PASS twice,
