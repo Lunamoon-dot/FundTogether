@@ -95,6 +95,19 @@ contract VNextJuryReviewTest is Test {
         review.assignCourt(caseId, 0);
     }
 
+    function _settleFinal(bytes32 reviewCaseId) private {
+        for (uint256 i = 0; i < 16 && !review.settlementComplete(reviewCaseId); i++) {
+            review.settleFinalRuling(reviewCaseId, 32);
+        }
+        assertTrue(review.settlementComplete(reviewCaseId));
+    }
+
+    function _settleRetry(bytes32 reviewCaseId) private {
+        review.prepareRetrySettlement(reviewCaseId);
+        review.settleCaseBatch(reviewCaseId, 32);
+        assertTrue(review.reviewCaseSettled(reviewCaseId));
+    }
+
     function _commit(address judge, JuryTypes.Vote vote, bytes32 salt) private {
         _commitFor(caseId, judge, vote, salt);
     }
@@ -246,6 +259,7 @@ contract VNextJuryReviewTest is Test {
         vm.expectRevert(JuryReview.ProtocolFailureNotReady.selector);
         review.finalizeProtocolFailure(caseId);
 
+        _settleRetry(caseId);
         bytes32 retryCaseId = review.openRetry(caseId);
         assertEq(review.retryCount(caseId), 1);
         assertEq(registry.lockedStake(judgeOne), 0);
@@ -279,6 +293,7 @@ contract VNextJuryReviewTest is Test {
         vm.warp(review.revealDeadline(caseId) + review.appealWindowDuration());
         assertEq(uint8(review.finalizeNoAppeal(caseId)), uint8(VNextTypes.ReviewOutcome.FINAL_PASS));
         assertEq(uint8(review.finalOutcome(caseId)), uint8(VNextTypes.ReviewOutcome.FINAL_PASS));
+        _settleFinal(caseId);
         assertEq(registry.lockedStake(first), 0);
         assertEq(registry.lockedStake(second), 0);
         assertEq(registry.lockedStake(third), 0);
@@ -352,8 +367,10 @@ contract VNextJuryReviewTest is Test {
         bytes32 noQuorumCase = review.createReviewCase(creator, 8, 3, 1, 100e6);
         vm.warp(review.enrollmentDeadline(noQuorumCase));
 
+        _settleRetry(noQuorumCase);
         bytes32 retryCaseId = review.openRetry(noQuorumCase);
         vm.warp(review.enrollmentDeadline(retryCaseId));
+        _settleRetry(retryCaseId);
         bytes32 finalRetryCaseId = review.openRetry(retryCaseId);
         vm.warp(review.enrollmentDeadline(finalRetryCaseId));
 
@@ -441,8 +458,10 @@ contract VNextJuryReviewTest is Test {
         vm.warp(review.revealDeadline(caseId));
         review.finalizeCourt(caseId, 0);
 
+        _settleRetry(caseId);
         bytes32 retryCaseId = review.openRetry(caseId);
         vm.warp(review.enrollmentDeadline(retryCaseId));
+        _settleRetry(retryCaseId);
         bytes32 finalRetryCaseId = review.openRetry(retryCaseId);
         vm.warp(review.enrollmentDeadline(finalRetryCaseId));
 
@@ -450,9 +469,37 @@ contract VNextJuryReviewTest is Test {
             uint8(review.finalizeProtocolFailure(finalRetryCaseId)),
             uint8(VNextTypes.ReviewOutcome.PROTOCOL_FAIL)
         );
+        _settleFinal(finalRetryCaseId);
         assertTrue(review.reviewCaseSettled(caseId));
         assertTrue(review.reviewCaseSettled(retryCaseId));
         assertTrue(review.reviewCaseSettled(finalRetryCaseId));
+    }
+
+    function test_FinalRulingSettlementCanBeCompletedInBoundedBatches() public {
+        _prepareCourt();
+        address first = review.courtJudge(caseId, 0, 0);
+        address second = review.courtJudge(caseId, 0, 1);
+        address third = review.courtJudge(caseId, 0, 2);
+        _commit(first, JuryTypes.Vote.PASS, SALT_ONE);
+        _commit(second, JuryTypes.Vote.PASS, SALT_TWO);
+        _commit(third, JuryTypes.Vote.FAIL, SALT_THREE);
+        vm.warp(review.commitDeadline(caseId));
+        _reveal(caseId, first, JuryTypes.Vote.PASS, SALT_ONE);
+        _reveal(caseId, second, JuryTypes.Vote.PASS, SALT_TWO);
+        _reveal(caseId, third, JuryTypes.Vote.FAIL, SALT_THREE);
+        vm.warp(review.revealDeadline(caseId) + review.appealWindowDuration());
+        review.finalizeCourt(caseId, 0);
+        review.finalizeNoAppeal(caseId);
+
+        assertFalse(review.reviewCaseSettled(caseId));
+        assertFalse(review.settlementComplete(caseId));
+
+        for (uint256 i = 0; i < 8 && !review.settlementComplete(caseId); i++) {
+            review.settleFinalRuling(caseId, 1);
+        }
+
+        assertTrue(review.reviewCaseSettled(caseId));
+        assertTrue(review.settlementComplete(caseId));
     }
 
     function test_AssignmentIndependentOfCallOrder() public {
@@ -601,6 +648,7 @@ contract VNextJuryReviewTest is Test {
         review.finalizeCourt(dustCase, 0);
         vm.warp(review.revealDeadline(dustCase) + review.appealWindowDuration());
         review.finalizeNoAppeal(dustCase);
+        _settleFinal(dustCase);
 
         assertEq(registry.pendingReward(dustCase, judgeSeven), 250_001);
         assertEq(registry.pendingReward(dustCase, judgeEight), 250_000);

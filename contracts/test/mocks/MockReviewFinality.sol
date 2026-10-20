@@ -9,6 +9,8 @@ contract MockReviewFinality {
     uint256 private nextCase;
     mapping(bytes32 => VNextTypes.ReviewOutcome) public finalOutcome;
     mapping(bytes32 => uint8) public reviewResults;
+    mapping(bytes32 => bool) public settlementCompleteOverride;
+    mapping(bytes32 => bool) public settlementCompleteOverrideSet;
 
     function createReviewCase(
         address,
@@ -24,6 +26,11 @@ contract MockReviewFinality {
 
     function setFinalOutcome(bytes32 reviewCaseId, VNextTypes.ReviewOutcome outcome) external {
         finalOutcome[reviewCaseId] = outcome;
+    }
+
+    function setSettlementComplete(bytes32 reviewCaseId, bool complete) external {
+        settlementCompleteOverride[reviewCaseId] = complete;
+        settlementCompleteOverrideSet[reviewCaseId] = true;
     }
 
     function setReviewResult(bytes32 reviewCaseId, uint8 result) external {
@@ -43,5 +50,12 @@ contract MockReviewFinality {
 
     function reviewResult(bytes32 reviewCaseId) external view returns (uint8 result) {
         return reviewResults[reviewCaseId];
+    }
+
+    function settlementComplete(bytes32 reviewCaseId) external view returns (bool) {
+        if (settlementCompleteOverrideSet[reviewCaseId]) {
+            return settlementCompleteOverride[reviewCaseId];
+        }
+        return finalOutcome[reviewCaseId] != VNextTypes.ReviewOutcome.NONE;
     }
 }

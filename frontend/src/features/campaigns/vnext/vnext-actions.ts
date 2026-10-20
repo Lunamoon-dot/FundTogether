@@ -35,6 +35,9 @@ const actionRoles: Record<string, VNextActionRole[]> = {
   finalizeCourt: ['any'],
   finalizeNoAppeal: ['any'],
   finalizeProtocolFailure: ['any'],
+  prepareRetrySettlement: ['any'],
+  settleCaseBatch: ['any'],
+  settleFinalRuling: ['any'],
   claimReward: ['judge'],
 }
 

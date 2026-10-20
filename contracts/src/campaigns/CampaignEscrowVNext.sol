@@ -28,6 +28,8 @@ interface IVNextReviewCaseCreator {
         external
         view
         returns (VNextTypes.ReviewOutcome outcome);
+
+    function settlementComplete(bytes32 reviewCaseId) external view returns (bool);
 }
 
 /// @notice Contract-owned campaign and contribution escrow for the VNext pilot.
@@ -110,6 +112,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
     error EvidenceReviewActive();
     error MilestoneAlreadyPaid();
     error ReviewNotFinal();
+    error ReviewSettlementPending();
     error FinalRulingAlreadySynced();
     error ChallengeWindowOpen();
     error ChallengeActive();
@@ -264,6 +267,9 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         VNextTypes.ReviewOutcome outcome =
             reviewEngine.finalOutcome(campaign.publicationReviewCaseId);
         if (outcome == VNextTypes.ReviewOutcome.NONE) revert ReviewNotFinal();
+        if (!reviewEngine.settlementComplete(campaign.publicationReviewCaseId)) {
+            revert ReviewSettlementPending();
+        }
 
         campaign.publicationOutcome = outcome;
         bool successful = outcome == VNextTypes.ReviewOutcome.FINAL_PASS;
@@ -485,6 +491,9 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
                 return outcome;
             }
             revert ReviewNotFinal();
+        }
+        if (!reviewEngine.settlementComplete(milestone.reviewCaseId)) {
+            revert ReviewSettlementPending();
         }
 
         milestone.finalOutcome = outcome;

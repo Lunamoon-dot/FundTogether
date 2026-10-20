@@ -68,6 +68,22 @@ contract VNextPayoutRefundTest is Test {
         assertEq(uint8(escrow.milestoneState(campaignId, 0)), uint8(VNextTypes.MilestoneState.PAID));
     }
 
+    function test_milestoneCannotSyncBeforeJudgeSettlementCompletes() public {
+        bytes32 reviewCaseId = _submitEvidence(0, keccak256("evidence-one"));
+        review.setFinalOutcome(reviewCaseId, VNextTypes.ReviewOutcome.FINAL_PASS);
+        review.setSettlementComplete(reviewCaseId, false);
+
+        vm.expectRevert(CampaignEscrowVNext.ReviewSettlementPending.selector);
+        escrow.syncFinalRuling(campaignId, 0);
+
+        review.setSettlementComplete(reviewCaseId, true);
+        escrow.syncFinalRuling(campaignId, 0);
+        assertEq(
+            uint8(escrow.milestoneState(campaignId, 0)),
+            uint8(VNextTypes.MilestoneState.CHALLENGE_WINDOW)
+        );
+    }
+
     function test_duplicatePayoutCannotSpendEscrowTwice() public {
         bytes32 reviewCaseId = _submitEvidence(0, keccak256("evidence-one"));
         review.setFinalOutcome(reviewCaseId, VNextTypes.ReviewOutcome.FINAL_PASS);

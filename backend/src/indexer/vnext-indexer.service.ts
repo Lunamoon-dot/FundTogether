@@ -503,7 +503,7 @@ export class VNextIndexerService implements OnModuleInit, OnModuleDestroy {
       await this.updateReviewFinality(tx, streamId, log, textArg(args, "reviewCaseId"), Number(textArg(args, "outcome")));
     } else if (eventName === "ReviewCaseSettled") {
       await this.updateReviewFinality(tx, streamId, log, textArg(args, "reviewCaseId"), Number(textArg(args, "outcome")));
-    } else if (eventName === "UnenrolledCaseStakeReleased" || eventName === "CaseStakeReserved" || eventName === "CaseStakeSettled" || eventName === "JudgeRewardAccrued" || eventName === "JurySnapshotFinalized" || eventName === "CourtFinalized" || eventName === "VoteCommitted" || eventName === "VoteRevealed" || eventName === "JudgeSlashed" || eventName === "JudgeRewardClaimed") {
+    } else if (eventName === "ReviewSettlementProgress" || eventName === "UnenrolledCaseStakeReleased" || eventName === "CaseStakeReserved" || eventName === "CaseStakeSettled" || eventName === "JudgeRewardAccrued" || eventName === "JurySnapshotFinalized" || eventName === "CourtFinalized" || eventName === "VoteCommitted" || eventName === "VoteRevealed" || eventName === "JudgeSlashed" || eventName === "JudgeRewardClaimed") {
       await tx.update(vnextReviewProjections).set({ lastBlockNumber: blockNumber.toString(), updatedAt: new Date() }).where(and(eq(vnextReviewProjections.streamId, streamId), eq(vnextReviewProjections.reviewCaseId, textArg(args, "reviewCaseId").toLowerCase())));
     }
 

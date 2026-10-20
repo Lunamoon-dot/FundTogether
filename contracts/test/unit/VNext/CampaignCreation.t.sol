@@ -114,6 +114,28 @@ contract VNextCampaignCreationTest is Test {
         );
     }
 
+    function test_publicationCannotFinalizeBeforeJudgeSettlementCompletes() public {
+        uint256[] memory budgets = new uint256[](1);
+        budgets[0] = 100e6;
+        bytes32[] memory criteria = new bytes32[](1);
+        criteria[0] = keccak256("final");
+
+        vm.prank(creator);
+        uint256 campaignId = escrow.createCampaign(
+            payout, 100e6, block.timestamp + 7 days, budgets, criteria, keccak256("publication-evidence")
+        );
+        bytes32 reviewCaseId = escrow.publicationReviewCase(campaignId);
+        review.setFinalOutcome(reviewCaseId, VNextTypes.ReviewOutcome.FINAL_PASS);
+        review.setSettlementComplete(reviewCaseId, false);
+
+        vm.expectRevert(CampaignEscrowVNext.ReviewSettlementPending.selector);
+        escrow.finalizePublication(campaignId);
+
+        review.setSettlementComplete(reviewCaseId, true);
+        escrow.finalizePublication(campaignId);
+        assertEq(uint8(escrow.campaignState(campaignId)), uint8(VNextTypes.CampaignState.FUNDING));
+    }
+
     function test_creatorCanAppealFailedPublication() public {
         uint256[] memory budgets = new uint256[](1);
         budgets[0] = 100e6;

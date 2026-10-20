@@ -74,6 +74,22 @@ function VNextMilestoneActions({
   const now = BigInt(Math.floor(Date.now() / 1000));
   const submissionExpired = Boolean(timing.data?.submissionDeadline && now >= timing.data.submissionDeadline);
   const correctionExpired = Boolean(timing.data?.correctionDeadline && now >= timing.data.correctionDeadline);
+  const settlement = useQuery({
+    queryKey: ['vnext-review-settlement', milestone.reviewCaseId, deployment.juryReview],
+    enabled: Boolean(client && deployment.juryReview && milestone.reviewCaseId),
+    queryFn: async () => {
+      if (!client || !deployment.juryReview || !milestone.reviewCaseId) throw new Error('Review settlement client is unavailable');
+      const [outcome, phase, settled, complete] = await Promise.all([
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'finalOutcome', args: [milestone.reviewCaseId as `0x${string}`] }),
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'settlementPhase', args: [milestone.reviewCaseId as `0x${string}`] }),
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'reviewCaseSettled', args: [milestone.reviewCaseId as `0x${string}`] }),
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'settlementComplete', args: [milestone.reviewCaseId as `0x${string}`] }),
+      ]);
+      return { outcome: Number(outcome), phase: Number(phase), settled: Boolean(settled), complete: Boolean(complete) };
+    },
+    retry: false,
+  });
+  const settlementState = settlement.data;
   const canEditEvidence = creator && campaign.state === CAMPAIGN_MILESTONES_RUNNING
     && [MILESTONE_PENDING, MILESTONE_CORRECTION, MILESTONE_RESUBMIT].includes(milestone.state);
   const canSubmit = canEditEvidence && /^0x[0-9a-fA-F]{64}$/.test(evidenceHash);
@@ -100,16 +116,19 @@ function VNextMilestoneActions({
           {milestone.state === MILESTONE_PENDING && submissionExpired && <button type="button" className="button button--secondary" disabled={transaction.busy} onClick={() => void transaction.send('campaign', 'expireMilestoneSubmission', [campaignNumber, milestoneNumber])}>Expire submission deadline</button>}
           {milestone.state === MILESTONE_CORRECTION && correctionExpired && <button type="button" className="button button--secondary" disabled={transaction.busy} onClick={() => void transaction.send('campaign', 'finalizeCorrectionFailure', [campaignNumber, milestoneNumber])}>Finalize correction failure</button>}
           {[MILESTONE_REVIEW_ENROLLMENT, MILESTONE_BASE_REVIEW, MILESTONE_PROVISIONAL_RULING, MILESTONE_APPEAL_WINDOW].includes(milestone.state) && milestone.reviewCaseId && <>
-            <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('campaign', 'syncFinalRuling', [campaignNumber, milestoneNumber])}>Sync final ruling</button>
+            <button type="button" className="button button--quiet" disabled={transaction.busy || Boolean(settlementState?.outcome && settlementState.outcome !== 0 && !settlementState.complete)} onClick={() => void transaction.send('campaign', 'syncFinalRuling', [campaignNumber, milestoneNumber])}>Sync final ruling</button>
             {[MILESTONE_PROVISIONAL_RULING, MILESTONE_APPEAL_WINDOW].includes(milestone.state) && <>
               <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('campaign', 'openAppeal', [campaignNumber, milestoneNumber])}>Open appeal</button>
               <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('review', 'finalizeNoAppeal', [milestone.reviewCaseId as `0x${string}`])}>Finalize no appeal</button>
             </>}
           </>}
           {milestone.state === MILESTONE_RETRY_PENDING && milestone.reviewCaseId && <>
-            <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('campaign', 'retryMilestoneReview', [campaignNumber, milestoneNumber])}>Retry review</button>
+            {settlementState?.phase === 0 && <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('review', 'prepareRetrySettlement', [milestone.reviewCaseId as `0x${string}`])}>Prepare retry settlement</button>}
+            {settlementState && settlementState.phase > 0 && !settlementState.settled && <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('review', 'settleCaseBatch', [milestone.reviewCaseId as `0x${string}`, 32n])}>Settle retry batch</button>}
+            <button type="button" className="button button--quiet" disabled={transaction.busy || !settlementState?.settled} onClick={() => void transaction.send('campaign', 'retryMilestoneReview', [campaignNumber, milestoneNumber])}>Retry review</button>
             <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('review', 'finalizeProtocolFailure', [milestone.reviewCaseId as `0x${string}`])}>Finalize protocol failure</button>
           </>}
+          {settlementState && settlementState.outcome !== 0 && !settlementState.complete && <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('review', 'settleFinalRuling', [milestone.reviewCaseId as `0x${string}`, 32n])}>Settle final ruling batch</button>}
         </div>
       )}
 
@@ -157,6 +176,20 @@ export function VNextActionPanel({
       if (!client || !deployment.juryReview || !campaign.publicationReviewCaseId) throw new Error('Publication review client is unavailable');
       const outcome = await client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'finalOutcome', args: [campaign.publicationReviewCaseId as `0x${string}`] });
       return Number(outcome);
+    },
+    retry: false,
+  });
+  const publicationSettlement = useQuery({
+    queryKey: ['vnext-publication-settlement', campaign.publicationReviewCaseId, deployment.juryReview],
+    enabled: Boolean(client && deployment.juryReview && campaign.publicationReviewCaseId),
+    queryFn: async () => {
+      if (!client || !deployment.juryReview || !campaign.publicationReviewCaseId) throw new Error('Publication settlement client is unavailable');
+      const [phase, settled, complete] = await Promise.all([
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'settlementPhase', args: [campaign.publicationReviewCaseId as `0x${string}`] }),
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'reviewCaseSettled', args: [campaign.publicationReviewCaseId as `0x${string}`] }),
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'settlementComplete', args: [campaign.publicationReviewCaseId as `0x${string}`] }),
+      ]);
+      return { phase: Number(phase), settled: Boolean(settled), complete: Boolean(complete) };
     },
     retry: false,
   });
@@ -208,12 +241,23 @@ export function VNextActionPanel({
             <button type="button" className="button button--quiet" disabled={transaction.busy || campaignNumber === null} onClick={() => void transaction.send('campaign', 'openAppeal', [campaignNumber!, 2n ** 256n - 1n])}>Open publication appeal</button>
             <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('review', 'finalizeNoAppeal', [campaign.publicationReviewCaseId as `0x${string}`])}>Finalize publication review</button>
           </>}
-          {(publicationReview?.outcome === 3 || publicationReview?.outcome === 4) && publicationFinalOutcome === 0 && <button type="button" className="button button--quiet" disabled={transaction.busy || campaignNumber === null} onClick={() => void transaction.send('campaign', 'retryPublication', [campaignNumber!])}>Retry publication review</button>}
+          {(publicationReview?.outcome === 3 || publicationReview?.outcome === 4) && publicationFinalOutcome === 0 && <>
+            {publicationSettlement.data?.phase === 0 && <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('review', 'prepareRetrySettlement', [campaign.publicationReviewCaseId as `0x${string}`])}>Prepare publication retry settlement</button>}
+            {publicationSettlement.data && publicationSettlement.data.phase > 0 && !publicationSettlement.data.settled && <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('review', 'settleCaseBatch', [campaign.publicationReviewCaseId as `0x${string}`, 32n])}>Settle publication retry batch</button>}
+            <button type="button" className="button button--quiet" disabled={transaction.busy || campaignNumber === null || !publicationSettlement.data?.settled} onClick={() => void transaction.send('campaign', 'retryPublication', [campaignNumber!])}>Retry publication review</button>
+          </>}
           {publicationFinalOutcome !== 0 && <p className="text-sm text-[var(--ink-subtle)] m-0">Final publication outcome {publicationFinalOutcome} đã được ghi nhận bởi review contract.</p>}
         </div>
       )}
 
-      {campaign.state === 0 && publicationFinalOutcome !== 0 && (
+      {campaign.state === 0 && publicationFinalOutcome !== 0 && publicationSettlement.data && !publicationSettlement.data.complete && (
+        <div data-vnext-action="settle-publication">
+          <p className="text-sm text-[var(--ink-subtle)] m-0">Final ruling đã tồn tại nhưng stake settlement chưa hoàn tất.</p>
+          <button type="button" className="button button--primary" disabled={transaction.busy || !campaign.publicationReviewCaseId} onClick={() => void transaction.send('review', 'settleFinalRuling', [campaign.publicationReviewCaseId as `0x${string}`, 32n])}>Settle publication ruling batch</button>
+        </div>
+      )}
+
+      {campaign.state === 0 && publicationFinalOutcome !== 0 && publicationSettlement.data?.complete && (
         <div data-vnext-action="finalizePublication">
           <p className="text-sm text-[var(--ink-subtle)] m-0">Publication review đã có final outcome; bất kỳ caller nào cũng có thể materialize state tiếp theo từ contract.</p>
           <button type="button" className="button button--primary" disabled={transaction.busy || campaignNumber === null} onClick={() => void transaction.send('campaign', 'finalizePublication', [campaignNumber!])}>Finalize publication</button>

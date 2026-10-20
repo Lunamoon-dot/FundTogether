@@ -122,12 +122,31 @@ async function resolvePass({ client, wallets, addresses, manifest, policy, campa
   await resolveCourt({ client, wallets, addresses, manifest, policy, campaignId, milestoneId, evidenceRevision, caseId, votes: [1, 1, 1] });
   await advance(client, policy.appealWindowSeconds + 1);
   await send(client, wallets[addresses.deployer], { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'finalizeNoAppeal', args: [caseId] });
+  await settleFinalRuling({ client, wallet: wallets[addresses.deployer], manifest, caseId });
 }
 
 async function resolveFail({ client, wallets, addresses, manifest, policy, campaignId, milestoneId, evidenceRevision, caseId }) {
   await resolveCourt({ client, wallets, addresses, manifest, policy, campaignId, milestoneId, evidenceRevision, caseId, votes: [2, 2, 1] });
   await advance(client, policy.appealWindowSeconds + 1);
   await send(client, wallets[addresses.deployer], { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'finalizeNoAppeal', args: [caseId] });
+  await settleFinalRuling({ client, wallet: wallets[addresses.deployer], manifest, caseId });
+}
+
+async function settleFinalRuling({ client, wallet, manifest, caseId }) {
+  for (let attempt = 0; attempt < 64; attempt++) {
+    if (await read(client, manifest.juryReview, reviewArtifact.abi, 'settlementComplete', [caseId])) return;
+    await send(client, wallet, { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'settleFinalRuling', args: [caseId, 32n] });
+  }
+  throw new Error(`VNext final ruling settlement did not complete for ${caseId}`);
+}
+
+async function settleRetryRound({ client, wallet, manifest, caseId }) {
+  await send(client, wallet, { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'prepareRetrySettlement', args: [caseId] });
+  for (let attempt = 0; attempt < 64; attempt++) {
+    if (await read(client, manifest.juryReview, reviewArtifact.abi, 'reviewCaseSettled', [caseId])) return;
+    await send(client, wallet, { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'settleCaseBatch', args: [caseId, 32n] });
+  }
+  throw new Error(`VNext retry settlement did not complete for ${caseId}`);
 }
 
 async function resolveTie({ client, wallets, addresses, manifest, policy, campaignId, milestoneId, evidenceRevision, caseId }) {
@@ -320,17 +339,21 @@ async function main() {
 
   const noQuorum = await createCampaign({ client, wallet: deployerWallet, manifest, goal, evidenceHash: keccak256(toHex('no-quorum-publication')), duration: 30n * 24n * 60n * 60n });
   await advance(client, policy.judgeEnrollmentWindowSeconds + 1);
+  await settleRetryRound({ client, wallet: deployerWallet, manifest, caseId: noQuorum.publicationCaseId });
   let retryReceipt = await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'retryPublication', args: [noQuorum.id] });
   let retryCaseId = eventArgs(retryReceipt, campaignArtifact.abi, 'PublicationReviewCaseChanged').reviewCaseId;
   await advance(client, policy.judgeEnrollmentWindowSeconds + 1);
+  await settleRetryRound({ client, wallet: deployerWallet, manifest, caseId: retryCaseId });
   retryReceipt = await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'retryPublication', args: [noQuorum.id] });
   retryCaseId = eventArgs(retryReceipt, campaignArtifact.abi, 'PublicationReviewCaseChanged').reviewCaseId;
   await advance(client, policy.judgeEnrollmentWindowSeconds + 1);
   await send(client, deployerWallet, { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'finalizeProtocolFailure', args: [retryCaseId] });
+  await settleFinalRuling({ client, wallet: deployerWallet, manifest, caseId: retryCaseId });
   assert.equal(await read(client, manifest.juryReview, reviewArtifact.abi, 'finalOutcome', [noQuorum.publicationCaseId]), 3);
 
   const tieCampaign = await createCampaign({ client, wallet: deployerWallet, manifest, goal, evidenceHash: keccak256(toHex('tie-publication')), duration: 30n * 24n * 60n * 60n });
   await resolveTie({ client, wallets, addresses: { deployer, judges: [...addresses.judges, ...appealAddresses.judges] }, manifest, policy, campaignId: tieCampaign.id, milestoneId: (2n ** 256n) - 1n, evidenceRevision: 1n, caseId: tieCampaign.publicationCaseId });
+  await settleRetryRound({ client, wallet: deployerWallet, manifest, caseId: tieCampaign.publicationCaseId });
   const tieRetryReceipt = await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'retryPublication', args: [tieCampaign.id] });
   const tieRetryCaseId = eventArgs(tieRetryReceipt, campaignArtifact.abi, 'PublicationReviewCaseChanged').reviewCaseId;
   assert.notEqual(tieRetryCaseId, tieCampaign.publicationCaseId);

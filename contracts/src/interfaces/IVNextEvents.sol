@@ -136,6 +136,15 @@ interface IVNextEvents {
         bytes32 indexed reviewCaseId, uint8 outcome, uint256 totalSlash, uint256 winners
     );
 
+    event ReviewSettlementProgress(
+        bytes32 indexed reviewCaseId,
+        uint8 outcome,
+        uint256 phase,
+        uint256 cursor,
+        uint256 enrolledCount,
+        bool complete
+    );
+
     event JudgeSlashed(bytes32 indexed reviewCaseId, address indexed judge, uint256 amount);
 
     event JudgeRewardClaimed(bytes32 indexed reviewCaseId, address indexed judge, uint256 amount);
