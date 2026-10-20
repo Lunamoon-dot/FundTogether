@@ -12,7 +12,8 @@ interface IVNextReviewCaseCreator {
         address creator,
         uint256 campaignId,
         uint256 milestoneId,
-        uint256 evidenceRevision
+        uint256 evidenceRevision,
+        uint256 riskValue
     ) external returns (bytes32 reviewCaseId);
 
     function openAppeal(bytes32 reviewCaseId, address requester)
@@ -172,7 +173,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
             )
         );
         bytes32 publicationReviewCaseId =
-            reviewEngine.createReviewCase(msg.sender, campaignId, type(uint256).max, 1);
+            _createReviewCase(msg.sender, campaignId, type(uint256).max, 1, goal);
         if (publicationReviewCaseId == bytes32(0)) revert InvalidEvidence();
         campaigns[campaignId] = Campaign({
             creator: msg.sender,
@@ -337,7 +338,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
 
         uint256 revision = milestone.evidenceRevision + 1;
         reviewCaseId =
-            reviewEngine.createReviewCase(campaign.creator, campaignId, milestoneId, revision);
+            _createReviewCase(campaign.creator, campaignId, milestoneId, revision, milestone.budget);
         if (reviewCaseId == bytes32(0)) revert InvalidEvidence();
 
         milestone.evidenceRevision = revision;
@@ -508,8 +509,12 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         ) revert ChallengeNotAllowed();
         if (challengeEvidenceHash == bytes32(0)) revert InvalidEvidence();
 
-        challengeCaseId = reviewEngine.createReviewCase(
-            campaign.creator, campaignId, milestoneId, milestone.evidenceRevision
+        challengeCaseId = _createReviewCase(
+            campaign.creator,
+            campaignId,
+            milestoneId,
+            milestone.evidenceRevision,
+            milestone.budget
         );
         if (challengeCaseId == bytes32(0)) revert InvalidEvidence();
         milestone.challengeReviewCaseId = challengeCaseId;
@@ -672,6 +677,18 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         for (uint256 i = 0; i < count; i++) {
             total += milestones[campaignId][i].budget;
         }
+    }
+
+    function _createReviewCase(
+        address creator,
+        uint256 campaignId,
+        uint256 milestoneId,
+        uint256 evidenceRevision,
+        uint256 riskValue
+    ) private returns (bytes32) {
+        return reviewEngine.createReviewCase(
+            creator, campaignId, milestoneId, evidenceRevision, riskValue
+        );
     }
 
     function _campaign(uint256 campaignId) private view returns (Campaign storage campaign) {

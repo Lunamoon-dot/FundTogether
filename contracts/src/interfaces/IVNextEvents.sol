@@ -127,7 +127,13 @@ interface IVNextEvents {
         uint256 indexed campaignId,
         uint256 indexed milestoneId,
         uint256 evidenceRevision,
-        address creator
+        address creator,
+        uint256 riskValue,
+        uint256 requiredCaseStake
+    );
+
+    event ReviewCaseSettled(
+        bytes32 indexed reviewCaseId, uint8 outcome, uint256 totalSlash, uint256 winners
     );
 
     event JudgeSlashed(bytes32 indexed reviewCaseId, address indexed judge, uint256 amount);

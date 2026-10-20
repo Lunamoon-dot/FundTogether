@@ -13,7 +13,8 @@ contract MockReviewFinality {
         address,
         uint256 campaignId,
         uint256 milestoneId,
-        uint256 evidenceRevision
+        uint256 evidenceRevision,
+        uint256
     ) external returns (bytes32 reviewCaseId) {
         reviewCaseId = keccak256(
             abi.encode(msg.sender, campaignId, milestoneId, evidenceRevision, nextCase++)
