@@ -68,4 +68,58 @@ describe("VNext event projector", () => {
     expect(state.campaigns.size).toBe(1);
     expect(state.seenEvents.size).toBe(1);
   });
+
+  it("projects milestone review case changes and canonical ruling state", () => {
+    const state = createVNextProjectionState();
+    const rootCaseId = "0x1111111111111111111111111111111111111111111111111111111111111111";
+    const retryCaseId = "0x2222222222222222222222222222222222222222222222222222222222222222";
+    const campaignId = 7n;
+
+    applyVNextEvent(state, event("CampaignCreated", {
+      campaignId,
+      creator: "0x0000000000000000000000000000000000000001",
+      payoutWallet: "0x0000000000000000000000000000000000000002",
+      commitmentHash: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      goal: 100n,
+      fundingDeadline: 1000n,
+      publicationEvidenceHash: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      publicationReviewCaseId: rootCaseId,
+      policyVersion: 1n,
+    }));
+    applyVNextEvent(state, event("MilestoneEvidenceSubmitted", {
+      campaignId,
+      milestoneId: 0n,
+      evidenceRevision: 1n,
+      evidenceHash: "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      reviewCaseId: rootCaseId,
+    }, 1));
+    applyVNextEvent(state, event("ReviewCaseCreated", {
+      reviewCaseId: rootCaseId,
+      campaignId,
+      milestoneId: 0n,
+      evidenceRevision: 1n,
+      creator: "0x0000000000000000000000000000000000000001",
+    }, 2));
+    applyVNextEvent(state, event("ReviewRetryOpened", {
+      rootCaseId,
+      retryRoundId: 1n,
+      reviewCaseId: retryCaseId,
+    }, 3));
+    applyVNextEvent(state, event("MilestoneReviewStateChanged", {
+      campaignId,
+      milestoneId: 0n,
+      reviewCaseId: retryCaseId,
+      state: 9n,
+      outcome: 1n,
+      challengeDeadline: 1234n,
+      correctionDeadline: 0n,
+    }, 4));
+
+    expect(state.milestones.get("7:0")).toMatchObject({
+      reviewCaseId: retryCaseId,
+      state: 9,
+      finalOutcome: 1,
+      challengeDeadline: "1234",
+    });
+  });
 });

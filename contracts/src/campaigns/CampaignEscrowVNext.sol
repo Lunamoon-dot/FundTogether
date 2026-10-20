@@ -283,6 +283,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         if (campaign.state != VNextTypes.CampaignState.CREATED) revert WrongState();
         reviewCaseId = reviewEngine.openRetry(campaign.publicationReviewCaseId);
         campaign.publicationReviewCaseId = reviewCaseId;
+        emit PublicationReviewCaseChanged(campaignId, reviewCaseId);
     }
 
     function contribute(uint256 campaignId, uint256 amount) external nonReentrant {
@@ -424,6 +425,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         if (revision > 1) {
             emit MilestoneRevisionSubmitted(campaignId, milestoneId, revision, evidenceHash);
         }
+        _emitMilestoneReviewState(campaignId, milestoneId, milestone);
     }
 
     /// @notice Ends a failed milestone after the frozen correction allowance
@@ -437,6 +439,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
                 || block.timestamp < milestone.correctionDeadline
         ) revert CorrectionLimitReached();
         milestone.state = VNextTypes.MilestoneState.TERMINAL;
+        _emitMilestoneReviewState(campaignId, milestoneId, milestone);
         _openRefunds(campaignId, campaign);
     }
 
@@ -452,6 +455,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         if (!submissionExpired && !correctionExpired) revert MilestoneDeadlineExpired();
 
         milestone.state = VNextTypes.MilestoneState.TERMINAL;
+        _emitMilestoneReviewState(campaignId, milestoneId, milestone);
         _openRefunds(campaignId, campaign);
     }
 
@@ -477,6 +481,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
             uint8 result = reviewEngine.reviewResult(milestone.reviewCaseId);
             if (result == 3 || result == 4) {
                 milestone.state = VNextTypes.MilestoneState.RETRY_PENDING;
+                _emitMilestoneReviewState(campaignId, milestoneId, milestone);
                 return outcome;
             }
             revert ReviewNotFinal();
@@ -493,6 +498,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
             milestone.state = VNextTypes.MilestoneState.TERMINAL;
             _openRefunds(campaignId, campaign);
         }
+        _emitMilestoneReviewState(campaignId, milestoneId, milestone);
     }
 
     /// @notice Opens the next bounded review attempt after an invalid/tied or
@@ -518,6 +524,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         milestone.reviewCaseId = reviewCaseId;
         milestone.finalOutcome = VNextTypes.ReviewOutcome.NONE;
         milestone.state = VNextTypes.MilestoneState.REVIEW_ENROLLMENT;
+        _emitMilestoneReviewState(campaignId, milestoneId, milestone);
     }
 
     /// @notice Lets an eligible Backer request the next review round. The
@@ -536,6 +543,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
             appealCaseId = reviewEngine.openAppeal(campaign.publicationReviewCaseId, msg.sender);
             if (appealCaseId == bytes32(0)) revert AppealNotAllowed();
             campaign.publicationReviewCaseId = appealCaseId;
+            emit PublicationReviewCaseChanged(campaignId, appealCaseId);
             return appealCaseId;
         }
 
@@ -555,6 +563,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         if (appealCaseId == bytes32(0)) revert AppealNotAllowed();
         milestone.reviewCaseId = appealCaseId;
         milestone.state = VNextTypes.MilestoneState.APPEAL_WINDOW;
+        _emitMilestoneReviewState(campaignId, milestoneId, milestone);
     }
 
     /// @notice Releases exactly the frozen milestone budget after final PASS
@@ -778,6 +787,22 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
     ) private returns (bytes32) {
         return reviewEngine.createReviewCase(
             creator, campaignId, milestoneId, evidenceRevision, riskValue
+        );
+    }
+
+    function _emitMilestoneReviewState(
+        uint256 campaignId,
+        uint256 milestoneId,
+        Milestone storage milestone
+    ) private {
+        emit MilestoneReviewStateChanged(
+            campaignId,
+            milestoneId,
+            milestone.reviewCaseId,
+            uint8(milestone.state),
+            uint8(milestone.finalOutcome),
+            milestone.challengeDeadline,
+            milestone.correctionDeadline
         );
     }
 

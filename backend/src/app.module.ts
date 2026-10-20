@@ -31,6 +31,8 @@ import { PayoutController } from "./modules/payout/controllers/payout.controller
 import { PayoutService } from "./modules/payout/services/payout.service";
 import { loadVNextConnection, VNEXT_CONNECTION, VNextIndexerService } from "./indexer/vnext-indexer.service";
 import { VNextController } from "./modules/campaigns/controllers/vnext.controller";
+import { VNextEvidenceController } from "./modules/campaigns/controllers/vnext-evidence.controller";
+import { VNextEvidenceService } from "./modules/campaigns/services/vnext-evidence.service";
 
 @Module({
   imports: [
@@ -56,6 +58,7 @@ import { VNextController } from "./modules/campaigns/controllers/vnext.controlle
     CompletionController,
     PayoutController,
     VNextController,
+    VNextEvidenceController,
     HealthController,
   ],
   providers: [
@@ -73,6 +76,7 @@ import { VNextController } from "./modules/campaigns/controllers/vnext.controlle
     PledgeService,
     CompletionService,
     PayoutService,
+    VNextEvidenceService,
   ],
   exports: [
     CommitmentService,

@@ -4,14 +4,20 @@ import { encodeAbiParameters, keccak256 } from 'viem';
 import type { Abi } from 'viem';
 import { usePublicClient } from 'wagmi';
 import reviewArtifact from '../../../../../backend/src/blockchain/generated/vnext/JuryReview.json';
+import campaignArtifact from '../../../../../backend/src/blockchain/generated/vnext/CampaignEscrowVNext.json';
 import { useAccountSession } from '../../auth/AccountSessionProvider';
 import { campaignApi, type VNextDeployment, type VNextReviewWithAssignments } from '../api/campaigns';
 import { getErrorMessage } from '../../../lib/api/error';
 import { useVNextTransaction } from './vnext-transaction';
 import { vnextStageLabel } from './vnext-actions';
+import { VNextEvidencePanel } from './VNextEvidencePanel';
 
 const reviewAbi = reviewArtifact.abi as Abi;
+const campaignAbi = campaignArtifact.abi as Abi;
 const ZERO_HASH = `0x${'0'.repeat(64)}` as `0x${string}`;
+const ROUND_ENROLLMENT_OPEN = 0;
+const ROUND_ASSIGNMENT_PENDING = 2;
+const ROUND_VOTING = 3;
 
 function validBytes32(value: string): value is `0x${string}` {
   return /^0x[0-9a-fA-F]{64}$/.test(value);
@@ -92,26 +98,46 @@ function JudgeReviewCard({
   const caseId = review.reviewCaseId as `0x${string}`;
   const meta = useQuery({
     queryKey: ['vnext-judge-case-meta', review.reviewCaseId, transaction.address, currentAssignment?.courtId],
-    enabled: Boolean(client && deployment.juryReview && transaction.address),
+    enabled: Boolean(client && deployment.juryReview && deployment.campaignEscrow && transaction.address),
     queryFn: async () => {
-      if (!client || !deployment.juryReview || !transaction.address) throw new Error('VNext review client is unavailable');
-      const [caseNumber, protocolVersion, requiredCaseStake, commitment, revealed] = await Promise.all([
+      if (!client || !deployment.juryReview || !deployment.campaignEscrow || !transaction.address) throw new Error('VNext review client is unavailable');
+      const [caseNumber, protocolVersion, requiredCaseStake, commitment, revealed, roundStatus, enrollmentDeadline, commitDeadline, revealDeadline, snapshotFinalized, courtAssigned, courtFinalized, contribution] = await Promise.all([
         client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'caseNumber', args: [caseId] }),
         client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'protocolVersion' }),
         client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'requiredCaseStake', args: [caseId] }),
         currentAssignment ? client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'commitments', args: [caseId, courtId, transaction.address] }) : ZERO_HASH,
         currentAssignment ? client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'revealed', args: [caseId, courtId, transaction.address] }) : false,
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'roundStatus', args: [caseId] }),
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'enrollmentDeadline', args: [caseId] }),
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'commitDeadline', args: [caseId] }),
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'revealDeadline', args: [caseId] }),
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'snapshotFinalized', args: [caseId] }),
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'courtAssigned', args: [caseId, courtId] }),
+        currentAssignment ? client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'courtFinalized', args: [caseId, courtId] }) : false,
+        client.readContract({ address: deployment.campaignEscrow, abi: campaignAbi, functionName: 'contributionOf', args: [BigInt(review.campaignId), transaction.address] }),
       ]);
-      return { caseNumber: BigInt(caseNumber as bigint), protocolVersion: BigInt(protocolVersion as bigint), requiredCaseStake: BigInt(requiredCaseStake as bigint), commitment: commitment as `0x${string}`, revealed: Boolean(revealed) };
+      return {
+        caseNumber: BigInt(caseNumber as bigint), protocolVersion: BigInt(protocolVersion as bigint), requiredCaseStake: BigInt(requiredCaseStake as bigint),
+        commitment: commitment as `0x${string}`, revealed: Boolean(revealed), roundStatus: Number(roundStatus),
+        enrollmentDeadline: BigInt(enrollmentDeadline as bigint), commitDeadline: BigInt(commitDeadline as bigint), revealDeadline: BigInt(revealDeadline as bigint),
+        snapshotFinalized: Boolean(snapshotFinalized), courtAssigned: Boolean(courtAssigned), courtFinalized: Boolean(courtFinalized),
+        contribution: BigInt(contribution as bigint),
+      };
     },
     retry: false,
   });
   const computedCommitment = meta.data && transaction.address && validBytes32(salt)
     ? makeCommitment(review, courtId, transaction.address, meta.data.caseNumber, meta.data.protocolVersion, vote, salt)
     : null;
-  const canEnroll = !currentAssignment && meta.data;
-  const canCommit = Boolean(currentAssignment && computedCommitment && !meta.data?.commitment || meta.data?.commitment === ZERO_HASH);
-  const canReveal = Boolean(currentAssignment && computedCommitment && computedCommitment === meta.data?.commitment && !meta.data.revealed && validBytes32(salt));
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  const creatorConflict = Boolean(transaction.address && transaction.address.toLowerCase() === review.creator.toLowerCase());
+  const contributorConflict = Boolean(meta.data?.contribution && meta.data.contribution > 0n);
+  const canEnroll = Boolean(!currentAssignment && meta.data && meta.data.roundStatus === ROUND_ENROLLMENT_OPEN && now < meta.data.enrollmentDeadline && !creatorConflict && !contributorConflict);
+  const canFinalizeSnapshot = Boolean(meta.data && meta.data.roundStatus === ROUND_ENROLLMENT_OPEN && !meta.data.snapshotFinalized && now >= meta.data.enrollmentDeadline && BigInt(review.enrolledCount) >= 3n);
+  const canAssignCourt = Boolean(meta.data && meta.data.roundStatus === ROUND_ASSIGNMENT_PENDING && meta.data.snapshotFinalized && !meta.data.courtAssigned);
+  const canCommit = Boolean(currentAssignment && meta.data?.roundStatus === ROUND_VOTING && now >= meta.data.enrollmentDeadline && now < meta.data.commitDeadline && computedCommitment && meta.data.commitment === ZERO_HASH);
+  const canReveal = Boolean(currentAssignment && meta.data?.roundStatus === ROUND_VOTING && now >= meta.data.commitDeadline && now < meta.data.revealDeadline && computedCommitment === meta.data.commitment && !meta.data.revealed && validBytes32(salt));
+  const canFinalizeCourt = Boolean(currentAssignment && meta.data?.roundStatus === ROUND_VOTING && now >= meta.data.revealDeadline && !meta.data.courtFinalized);
 
   return (
     <article className="monograph-card space-y-3">
@@ -119,6 +145,9 @@ function JudgeReviewCard({
       <h2 className="monograph-card__title">Case {review.reviewCaseId}</h2>
       <p className="text-sm m-0">Campaign {review.campaignId} · milestone {review.milestoneId} · round {review.roundId} · enrolled {review.enrolledCount}</p>
       <p className="text-xs font-mono break-all m-0">Assignment: {currentAssignment ? `court ${currentAssignment.courtId}, slot ${currentAssignment.slot}` : 'chưa được chọn vào court'}</p>
+      <p className="text-sm text-[var(--ink-subtle)] m-0">{review.outcome == null ? 'Court chưa final canonical outcome; chưa hiển thị PASS/FAIL cuối cùng.' : `Canonical review outcome: ${review.outcome}`}</p>
+      {creatorConflict && <p className="text-sm text-[var(--danger)] m-0">Creator conflict: wallet tạo case không được enroll.</p>}
+      {contributorConflict && !creatorConflict && <p className="text-sm text-[var(--danger)] m-0">Contributor conflict: wallet đã góp vốn cho campaign không được enroll.</p>}
       {meta.data && <p className="text-sm text-[var(--ink-subtle)] m-0">Case stake tối thiểu: {meta.data.requiredCaseStake.toString()} token units.</p>}
       {canEnroll && deployment.juryRegistry && (
         <div className="flex flex-wrap gap-2">
@@ -145,10 +174,11 @@ function JudgeReviewCard({
       {currentAssignment && review.finalized && meta.data?.revealed && (
         <button type="button" className="button button--secondary" disabled={transaction.busy} onClick={() => void transaction.send('registry', 'claimReward', [caseId])}>Claim Judge reward</button>
       )}
+      {currentAssignment && <VNextEvidencePanel reviewCaseId={review.reviewCaseId} />}
       <div className="flex flex-wrap gap-2">
-        <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('review', 'finalizeSnapshot', [caseId])}>Finalize snapshot</button>
-        {!currentAssignment && <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('review', 'assignCourt', [caseId, 0n])}>Assign court 0</button>}
-        {currentAssignment && <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('review', 'finalizeCourt', [caseId, courtId])}>Finalize court</button>}
+        {meta.data?.roundStatus === ROUND_ENROLLMENT_OPEN && <button type="button" className="button button--quiet" disabled={!canFinalizeSnapshot || transaction.busy} onClick={() => void transaction.send('review', 'finalizeSnapshot', [caseId])}>Finalize snapshot</button>}
+        {meta.data?.roundStatus === ROUND_ASSIGNMENT_PENDING && <button type="button" className="button button--quiet" disabled={!canAssignCourt || transaction.busy} onClick={() => void transaction.send('review', 'assignCourt', [caseId, 0n])}>Assign court 0</button>}
+        {currentAssignment && <button type="button" className="button button--quiet" disabled={!canFinalizeCourt || transaction.busy} onClick={() => void transaction.send('review', 'finalizeCourt', [caseId, courtId])}>Finalize court</button>}
       </div>
       {transaction.stage !== 'idle' && <p className="text-sm m-0" role="status">{vnextStageLabel(transaction.stage)}{transaction.txHash ? ` · ${transaction.txHash}` : ''}</p>}
       {transaction.error && <p className="monograph-alert monograph-alert--error" role="alert">{getErrorMessage(transaction.error)}</p>}

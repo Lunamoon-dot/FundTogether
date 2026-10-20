@@ -147,6 +147,23 @@ interface IVNextEvents {
         bytes32 evidenceHash
     );
 
+    /// @notice Canonical milestone state after a permissionless review
+    /// transition. The indexer must not infer this state from a database row
+    /// or from a Judge vote event alone.
+    event MilestoneReviewStateChanged(
+        uint256 indexed campaignId,
+        uint256 indexed milestoneId,
+        bytes32 indexed reviewCaseId,
+        uint8 state,
+        uint8 outcome,
+        uint256 challengeDeadline,
+        uint256 correctionDeadline
+    );
+
+    event PublicationReviewCaseChanged(
+        uint256 indexed campaignId, bytes32 indexed reviewCaseId
+    );
+
     event MilestonePaid(
         uint256 indexed campaignId,
         uint256 indexed milestoneId,

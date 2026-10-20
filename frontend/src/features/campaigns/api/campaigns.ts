@@ -204,6 +204,20 @@ export interface VNextAssignedReview {
   assignments: VNextJudgeAssignment[];
 }
 export type VNextReviewWithAssignments = VNextAssignedReview;
+export interface VNextCaseEvidence {
+  reviewCaseId: string;
+  evidenceHash: string;
+  sha256: string;
+  mediaType: string;
+  sizeBytes: number;
+  summary: string;
+  createdAt: string;
+}
+export interface VNextCaseEvidenceResponse {
+  access: 'CREATOR' | 'JUDGE';
+  assignments: VNextJudgeAssignment[];
+  evidence: VNextCaseEvidence[];
+}
 export interface CampaignChain {
   deployment: DeploymentManifest; status: 'ON_CHAIN_CONFIRMED' | 'ORPHANED' | 'NOT_PUBLISHED'; onchainCampaignId: string | null;
   bindingTransactionHash: `0x${string}` | null;
@@ -366,6 +380,12 @@ export const campaignApi = {
   vnextMilestones: async (id: string, signal?: AbortSignal) => (await http.get<VNextMilestoneProjection[]>(`/v1/fundtogether/vnext/campaigns/${id}/milestones`, { signal })).data,
   vnextAssignedReviews: async (signal?: AbortSignal) => (await http.get<VNextAssignedReview[]>('/v1/fundtogether/vnext/reviews/assigned', { signal })).data,
   vnextReviews: async (signal?: AbortSignal) => (await http.get<VNextReviewWithAssignments[]>('/v1/fundtogether/vnext/reviews', { signal })).data,
+  vnextEvidence: async (reviewCaseId: string, signal?: AbortSignal) => (await http.get<VNextCaseEvidenceResponse>(`/v1/fundtogether/vnext/reviews/${encodeURIComponent(reviewCaseId)}/evidence`, { signal })).data,
+  vnextUploadEvidence: async (reviewCaseId: string, summary: string, file: File) => {
+    const data = new FormData(); data.append('summary', summary); data.append('file', file);
+    return (await http.post<VNextCaseEvidence>(`/v1/fundtogether/vnext/reviews/${encodeURIComponent(reviewCaseId)}/evidence`, data, { headers: { 'Content-Type': undefined }, timeout: 60000 })).data;
+  },
+  vnextEvidenceFileUrl: (reviewCaseId: string, evidenceHash: string) => `/v1/fundtogether/vnext/reviews/${encodeURIComponent(reviewCaseId)}/evidence/${encodeURIComponent(evidenceHash)}/file`,
   vnextTransaction: async (txHash: string, signal?: AbortSignal) => (await http.get<VNextTransactionStatus>(`/v1/fundtogether/vnext/transactions/${txHash}`, { signal })).data,
   chain: async (id: string, signal?: AbortSignal) => (await http.get<CampaignChain>(`${base}/campaigns/${id}/chain`, { signal })).data,
   operations: async (scope: 'creator' | 'judge' | 'resolver' | 'admin', signal?: AbortSignal) =>

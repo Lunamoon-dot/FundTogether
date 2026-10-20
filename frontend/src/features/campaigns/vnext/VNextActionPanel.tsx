@@ -3,29 +3,125 @@ import { useQuery } from '@tanstack/react-query';
 import { useAccount, usePublicClient } from 'wagmi';
 import type { Abi } from 'viem';
 import campaignArtifact from '../../../../../backend/src/blockchain/generated/vnext/CampaignEscrowVNext.json';
+import reviewArtifact from '../../../../../backend/src/blockchain/generated/vnext/JuryReview.json';
 import type {
   VNextCampaignProjection,
   VNextDeployment,
   VNextMilestoneProjection,
 } from '../api/campaigns';
+import { campaignApi } from '../api/campaigns';
 import { useVNextTransaction } from './vnext-transaction';
 import { vnextStageLabel } from './vnext-actions';
+import { VNextEvidencePanel } from './VNextEvidencePanel';
 
 const CAMPAIGN_FUNDING = 1;
 const CAMPAIGN_MILESTONES_RUNNING = 3;
 const CAMPAIGN_REFUNDING = 5;
 const CAMPAIGN_REFUNDING_REMAINDER = 6;
+const MILESTONE_PENDING = 0;
+const MILESTONE_REVIEW_ENROLLMENT = 2;
+const MILESTONE_BASE_REVIEW = 3;
+const MILESTONE_RETRY_PENDING = 4;
+const MILESTONE_PROVISIONAL_RULING = 5;
+const MILESTONE_APPEAL_WINDOW = 6;
+const MILESTONE_CORRECTION = 12;
+const MILESTONE_RESUBMIT = 13;
 const MILESTONE_PAYABLE = 8;
 const campaignAbi = campaignArtifact.abi as Abi;
+const reviewAbi = reviewArtifact.abi as Abi;
 
 function tokenAmount(value: string): bigint | null {
   if (!/^[0-9]+$/.test(value) || value === '0') return null;
   try { return BigInt(value); } catch { return null; }
 }
 
+function VNextMilestoneActions({
+  campaignId,
+  campaign,
+  milestone,
+  deployment,
+  creator,
+  userId,
+  onRefresh,
+}: {
+  campaignId: string;
+  campaign: VNextCampaignProjection;
+  milestone: VNextMilestoneProjection;
+  deployment: VNextDeployment;
+  creator: boolean;
+  userId?: string;
+  onRefresh: () => void;
+}) {
+  const transaction = useVNextTransaction(onRefresh);
+  const client = usePublicClient({ chainId: 31339 });
+  const [evidenceHash, setEvidenceHash] = useState('');
+  const campaignNumber = /^[0-9]+$/.test(campaignId) ? BigInt(campaignId) : null;
+  const milestoneNumber = BigInt(milestone.milestoneId);
+  const timing = useQuery({
+    queryKey: ['vnext-milestone-timing', campaignId, milestone.milestoneId, deployment.campaignEscrow],
+    enabled: Boolean(client && deployment.campaignEscrow && campaignNumber !== null),
+    queryFn: async () => {
+      if (!client || !deployment.campaignEscrow || campaignNumber === null) throw new Error('Milestone read client is unavailable');
+      const [submissionDeadline, correctionDeadline] = await Promise.all([
+        client.readContract({ address: deployment.campaignEscrow, abi: campaignAbi, functionName: 'milestoneSubmissionDeadline', args: [campaignNumber, milestoneNumber] }),
+        client.readContract({ address: deployment.campaignEscrow, abi: campaignAbi, functionName: 'milestoneCorrectionDeadline', args: [campaignNumber, milestoneNumber] }),
+      ]);
+      return { submissionDeadline: BigInt(submissionDeadline as bigint), correctionDeadline: BigInt(correctionDeadline as bigint) };
+    },
+    retry: false,
+  });
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  const submissionExpired = Boolean(timing.data?.submissionDeadline && now >= timing.data.submissionDeadline);
+  const correctionExpired = Boolean(timing.data?.correctionDeadline && now >= timing.data.correctionDeadline);
+  const canEditEvidence = creator && campaign.state === CAMPAIGN_MILESTONES_RUNNING
+    && [MILESTONE_PENDING, MILESTONE_CORRECTION, MILESTONE_RESUBMIT].includes(milestone.state);
+  const canSubmit = canEditEvidence && /^0x[0-9a-fA-F]{64}$/.test(evidenceHash);
+
+  return (
+    <article className="monograph-card space-y-3" data-vnext-milestone={milestone.milestoneId}>
+      <div>
+        <span className="monograph-card__kicker">MILESTONE {milestone.milestoneId}</span>
+        <p className="text-sm text-[var(--ink-subtle)] m-0">State {milestone.state} · revision {milestone.evidenceRevision} · {milestone.paid ? 'đã payout' : 'chưa payout'}</p>
+      </div>
+
+      {canEditEvidence && (
+        <div className="space-y-2" data-vnext-action="submitMilestoneEvidence">
+          <label className="text-sm block" htmlFor={`vnext-evidence-hash-${milestone.milestoneId}`}>Evidence hash cho milestone {milestone.milestoneId}</label>
+          <input id={`vnext-evidence-hash-${milestone.milestoneId}`} className="font-mono" value={evidenceHash} onChange={event => setEvidenceHash(event.target.value)} placeholder="0x + 64 hex chars" />
+          <button type="button" className="button button--primary" disabled={!canSubmit || transaction.busy || campaignNumber === null} onClick={() => void transaction.send('campaign', 'submitMilestoneEvidence', [campaignNumber!, milestoneNumber, evidenceHash as `0x${string}`])}>Submit evidence revision</button>
+        </div>
+      )}
+
+      {creator && milestone.reviewCaseId && <VNextEvidencePanel reviewCaseId={milestone.reviewCaseId} enabled={Boolean(userId)} />}
+
+      {campaignNumber !== null && (
+        <div className="flex flex-wrap gap-2" data-vnext-action="milestone-timeouts">
+          {milestone.state === MILESTONE_PENDING && submissionExpired && <button type="button" className="button button--secondary" disabled={transaction.busy} onClick={() => void transaction.send('campaign', 'expireMilestoneSubmission', [campaignNumber, milestoneNumber])}>Expire submission deadline</button>}
+          {milestone.state === MILESTONE_CORRECTION && correctionExpired && <button type="button" className="button button--secondary" disabled={transaction.busy} onClick={() => void transaction.send('campaign', 'finalizeCorrectionFailure', [campaignNumber, milestoneNumber])}>Finalize correction failure</button>}
+          {[MILESTONE_REVIEW_ENROLLMENT, MILESTONE_BASE_REVIEW, MILESTONE_PROVISIONAL_RULING, MILESTONE_APPEAL_WINDOW].includes(milestone.state) && milestone.reviewCaseId && <>
+            <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('campaign', 'syncFinalRuling', [campaignNumber, milestoneNumber])}>Sync final ruling</button>
+            {[MILESTONE_PROVISIONAL_RULING, MILESTONE_APPEAL_WINDOW].includes(milestone.state) && <>
+              <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('campaign', 'openAppeal', [campaignNumber, milestoneNumber])}>Open appeal</button>
+              <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('review', 'finalizeNoAppeal', [milestone.reviewCaseId as `0x${string}`])}>Finalize no appeal</button>
+            </>}
+          </>}
+          {milestone.state === MILESTONE_RETRY_PENDING && milestone.reviewCaseId && <>
+            <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('campaign', 'retryMilestoneReview', [campaignNumber, milestoneNumber])}>Retry review</button>
+            <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('review', 'finalizeProtocolFailure', [milestone.reviewCaseId as `0x${string}`])}>Finalize protocol failure</button>
+          </>}
+        </div>
+      )}
+
+      {milestone.state === MILESTONE_PAYABLE && campaignNumber !== null && <button type="button" className="button button--primary" disabled={transaction.busy} onClick={() => void transaction.send('campaign', 'payMilestone', [campaignNumber, milestoneNumber])}>Payout milestone {milestone.milestoneId}</button>}
+      {transaction.stage !== 'idle' && <p className="text-sm m-0" role="status">{vnextStageLabel(transaction.stage)}{transaction.txHash ? ` · ${transaction.txHash}` : ''}</p>}
+      {transaction.error && <p className="monograph-alert monograph-alert--error" role="alert">{transaction.error}</p>}
+    </article>
+  );
+}
+
 export function VNextActionPanel({
   campaignId,
-  userId: _userId,
+  userId,
   campaign,
   milestones,
   deployment,
@@ -42,12 +138,28 @@ export function VNextActionPanel({
   const account = useAccount();
   const client = usePublicClient({ chainId: 31339 });
   const [amount, setAmount] = useState('');
-  const [evidenceHash, setEvidenceHash] = useState('');
   const creator = Boolean(transaction.address && transaction.address.toLowerCase() === campaign.creator.toLowerCase());
   const amountValue = tokenAmount(amount);
   const fundingEnded = BigInt(Math.floor(Date.now() / 1000)) >= BigInt(campaign.fundingDeadline);
-  const firstMilestone = milestones[0];
   const campaignNumber = /^[0-9]+$/.test(campaignId) ? BigInt(campaignId) : null;
+  const reviews = useQuery({
+    queryKey: ['vnext-reviews', deployment.juryReview],
+    queryFn: ({ signal }) => campaignApi.vnextReviews(signal),
+    enabled: Boolean(deployment.juryReview),
+    retry: false,
+  });
+  const publicationReview = reviews.data?.find(review => review.reviewCaseId.toLowerCase() === campaign.publicationReviewCaseId?.toLowerCase());
+  const publicationFinality = useQuery({
+    queryKey: ['vnext-publication-finality', campaignId, campaign.publicationReviewCaseId, deployment.juryReview],
+    enabled: Boolean(client && deployment.juryReview && campaign.publicationReviewCaseId),
+    queryFn: async () => {
+      if (!client || !deployment.juryReview || !campaign.publicationReviewCaseId) throw new Error('Publication review client is unavailable');
+      const outcome = await client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'finalOutcome', args: [campaign.publicationReviewCaseId as `0x${string}`] });
+      return Number(outcome);
+    },
+    retry: false,
+  });
+  const publicationFinalOutcome = publicationFinality.data ?? (campaign.publicationOutcome && campaign.publicationOutcome !== 0 ? campaign.publicationOutcome : 0);
   const backerPosition = useQuery({
     queryKey: ['vnext-backer-position', campaignId, account.address, deployment.campaignEscrow],
     enabled: Boolean(client && account.address && deployment.campaignEscrow && campaignNumber !== null),
@@ -75,20 +187,28 @@ export function VNextActionPanel({
     void transaction.send('token', 'approve', [deployment.campaignEscrow, amountValue]);
   };
 
-  const submitEvidence = () => {
-    if (!/^0x[0-9a-fA-F]{64}$/.test(evidenceHash) || campaignNumber === null) return;
-    void transaction.send('campaign', 'submitMilestoneEvidence', [campaignNumber, 0n, evidenceHash as `0x${string}`]);
-  };
-
   return (
     <section className="monograph-card space-y-3" aria-labelledby="vnext-actions-title">
       <span className="monograph-card__kicker">PERMISSIONLESS ACTIONS</span>
       <h2 id="vnext-actions-title" className="monograph-card__title">Thao tác on-chain</h2>
       <p className="text-sm text-[var(--ink-subtle)] m-0">Mọi nút dưới đây gọi trực tiếp contract VNext. Backend chỉ xác nhận receipt và indexed event.</p>
 
-      {campaign.state === 0 && campaign.publicationOutcome !== null && campaign.publicationOutcome !== 0 && (
+      {campaign.state === 0 && campaign.publicationReviewCaseId && (
+        <div className="space-y-2" data-vnext-action="publication-review">
+          <p className="text-sm text-[var(--ink-subtle)] m-0">Publication case {publicationReview?.outcome == null ? 'đang chờ canonical review outcome' : `đã có court result ${publicationReview.outcome}`}. Chỉ final ruling từ review contract mới mở funding.</p>
+          {publicationReview?.outcome === 1 && publicationFinalOutcome === 0 && <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('review', 'finalizeNoAppeal', [campaign.publicationReviewCaseId as `0x${string}`])}>Finalize publication review</button>}
+          {publicationReview?.outcome === 2 && publicationFinalOutcome === 0 && creator && <>
+            <button type="button" className="button button--quiet" disabled={transaction.busy || campaignNumber === null} onClick={() => void transaction.send('campaign', 'openAppeal', [campaignNumber!, 2n ** 256n - 1n])}>Open publication appeal</button>
+            <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('review', 'finalizeNoAppeal', [campaign.publicationReviewCaseId as `0x${string}`])}>Finalize publication review</button>
+          </>}
+          {(publicationReview?.outcome === 3 || publicationReview?.outcome === 4) && publicationFinalOutcome === 0 && <button type="button" className="button button--quiet" disabled={transaction.busy || campaignNumber === null} onClick={() => void transaction.send('campaign', 'retryPublication', [campaignNumber!])}>Retry publication review</button>}
+          {publicationFinalOutcome !== 0 && <p className="text-sm text-[var(--ink-subtle)] m-0">Final publication outcome {publicationFinalOutcome} đã được ghi nhận bởi review contract.</p>}
+        </div>
+      )}
+
+      {campaign.state === 0 && publicationFinalOutcome !== 0 && (
         <div data-vnext-action="finalizePublication">
-          <p className="text-sm text-[var(--ink-subtle)] m-0">Publication Judge case đã có outcome; bất kỳ caller nào cũng có thể materialize state tiếp theo từ contract.</p>
+          <p className="text-sm text-[var(--ink-subtle)] m-0">Publication review đã có final outcome; bất kỳ caller nào cũng có thể materialize state tiếp theo từ contract.</p>
           <button type="button" className="button button--primary" disabled={transaction.busy || campaignNumber === null} onClick={() => void transaction.send('campaign', 'finalizePublication', [campaignNumber!])}>Finalize publication</button>
         </div>
       )}
@@ -118,17 +238,19 @@ export function VNextActionPanel({
         </div>
       )}
 
-      {creator && campaign.state === CAMPAIGN_MILESTONES_RUNNING && firstMilestone && (
-        <div className="space-y-2" data-vnext-action="submitMilestoneEvidence">
-          <label className="text-sm block" htmlFor="vnext-evidence-hash">Evidence hash cho milestone 0</label>
-          <input id="vnext-evidence-hash" className="font-mono" value={evidenceHash} onChange={event => setEvidenceHash(event.target.value)} placeholder="0x + 64 hex chars" />
-          <button type="button" className="button button--primary" disabled={!/^0x[0-9a-fA-F]{64}$/.test(evidenceHash) || transaction.busy} onClick={submitEvidence}>Submit evidence</button>
-        </div>
-      )}
-
-      {firstMilestone?.state === MILESTONE_PAYABLE && (
-        <button type="button" className="button button--primary" disabled={transaction.busy || campaignNumber === null} onClick={() => void transaction.send('campaign', 'payMilestone', [campaignNumber!, BigInt(firstMilestone.milestoneId)])}>Payout milestone 0</button>
-      )}
+      {creator && campaign.publicationReviewCaseId && <VNextEvidencePanel reviewCaseId={campaign.publicationReviewCaseId} enabled={Boolean(userId)} />}
+      {campaign.state === CAMPAIGN_MILESTONES_RUNNING && milestones.map(milestone => (
+        <VNextMilestoneActions
+          key={milestone.milestoneId}
+          campaignId={campaignId}
+          campaign={campaign}
+          milestone={milestone}
+          deployment={deployment}
+          creator={creator}
+          userId={userId}
+          onRefresh={onRefresh}
+        />
+      ))}
 
       {(campaign.state === CAMPAIGN_REFUNDING || campaign.state === CAMPAIGN_REFUNDING_REMAINDER) && (
         <div className="flex flex-wrap gap-2" data-vnext-action="claimRefund">

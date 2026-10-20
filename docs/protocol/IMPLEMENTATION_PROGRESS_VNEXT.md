@@ -34,9 +34,9 @@ so the focused Solidity suite must be rerun before this delta is called green.
 | L | `CampaignEscrowVNext.sol` | Payout/refund/challenge tests: 4 passed; conservation/failure-transfer fuzz suite: 3 passed |
 | P | `DeployVNext.s.sol`, `deploy-vnext.cjs`, `verify-vnext-runtime.cjs`, `vnext-deployment.ts` | Foundry script compiles; runtime verifier/policy identity tests: 6 passed; one-time wiring is executable |
 | P0/P1 remediation | `JuryReview.sol`, `JuryRegistry.sol`, `CampaignEscrowVNext.sol` | Retry/settlement/stake/liveness/budget/refund/court-order regressions covered; full Foundry suite: 117 passed |
-| Q/R | `vnext-indexer.service.ts`, `vnext-event-projector.ts`, VNext Drizzle schema | Persistent event/projection/checkpoint transaction; replay/crash/refund/completion tests: 8 passed; real PostgreSQL replay check passed |
-| S/T | `vnext.controller.ts`, `vnext-evidence-integrity.ts` | Read-only projection API, SHA-256 evidence check and focused evidence tests added |
-| U/V/W/X | `VNextProtocolPage.tsx`, `VNextCreateCampaignPanel.tsx`, `VNextActionPanel.tsx`, `VNextJudgePage.tsx` | VNext Creator campaign creation/publication finalization, Backer actions and Judge stake/commit–reveal surface added; full journey and runtime acceptance remain incomplete |
+| Q/R | `vnext-indexer.service.ts`, `vnext-event-projector.ts`, `IVNextEvents.sol`, VNext Drizzle schema | Persistent event/projection/checkpoint transaction; milestone review state/case-pointer events now project retry, appeal, ruling, correction and timeout transitions; replay/crash/refund/completion tests remain the verification boundary |
+| S/T | `vnext.controller.ts`, `vnext-evidence.service.ts`, `vnext-evidence.controller.ts`, `vnext.schema.ts` | Read-only projection API plus private VNext case-evidence upload/read ACL, canonical hash verification and migration added |
+| U/V/W/X | `VNextProtocolPage.tsx`, `VNextCreateCampaignPanel.tsx`, `VNextActionPanel.tsx`, `VNextJudgePage.tsx`, `VNextEvidencePanel.tsx` | VNext Creator campaign creation/publication finalization, private evidence, Backer actions and Judge stake/commit–reveal/reward surface added; full journey and runtime acceptance remain incomplete |
 
 ## Current executable behavior
 
@@ -85,6 +85,12 @@ The current VNext contract slice can:
   case-stake reservation, enrollment and assigned commit–reveal actions;
 - validate VNext genesis, deployed bytecode and campaign ABI identity before a
   wallet transaction is signed.
+- emit and index canonical milestone review state/case-pointer events instead
+  of inferring retry, appeal, ruling, correction or timeout state from votes or
+  receipts;
+- keep VNext case evidence in private storage, verify its SHA-256 bytes against
+  the canonical on-chain evidence hash, and authorize only the Creator or an
+  assigned Judge.
 
 ## Not implemented yet
 
@@ -93,13 +99,12 @@ The following remain incomplete and must not be inferred from the passing slice:
 - non-reveal penalty remains the explicitly frozen local value `0`; production
   penalty economics and service-fee funding are not approved;
 - full appeal/retry contribution eligibility and evidence availability wiring
-  in the backend and wallet journeys;
+  for every review round in the backend and wallet journeys;
 - production batch/pull settlement and gas policy for the maximum 300-Judge
   snapshot;
 - complete invariant coverage for all review liveness and multi-court paths;
-- complete Creator multi-milestone/evidence-storage journey,
-  Backer balances and refund entitlement reads, Judge reward claim and exact
-  assigned-dossier ACL;
+- full per-round appeal/retry dossier ACL and availability handling, full Backer
+  balance/refund read models, and production reward economics;
 - fresh local runtime deployment and end-to-end acceptance.
 
 ## Verification record
@@ -138,15 +143,22 @@ deploying policy V2 and is not a current acceptance run for this branch.
 Frontend evidence: `npm test` → 199 passed;
 `npm run build` completed with only the existing large-bundle warning.
 
-Current policy-freeze branch evidence after the wallet-journey slice:
+Current policy-freeze branch evidence after the wallet-journey and projection
+state slices:
 
 ```text
 frontend: npm test -> 205 passed, 0 failed
 frontend: npm run build -> success (existing large-bundle warning)
-backend: focused VNext transaction-status Jest helper -> 3 passed, 0 failed
-backend: npm run build -> success
-contracts: Forge/Anvil verification remains pending because the tools are not
-available in this Windows environment.
+backend: explicit VNext Jest config -> 5 suites, 19 passed, 0 failed; npm run build -> success
+contracts: source event changes are present; Forge/Anvil and generated ABI
+regeneration remain pending because the tools are not available in this Windows
+environment.
+
+The repository's default backend `npm test` currently discovers zero tests due
+to its Jest pattern, while the explicit VNext config above discovers the
+checked-in `src/**/*.spec.ts` suites. A full historical backend run also needs
+RPC `127.0.0.1:9548` and currently cannot be treated as a green VNext runtime
+acceptance result.
 ```
 
 The current backend/frontend results do not imply contract deployment or
