@@ -46,7 +46,7 @@ contract DeployVNext is Script {
             MINORITY_SLASH_BPS
         );
         escrow = new CampaignEscrowVNext(
-            token, address(review), PROTOCOL_VERSION, POLICY_HASH, 7 days
+            token, address(review), PROTOCOL_VERSION, POLICY_HASH, 7 days, 7 days, 7 days
         );
         registry.configureReviewController(address(review));
         review.configureCampaignEscrow(address(escrow));

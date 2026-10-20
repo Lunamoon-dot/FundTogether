@@ -14,13 +14,14 @@ contract VNextPayoutRefundTest is Test {
     address private creator = makeAddr("vnext-payout-creator");
     address private payout = makeAddr("vnext-payout-wallet");
     address private backer = makeAddr("vnext-payout-backer");
+    address private secondBacker = makeAddr("vnext-payout-second-backer");
     uint256 private campaignId;
 
     function setUp() public {
         token = new MockUSDC();
         review = new MockReviewFinality();
         escrow = new CampaignEscrowVNext(
-            address(token), address(review), 1, keccak256("policy-v1"), 2 days
+            address(token), address(review), 1, keccak256("policy-v1"), 2 days, 7 days, 7 days
         );
 
         uint256[] memory budgets = new uint256[](2);
@@ -87,6 +88,7 @@ contract VNextPayoutRefundTest is Test {
         bytes32 secondCase = _submitEvidence(1, keccak256("evidence-two"));
         review.setFinalOutcome(secondCase, VNextTypes.ReviewOutcome.PROTOCOL_FAIL);
         escrow.syncFinalRuling(campaignId, 1);
+        escrow.freezeRefundAllocations(campaignId, 10);
 
         vm.prank(backer);
         escrow.claimRefund(campaignId);
@@ -113,11 +115,117 @@ contract VNextPayoutRefundTest is Test {
         assertEq(uint8(escrow.campaignState(campaignId)), uint8(VNextTypes.CampaignState.REFUNDING));
     }
 
+    function test_EnforceRefundAllocationBeforeClaim() public {
+        uint256 smallCampaign = _createPartialRefundCampaign();
+
+        vm.prank(backer);
+        vm.expectRevert(CampaignEscrowVNext.RefundAllocationIncomplete.selector);
+        escrow.claimRefund(smallCampaign);
+
+        escrow.freezeRefundAllocations(smallCampaign, 1);
+        vm.prank(backer);
+        vm.expectRevert(CampaignEscrowVNext.RefundAllocationIncomplete.selector);
+        escrow.claimRefund(smallCampaign);
+
+        escrow.freezeRefundAllocations(smallCampaign, 10);
+        vm.prank(backer);
+        escrow.claimRefund(smallCampaign);
+        vm.prank(secondBacker);
+        escrow.claimRefund(smallCampaign);
+        assertEq(
+            escrow.campaignRefunded(smallCampaign), escrow.campaignRefundPool(smallCampaign)
+        );
+    }
+
+    function test_AllRefundClaimsConsumeSnapshotPool() public {
+        uint256 smallCampaign = _createPartialRefundCampaign();
+        escrow.freezeRefundAllocations(smallCampaign, 10);
+
+        vm.prank(secondBacker);
+        escrow.claimRefund(smallCampaign);
+        vm.prank(backer);
+        escrow.claimRefund(smallCampaign);
+
+        assertEq(
+            escrow.campaignRefunded(smallCampaign), escrow.campaignRefundPool(smallCampaign)
+        );
+        assertEq(token.balanceOf(address(escrow)), 100e6);
+    }
+
+    function test_RefundEntitlementIsIndependentOfClaimOrder() public {
+        uint256 smallCampaign = _createPartialRefundCampaign();
+        escrow.freezeRefundAllocations(smallCampaign, 10);
+
+        assertEq(escrow.refundEntitlement(smallCampaign, backer), 0);
+        assertEq(escrow.refundEntitlement(smallCampaign, secondBacker), 1);
+
+        vm.prank(secondBacker);
+        escrow.claimRefund(smallCampaign);
+        vm.prank(backer);
+        escrow.claimRefund(smallCampaign);
+
+        assertTrue(escrow.refundClaimed(smallCampaign, backer));
+        assertTrue(escrow.refundClaimed(smallCampaign, secondBacker));
+        assertEq(token.balanceOf(backer), 0);
+        assertEq(token.balanceOf(secondBacker), 1);
+    }
+
     function _submitEvidence(uint256 milestoneId, bytes32 evidenceHash)
         private
         returns (bytes32 reviewCaseId)
     {
         vm.prank(creator);
         reviewCaseId = escrow.submitMilestoneEvidence(campaignId, milestoneId, evidenceHash);
+    }
+
+    function _createPartialRefundCampaign() private returns (uint256 smallCampaign) {
+        uint256[] memory budgets = new uint256[](2);
+        budgets[0] = 2;
+        budgets[1] = 1;
+        bytes32[] memory criteria = new bytes32[](2);
+        criteria[0] = keccak256("small-one");
+        criteria[1] = keccak256("small-two");
+        vm.prank(creator);
+        smallCampaign = escrow.createCampaign(
+            payout,
+            3,
+            block.timestamp + 7 days,
+            budgets,
+            criteria,
+            keccak256("small-publication")
+        );
+        review.setFinalOutcome(
+            escrow.publicationReviewCase(smallCampaign), VNextTypes.ReviewOutcome.FINAL_PASS
+        );
+        escrow.finalizePublication(smallCampaign);
+
+        token.mint(backer, 1);
+        token.mint(secondBacker, 2);
+        vm.startPrank(backer);
+        token.approve(address(escrow), 1);
+        escrow.contribute(smallCampaign, 1);
+        vm.stopPrank();
+        vm.startPrank(secondBacker);
+        token.approve(address(escrow), 2);
+        escrow.contribute(smallCampaign, 2);
+        vm.stopPrank();
+        escrow.finalizeFunding(smallCampaign);
+
+        bytes32 firstCase = _submitEvidenceFor(smallCampaign, 0, keccak256("small-evidence"));
+        review.setFinalOutcome(firstCase, VNextTypes.ReviewOutcome.FINAL_PASS);
+        escrow.syncFinalRuling(smallCampaign, 0);
+        vm.warp(block.timestamp + 2 days);
+        escrow.payMilestone(smallCampaign, 0);
+
+        vm.warp(block.timestamp + 7 days);
+        escrow.expireMilestoneSubmission(smallCampaign, 1);
+    }
+
+    function _submitEvidenceFor(uint256 id, uint256 milestoneId, bytes32 evidenceHash)
+        private
+        returns (bytes32 reviewCaseId)
+    {
+        vm.prank(creator);
+        reviewCaseId = escrow.submitMilestoneEvidence(id, milestoneId, evidenceHash);
     }
 }

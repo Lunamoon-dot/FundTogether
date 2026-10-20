@@ -8,6 +8,7 @@ import { VNextTypes } from "../../src/campaigns/VNextTypes.sol";
 contract MockReviewFinality {
     uint256 private nextCase;
     mapping(bytes32 => VNextTypes.ReviewOutcome) public finalOutcome;
+    mapping(bytes32 => uint8) public reviewResults;
 
     function createReviewCase(
         address,
@@ -25,6 +26,10 @@ contract MockReviewFinality {
         finalOutcome[reviewCaseId] = outcome;
     }
 
+    function setReviewResult(bytes32 reviewCaseId, uint8 result) external {
+        reviewResults[reviewCaseId] = result;
+    }
+
     function openAppeal(bytes32 reviewCaseId, address requester)
         external
         returns (bytes32 appealCaseId)
@@ -36,7 +41,7 @@ contract MockReviewFinality {
         retryCaseId = keccak256(abi.encode(reviewCaseId, bytes32("RETRY"), nextCase++));
     }
 
-    function reviewResult(bytes32) external pure returns (uint8 result) {
-        return result;
+    function reviewResult(bytes32 reviewCaseId) external view returns (uint8 result) {
+        return reviewResults[reviewCaseId];
     }
 }
