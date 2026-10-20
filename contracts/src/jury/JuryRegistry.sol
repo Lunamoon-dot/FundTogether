@@ -21,6 +21,11 @@ contract JuryRegistry is ReentrancyGuard, IVNextEvents {
     mapping(address => uint256) public depositedStake;
     mapping(address => uint256) public availableStake;
     mapping(address => uint256) public lockedStake;
+    mapping(bytes32 => bool) public caseRegistered;
+    mapping(bytes32 => uint256) public caseEnrollmentDeadline;
+    mapping(bytes32 => uint256) public requiredCaseStake;
+    mapping(bytes32 => bytes32) public casePoolId;
+    mapping(bytes32 => mapping(address => bool)) public caseEnrolled;
     mapping(bytes32 => mapping(address => uint256)) public caseStake;
     mapping(bytes32 => mapping(address => bool)) public caseSettled;
     mapping(bytes32 => uint256) public caseRewardPool;
@@ -30,6 +35,13 @@ contract JuryRegistry is ReentrancyGuard, IVNextEvents {
 
     error InvalidAddress();
     error InvalidAmount();
+    error UnknownCase();
+    error CaseEnrollmentClosed();
+    error InsufficientCaseStake();
+    error CaseAlreadyRegistered();
+    error CaseAlreadyReserved();
+    error CaseAlreadyEnrolled();
+    error NoCaseStake();
     error InsufficientAvailableStake();
     error NotReviewController();
     error CaseAlreadySettled();
@@ -95,8 +107,34 @@ contract JuryRegistry is ReentrancyGuard, IVNextEvents {
         emit StakeWithdrawn(msg.sender, amount, depositedStake[msg.sender]);
     }
 
+    function registerCase(
+        bytes32 reviewCaseId,
+        uint256 enrollmentDeadline_,
+        uint256 requiredCaseStake_,
+        bytes32 poolId
+    ) external {
+        if (msg.sender != reviewController) revert NotReviewController();
+        if (
+            reviewCaseId == bytes32(0) || poolId == bytes32(0) || enrollmentDeadline_ <= block.timestamp
+                || requiredCaseStake_ == 0
+        ) revert InvalidAmount();
+        if (caseRegistered[reviewCaseId]) revert CaseAlreadyRegistered();
+
+        caseRegistered[reviewCaseId] = true;
+        caseEnrollmentDeadline[reviewCaseId] = enrollmentDeadline_;
+        requiredCaseStake[reviewCaseId] = requiredCaseStake_;
+        casePoolId[reviewCaseId] = poolId;
+        emit CaseRegistered(reviewCaseId, poolId, enrollmentDeadline_, requiredCaseStake_);
+    }
+
     function reserveCaseStake(bytes32 reviewCaseId, uint256 amount) external {
         if (reviewCaseId == bytes32(0) || amount == 0) revert InvalidAmount();
+        if (!caseRegistered[reviewCaseId]) revert UnknownCase();
+        if (block.timestamp >= caseEnrollmentDeadline[reviewCaseId]) {
+            revert CaseEnrollmentClosed();
+        }
+        if (amount < requiredCaseStake[reviewCaseId]) revert InsufficientCaseStake();
+        if (caseStake[reviewCaseId][msg.sender] != 0) revert CaseAlreadyReserved();
         if (amount > availableStake[msg.sender]) revert InsufficientAvailableStake();
 
         availableStake[msg.sender] -= amount;
@@ -104,6 +142,32 @@ contract JuryRegistry is ReentrancyGuard, IVNextEvents {
         caseStake[reviewCaseId][msg.sender] += amount;
 
         emit CaseStakeReserved(reviewCaseId, msg.sender, amount);
+    }
+
+    function markCaseEnrollment(bytes32 reviewCaseId, address judge) external {
+        if (msg.sender != reviewController) revert NotReviewController();
+        if (!caseRegistered[reviewCaseId]) revert UnknownCase();
+        if (caseEnrolled[reviewCaseId][judge]) revert CaseAlreadyEnrolled();
+        if (caseStake[reviewCaseId][judge] < requiredCaseStake[reviewCaseId]) {
+            revert InsufficientCaseStake();
+        }
+        caseEnrolled[reviewCaseId][judge] = true;
+    }
+
+    function releaseUnenrolledCaseStake(bytes32 reviewCaseId, address judge) external {
+        if (!caseRegistered[reviewCaseId]) revert UnknownCase();
+        if (caseEnrolled[reviewCaseId][judge]) revert CaseAlreadyEnrolled();
+        if (block.timestamp < caseEnrollmentDeadline[reviewCaseId]) {
+            revert CaseEnrollmentClosed();
+        }
+
+        uint256 amount = caseStake[reviewCaseId][judge];
+        if (amount == 0) revert NoCaseStake();
+
+        caseStake[reviewCaseId][judge] = 0;
+        lockedStake[judge] -= amount;
+        availableStake[judge] += amount;
+        emit UnenrolledCaseStakeReleased(reviewCaseId, judge, amount);
     }
 
     function settleCaseStake(bytes32 reviewCaseId, address judge, uint256 slashedAmount) external {
