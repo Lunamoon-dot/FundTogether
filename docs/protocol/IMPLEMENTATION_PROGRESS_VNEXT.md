@@ -14,8 +14,9 @@
 finalization only after its deadline, an initialized milestone deadline before
 permissionless expiry, contributor conflict exclusion, publication appeals for
 Creator verdict-fail cases, deterministic reward-dust allocation and disabled
-challenge entrypoints. Forge is unavailable in the current Windows checkout,
-so the focused Solidity suite must be rerun before this delta is called green.
+challenge entrypoints. Forge is unavailable on the Windows host PATH, but the
+checked-in Foundry container is available for reproducible contract builds and
+tests. Fresh local runtime acceptance remains separate.
 
 ## Implemented and verified slices
 
@@ -33,7 +34,7 @@ so the focused Solidity suite must be rerun before this delta is called green.
 | K | `JuryReview.sol`, `CampaignEscrowVNext.sol` | Appeal hooks exist; the active local policy keeps the challenge window passive and disables challenge entrypoints |
 | L | `CampaignEscrowVNext.sol` | Payout/refund/challenge tests: 4 passed; conservation/failure-transfer fuzz suite: 3 passed |
 | P | `DeployVNext.s.sol`, `deploy-vnext.cjs`, `verify-vnext-runtime.cjs`, `vnext-deployment.ts` | Foundry script compiles; runtime verifier/policy identity tests: 6 passed; one-time wiring is executable |
-| P0/P1 remediation | `JuryReview.sol`, `JuryRegistry.sol`, `CampaignEscrowVNext.sol` | Retry/settlement/stake/liveness/budget/refund/court-order regressions covered; full Foundry suite: 117 passed |
+| P0/P1 remediation | `JuryReview.sol`, `JuryRegistry.sol`, `CampaignEscrowVNext.sol` | Retry/settlement/stake/liveness/budget/refund/court-order regressions covered; current full Foundry suite: 124 passed |
 | Q/R | `vnext-indexer.service.ts`, `vnext-event-projector.ts`, `IVNextEvents.sol`, VNext Drizzle schema | Persistent event/projection/checkpoint transaction; milestone review state/case-pointer events now project retry, appeal, ruling, correction and timeout transitions; Backer contribution/refund, challenge, court-summary and Judge ledger projections added; replay/crash/refund/completion tests remain the verification boundary |
 | S/T/X | `vnext.controller.ts`, `vnext-evidence.service.ts`, `vnext-evidence.controller.ts`, `vnext.schema.ts` | Read-only projection API now exposes authenticated Backer/Judge indexed read models, assigned-Judge review reads, challenge history, indexer checkpoint/lag status, plus private VNext case-evidence upload/read ACL, object availability status and canonical hash verification |
 | U/V/W/X | `VNextProtocolPage.tsx`, `VNextCreateCampaignPanel.tsx`, `VNextActionPanel.tsx`, `VNextJudgePage.tsx`, `VNextEvidencePanel.tsx` | VNext Creator campaign creation/publication finalization, private evidence, Backer actions and Judge stake/commit–reveal/reward surface added; Judge workspace now requests assigned cases only; full journey and runtime acceptance remain incomplete |
@@ -119,6 +120,16 @@ financial behavior.
 Those counts predate the policy-freeze delta above; they are retained as
 historical evidence, not as current verification of the changed behavior.
 
+Current contract verification was rerun in the Foundry container because the
+host Windows checkout does not have Forge on PATH:
+
+```text
+forge build -> success (solc 0.8.24)
+forge test --summary -> 124 passed, 0 failed, 0 skipped
+focused VNext unit suites -> 68 passed
+VNextConservation invariant suite -> 3 passed (256-case fuzz)
+```
+
 The pre-freeze VNext test snapshot was:
 
 ```text
@@ -130,12 +141,14 @@ test/unit/VNext/FundingEscrow.t.sol 3 passed
 test/unit/VNext/MilestoneEvidence.t.sol 4 passed
 test/unit/VNext/PayoutRefund.t.sol 4 passed
 test/invariant/VNextConservation.t.sol 3 passed (256-case fuzz)
+```
 
 The full pre-freeze command was `forge test` → 117 passed, 0 failed, 0
 skipped across 11 suites. The suite includes historical Resolver tests for
-regression visibility; the VNext evidence is the focused VNext/invariant rows
-above. Forge is unavailable in the current worktree, so these counts are not
-current verification of the policy-freeze delta.
+regression visibility; the current VNext evidence is the focused
+VNext/invariant rows above plus the current full run. The checked-in generated
+CampaignEscrowVNext, JuryRegistry and JuryReview artifacts were regenerated
+from that successful build.
 
 Backend focused evidence from the prior remediation checkout: VNext
 indexer/projector 8 passed; runtime identity 6 passed; real PostgreSQL VNext
@@ -145,24 +158,25 @@ deploying policy V2 and is not a current acceptance run for this branch.
 Frontend evidence: `npm test` → 199 passed;
 `npm run build` completed with only the existing large-bundle warning.
 
-Current policy-freeze branch evidence after the wallet-journey and projection
-state slices:
+Current policy-freeze branch evidence after the wallet-journey, projection,
+evidence-availability and contract-artifact slices:
 
 ```text
 frontend: npm test -> 205 passed, 0 failed
 frontend: npm run build -> success (existing large-bundle warning)
 frontend: VNext static journey tests -> 6 passed, 0 failed after assigned-case read boundary
 backend: explicit VNext Jest config -> 6 suites, 25 passed, 0 failed; npm run build -> success; migration/service tests -> 4 passed
-contracts: source event changes are present; Forge/Anvil and generated ABI
-regeneration remain pending because the tools are not available in this Windows
-environment.
+contracts: Docker Foundry forge build -> success (solc 0.8.24); full
+forge test -> 124 passed, 0 failed, 0 skipped; generated VNext ABIs refreshed.
+The host still lacks native Forge/Anvil, so these are container-backed contract
+checks rather than a local runtime acceptance run.
+```
 
 The repository's default backend `npm test` currently discovers zero tests due
 to its Jest pattern, while the explicit VNext config above discovers the
 checked-in `src/**/*.spec.ts` suites. A full historical backend run also needs
 RPC `127.0.0.1:9548` and currently cannot be treated as a green VNext runtime
 acceptance result.
-```
 
 The current backend/frontend results do not imply contract deployment or
 runtime acceptance. The VNext transaction endpoint reports `INDEXING` until a

@@ -7,9 +7,8 @@ import reviewArtifact = require("./generated/vnext/JuryReview.json");
 import tokenAbiJson = require("./generated/fundtogether/mock-usdc.abi.json");
 
 export const vnextCampaignAbi = campaignArtifact.abi as Abi;
-// Kept separate until Foundry is available to regenerate the checked-in
-// artifact. The indexer can still decode the new canonical state events while
-// transaction/read ABI identity remains tied to the generated artifact.
+// Keep an explicit event-only ABI as a compatibility fallback for deployments
+// whose historical generated artifact predates these canonical state events.
 export const vnextCampaignEventAbi = [
   {
     type: "event",

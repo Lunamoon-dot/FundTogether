@@ -103,7 +103,7 @@ contract VNextFundingEscrowTest is Test {
     }
 
     function test_CreatorInactiveOpensRefundAfterSubmissionDeadline() public {
-        _fund(backerOne, 25e6);
+        _fund(backerOne, 100e6);
         vm.warp(block.timestamp + 7 days);
         escrow.finalizeFunding(campaignId);
 
@@ -114,11 +114,11 @@ contract VNextFundingEscrowTest is Test {
         escrow.freezeRefundAllocations(campaignId, 10);
         vm.prank(backerOne);
         escrow.claimRefund(campaignId);
-        assertEq(token.balanceOf(backerOne), 25e6);
+        assertEq(token.balanceOf(backerOne), 100e6);
     }
 
     function test_TimeoutIsPermissionless() public {
-        _fund(backerOne, 25e6);
+        _fund(backerOne, 100e6);
         vm.warp(block.timestamp + 7 days);
         escrow.finalizeFunding(campaignId);
         vm.warp(block.timestamp + 7 days);
