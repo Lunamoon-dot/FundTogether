@@ -15,6 +15,7 @@ contract VNextPayoutRefundTest is Test {
     address private payout = makeAddr("vnext-payout-wallet");
     address private backer = makeAddr("vnext-payout-backer");
     address private secondBacker = makeAddr("vnext-payout-second-backer");
+    address private unrelatedWallet = makeAddr("vnext-unrelated-wallet");
     uint256 private campaignId;
 
     function setUp() public {
@@ -176,6 +177,18 @@ contract VNextPayoutRefundTest is Test {
         assertTrue(escrow.refundClaimed(smallCampaign, secondBacker));
         assertEq(token.balanceOf(backer), 0);
         assertEq(token.balanceOf(secondBacker), 1);
+    }
+
+    function test_unrelatedWalletCannotClaimAnotherBackersRefund() public {
+        uint256 smallCampaign = _createPartialRefundCampaign();
+        escrow.freezeRefundAllocations(smallCampaign, 10);
+
+        vm.prank(unrelatedWallet);
+        vm.expectRevert(CampaignEscrowVNext.NoRefund.selector);
+        escrow.claimRefund(smallCampaign);
+
+        assertFalse(escrow.refundClaimed(smallCampaign, backer));
+        assertEq(escrow.campaignRefunded(smallCampaign), 0);
     }
 
     function _submitEvidence(uint256 milestoneId, bytes32 evidenceHash)

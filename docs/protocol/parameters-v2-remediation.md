@@ -106,6 +106,26 @@ The supported local limit is therefore 300 enrolled Judges with 32 settlement
 work units per transaction. Production gas pricing, calldata costs and reward
 economics still require a new policy review.
 
+## External token call review
+
+The VNext fund-moving paths use OpenZeppelin `SafeERC20` and are guarded by
+`ReentrancyGuard` where an external token call can mutate custody:
+
+- `JuryRegistry.depositStake` and `CampaignEscrowVNext.contribute` pull tokens
+  before crediting internal balances; a failed pull reverts the whole call.
+- `JuryRegistry.withdrawStake` and `claimReward`, plus escrow refund and
+  milestone payout, update the caller's one-time or custody state before the
+  outbound transfer and cannot be re-entered.
+- `JuryReview.openAppeal` pulls the bounded appeal bond under the same
+  non-reentrant boundary; final-ruling paths refund each stored bond once.
+- No VNext path uses raw ERC-20 `transfer`/`transferFrom`; the only remaining
+  non-VNext token calls are historical contracts outside this protocol slice.
+
+The focused Gate O tests cover failed-transfer rollback in the existing
+conservation suite and caller isolation for reward/refund claims. This review
+does not claim that an arbitrary non-standard token is safe; the local policy
+uses MockUSDC with standard ERC-20 return behavior.
+
 ## Financial boundary
 
 The CampaignEscrowVNext contract owns contribution escrow, milestone payout,

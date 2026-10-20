@@ -490,11 +490,11 @@ unusable gas costs.
 bounded arrays, no external callback reentrancy and safe handling of 300-judge
 simulation input.
 
-- [ ] Measure one, two, ten and configured maximum courts.
-- [ ] Test partial batch completion and retry.
-- [ ] Test a caller cannot claim another wallet's refund or reward.
-- [ ] Review all external token calls and state-update ordering.
-- [ ] Record a supported local limit instead of claiming unlimited scale.
+- [x] Measure one, two, ten and configured maximum courts.
+- [x] Test partial batch completion and retry.
+- [x] Test a caller cannot claim another wallet's refund or reward.
+- [x] Review all external token calls and state-update ordering.
+- [x] Record a supported local limit instead of claiming unlimited scale.
 
 ### Gate P — Deployable artifacts and runtime verifier
 

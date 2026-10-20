@@ -77,6 +77,29 @@ contract BatchSettlementTest is Test {
         assertEq(review.settlementPhase(reviewCaseId), 3);
     }
 
+    function test_partialSettlementCanResumeAcrossPermissionlessBatches() public {
+        bytes32 reviewCaseId = _createAndEnroll(10);
+        vm.warp(review.randomnessDeadline(reviewCaseId) + 1);
+        review.prepareRetrySettlement(reviewCaseId);
+
+        review.settleCaseBatch(reviewCaseId, 3);
+        assertFalse(review.reviewCaseSettled(reviewCaseId));
+        assertEq(review.settlementCursor(reviewCaseId), 3);
+
+        review.settleCaseBatch(reviewCaseId, 3);
+        assertFalse(review.reviewCaseSettled(reviewCaseId));
+        assertEq(review.settlementCursor(reviewCaseId), 6);
+
+        review.settleCaseBatch(reviewCaseId, 3);
+        assertFalse(review.reviewCaseSettled(reviewCaseId));
+        assertEq(review.settlementCursor(reviewCaseId), 9);
+
+        review.settleCaseBatch(reviewCaseId, 3);
+        assertTrue(review.reviewCaseSettled(reviewCaseId));
+        assertEq(review.settlementCursor(reviewCaseId), 10);
+        assertEq(review.settlementPhase(reviewCaseId), 3);
+    }
+
     function _createAndEnroll(uint256 count) private returns (bytes32 reviewCaseId) {
         reviewCaseId = review.createReviewCase(address(0xCAFE), 7, 2, 1, 100e6);
         randomness.setSeed(reviewCaseId, keccak256(abi.encode("batch", count)));
