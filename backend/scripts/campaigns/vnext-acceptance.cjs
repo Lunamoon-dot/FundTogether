@@ -163,6 +163,18 @@ async function syncPersistentProjection({ client, manifest, campaignIds }) {
     const indexer = new VNextIndexerService(db, { manifest, client });
     await indexer.runOnce();
     const streamId = indexer.streamId();
+    const projectionSnapshot = async () => (await db.select().from(schema.vnextCampaignProjections))
+      .filter(row => row.streamId === streamId && campaignIds.some(campaignId => row.onchainCampaignId === campaignId.toString()))
+      .sort((left, right) => left.onchainCampaignId.localeCompare(right.onchainCampaignId))
+      .map(row => ({
+        onchainCampaignId: row.onchainCampaignId,
+        state: row.state,
+        raised: row.raised,
+        paidOut: row.paidOut,
+        refunded: row.refunded,
+        lastEventName: row.lastEventName,
+        lastBlockNumber: row.lastBlockNumber,
+      }));
     for (const campaignId of campaignIds) {
       const rows = await db.select().from(schema.vnextCampaignProjections);
       const row = findCampaignProjection(rows, streamId, campaignId);
@@ -172,6 +184,9 @@ async function syncPersistentProjection({ client, manifest, campaignIds }) {
       if (expectedState === 4) assert.equal(row.paidOut, '100000000');
       if (expectedState === 5) assert.equal(row.refunded, '100000000');
     }
+    const beforeReplay = await projectionSnapshot();
+    await indexer.runOnce();
+    assert.deepEqual(await projectionSnapshot(), beforeReplay, 'indexer replay changed VNext projection values');
   } finally {
     await pool.end();
   }
@@ -223,6 +238,10 @@ async function main() {
   );
   await advance(client, policy.challengeWindowSeconds + 1);
   await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'payMilestone', args: [first.id, 0n] });
+  await expectRevert(
+    () => send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'payMilestone', args: [first.id, 0n] }),
+    'duplicate milestone payout',
+  );
 
   const second = await createCampaign({ client, wallet: deployerWallet, manifest, goal, evidenceHash: keccak256(toHex('second-publication')), duration: 30n * 24n * 60n * 60n });
   await resolvePass({ client, wallets, addresses, manifest, policy, campaignId: second.id, milestoneId: (2n ** 256n) - 1n, evidenceRevision: 1n, caseId: second.publicationCaseId });
@@ -236,6 +255,10 @@ async function main() {
   assert.equal(entitlementOne + entitlementTwo, goal);
   await send(client, wallets[backerTwo], { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'claimRefund', args: [second.id] });
   await send(client, wallets[backerOne], { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'claimRefund', args: [second.id] });
+  await expectRevert(
+    () => send(client, wallets[backerOne], { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'claimRefund', args: [second.id] }),
+    'duplicate backer refund',
+  );
 
   assert.equal(await read(client, manifest.campaignEscrow, campaignArtifact.abi, 'campaignState', [first.id]), 4);
   assert.equal(await read(client, manifest.campaignEscrow, campaignArtifact.abi, 'campaignPaidOut', [first.id]), goal);
