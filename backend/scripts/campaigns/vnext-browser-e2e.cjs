@@ -26,6 +26,7 @@ const client = createPublicClient({ chain, transport: http(rpcUrl), pollingInter
 const wallet = account => createWalletClient({ account, chain, transport: http(rpcUrl) });
 const campaignArtifact = JSON.parse(fs.readFileSync(path.join(root, 'contracts/out/CampaignEscrowVNext.sol/CampaignEscrowVNext.json')));
 const databaseName = `fundtogether_vnext_browser_${process.pid}`;
+const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 let admin;
 let app;
 let db;
@@ -174,7 +175,29 @@ async function main() {
   await page.getByLabel(/Milestone acceptance criteria hash/).fill(`0x${'1'.repeat(64)}`);
   await page.getByLabel(/Publication evidence hash/).fill(`0x${'2'.repeat(64)}`);
   await page.getByRole('button', { name: 'Tạo campaign và mở Judge case' }).click();
-  await page.getByRole('status').filter({ hasText: /Indexer đã xác nhận canonical/ }).waitFor();
+  const receiptStatus = page.getByRole('status').filter({ hasText: /Receipt on-chain đã thành công|Indexer đã xác nhận canonical/ });
+  try {
+    await receiptStatus.waitFor();
+  } catch (error) {
+    console.error(`VNext browser transaction status timeout:\n${await page.locator('body').innerText()}`);
+    throw error;
+  }
+  const transactionText = (await receiptStatus.allTextContents()).join(' ');
+  const transactionHash = transactionText.match(/0x[0-9a-fA-F]{64}/)?.[0];
+  assert.ok(transactionHash, `missing transaction hash in UI status: ${transactionText}`);
+  let canonicalStatus;
+  for (let attempt = 0; attempt < 90; attempt++) {
+    const response = await context.request.get(`${apiUrl}/v1/fundtogether/vnext/transactions/${transactionHash}`);
+    if (response.ok()) {
+      const status = await response.json();
+      if (status.state === 'ON_CHAIN_CONFIRMED') {
+        canonicalStatus = status;
+        break;
+      }
+    }
+    await wait(1000);
+  }
+  assert.equal(canonicalStatus?.state, 'ON_CHAIN_CONFIRMED', 'VNext indexer did not confirm the browser transaction');
 
   const campaignCount = await client.readContract({ address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'campaignCount' });
   const campaignId = (BigInt(campaignCount) - 1n).toString();

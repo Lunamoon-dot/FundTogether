@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { usePublicClient } from 'wagmi';
 import type { VNextDeployment } from '../api/campaigns';
 import { useVNextTransaction } from './vnext-transaction';
 import { vnextStageLabel } from './vnext-actions';
@@ -12,20 +14,33 @@ function bytes32(value: string): value is `0x${string}` {
   return /^0x[0-9a-fA-F]{64}$/.test(value);
 }
 
-function deadlineAfterDays(days: string): bigint | null {
+function deadlineAfterDays(days: string, chainTimestamp?: bigint): bigint | null {
   if (!/^[0-9]+$/.test(days) || days === '0') return null;
-  try { return (BigInt(Date.now()) / 1000n) + BigInt(days) * 86_400n; } catch { return null; }
+  if (chainTimestamp === undefined) return null;
+  try { return chainTimestamp + BigInt(days) * 86_400n; } catch { return null; }
 }
 
 export function VNextCreateCampaignPanel({ deployment }: { deployment: VNextDeployment }) {
   const transaction = useVNextTransaction();
+  const client = usePublicClient({ chainId: 31339 });
+  const chainClock = useQuery({
+    queryKey: ['vnext-create-chain-clock', client?.chain?.id],
+    enabled: Boolean(client),
+    queryFn: async () => {
+      if (!client) throw new Error('VNext chain clock is unavailable');
+      return (await client.getBlock({ blockTag: 'latest' })).timestamp;
+    },
+    retry: false,
+    staleTime: 5_000,
+  });
   const [payoutWallet, setPayoutWallet] = useState('');
   const [goal, setGoal] = useState('');
   const [fundingDays, setFundingDays] = useState('7');
   const [acceptanceCriteriaHash, setAcceptanceCriteriaHash] = useState('');
   const [publicationEvidenceHash, setPublicationEvidenceHash] = useState('');
   const goalValue = tokenAmount(goal);
-  const deadline = deadlineAfterDays(fundingDays);
+  const chainTimestamp = chainClock.data;
+  const deadline = deadlineAfterDays(fundingDays, chainTimestamp);
   const ready = Boolean(
     deployment.campaignEscrow
       && /^0x[0-9a-fA-F]{40}$/.test(payoutWallet)

@@ -39,7 +39,7 @@ tests. Full web/API/browser acceptance remains separate.
 | P0/P1 remediation | `JuryReview.sol`, `JuryRegistry.sol`, `CampaignEscrowVNext.sol` | Retry/settlement/stake/liveness/budget/refund/court-order regressions covered; current full Foundry suite: 136 passed |
 | Q/R | `vnext-indexer.service.ts`, `vnext-event-projector.ts`, `IVNextEvents.sol`, VNext Drizzle schema | Persistent event/projection/checkpoint transaction; milestone review state/case-pointer events now project retry, appeal, ruling, correction and timeout transitions; Backer contribution/refund, challenge, court-summary and Judge ledger projections added; replay/crash/refund/completion tests remain the verification boundary |
 | S/T/X | `vnext.controller.ts`, `vnext-evidence.service.ts`, `vnext-evidence.controller.ts`, `vnext.schema.ts` | Read-only projection API now exposes authenticated Backer/Judge indexed read models, assigned-Judge review reads, challenge history, indexer checkpoint/lag status, plus private VNext case-evidence upload/read ACL, canonical hash verification, short-lived user-bound evidence tickets and explicit storage-timeout/retry status |
-| U/V/W/X | `VNextProtocolPage.tsx`, `VNextCreateCampaignPanel.tsx`, `VNextActionPanel.tsx`, `VNextJudgePage.tsx`, `VNextEvidencePanel.tsx`, `backend/scripts/campaigns/vnext-browser-e2e.cjs` | VNext Creator campaign creation/publication finalization, private evidence, Backer actions and Judge stake/commit–reveal/reward surface added; Judge workspace now requests assigned cases only; a real SIWE + EIP-6963 browser Creator-create journey passes twice from fresh Anvil genesis, while the full browser funding/review/payout journey remains incomplete |
+| U/V/W/X | `VNextProtocolPage.tsx`, `VNextCreateCampaignPanel.tsx`, `VNextActionPanel.tsx`, `VNextJudgePage.tsx`, `VNextEvidencePanel.tsx`, `backend/scripts/campaigns/vnext-browser-e2e.cjs` | VNext Creator campaign creation/publication finalization, private evidence, Backer actions and Judge stake/commit–reveal/reward surface added; Judge workspace now requests assigned cases only; real SIWE + EIP-6963 browser Creator-create journey passes from fresh genesis and after long chain-time jumps, with deadline derived from latest chain block; full browser funding/review/payout journey remains incomplete |
 
 ## Current executable behavior
 
@@ -188,12 +188,16 @@ projection and checkpoint rollback was verified before exactly-once replay
 backend: VNext runtime boot -> `GET /health` returned `200`, protocol
 `FUNDTOGETHER_VNEXT`, chain `31339`, campaign escrow
 `0xdc64a140aa3e981100a9beca4e685f962f0cf6c9`
-backend: direct fresh-chain acceptance -> `PASS`, protocol `FUNDTOGETHER_VNEXT`, chain `31339`, payout campaign `0`, refund campaign `1`, contract balance `0`
-browser: `npm run test:vnext-browser` -> `PASS` twice from fresh Anvil
-genesis; real SIWE session, EIP-6963 test wallet link, VNext Creator campaign
+backend: `npm run test:vnext-acceptance` now creates/migrates/drops an isolated
+PostgreSQL database itself; direct fresh-chain acceptance -> `PASS`, protocol
+`FUNDTOGETHER_VNEXT`, chain `31339`, payout campaign `0`, refund campaign `1`,
+contract balance `0`
+browser: `npm run test:vnext-browser` -> `PASS` from fresh Anvil genesis and
+again after the direct acceptance advanced Anvil time and created six prior
+campaigns; real SIWE session, EIP-6963 test wallet link, VNext Creator campaign
 creation, receipt confirmation, canonical indexer polling and `CREATED`
-projection reload all passed; no legacy `/public/campaigns/vnext` request
-remained
+projection reload all passed; deadline creation uses latest chain block time;
+no legacy `/public/campaigns/vnext` request remained
 contracts: focused Gate O additions -> `BatchSettlement` 3 passed,
 `JuryRegistry` 14 passed, `PayoutRefund` 9 passed; the pre-fuzz full
 `forge test --summary` run -> 134 passed, 0 failed, 0 skipped
