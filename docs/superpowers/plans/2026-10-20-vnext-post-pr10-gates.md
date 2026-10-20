@@ -179,7 +179,7 @@ Expected: matching fake deployment passes and every mismatch fails closed. The l
 - [x] **Step 5: Commit**
 
 ```powershell
-git add backend/src/blockchain/vnext-deployment.ts backend/scripts/campaigns/vnext-runtime-identity.test.cjs backend/scripts/campaigns/vnext-acceptance.cjs backend/src/blockchain/generated/vnext/JuryReview.json
+git add backend/src/blockchain/vnext-deployment.ts backend/scripts/campaigns/vnext-runtime-identity.test.cjs docs/protocol/parameters-v2-remediation.md backend/src/blockchain/generated/vnext/CampaignEscrowVNext.json
 git commit -m "test: verify complete VNext local policy"
 ```
 
