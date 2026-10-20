@@ -403,4 +403,4 @@ async function main() {
 
 if (require.main === module) main().catch(error => { console.error(error.stack || error.message); process.exitCode = 1; });
 
-module.exports = { commitment, findCampaignProjection, loadManifest, loadPolicy, resolvePass };
+module.exports = { commitment, findCampaignProjection, loadManifest, loadPolicy, main, resolvePass };

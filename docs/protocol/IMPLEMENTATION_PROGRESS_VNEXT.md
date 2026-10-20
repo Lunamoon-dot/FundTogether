@@ -170,7 +170,8 @@ frontend: VNext static journey tests -> 6 passed, 0 failed after assigned-case r
 backend: explicit VNext Jest config -> 6 suites, 25 passed, 0 failed; npm run build -> success; migration/service tests -> 4 passed
 backend: all 9 campaign script-test files -> 35 passed; vnext-acceptance.test.cjs
 regression -> 1 passed; migrate-isolated.cjs -> success;
-deploy-vnext.cjs --create -> success; vnext-acceptance.cjs -> PASS twice,
+deploy-vnext.cjs --create -> success; vnext-scenarios-e2e.cjs
+(implementation: vnext-acceptance.cjs) -> PASS twice,
 including one fresh Anvil genesis plus a newly created isolated PostgreSQL
 database, with one payout and one refund campaign, duplicate payout/refund
 rejection, idempotent indexer replay and no-quorum retry-to-`PROTOCOL_FAIL`
