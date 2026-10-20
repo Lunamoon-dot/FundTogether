@@ -17,7 +17,7 @@ contract DeployVNext is Script {
     uint256 private constant APPEAL_BOND = 1e6;
     uint256 private constant MAX_APPEAL_ROUNDS = 2;
     uint256 private constant MINORITY_SLASH_BPS = 500;
-    bytes32 private constant POLICY_HASH = keccak256("fundtogether-vnext-local-v1");
+    bytes32 private constant POLICY_HASH = keccak256("fundtogether-vnext-local-v2-remediation");
 
     function run()
         external

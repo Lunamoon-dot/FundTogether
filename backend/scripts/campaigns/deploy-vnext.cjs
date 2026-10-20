@@ -18,7 +18,7 @@ const chain = defineChain({
   rpcUrls: { default: { http: [rpcUrl] } },
 });
 const zero = '0x0000000000000000000000000000000000000000';
-const policyHash = keccak256(toHex('fundtogether-vnext-local-v1'));
+const policyHash = keccak256(toHex('fundtogether-vnext-local-v2-remediation'));
 const abiHash = keccak256(toHex(JSON.stringify(campaignArtifact.abi, null, 2) + '\n'));
 
 async function deploy(client, wallet, artifact, args = []) {
@@ -72,6 +72,8 @@ async function main() {
     1n,
     policyHash,
     7n * 24n * 60n * 60n,
+    7n * 24n * 60n * 60n,
+    7n * 24n * 60n * 60n,
   ]);
 
   await write(client, wallet, { address: registry.address, abi: registryArtifact.abi, functionName: 'configureReviewController', args: [review.address] });
@@ -82,7 +84,7 @@ async function main() {
     protocolKind: 'FUNDTOGETHER_VNEXT',
     chainId: 31339,
     rpcUrl,
-    abiVersion: 'fundtogether-vnext-local-v1',
+    abiVersion: 'fundtogether-vnext-local-v2-remediation',
     abiHash,
     policyHash,
     tokenDecimals: 6,

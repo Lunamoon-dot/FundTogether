@@ -7,7 +7,7 @@ import tokenAbiJson = require("./generated/fundtogether/mock-usdc.abi.json");
 
 export const vnextCampaignAbi = campaignArtifact.abi as Abi;
 export const vnextReviewAbi = reviewArtifact.abi as Abi;
-export const vnextPolicyHash = keccak256(toHex("fundtogether-vnext-local-v1"));
+export const vnextPolicyHash = keccak256(toHex("fundtogether-vnext-local-v2-remediation"));
 export const vnextCampaignAbiHash = keccak256(
   toHex(JSON.stringify(campaignArtifact.abi, null, 2) + "\n"),
 );
@@ -27,7 +27,7 @@ const schema = z.strictObject({
       return false;
     }
   }),
-  abiVersion: z.literal("fundtogether-vnext-local-v1"),
+  abiVersion: z.literal("fundtogether-vnext-local-v2-remediation"),
   abiHash: z.literal(vnextCampaignAbiHash),
   policyHash: z.literal(vnextPolicyHash),
   tokenDecimals: z.literal(6),
@@ -102,11 +102,15 @@ export async function verifyVNextDeployment(
     client.readContract({ address: manifest.campaignEscrow, abi: vnextCampaignAbi, functionName: "reviewEngine" }),
     client.readContract({ address: manifest.campaignEscrow, abi: vnextCampaignAbi, functionName: "protocolVersion" }),
     client.readContract({ address: manifest.campaignEscrow, abi: vnextCampaignAbi, functionName: "policyHash" }),
+    client.readContract({ address: manifest.campaignEscrow, abi: vnextCampaignAbi, functionName: "milestoneSubmissionWindow" }),
+    client.readContract({ address: manifest.campaignEscrow, abi: vnextCampaignAbi, functionName: "correctionWindow" }),
   ]);
   if (String(campaignReads[0]).toLowerCase() !== manifest.tokenAddress
     || String(campaignReads[1]).toLowerCase() !== manifest.juryReview
     || campaignReads[2] !== 1n
-    || String(campaignReads[3]).toLowerCase() !== manifest.policyHash.toLowerCase()) {
+    || String(campaignReads[3]).toLowerCase() !== manifest.policyHash.toLowerCase()
+    || campaignReads[4] !== 7n * 24n * 60n * 60n
+    || campaignReads[5] !== 7n * 24n * 60n * 60n) {
     throw new Error("VNext campaign wiring mismatch");
   }
 
@@ -114,10 +118,14 @@ export async function verifyVNextDeployment(
     client.readContract({ address: manifest.juryReview, abi: vnextReviewAbi, functionName: "registry" }),
     client.readContract({ address: manifest.juryReview, abi: vnextReviewAbi, functionName: "campaignEscrow" }),
     client.readContract({ address: manifest.juryReview, abi: vnextReviewAbi, functionName: "protocolVersion" }),
+    client.readContract({ address: manifest.juryReview, abi: vnextReviewAbi, functionName: "MINIMUM_STAKE_FLOOR" }),
+    client.readContract({ address: manifest.juryReview, abi: vnextReviewAbi, functionName: "RISK_MULTIPLIER_BPS" }),
   ]);
   if (String(reviewReads[0]).toLowerCase() !== manifest.juryRegistry
     || String(reviewReads[1]).toLowerCase() !== manifest.campaignEscrow
-    || reviewReads[2] !== 1n) {
+    || reviewReads[2] !== 1n
+    || reviewReads[3] !== 10_000_000n
+    || reviewReads[4] !== 500n) {
     throw new Error("VNext review wiring mismatch");
   }
   const decimals = await client.readContract({
