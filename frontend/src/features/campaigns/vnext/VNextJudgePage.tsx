@@ -190,6 +190,7 @@ export function VNextJudgePage() {
   const { session } = useAccountSession();
   const deployment = useQuery({ queryKey: ['vnext-deployment'], queryFn: campaignApi.vnextDeployment, retry: false });
   const reviews = useQuery({ queryKey: ['vnext-reviews'], queryFn: ({ signal }) => campaignApi.vnextReviews(signal), enabled: Boolean(session), retry: false });
+  const ledger = useQuery({ queryKey: ['vnext-judge-ledger'], queryFn: ({ signal }) => campaignApi.vnextJudgeLedger(signal), enabled: Boolean(session), retry: false });
 
   if (!session) return <p>Đăng nhập bằng wallet để mở Judge workspace. <a href="#/account">Đăng nhập</a></p>;
   if (deployment.isPending || reviews.isPending) return <p role="status" className="muted">Đang tải VNext Judge workspace…</p>;
@@ -201,6 +202,9 @@ export function VNextJudgePage() {
         <span className="campaign-eyebrow">FUNDTOGETHER VNEXT · JUDGE</span>
         <h1>Judge workspace</h1>
         <p className="muted">Enrollment, assignment, commit và reveal đều chỉ có hiệu lực khi contract xác nhận đúng case, court và deadline.</p>
+        {ledger.data?.length ? <p className="text-xs text-[var(--ink-subtle)] m-0" data-vnext-read="judge-ledger">
+          Indexed ledger: {ledger.data.length} case rows · accrued {ledger.data.reduce((total, item) => total + BigInt(item.rewardAccrued), 0n).toString()} · claimed {ledger.data.reduce((total, item) => total + BigInt(item.rewardClaimed), 0n).toString()} token units. Contract state remains authoritative.
+        </p> : null}
       </section>
       <JudgeStakePanel deployment={deployment.data} />
       {reviews.data?.length ? reviews.data.map(review => (

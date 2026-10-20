@@ -34,8 +34,8 @@ so the focused Solidity suite must be rerun before this delta is called green.
 | L | `CampaignEscrowVNext.sol` | Payout/refund/challenge tests: 4 passed; conservation/failure-transfer fuzz suite: 3 passed |
 | P | `DeployVNext.s.sol`, `deploy-vnext.cjs`, `verify-vnext-runtime.cjs`, `vnext-deployment.ts` | Foundry script compiles; runtime verifier/policy identity tests: 6 passed; one-time wiring is executable |
 | P0/P1 remediation | `JuryReview.sol`, `JuryRegistry.sol`, `CampaignEscrowVNext.sol` | Retry/settlement/stake/liveness/budget/refund/court-order regressions covered; full Foundry suite: 117 passed |
-| Q/R | `vnext-indexer.service.ts`, `vnext-event-projector.ts`, `IVNextEvents.sol`, VNext Drizzle schema | Persistent event/projection/checkpoint transaction; milestone review state/case-pointer events now project retry, appeal, ruling, correction and timeout transitions; replay/crash/refund/completion tests remain the verification boundary |
-| S/T | `vnext.controller.ts`, `vnext-evidence.service.ts`, `vnext-evidence.controller.ts`, `vnext.schema.ts` | Read-only projection API plus private VNext case-evidence upload/read ACL, canonical hash verification and migration added |
+| Q/R | `vnext-indexer.service.ts`, `vnext-event-projector.ts`, `IVNextEvents.sol`, VNext Drizzle schema | Persistent event/projection/checkpoint transaction; milestone review state/case-pointer events now project retry, appeal, ruling, correction and timeout transitions; Backer contribution/refund, challenge, court-summary and Judge ledger projections added; replay/crash/refund/completion tests remain the verification boundary |
+| S/T | `vnext.controller.ts`, `vnext-evidence.service.ts`, `vnext-evidence.controller.ts`, `vnext.schema.ts` | Read-only projection API now exposes authenticated Backer/Judge indexed read models, challenge history, plus private VNext case-evidence upload/read ACL and canonical hash verification |
 | U/V/W/X | `VNextProtocolPage.tsx`, `VNextCreateCampaignPanel.tsx`, `VNextActionPanel.tsx`, `VNextJudgePage.tsx`, `VNextEvidencePanel.tsx` | VNext Creator campaign creation/publication finalization, private evidence, Backer actions and Judge stake/commit–reveal/reward surface added; full journey and runtime acceptance remain incomplete |
 
 ## Current executable behavior
@@ -104,7 +104,8 @@ The following remain incomplete and must not be inferred from the passing slice:
   snapshot;
 - complete invariant coverage for all review liveness and multi-court paths;
 - full per-round appeal/retry dossier ACL and availability handling, full Backer
-  balance/refund read models, and production reward economics;
+  balance/refund entitlement read models, on-chain reward economics and
+  production reward settlement policy;
 - fresh local runtime deployment and end-to-end acceptance.
 
 ## Verification record
@@ -149,7 +150,7 @@ state slices:
 ```text
 frontend: npm test -> 205 passed, 0 failed
 frontend: npm run build -> success (existing large-bundle warning)
-backend: explicit VNext Jest config -> 5 suites, 19 passed, 0 failed; npm run build -> success
+backend: explicit VNext Jest config -> 5 suites, 21 passed, 0 failed; npm run build -> success; migration/service tests -> 4 passed
 contracts: source event changes are present; Forge/Anvil and generated ABI
 regeneration remain pending because the tools are not available in this Windows
 environment.

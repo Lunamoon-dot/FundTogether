@@ -178,6 +178,8 @@ export interface VNextMilestoneProjection {
   evidenceHash: string | null;
   reviewCaseId: string | null;
   finalOutcome: number | null;
+  challengeDeadline?: string | null;
+  correctionDeadline?: string | null;
   state: number;
   paid: boolean;
 }
@@ -198,12 +200,47 @@ export interface VNextAssignedReview {
   roundId: string;
   creator: string;
   enrolledCount: string;
+  courtCount?: string;
+  finalizedCourtCount?: string;
+  passCourts?: string;
+  failCourts?: string;
   outcome: number | null;
   finalized: boolean;
   lastBlockNumber: string;
   assignments: VNextJudgeAssignment[];
 }
 export type VNextReviewWithAssignments = VNextAssignedReview;
+export interface VNextBackerProjection {
+  streamId: string;
+  onchainCampaignId: string;
+  backerAddress: string;
+  contributed: string;
+  refunded: string;
+  refundClaimed: boolean;
+  lastBlockNumber: string;
+}
+export interface VNextChallengeProjection {
+  streamId: string;
+  onchainCampaignId: string;
+  milestoneId: number;
+  challengeCaseId: string;
+  challenger: string;
+  evidenceHash: string;
+  outcome: number | null;
+  lastBlockNumber: string;
+}
+export interface VNextJudgeLedgerProjection {
+  streamId: string;
+  reviewCaseId: string;
+  judgeAddress: string;
+  reserved: string;
+  released: string;
+  settled: string;
+  caseSlashed: string;
+  rewardAccrued: string;
+  rewardClaimed: string;
+  lastBlockNumber: string;
+}
 export interface VNextCaseEvidence {
   reviewCaseId: string;
   evidenceHash: string;
@@ -378,8 +415,11 @@ export const campaignApi = {
   vnextDeployment: async () => (await http.get<VNextDeployment>('/v1/fundtogether/vnext/deployment')).data,
   vnextCampaign: async (id: string, signal?: AbortSignal) => (await http.get<VNextCampaignProjection>(`/v1/fundtogether/vnext/campaigns/${id}`, { signal })).data,
   vnextMilestones: async (id: string, signal?: AbortSignal) => (await http.get<VNextMilestoneProjection[]>(`/v1/fundtogether/vnext/campaigns/${id}/milestones`, { signal })).data,
+  vnextBackerPosition: async (id: string, signal?: AbortSignal) => (await http.get<VNextBackerProjection[]>(`/v1/fundtogether/vnext/campaigns/${id}/backer`, { signal })).data,
+  vnextChallenges: async (id: string, signal?: AbortSignal) => (await http.get<VNextChallengeProjection[]>(`/v1/fundtogether/vnext/campaigns/${id}/challenges`, { signal })).data,
   vnextAssignedReviews: async (signal?: AbortSignal) => (await http.get<VNextAssignedReview[]>('/v1/fundtogether/vnext/reviews/assigned', { signal })).data,
   vnextReviews: async (signal?: AbortSignal) => (await http.get<VNextReviewWithAssignments[]>('/v1/fundtogether/vnext/reviews', { signal })).data,
+  vnextJudgeLedger: async (signal?: AbortSignal) => (await http.get<VNextJudgeLedgerProjection[]>('/v1/fundtogether/vnext/judge-ledger', { signal })).data,
   vnextEvidence: async (reviewCaseId: string, signal?: AbortSignal) => (await http.get<VNextCaseEvidenceResponse>(`/v1/fundtogether/vnext/reviews/${encodeURIComponent(reviewCaseId)}/evidence`, { signal })).data,
   vnextUploadEvidence: async (reviewCaseId: string, summary: string, file: File) => {
     const data = new FormData(); data.append('summary', summary); data.append('file', file);

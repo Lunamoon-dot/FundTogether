@@ -7,7 +7,10 @@ import { DRIZZLE_DB } from "../../../database/database.constants";
 import {
   vnextCampaignProjections,
   vnextChainEvents,
+  vnextBackerProjections,
+  vnextChallengeProjections,
   vnextJudgeAssignments,
+  vnextJudgeLedgerProjections,
   vnextMilestoneProjections,
   vnextReviewProjections,
 } from "../../../database/schema";
@@ -87,6 +90,41 @@ export class VNextController {
     return this.db.select().from(vnextMilestoneProjections).where(
       and(eq(vnextMilestoneProjections.streamId, this.streamId()), eq(vnextMilestoneProjections.onchainCampaignId, campaignId)),
     );
+  }
+
+  @Get("campaigns/:campaignId/backer")
+  @UseGuards(AuthGuard)
+  async backerPosition(@Param("campaignId") campaignId: string, @Req() request: Request) {
+    const walletAddresses = (request.account?.wallets ?? [])
+      .filter(wallet => wallet.chainId === 31339)
+      .map(wallet => wallet.address.toLowerCase());
+    if (walletAddresses.length === 0) return [];
+    return this.db.select().from(vnextBackerProjections).where(and(
+      eq(vnextBackerProjections.streamId, this.streamId()),
+      eq(vnextBackerProjections.onchainCampaignId, campaignId),
+      inArray(vnextBackerProjections.backerAddress, walletAddresses),
+    ));
+  }
+
+  @Get("campaigns/:campaignId/challenges")
+  async challenges(@Param("campaignId") campaignId: string) {
+    return this.db.select().from(vnextChallengeProjections).where(and(
+      eq(vnextChallengeProjections.streamId, this.streamId()),
+      eq(vnextChallengeProjections.onchainCampaignId, campaignId),
+    ));
+  }
+
+  @Get("judge-ledger")
+  @UseGuards(AuthGuard)
+  async judgeLedger(@Req() request: Request) {
+    const walletAddresses = (request.account?.wallets ?? [])
+      .filter(wallet => wallet.chainId === 31339)
+      .map(wallet => wallet.address.toLowerCase());
+    if (walletAddresses.length === 0) return [];
+    return this.db.select().from(vnextJudgeLedgerProjections).where(and(
+      eq(vnextJudgeLedgerProjections.streamId, this.streamId()),
+      inArray(vnextJudgeLedgerProjections.judgeAddress, walletAddresses),
+    ));
   }
 
   @Get("reviews")

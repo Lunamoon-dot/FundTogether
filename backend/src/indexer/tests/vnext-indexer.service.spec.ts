@@ -1,9 +1,12 @@
 import { VNextIndexerService } from "../vnext-indexer.service";
 import {
   indexerStreams,
+  vnextBackerProjections,
   vnextCampaignProjections,
   vnextChainEvents,
+  vnextChallengeProjections,
   vnextJudgeAssignments,
+  vnextJudgeLedgerProjections,
   vnextMilestoneProjections,
   vnextReviewProjections,
 } from "../../database/schema";
@@ -42,6 +45,9 @@ function createFakeDb() {
     streams: [],
     events: [],
     campaigns: [],
+    backers: [],
+    challenges: [],
+    judgeLedger: [],
     milestones: [],
     reviews: [],
     assignments: [],
@@ -52,6 +58,9 @@ function createFakeDb() {
     streams: state.streams,
     events: state.events,
     campaigns: state.campaigns,
+    backers: state.backers,
+    challenges: state.challenges,
+    judgeLedger: state.judgeLedger,
     milestones: state.milestones,
     reviews: state.reviews,
     assignments: state.assignments,
@@ -65,6 +74,9 @@ function createFakeDb() {
     if (table === indexerStreams) return state.streams;
     if (table === vnextChainEvents) return state.events;
     if (table === vnextCampaignProjections) return state.campaigns;
+    if (table === vnextBackerProjections) return state.backers;
+    if (table === vnextChallengeProjections) return state.challenges;
+    if (table === vnextJudgeLedgerProjections) return state.judgeLedger;
     if (table === vnextMilestoneProjections) return state.milestones;
     if (table === vnextReviewProjections) return state.reviews;
     if (table === vnextJudgeAssignments) return state.assignments;
@@ -74,6 +86,9 @@ function createFakeDb() {
   const key = (table: unknown, value: any) => {
     if (table === vnextChainEvents) return `${value.streamId}:${value.transactionHash}:${value.logIndex}`;
     if (table === vnextCampaignProjections) return `${value.streamId}:${value.onchainCampaignId}`;
+    if (table === vnextBackerProjections) return `${value.streamId}:${value.onchainCampaignId}:${value.backerAddress}`;
+    if (table === vnextChallengeProjections) return `${value.streamId}:${value.challengeCaseId}`;
+    if (table === vnextJudgeLedgerProjections) return `${value.streamId}:${value.reviewCaseId}:${value.judgeAddress}`;
     if (table === vnextMilestoneProjections) return `${value.streamId}:${value.onchainCampaignId}:${value.milestoneId}`;
     if (table === vnextReviewProjections) return `${value.streamId}:${value.reviewCaseId}`;
     if (table === vnextJudgeAssignments) return `${value.streamId}:${value.reviewCaseId}:${value.courtId}:${value.slot}`;
@@ -115,6 +130,8 @@ function createFakeDb() {
         if (table === vnextCampaignProjections && state.failCampaignUpdate) {
           throw new Error("simulated projection crash");
         }
+        const plainValues = Object.fromEntries(Object.entries(value).filter(([, item]) => item === null || typeof item !== "object"));
+        for (const row of tableRows(table)) Object.assign(row, plainValues);
         return [value];
       },
     }),
@@ -212,6 +229,75 @@ describe("VNextIndexerService", () => {
     await persist(service, "stream-1", log(1), "CampaignCompleted", { campaignId: 7n });
     expect(fake.state.events).toHaveLength(2);
     expect(fake.state.campaigns).toHaveLength(1);
+  });
+
+  it("test_PersistentBackerChallengeAndJudgeLedgerEventsCreateReadModels", async () => {
+    const fake = createFakeDb();
+    const service = serviceWith(fake);
+    const caseId = hash("e");
+    const judge = "0x0000000000000000000000000000000000000003";
+    await persist(service, "stream-1", log(0), "CampaignCreated", campaignCreated());
+    await persist(service, "stream-1", log(1), "ContributionReceived", {
+      campaignId: 7n,
+      backer: judge,
+      amount: 50n,
+      cumulativeRaised: 50n,
+    });
+    await persist(service, "stream-1", log(2), "ChallengeOpened", {
+      campaignId: 7n,
+      milestoneId: 0n,
+      challengeCaseId: hash("g"),
+      challenger: judge,
+      evidenceHash: hash("h"),
+    });
+    await persist(service, "stream-1", log(3), "CaseStakeReserved", {
+      reviewCaseId: caseId,
+      judge,
+      amount: 10n,
+    });
+    await persist(service, "stream-1", log(4), "CaseStakeSettled", {
+      reviewCaseId: caseId,
+      judge,
+      unlockedAmount: 9n,
+      slashedAmount: 1n,
+    });
+    await persist(service, "stream-1", log(5), "JudgeRewardAccrued", {
+      reviewCaseId: caseId,
+      judge,
+      amount: 1n,
+    });
+
+    expect(fake.state.backers).toHaveLength(1);
+    expect(fake.state.backers[0].backerAddress).toBe(judge);
+    expect(fake.state.challenges).toHaveLength(1);
+    expect(fake.state.challenges[0].challengeCaseId).toBe(hash("g"));
+    expect(fake.state.judgeLedger).toHaveLength(1);
+    expect(fake.state.judgeLedger[0].reviewCaseId).toBe(caseId);
+  });
+
+  it("test_PersistentReviewRoundEventsPopulateCourtSummary", async () => {
+    const fake = createFakeDb();
+    const service = serviceWith(fake);
+    const caseId = hash("e");
+    await persist(service, "stream-1", log(0), "ReviewCaseCreated", reviewCreated(caseId));
+    await persist(service, "stream-1", log(1), "JurySnapshotFinalized", {
+      reviewCaseId: caseId,
+      snapshotBlock: 12n,
+      eligibleCount: 9n,
+      randomnessRequestId: hash("f"),
+    });
+    await persist(service, "stream-1", log(2), "ReviewRoundFinalized", {
+      reviewCaseId: caseId,
+      roundId: 0n,
+      outcome: 1,
+      passCourts: 2n,
+      failCourts: 1n,
+    });
+    expect(fake.state.reviews[0].courtCount).toBe("3");
+    expect(fake.state.reviews[0].finalizedCourtCount).toBe("3");
+    expect(fake.state.reviews[0].passCourts).toBe("2");
+    expect(fake.state.reviews[0].failCourts).toBe("1");
+    expect(fake.state.events).toHaveLength(3);
   });
 
   it("test_MissingOrMalformedEventDoesNotAdvanceCheckpoint", async () => {

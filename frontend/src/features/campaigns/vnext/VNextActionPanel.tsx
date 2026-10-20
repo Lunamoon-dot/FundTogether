@@ -7,6 +7,7 @@ import reviewArtifact from '../../../../../backend/src/blockchain/generated/vnex
 import type {
   VNextCampaignProjection,
   VNextDeployment,
+  VNextBackerProjection,
   VNextMilestoneProjection,
 } from '../api/campaigns';
 import { campaignApi } from '../api/campaigns';
@@ -176,6 +177,12 @@ export function VNextActionPanel({
     },
     retry: false,
   });
+  const indexedBackerPosition = useQuery<VNextBackerProjection[]>({
+    queryKey: ['vnext-indexed-backer-position', campaignId, account.address],
+    queryFn: ({ signal }) => campaignApi.vnextBackerPosition(campaignId, signal),
+    enabled: Boolean(userId && account.address),
+    retry: false,
+  });
 
   const sendContribution = () => {
     if (!amountValue || !deployment.campaignEscrow || campaignNumber === null) return;
@@ -229,6 +236,11 @@ export function VNextActionPanel({
         <div className="text-sm text-[var(--ink-subtle)]" data-vnext-read="backer-position">
           Wallet hiện tại đã góp {backerPosition.data.contribution.toString()} token units; entitlement refund đọc từ contract là {backerPosition.data.entitlement.toString()}.
         </div>
+      )}
+      {indexedBackerPosition.data?.[0] && (
+        <p className="text-xs text-[var(--ink-subtle)] m-0" data-vnext-read="indexed-backer-position">
+          Indexed projection: đã ghi nhận {indexedBackerPosition.data[0].contributed} contribution và {indexedBackerPosition.data[0].refunded} refund ở block {indexedBackerPosition.data[0].lastBlockNumber}; đây không thay thế contract state.
+        </p>
       )}
 
       {campaign.state === CAMPAIGN_FUNDING && (
