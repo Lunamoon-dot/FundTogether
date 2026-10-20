@@ -101,6 +101,10 @@ export class VNextEvidenceService {
     const items = await this.db.select().from(schema.vnextCaseEvidence).where(
       and(eq(schema.vnextCaseEvidence.streamId, streamId), inArray(schema.vnextCaseEvidence.reviewCaseId, caseIds)),
     );
+    const evidence = await Promise.all(items.map(async item => ({
+      ...dto(item),
+      availability: await this.storage.availability(item.objectId),
+    })));
     return {
       access,
       assignments: access === "CREATOR"
@@ -108,7 +112,7 @@ export class VNextEvidenceService {
         : access === "JUDGE"
           ? assignments.filter(item => this.wallets(account).includes(item.judgeAddress.toLowerCase()))
           : [],
-      evidence: items.map(dto),
+      evidence,
     };
   }
 

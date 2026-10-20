@@ -1,9 +1,11 @@
 import { Injectable, OnModuleDestroy, ServiceUnavailableException } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
+import type { ConfigService } from "@nestjs/config";
 import {
   CreateBucketCommand, DeleteObjectCommand, GetBucketPolicyCommand,
-  GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client,
+  GetObjectCommand, HeadBucketCommand, HeadObjectCommand, PutObjectCommand, S3Client,
 } from "@aws-sdk/client-s3";
+
+export type EvidenceObjectAvailability = "AVAILABLE" | "MISSING" | "UNAVAILABLE";
 
 @Injectable()
 export class EvidenceStorageService implements OnModuleDestroy {
@@ -67,6 +69,19 @@ export class EvidenceStorageService implements OnModuleDestroy {
   async get(objectId: string) {
     const { client, bucket } = await this.storage();
     return client.send(new GetObjectCommand({ Bucket: bucket, Key: `originals/${objectId}` }));
+  }
+
+  async availability(objectId: string): Promise<EvidenceObjectAvailability> {
+    try {
+      const { client, bucket } = await this.storage();
+      await client.send(new HeadObjectCommand({ Bucket: bucket, Key: `originals/${objectId}` }));
+      return "AVAILABLE";
+    } catch (error) {
+      const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
+      const name = (error as { name?: string }).name;
+      if (status === 404 || name === "NotFound" || name === "NoSuchKey") return "MISSING";
+      return "UNAVAILABLE";
+    }
   }
 
   async remove(objectId: string) {

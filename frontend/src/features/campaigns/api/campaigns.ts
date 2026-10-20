@@ -263,6 +263,7 @@ export interface VNextCaseEvidence {
   sizeBytes: number;
   summary: string;
   createdAt: string;
+  availability?: 'AVAILABLE' | 'MISSING' | 'UNAVAILABLE';
 }
 export interface VNextCaseEvidenceResponse {
   access: 'CREATOR' | 'JUDGE' | 'CHALLENGER';

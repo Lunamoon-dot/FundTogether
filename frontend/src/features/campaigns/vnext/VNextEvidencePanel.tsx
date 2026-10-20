@@ -45,9 +45,11 @@ export function VNextEvidencePanel({ reviewCaseId, enabled = true }: { reviewCas
         </>
       )}
       {evidence.data?.evidence.length ? evidence.data.evidence.map(item => (
-        <a key={item.evidenceHash} className="text-sm block font-mono break-all" href={campaignApi.vnextEvidenceFileUrl(reviewCaseId, item.evidenceHash)} download>
-          Tải evidence {item.evidenceHash} · {item.sizeBytes} bytes
-        </a>
+        <div key={item.evidenceHash} className="text-sm space-y-1">
+          <p className="font-mono break-all m-0">Evidence {item.evidenceHash} · {item.sizeBytes} bytes</p>
+          <p className="text-xs text-[var(--ink-subtle)] m-0">Private object: {item.availability ?? 'UNKNOWN'} · availability không thay thế kiểm tra hash hoặc đánh giá factual truth.</p>
+          {item.availability === 'AVAILABLE' && <a className="block font-mono break-all" href={campaignApi.vnextEvidenceFileUrl(reviewCaseId, item.evidenceHash)} download>Tải evidence</a>}
+        </div>
       )) : evidence.isPending ? <p className="text-sm muted m-0">Đang đọc evidence ACL…</p> : <p className="text-sm muted m-0">Chưa có private evidence đã xác minh.</p>}
       {evidence.error && <p className="text-sm text-[var(--ink-subtle)] m-0">Case evidence chỉ hiển thị cho Creator, Challenger hợp lệ hoặc Judge được assign.</p>}
       {error && <p className="monograph-alert monograph-alert--error" role="alert">{error}</p>}
