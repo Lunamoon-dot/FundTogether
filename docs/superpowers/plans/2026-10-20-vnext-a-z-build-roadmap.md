@@ -759,14 +759,14 @@ capital, reward inequality, refundable proportion and invariant violations.
 
 **Release gate:**
 
-- [ ] `forge test` unit, fuzz and invariant suites pass.
-- [ ] Backend Jest suite passes with VNext tests separated from historical tests.
-- [ ] Frontend VNext scripts pass.
+- [x] `forge test` unit, fuzz and invariant suites pass.
+- [x] Backend focused Jest suite passes with VNext tests separated from historical tests.
+- [x] Frontend VNext scripts pass.
 - [ ] Fresh runtime E2E passes twice from clean state.
-- [ ] Indexer replay is idempotent.
+- [x] Indexer replay is idempotent.
 - [ ] No unresolved financial invariant violation exists.
-- [ ] Known accepted risks and unsupported limits are recorded.
-- [ ] Report says “local research prototype verified” only if evidence supports
+- [x] Known accepted risks and unsupported limits are recorded.
+- [x] Report says “local research prototype verified” only if evidence supports
   it; never “trustless truth” or “public-chain ready” by implication.
 
 ## Milestone gates and release order
