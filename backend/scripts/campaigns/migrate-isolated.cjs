@@ -3,7 +3,7 @@ const path = require('node:path');
 const { Client } = require('pg');
 const { guardEnvironment } = require('./guard-environment.cjs');
 
-const migrationIds = ['0000_fundtogether_baseline', '0001_campaigns_namespace_cleanup', '0002_remove_delivery_estimate', '0003_campaign_pledge_quantities', '0004_creator_studio_wallet', '0005_review_conversation_limits', '0006_historical_dispute_integrity', '0007_campaign_payout_requests', '0008_campaign_completion_surplus', '0009_surplus_claim_reorg_history', '0010_campaign_payout_file_purposes', '0011_vnext_projections', '0012_vnext_case_evidence', '0013_vnext_financial_read_models'];
+const migrationIds = ['0000_fundtogether_baseline', '0001_campaigns_namespace_cleanup', '0002_remove_delivery_estimate', '0003_campaign_pledge_quantities', '0004_creator_studio_wallet', '0005_review_conversation_limits', '0006_historical_dispute_integrity', '0007_campaign_payout_requests', '0008_campaign_completion_surplus', '0009_surplus_claim_reorg_history', '0010_campaign_payout_file_purposes', '0011_vnext_projections', '0012_vnext_case_evidence', '0013_vnext_financial_read_models', '0014_vnext_evidence_access_tickets'];
 
 function readEnvironment(file) {
   const values = {};

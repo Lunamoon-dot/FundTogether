@@ -23,9 +23,14 @@ export class VNextEvidenceController {
     return this.evidence.upload(reviewCaseId, request.account!, body, file);
   }
 
-  @Get(":reviewCaseId/evidence/:evidenceHash/file")
-  async file(@Param("reviewCaseId") reviewCaseId: string, @Param("evidenceHash") evidenceHash: string, @Req() request: Request, @Res() response: Response) {
-    const file = await this.evidence.file(reviewCaseId, evidenceHash, request.account!);
+  @Post(":reviewCaseId/evidence/:evidenceHash/ticket")
+  ticket(@Param("reviewCaseId") reviewCaseId: string, @Param("evidenceHash") evidenceHash: string, @Req() request: Request) {
+    return this.evidence.issueTicket(reviewCaseId, evidenceHash, request.account!);
+  }
+
+  @Get("evidence-downloads/:token")
+  async download(@Param("token") token: string, @Req() request: Request, @Res() response: Response) {
+    const file = await this.evidence.downloadTicket(token, request.account!);
     response.set({ ...privateHeaders, "Content-Type": file.mediaType, "Content-Disposition": "attachment; filename=vnext-evidence" }).send(file.bytes);
   }
 }

@@ -8,6 +8,7 @@ export function VNextEvidencePanel({ reviewCaseId, enabled = true }: { reviewCas
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [downloadBusy, setDownloadBusy] = useState<string | null>(null);
   const evidence = useQuery({
     queryKey: ['vnext-case-evidence', reviewCaseId],
     queryFn: ({ signal }) => campaignApi.vnextEvidence(reviewCaseId, signal),
@@ -31,6 +32,19 @@ export function VNextEvidencePanel({ reviewCaseId, enabled = true }: { reviewCas
     }
   };
 
+  const download = async (evidenceHash: string) => {
+    setDownloadBusy(evidenceHash);
+    setError(null);
+    try {
+      const ticket = await campaignApi.vnextEvidenceTicket(reviewCaseId, evidenceHash);
+      window.location.assign(ticket.url);
+    } catch (cause) {
+      setError(getErrorMessage(cause));
+    } finally {
+      setDownloadBusy(null);
+    }
+  };
+
   if (!enabled) return null;
   return (
     <section className="border-t border-[var(--border-hairline)] pt-3 space-y-2" data-vnext-evidence-case={reviewCaseId}>
@@ -49,7 +63,7 @@ export function VNextEvidencePanel({ reviewCaseId, enabled = true }: { reviewCas
         <div key={item.evidenceHash} className="text-sm space-y-1">
           <p className="font-mono break-all m-0">Evidence {item.evidenceHash} · {item.sizeBytes} bytes</p>
           <p className="text-xs text-[var(--ink-subtle)] m-0">Private object: {item.availability ?? 'UNKNOWN'} · availability không thay thế kiểm tra hash hoặc đánh giá factual truth.</p>
-          {item.availability === 'AVAILABLE' && <a className="block font-mono break-all" href={campaignApi.vnextEvidenceFileUrl(reviewCaseId, item.evidenceHash)} download>Tải evidence</a>}
+          {item.availability === 'AVAILABLE' && <button type="button" className="button button--secondary" disabled={downloadBusy === item.evidenceHash} onClick={() => void download(item.evidenceHash)}>{downloadBusy === item.evidenceHash ? 'Đang cấp ticket…' : 'Tải evidence'}</button>}
         </div>
       )) : evidence.isPending ? <p className="text-sm muted m-0">Đang đọc evidence ACL…</p> : <p className="text-sm muted m-0">Chưa có private evidence đã xác minh.</p>}
       {evidence.error && <p className="text-sm text-[var(--ink-subtle)] m-0">Case evidence chỉ hiển thị cho Creator, Challenger hợp lệ hoặc Judge được assign.</p>}

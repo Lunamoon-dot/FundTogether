@@ -107,9 +107,10 @@ explicit availability timeout.
 The local VNext evidence API exposes `WAITING_FOR_INDEXER`,
 `WAITING_FOR_EVIDENCE`, `TIMEOUT_RETRY_ELIGIBLE` and `REVIEW_CLOSED` states.
 Assigned-Judge commit/reveal controls fail closed until canonical bytes are
-available. After the on-chain review timeout, the backend exposes only the
-protocol retry/failure path; it never creates a ruling or moves escrow from a
-storage observation.
+available. Private bytes are served only through an authenticated, user-bound
+short-lived ticket. After the on-chain review timeout, the backend exposes
+only the protocol retry/failure path; it never creates a ruling or moves
+escrow from a storage observation.
 
 ### T08 — Replay or revision confusion
 

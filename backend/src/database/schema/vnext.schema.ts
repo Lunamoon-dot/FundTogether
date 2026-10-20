@@ -188,3 +188,16 @@ export const vnextCaseEvidence = pgTable("vnext_case_evidence", {
   primaryKey({ columns: [table.streamId, table.reviewCaseId, table.evidenceHash] }),
   index("vnext_case_evidence_case_idx").on(table.streamId, table.reviewCaseId),
 ]);
+
+export const vnextEvidenceAccessTickets = pgTable("vnext_evidence_access_tickets", {
+  tokenHash: varchar("token_hash", { length: 64 }).primaryKey(),
+  streamId: text("stream_id").notNull().references(() => indexerStreams.streamId),
+  reviewCaseId: varchar("review_case_id", { length: 66 }).notNull(),
+  evidenceHash: varchar("evidence_hash", { length: 66 }).notNull(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
+  requestedAt: timestamp("requested_at", { withTimezone: true }),
+}, table => [
+  index("vnext_evidence_access_ticket_user_idx").on(table.userId, table.expiresAt),
+]);

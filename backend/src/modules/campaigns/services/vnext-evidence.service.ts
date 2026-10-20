@@ -8,6 +8,7 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { and, eq, inArray } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -25,6 +26,11 @@ import {
   type VNextEvidenceObjectState,
   type VNextEvidenceReviewPhase,
 } from "./vnext-evidence-availability";
+import {
+  createVNextEvidenceAccessTicket,
+  hashVNextEvidenceAccessToken,
+  isVNextEvidenceAccessTicketExpired,
+} from "./vnext-evidence-access-ticket";
 
 const summarySchema = z.strictObject({ summary: z.string().trim().min(1).max(5000) });
 const hashPattern = /^0x[0-9a-fA-F]{64}$/;
@@ -226,16 +232,7 @@ export class VNextEvidenceService {
     }
   }
 
-  async file(reviewCaseIdInput: string, evidenceHashInput: string, account: AuthenticatedAccount) {
-    const reviewCaseId = this.caseId(reviewCaseIdInput);
-    const evidenceHash = this.caseId(evidenceHashInput);
-    const { streamId, caseIds } = await this.reviewAndAccess(reviewCaseId, account);
-    const [item] = await this.db.select().from(schema.vnextCaseEvidence).where(and(
-      eq(schema.vnextCaseEvidence.streamId, streamId),
-      inArray(schema.vnextCaseEvidence.reviewCaseId, caseIds),
-      eq(schema.vnextCaseEvidence.evidenceHash, evidenceHash),
-    ));
-    if (!item) throw new NotFoundException("VNext case evidence not found");
+  private async readEvidence(item: VNextEvidence) {
     try {
       await this.storage.verifyPrivateBucket();
       const object = await this.storage.get(item.objectId);
@@ -247,5 +244,63 @@ export class VNextEvidenceService {
     } catch {
       throw new ServiceUnavailableException("Private VNext evidence is unavailable or failed integrity verification");
     }
+  }
+
+  async issueTicket(reviewCaseIdInput: string, evidenceHashInput: string, account: AuthenticatedAccount) {
+    const reviewCaseId = this.caseId(reviewCaseIdInput);
+    const evidenceHash = this.caseId(evidenceHashInput);
+    const { streamId, caseIds } = await this.reviewAndAccess(reviewCaseId, account);
+    const canonicalHash = await this.canonicalEvidenceHash(streamId, caseIds);
+    if (canonicalHash !== evidenceHash) throw new ConflictException("Evidence is not the canonical case revision");
+    const [item] = await this.db.select().from(schema.vnextCaseEvidence).where(and(
+      eq(schema.vnextCaseEvidence.streamId, streamId),
+      inArray(schema.vnextCaseEvidence.reviewCaseId, caseIds),
+      eq(schema.vnextCaseEvidence.evidenceHash, evidenceHash),
+    ));
+    if (!item) throw new NotFoundException("VNext case evidence not found");
+    await this.readEvidence(item);
+    const ticket = createVNextEvidenceAccessTicket();
+    await this.db.insert(schema.vnextEvidenceAccessTickets).values({
+      tokenHash: ticket.tokenHash,
+      streamId,
+      reviewCaseId,
+      evidenceHash,
+      userId: account.userId,
+      expiresAt: ticket.expiresAt,
+    });
+    return {
+      state: "EVIDENCE_AVAILABLE",
+      url: `/v1/fundtogether/vnext/reviews/evidence-downloads/${ticket.token}`,
+      expiresAt: ticket.expiresAt,
+      sha256: item.sha256,
+    };
+  }
+
+  async downloadTicket(tokenInput: string, account: AuthenticatedAccount) {
+    let tokenHash: string;
+    try {
+      tokenHash = hashVNextEvidenceAccessToken(tokenInput);
+    } catch {
+      throw new NotFoundException("Evidence access ticket not found");
+    }
+    const [ticket] = await this.db.select().from(schema.vnextEvidenceAccessTickets).where(and(
+      eq(schema.vnextEvidenceAccessTickets.tokenHash, tokenHash),
+      eq(schema.vnextEvidenceAccessTickets.userId, account.userId),
+    ));
+    if (!ticket || isVNextEvidenceAccessTicketExpired(ticket.expiresAt)) {
+      throw new NotFoundException("Evidence access ticket expired or unavailable");
+    }
+    const { streamId, caseIds } = await this.reviewAndAccess(ticket.reviewCaseId, account);
+    if (streamId !== ticket.streamId) throw new NotFoundException("Evidence access ticket unavailable");
+    const [item] = await this.db.select().from(schema.vnextCaseEvidence).where(and(
+      eq(schema.vnextCaseEvidence.streamId, streamId),
+      inArray(schema.vnextCaseEvidence.reviewCaseId, caseIds),
+      eq(schema.vnextCaseEvidence.evidenceHash, ticket.evidenceHash),
+    ));
+    if (!item) throw new NotFoundException("VNext case evidence not found");
+    const file = await this.readEvidence(item);
+    if (isVNextEvidenceAccessTicketExpired(ticket.expiresAt)) throw new NotFoundException("Evidence access ticket expired or unavailable");
+    await this.db.update(schema.vnextEvidenceAccessTickets).set({ requestedAt: sql`COALESCE(${schema.vnextEvidenceAccessTickets.requestedAt}, now())` }).where(eq(schema.vnextEvidenceAccessTickets.tokenHash, tokenHash));
+    return file;
   }
 }

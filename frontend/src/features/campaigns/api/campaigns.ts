@@ -277,6 +277,7 @@ export interface VNextCaseEvidenceResponse {
     timeoutAtSeconds: string | null;
   };
 }
+export interface VNextEvidenceAccessTicket { state: 'EVIDENCE_AVAILABLE'; url: string; expiresAt: string; sha256: string; }
 export interface CampaignChain {
   deployment: DeploymentManifest; status: 'ON_CHAIN_CONFIRMED' | 'ORPHANED' | 'NOT_PUBLISHED'; onchainCampaignId: string | null;
   bindingTransactionHash: `0x${string}` | null;
@@ -448,7 +449,7 @@ export const campaignApi = {
     const data = new FormData(); data.append('summary', summary); data.append('file', file);
     return (await http.post<VNextCaseEvidence>(`/v1/fundtogether/vnext/reviews/${encodeURIComponent(reviewCaseId)}/evidence`, data, { headers: { 'Content-Type': undefined }, timeout: 60000 })).data;
   },
-  vnextEvidenceFileUrl: (reviewCaseId: string, evidenceHash: string) => `/v1/fundtogether/vnext/reviews/${encodeURIComponent(reviewCaseId)}/evidence/${encodeURIComponent(evidenceHash)}/file`,
+  vnextEvidenceTicket: async (reviewCaseId: string, evidenceHash: string) => (await http.post<VNextEvidenceAccessTicket>(`/v1/fundtogether/vnext/reviews/${encodeURIComponent(reviewCaseId)}/evidence/${encodeURIComponent(evidenceHash)}/ticket`)).data,
   vnextTransaction: async (txHash: string, signal?: AbortSignal) => (await http.get<VNextTransactionStatus>(`/v1/fundtogether/vnext/transactions/${txHash}`, { signal })).data,
   chain: async (id: string, signal?: AbortSignal) => (await http.get<CampaignChain>(`${base}/campaigns/${id}/chain`, { signal })).data,
   operations: async (scope: 'creator' | 'judge' | 'resolver' | 'admin', signal?: AbortSignal) =>

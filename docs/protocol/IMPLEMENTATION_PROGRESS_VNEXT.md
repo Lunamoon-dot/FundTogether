@@ -36,7 +36,7 @@ tests. Full web/API/browser acceptance remains separate.
 | P | `DeployVNext.s.sol`, `deploy-vnext.cjs`, `verify-vnext-runtime.cjs`, `vnext-deployment.ts` | Foundry script compiles; runtime verifier/policy identity tests: 6 passed; one-time wiring is executable |
 | P0/P1 remediation | `JuryReview.sol`, `JuryRegistry.sol`, `CampaignEscrowVNext.sol` | Retry/settlement/stake/liveness/budget/refund/court-order regressions covered; current full Foundry suite: 129 passed |
 | Q/R | `vnext-indexer.service.ts`, `vnext-event-projector.ts`, `IVNextEvents.sol`, VNext Drizzle schema | Persistent event/projection/checkpoint transaction; milestone review state/case-pointer events now project retry, appeal, ruling, correction and timeout transitions; Backer contribution/refund, challenge, court-summary and Judge ledger projections added; replay/crash/refund/completion tests remain the verification boundary |
-| S/T/X | `vnext.controller.ts`, `vnext-evidence.service.ts`, `vnext-evidence.controller.ts`, `vnext.schema.ts` | Read-only projection API now exposes authenticated Backer/Judge indexed read models, assigned-Judge review reads, challenge history, indexer checkpoint/lag status, plus private VNext case-evidence upload/read ACL, object availability status, canonical hash verification and explicit storage-timeout/retry status |
+| S/T/X | `vnext.controller.ts`, `vnext-evidence.service.ts`, `vnext-evidence.controller.ts`, `vnext.schema.ts` | Read-only projection API now exposes authenticated Backer/Judge indexed read models, assigned-Judge review reads, challenge history, indexer checkpoint/lag status, plus private VNext case-evidence upload/read ACL, canonical hash verification, short-lived user-bound evidence tickets and explicit storage-timeout/retry status |
 | U/V/W/X | `VNextProtocolPage.tsx`, `VNextCreateCampaignPanel.tsx`, `VNextActionPanel.tsx`, `VNextJudgePage.tsx`, `VNextEvidencePanel.tsx` | VNext Creator campaign creation/publication finalization, private evidence, Backer actions and Judge stake/commit–reveal/reward surface added; Judge workspace now requests assigned cases only; isolated runtime acceptance passes, while full browser journey remains incomplete |
 
 ## Current executable behavior
@@ -173,11 +173,11 @@ Current policy-freeze branch evidence after the bounded-settlement,
 escrow-boundary and evidence-availability slices:
 
 ```text
-frontend: npm test -> 206 passed, 0 failed
+frontend: npm test -> 207 passed, 0 failed
 frontend: npm run build -> success (existing large-bundle warning)
-frontend: VNext static journey tests remain covered by the 206-test suite
-backend: `npm run build` -> success
-backend: focused VNext Jest invocation with `--testMatch="**/*.spec.ts"` -> 8 suites, 30 passed, 0 failed
+frontend: VNext static journey tests remain covered by the 207-test suite
+backend: `npm run build` -> success; isolated migration audit -> PASS
+backend: focused VNext Jest invocation with `--testMatch="**/*.spec.ts"` -> 9 suites, 33 passed, 0 failed
 backend: direct fresh-chain acceptance -> `PASS`, protocol `FUNDTOGETHER_VNEXT`, chain `31339`, payout campaign `6`, refund campaign `7`, contract balance `0`
 contracts: Docker Foundry forge build -> success (solc 0.8.24); full
 forge test -> 129 passed, 0 failed, 0 skipped; generated VNext ABIs refreshed.

@@ -113,3 +113,11 @@ test('VNext Judge review blocks voting until canonical evidence is available', (
   assert.match(page, /TIMEOUT_RETRY_ELIGIBLE/)
   assert.match(page, /evidenceReady/)
 })
+
+test('VNext evidence uses a short-lived access ticket instead of a direct file URL', () => {
+  const api = fs.readFileSync(path.join(root, 'src/features/campaigns/api/campaigns.ts'), 'utf8')
+  const panel = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextEvidencePanel.tsx'), 'utf8')
+  assert.match(api, /vnextEvidenceTicket/)
+  assert.doesNotMatch(api, /vnextEvidenceFileUrl/)
+  assert.match(panel, /window\.location\.assign\(ticket\.url\)/)
+})
