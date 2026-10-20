@@ -323,7 +323,7 @@ export class VNextIndexerService implements OnModuleInit, OnModuleDestroy {
       });
     } else if (eventName === "FundingFinalized") {
       await tx.update(vnextCampaignProjections).set({
-        state: boolArg(args, "successful") ? 2 : 5, raised: textArg(args, "raised"), lastBlockNumber: blockNumber.toString(), lastEventName: eventName, updatedAt: new Date(),
+        state: boolArg(args, "successful") ? 3 : 5, raised: textArg(args, "raised"), lastBlockNumber: blockNumber.toString(), lastEventName: eventName, updatedAt: new Date(),
       }).where(and(eq(vnextCampaignProjections.streamId, streamId), eq(vnextCampaignProjections.onchainCampaignId, textArg(args, "campaignId"))));
     } else if (eventName === "CampaignRefundsOpened") {
       await tx.update(vnextCampaignProjections).set({

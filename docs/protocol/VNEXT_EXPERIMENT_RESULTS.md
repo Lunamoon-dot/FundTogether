@@ -17,6 +17,7 @@ claim that the protocol is economically optimal.
 | Verdict FAIL → correction | One bounded correction revision passed and paid; correction timeout opened refund | One correction is the configured local limit |
 | Failed transfer / duplicate settlement | State rollback and duplicate protection passed in focused contract tests | Uses MockUSDC behavior, not adversarial production tokens |
 | Indexer replay/crash | Persistent event, projection and checkpoint transaction rolled back together, then replayed exactly once | PostgreSQL isolated test; no reorg simulation |
+| Browser funding slice | Creator created a campaign, a three-Judge publication case was resolved, a Backer approved and contributed the full 100 MockUSDC goal, then a permissionless caller finalized funding only after a 7-day chain-time jump; contract and indexed projection both reached `MILESTONES_RUNNING` | Local Edge/Playwright runner passed twice on campaigns 22 and 23; publication materialization was direct contract invocation, and Judge UI/evidence/payout/refund remain untested in-browser |
 
 ## Measured limits
 

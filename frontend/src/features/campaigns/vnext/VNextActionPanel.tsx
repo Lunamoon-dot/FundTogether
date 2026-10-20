@@ -160,7 +160,19 @@ export function VNextActionPanel({
   const [amount, setAmount] = useState('');
   const creator = Boolean(transaction.address && transaction.address.toLowerCase() === campaign.creator.toLowerCase());
   const amountValue = tokenAmount(amount);
-  const fundingEnded = BigInt(Math.floor(Date.now() / 1000)) >= BigInt(campaign.fundingDeadline);
+  const fundingClock = useQuery({
+    queryKey: ['vnext-funding-chain-clock', client?.chain?.id],
+    enabled: Boolean(client),
+    queryFn: async () => {
+      if (!client) throw new Error('VNext chain clock is unavailable');
+      return (await client.getBlock({ blockTag: 'latest' })).timestamp;
+    },
+    retry: false,
+    staleTime: 5_000,
+  });
+  const fundingChainTimestamp = fundingClock.data;
+  const fundingEnded = fundingChainTimestamp !== undefined
+    && fundingChainTimestamp >= BigInt(campaign.fundingDeadline);
   const campaignNumber = /^[0-9]+$/.test(campaignId) ? BigInt(campaignId) : null;
   const reviews = useQuery({
     queryKey: ['vnext-reviews', deployment.juryReview],

@@ -153,7 +153,7 @@ export function applyVNextEvent(state: VNextProjectionState, event: VNextEvent):
     campaign.raised = stringValue(args, "cumulativeRaised");
   } else if (event.eventName === "FundingFinalized" && campaign) {
     campaign.raised = stringValue(args, "raised");
-    campaign.state = Boolean(value(args, "successful")) ? 2 : 5;
+    campaign.state = Boolean(value(args, "successful")) ? 3 : 5;
   } else if (event.eventName === "MilestoneEvidenceSubmitted") {
     const key = `${campaignId}:${stringValue(args, "milestoneId")}`;
     state.milestones.set(key, {

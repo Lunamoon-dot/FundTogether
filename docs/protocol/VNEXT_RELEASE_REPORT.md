@@ -26,14 +26,22 @@ real-money custody are outside this decision.
 | Backend | 11 focused suites / 38 tests passed; build passed | VNext-focused Jest selection, not a claim that every historical suite is green |
 | Frontend | 207 tests passed; production build passed | Existing large-bundle warning remains |
 | Direct runtime | Fresh Anvil + isolated PostgreSQL scenario passed; payout/refund/no-quorum/tie/appeal/correction/replay paths exercised; contract balance ended at zero | One local chain and temporary database |
-| Browser runtime | SIWE + EIP-6963 wallet link + Creator campaign creation + receipt/indexer/projection reload passed from fresh genesis and after large chain-time jumps | Full browser funding/review/payout journey remains open |
+| Browser runtime | SIWE + EIP-6963 wallet link, Creator campaign creation, direct Judge publication resolve/materialization, Backer allowance/contribution, chain-time deadline finalization and contract/indexer `MILESTONES_RUNNING` projection passed twice (campaigns 22 and 23) | Publication materialization is a direct permissionless contract call in this runner; Judge UI commit/reveal, evidence, payout and refund browser journeys remain open |
+
+The browser run also caught and fixed a projection defect: the contract moves a
+successful `FundingFinalized` campaign directly to `MILESTONES_RUNNING (3)`,
+while the projector had incorrectly retained the unused intermediate
+`FUNDED (2)` value. Both the pure projector and PostgreSQL projector now map the
+canonical event to state `3`.
 
 ## Release blockers
 
 The following prevent a broader release decision:
 
-1. Full browser Backer/Judge funding, review, payout and refund journeys have
-   not been accepted as one end-to-end browser scenario.
+1. The browser funding slice is accepted, but Judge UI commit/reveal, evidence,
+   payout and refund journeys have not been accepted as one end-to-end browser
+   scenario. Publication materialization is currently exercised by a direct
+   permissionless contract call in the runner.
 2. Non-reveal penalty and service-fee/reviewer-budget economics remain frozen
    or unapproved; the local policy uses non-reveal penalty `0`.
 3. The configured local batch limit is measured, but production sizing for the

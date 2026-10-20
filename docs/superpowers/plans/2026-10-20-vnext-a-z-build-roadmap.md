@@ -732,8 +732,11 @@ replay and unavailable evidence.
 - [ ] Verify chain ID `31339`, deployment block, code identity and manifest.
 - [ ] Verify service ports: web `5175`, API `3002`, PostgreSQL `5436`, MinIO
   `9202/9203`, RPC `9548`.
-- [ ] Run contract, backend, indexer and browser acceptance sequentially.
-- [ ] Confirm all financial outcomes from canonical events, not UI state.
+- [x] Run contract, backend, indexer and browser acceptance sequentially for the
+  currently implemented local slices.
+- [x] Confirm the accepted funding outcomes from canonical contract events and
+  indexed projection, not UI state; the full Judge/evidence/payout/refund
+  scenario remains open.
 
 ### Gate Z — Security, research evaluation and release decision
 

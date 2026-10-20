@@ -43,9 +43,14 @@ describe("VNext event projector", () => {
       evidenceRevision: 1n,
       creator: "0x0000000000000000000000000000000000000001",
     }, 3))).toBe(true);
+    expect(applyVNextEvent(state, event("FundingFinalized", {
+      campaignId,
+      successful: true,
+      raised: 100000000n,
+    }, 4))).toBe(true);
 
     const campaign = state.campaigns.get("7");
-    expect(campaign?.state).toBe(1);
+    expect(campaign?.state).toBe(3);
     expect(campaign?.raised).toBe("100000000");
     expect(state.reviews.get(caseId)?.campaignId).toBe("7");
   });

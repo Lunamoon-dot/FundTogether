@@ -21,11 +21,14 @@
   access tickets, and wallet-only SIWE boundaries. Current focused backend
   evidence is `11` suites / `38` tests; frontend evidence is `207` tests and a
   successful production build.
-- Fresh local direct acceptance and a real SIWE/EIP-6963 Creator browser slice
-  pass on Anvil chain `31339`; the browser Create panel now derives deadlines
-  from the latest chain block rather than the host clock. Full browser
-  Backer/Judge funding/review/payout acceptance, production economics and
-  public-chain release remain out of scope. See
+- Fresh local direct acceptance and a real SIWE/EIP-6963 browser funding slice
+  pass on Anvil chain `31339`: Creator creation, direct Judge publication
+  resolution, Backer allowance/contribution, chain-time deadline finalization,
+  and contract/indexer `MILESTONES_RUNNING` projection pass twice. The browser
+  Create and Action panels derive deadlines from the latest chain block rather
+  than the host clock. Judge UI commit/reveal, evidence, payout/refund browser
+  acceptance, production economics and public-chain release remain out of
+  scope. See
   [the VNext release report](protocol/VNEXT_RELEASE_REPORT.md).
 
 The detailed live ledger is [Implementation Progress VNext](protocol/IMPLEMENTATION_PROGRESS_VNEXT.md);
