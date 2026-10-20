@@ -60,6 +60,7 @@ test('keeps reserved list, draft, profile and review routes out of detail matchi
   for (const path of [
     '/campaigns',
     '/campaigns/review',
+    '/campaigns/vnext',
     '/campaigns/library',
     '/campaigns/history',
     '/campaigns/history/entitlements',

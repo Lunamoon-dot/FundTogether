@@ -175,10 +175,19 @@ escrow-boundary and evidence-availability slices:
 ```text
 frontend: npm test -> 207 passed, 0 failed
 frontend: npm run build -> success (existing large-bundle warning)
-frontend: VNext static journey tests remain covered by the 207-test suite
+frontend: VNext static journey tests remain covered by the 207-test suite; the
+route regression keeps `/campaigns/vnext` out of the legacy public campaign
+detail matcher
 backend: `npm run build` -> success; isolated migration audit -> PASS
-backend: focused VNext Jest invocation with `--testMatch="**/*.spec.ts"` -> 9 suites, 33 passed, 0 failed
-backend: direct fresh-chain acceptance -> `PASS`, protocol `FUNDTOGETHER_VNEXT`, chain `31339`, payout campaign `6`, refund campaign `7`, contract balance `0`
+backend: focused VNext Jest invocation with `--testMatch="**/*.spec.ts"` -> 10 suites, 37 passed, 0 failed
+backend: VNext runtime boot -> `GET /health` returned `200`, protocol
+`FUNDTOGETHER_VNEXT`, chain `31339`, campaign escrow
+`0xdc64a140aa3e981100a9beca4e685f962f0cf6c9`
+backend: direct fresh-chain acceptance -> `PASS`, protocol `FUNDTOGETHER_VNEXT`, chain `31339`, payout campaign `0`, refund campaign `1`, contract balance `0`
+browser: Playwright Edge read-only VNext route -> deployment and indexer
+requests returned `200`; no legacy `/public/campaigns/vnext` request remains;
+guest `/auth/session` returned the expected `401`; wallet mutation journey
+was not run
 contracts: Docker Foundry forge build -> success (solc 0.8.24); full
 forge test -> 129 passed, 0 failed, 0 skipped; generated VNext ABIs refreshed.
 The host still lacks native Forge/Anvil; contract checks are container-backed.
