@@ -178,6 +178,25 @@ contract VNextMilestoneEvidenceTest is Test {
         assertEq(uint8(escrow.campaignState(campaignId)), uint8(VNextTypes.CampaignState.REFUNDING));
     }
 
+    function test_CannotFinalizeCorrectionFailureWithUninitializedDeadline() public {
+        vm.prank(creator);
+        bytes32 firstCase = escrow.submitMilestoneEvidence(campaignId, 0, keccak256("evidence-r1"));
+        review.setFinalOutcome(firstCase, VNextTypes.ReviewOutcome.VERDICT_FAIL);
+        escrow.syncFinalRuling(campaignId, 0);
+
+        vm.prank(creator);
+        bytes32 correctionCase = escrow.submitMilestoneEvidence(
+            campaignId, 0, keccak256("evidence-r2")
+        );
+        review.setFinalOutcome(correctionCase, VNextTypes.ReviewOutcome.VERDICT_FAIL);
+        escrow.syncFinalRuling(campaignId, 0);
+
+        vm.store(address(escrow), _milestoneStorageSlot(campaignId, 0, 8), bytes32(0));
+        vm.warp(block.timestamp + 365 days);
+        vm.expectRevert(CampaignEscrowVNext.CorrectionLimitReached.selector);
+        escrow.finalizeCorrectionFailure(campaignId, 0);
+    }
+
     function test_CreatorCanAppealOwnVerdictFail() public {
         vm.prank(creator);
         bytes32 caseId = escrow.submitMilestoneEvidence(
@@ -218,5 +237,15 @@ contract VNextMilestoneEvidenceTest is Test {
     function _submitEvidence(bytes32 evidenceHash) private returns (bytes32 reviewCaseId) {
         vm.prank(creator);
         reviewCaseId = escrow.submitMilestoneEvidence(campaignId, 0, evidenceHash);
+    }
+
+    function _milestoneStorageSlot(uint256 id, uint256 milestoneId, uint256 memberOffset)
+        private
+        pure
+        returns (bytes32)
+    {
+        bytes32 campaignSlot = keccak256(abi.encode(id, uint256(3)));
+        bytes32 milestoneSlot = keccak256(abi.encode(milestoneId, campaignSlot));
+        return bytes32(uint256(milestoneSlot) + memberOffset);
     }
 }

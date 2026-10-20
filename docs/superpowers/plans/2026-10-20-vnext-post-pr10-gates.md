@@ -57,6 +57,10 @@ Expected: the new precondition tests fail because `expireMilestoneSubmission` ac
 
 Add an internal active-milestone lookup that returns the first unpaid milestone in order. Require `FUNDED` or `MILESTONES_RUNNING`, the selected ID to equal that active ID, and a nonzero deadline in the corresponding submission/correction branch. Add the same nonzero submission-deadline guard to `submitMilestoneEvidence` for a `PENDING` milestone.
 
+The follow-up guard also rejects an uninitialized correction deadline in
+`finalizeCorrectionFailure`, with a storage-level regression test covering the
+defensive invariant.
+
 - [x] **Step 4: Run the focused tests and verify GREEN**
 
 Run the same Forge command. Expected: every new regression and existing focused test passes.

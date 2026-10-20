@@ -175,7 +175,7 @@ describe("VNextIndexerService", () => {
       budget: 100000000n,
       acceptanceCriteriaHash: hash("f"),
     });
-    expect(await persist(service, "stream-1", log(2), "MilestoneStateChanged", {
+    const stateChange = {
       campaignId: 7n,
       milestoneId: 0n,
       evidenceRevision: 1n,
@@ -187,7 +187,9 @@ describe("VNextIndexerService", () => {
       correctionDeadline: 0n,
       challengeDeadline: 99n,
       paid: false,
-    })).toBe(true);
+    };
+    expect(await persist(service, "stream-1", log(2), "MilestoneStateChanged", stateChange)).toBe(true);
+    expect(await persist(service, "stream-1", log(2), "MilestoneStateChanged", stateChange)).toBe(false);
 
     await persist(service, "stream-1", log(3), "MilestoneStateChanged", {
       campaignId: 7n,
@@ -218,6 +220,7 @@ describe("VNextIndexerService", () => {
       paid: false,
     });
     expect(fake.state.milestones[1].reviewCaseId).toBeNull();
+    expect(fake.state.events).toHaveLength(4);
   });
 
   it("test_IndexedEnrollmentReplayIsIdempotent", async () => {

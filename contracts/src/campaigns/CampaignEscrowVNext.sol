@@ -450,6 +450,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         if (
             milestone.state != VNextTypes.MilestoneState.CORRECTION
                 || milestone.correctionCount < MAX_MILESTONE_CORRECTIONS
+                || milestone.correctionDeadline == 0
                 || block.timestamp < milestone.correctionDeadline
         ) revert CorrectionLimitReached();
         milestone.state = VNextTypes.MilestoneState.TERMINAL;

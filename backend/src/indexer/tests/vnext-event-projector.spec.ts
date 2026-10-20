@@ -73,7 +73,7 @@ describe("VNext event projector", () => {
       budget: 100000000n,
       acceptanceCriteriaHash: "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
     }, 1))).toBe(true);
-    expect(applyVNextEvent(state, event("MilestoneStateChanged", {
+    const stateChange = event("MilestoneStateChanged", {
       campaignId,
       milestoneId: 0n,
       evidenceRevision: 1n,
@@ -85,7 +85,9 @@ describe("VNext event projector", () => {
       correctionDeadline: 0n,
       challengeDeadline: 99n,
       paid: false,
-    }, 2))).toBe(true);
+    }, 2);
+    expect(applyVNextEvent(state, stateChange)).toBe(true);
+    expect(applyVNextEvent(state, stateChange)).toBe(false);
 
     expect(state.milestones.get("7:0")).toMatchObject({
       campaignId: "7",

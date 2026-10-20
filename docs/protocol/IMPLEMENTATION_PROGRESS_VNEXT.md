@@ -25,7 +25,7 @@
 | K | `JuryReview.sol`, `CampaignEscrowVNext.sol` | Appeal/challenge hooks exist; focused review/campaign tests pass |
 | L | `CampaignEscrowVNext.sol` | Payout/refund/challenge tests: 4 passed; conservation/failure-transfer fuzz suite: 3 passed |
 | P | `DeployVNext.s.sol`, `deploy-vnext.cjs`, `verify-vnext-runtime.cjs`, `vnext-deployment.ts` | Foundry script compiles; runtime verifier/policy identity tests: 8 passed; one-time wiring is executable |
-| P0/P1 remediation | `JuryReview.sol`, `JuryRegistry.sol`, `CampaignEscrowVNext.sol` | Retry/settlement/stake/liveness/budget/refund/court-order regressions covered; current full Foundry suite: 128 passed |
+| P0/P1 remediation | `JuryReview.sol`, `JuryRegistry.sol`, `CampaignEscrowVNext.sol` | Retry/settlement/stake/liveness/budget/refund/court-order regressions covered; current full Foundry suite: 129 passed |
 | Q/R | `vnext-indexer.service.ts`, `vnext-event-projector.ts`, VNext Drizzle schema | Persistent event/projection/checkpoint transaction; current post-remediation projector/indexer tests: 10 passed |
 | S/T | `vnext.controller.ts`, `vnext-evidence-integrity.ts` | Read-only projection API, SHA-256 evidence check and focused evidence tests added |
 | U/V/W/X | `VNextProtocolPage.tsx` | Read-only VNext protocol/campaign projection surface added; Creator/Backer/Judge wallet journeys remain incomplete |
@@ -93,7 +93,7 @@ security audit.
 
 ```text
 contracts: forge test
-  128 passed, 0 failed, 0 skipped, 11 suites
+  129 passed, 0 failed, 0 skipped, 11 suites
 
 backend: npm run build
   exit 0
