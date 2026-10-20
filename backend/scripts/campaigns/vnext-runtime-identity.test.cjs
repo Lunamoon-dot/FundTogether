@@ -48,6 +48,71 @@ function manifest() {
   };
 }
 
+function deployedFixture() {
+  const current = manifest();
+  const code = {
+    [current.campaignEscrow]: '0x6000',
+    [current.juryRegistry]: '0x6001',
+    [current.juryReview]: '0x6002',
+    [current.randomnessProvider]: '0x6003',
+    [current.tokenAddress]: '0x6004',
+  };
+  const verified = {
+    ...current,
+    campaignCodeHash: keccak256(code[current.campaignEscrow]),
+    registryCodeHash: keccak256(code[current.juryRegistry]),
+    reviewCodeHash: keccak256(code[current.juryReview]),
+    tokenCodeHash: keccak256(code[current.tokenAddress]),
+  };
+  return { verified, code };
+}
+
+function verifierClient(verified, code, overrides = {}) {
+  const campaignReads = {
+    supportedToken: verified.tokenAddress,
+    reviewEngine: verified.juryReview,
+    protocolVersion: 1n,
+    policyHash: verified.policyHash,
+    milestoneSubmissionWindow: 7n * 24n * 60n * 60n,
+    correctionWindow: 7n * 24n * 60n * 60n,
+    challengeWindowDuration: 7n * 24n * 60n * 60n,
+    MAX_MILESTONE_CORRECTIONS: 1n,
+  };
+  const reviewReads = {
+    registry: verified.juryRegistry,
+    campaignEscrow: verified.campaignEscrow,
+    randomnessProvider: verified.randomnessProvider,
+    protocolVersion: 1n,
+    enrollmentDuration: 48n * 60n * 60n,
+    commitDuration: 24n * 60n * 60n,
+    revealDuration: 24n * 60n * 60n,
+    appealWindowDuration: 48n * 60n * 60n,
+    randomnessTimeout: 48n * 60n * 60n,
+    maxEligibleJudges: 300n,
+    MINIMUM_STAKE_FLOOR: 10_000_000n,
+    RISK_MULTIPLIER_BPS: 500n,
+    appealBond: 1_000_000n,
+    maximumAppealRounds: 2n,
+    MAXIMUM_RETRIES_PER_REVIEW_LEVEL: 2n,
+    minoritySlashBps: 500n,
+  };
+  const read = (addressValue, functionName) => {
+    const key = `${addressValue.toLowerCase()}:${functionName}`;
+    if (Object.prototype.hasOwnProperty.call(overrides, key)) return overrides[key];
+    if (addressValue === verified.campaignEscrow) return campaignReads[functionName];
+    if (addressValue === verified.juryReview) return reviewReads[functionName];
+    return 6;
+  };
+  return {
+    getChainId: async () => 31339,
+    getBlock: async ({ blockNumber }) => ({
+      hash: blockNumber === 0n ? verified.genesisHash : verified.deploymentBlockHash,
+    }),
+    getCode: async ({ address: addressValue }) => code[addressValue],
+    readContract: async ({ address: addressValue, functionName }) => read(addressValue, functionName),
+  };
+}
+
 test('VNext manifest parser accepts the frozen local identity', () => {
   assert.doesNotThrow(() => parseVNextDeploymentManifest(manifest()));
 });
@@ -80,6 +145,18 @@ test('VNext runtime identity matches the remediation policy registry', () => {
     tokenDecimals: policy.tokenDecimals,
     milestoneSubmissionWindowSeconds: policy.milestoneSubmissionWindowSeconds,
     correctionWindowSeconds: policy.correctionWindowSeconds,
+    challengeWindowSeconds: policy.challengeWindowSeconds,
+    judgeEnrollmentWindowSeconds: policy.judgeEnrollmentWindowSeconds,
+    commitWindowSeconds: policy.commitWindowSeconds,
+    revealWindowSeconds: policy.revealWindowSeconds,
+    appealWindowSeconds: policy.appealWindowSeconds,
+    randomnessTimeoutSeconds: policy.randomnessTimeoutSeconds,
+    maxEligibleJudges: policy.maxEligibleJudges,
+    maximumAppealRounds: policy.maximumAppealRounds,
+    maximumRetriesPerReviewLevel: policy.maximumRetriesPerReviewLevel,
+    maximumMilestoneCorrections: policy.maximumMilestoneCorrections,
+    minoritySlashBps: policy.minoritySlashBps,
+    appealBondUnits: policy.appealBondUnits,
     minimumStakeFloorUnits: policy.minimumStakeFloorUnits,
     riskMultiplierBps: policy.riskMultiplierBps,
   }, {
@@ -88,6 +165,18 @@ test('VNext runtime identity matches the remediation policy registry', () => {
     tokenDecimals: 6,
     milestoneSubmissionWindowSeconds: 7 * 24 * 60 * 60,
     correctionWindowSeconds: 7 * 24 * 60 * 60,
+    challengeWindowSeconds: 7 * 24 * 60 * 60,
+    judgeEnrollmentWindowSeconds: 48 * 60 * 60,
+    commitWindowSeconds: 24 * 60 * 60,
+    revealWindowSeconds: 24 * 60 * 60,
+    appealWindowSeconds: 48 * 60 * 60,
+    randomnessTimeoutSeconds: 48 * 60 * 60,
+    maxEligibleJudges: 300,
+    maximumAppealRounds: 2,
+    maximumRetriesPerReviewLevel: 2,
+    maximumMilestoneCorrections: 1,
+    minoritySlashBps: 500,
+    appealBondUnits: '1000000',
     minimumStakeFloorUnits: '10000000',
     riskMultiplierBps: 500,
   });
@@ -95,50 +184,30 @@ test('VNext runtime identity matches the remediation policy registry', () => {
 });
 
 test('VNext verifier enforces remediation policy values and contract wiring', async () => {
-  const current = manifest();
-  const code = {
-    [current.campaignEscrow]: '0x6000',
-    [current.juryRegistry]: '0x6001',
-    [current.juryReview]: '0x6002',
-    [current.randomnessProvider]: '0x6003',
-    [current.tokenAddress]: '0x6004',
-  };
-  const verified = {
-    ...current,
-    campaignCodeHash: keccak256(code[current.campaignEscrow]),
-    registryCodeHash: keccak256(code[current.juryRegistry]),
-    reviewCodeHash: keccak256(code[current.juryReview]),
-    tokenCodeHash: keccak256(code[current.tokenAddress]),
-  };
-  const client = {
-    getChainId: async () => 31339,
-    getBlock: async ({ blockNumber }) => ({
-      hash: blockNumber === 0n ? verified.genesisHash : verified.deploymentBlockHash,
-    }),
-    getCode: async ({ address }) => code[address],
-    readContract: async ({ address, functionName }) => {
-      if (address === verified.campaignEscrow) {
-        return {
-          supportedToken: verified.tokenAddress,
-          reviewEngine: verified.juryReview,
-          protocolVersion: 1n,
-          policyHash: verified.policyHash,
-          milestoneSubmissionWindow: 7n * 24n * 60n * 60n,
-          correctionWindow: 7n * 24n * 60n * 60n,
-        }[functionName];
-      }
-      if (address === verified.juryReview) {
-        return {
-          registry: verified.juryRegistry,
-          campaignEscrow: verified.campaignEscrow,
-          protocolVersion: 1n,
-          MINIMUM_STAKE_FLOOR: 10_000_000n,
-          RISK_MULTIPLIER_BPS: 500n,
-        }[functionName];
-      }
-      return 6;
-    },
-  };
+  const { verified, code } = deployedFixture();
+  const client = verifierClient(verified, code);
 
   await verifyVNextDeployment(client, parseVNextDeploymentManifest(verified));
+});
+
+test('VNext verifier rejects a campaign policy window mismatch', async () => {
+  const { verified, code } = deployedFixture();
+  const overrideKey = `${verified.campaignEscrow}:challengeWindowDuration`;
+  const client = verifierClient(verified, code, { [overrideKey]: 6n * 24n * 60n * 60n });
+
+  await assert.rejects(
+    verifyVNextDeployment(client, parseVNextDeploymentManifest(verified)),
+    /VNext campaign policy mismatch/,
+  );
+});
+
+test('VNext verifier rejects a review policy parameter mismatch', async () => {
+  const { verified, code } = deployedFixture();
+  const overrideKey = `${verified.juryReview}:appealBond`;
+  const client = verifierClient(verified, code, { [overrideKey]: 2_000_000n });
+
+  await assert.rejects(
+    verifyVNextDeployment(client, parseVNextDeploymentManifest(verified)),
+    /VNext review policy mismatch/,
+  );
 });

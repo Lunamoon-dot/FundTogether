@@ -31,6 +31,7 @@ verifier must agree with it before a local acceptance run is considered valid.
   "revealWindowSeconds": 86400,
   "appealWindowSeconds": 172800,
   "randomnessTimeoutSeconds": 172800,
+  "maxEligibleJudges": 300,
   "maximumAppealRounds": 2,
   "maximumRetriesPerReviewLevel": 2,
   "maximumMilestoneCorrections": 1,
@@ -54,6 +55,7 @@ verifier must agree with it before a local acceptance run is considered valid.
 | `revealWindow` | 24 hours | All three assigned Judges must reveal |
 | `appealWindow` | 48 hours | Starts after the latest valid round |
 | `randomnessTimeout` | 48 hours | No randomness is a substantive FAIL |
+| `maxEligibleJudges` | `300` | Local enrollment cap; not a scalability claim |
 | `maximumAppealRounds` | 2 | Fresh, non-overlapping Judge pool per appeal |
 | `maximumRetriesPerReviewLevel` | 2 | Only protocol failure can retry |
 | `maximumMilestoneCorrections` | 1 | Correction keeps the frozen budget and criteria |

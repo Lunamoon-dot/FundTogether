@@ -13,6 +13,30 @@ export const vnextPolicyHash = keccak256(toHex("fundtogether-vnext-local-v2-reme
 export const vnextCampaignAbiHash = keccak256(
   toHex(JSON.stringify(campaignArtifact.abi, null, 2) + "\n"),
 );
+const vnextLocalPolicy = {
+  campaign: {
+    protocolVersion: 1n,
+    challengeWindowDuration: 7n * 24n * 60n * 60n,
+    milestoneSubmissionWindow: 7n * 24n * 60n * 60n,
+    correctionWindow: 7n * 24n * 60n * 60n,
+    maxMilestoneCorrections: 1n,
+  },
+  review: {
+    protocolVersion: 1n,
+    enrollmentDuration: 48n * 60n * 60n,
+    commitDuration: 24n * 60n * 60n,
+    revealDuration: 24n * 60n * 60n,
+    appealWindowDuration: 48n * 60n * 60n,
+    randomnessTimeout: 48n * 60n * 60n,
+    maxEligibleJudges: 300n,
+    minimumStakeFloor: 10_000_000n,
+    riskMultiplierBps: 500n,
+    appealBond: 1_000_000n,
+    maximumAppealRounds: 2n,
+    maximumRetriesPerReviewLevel: 2n,
+    minoritySlashBps: 500n,
+  },
+} as const;
 const hash = z.string().regex(/^0x[0-9a-fA-F]{64}$/);
 const address = z.string().regex(/^0x[0-9a-fA-F]{40}$/).transform(value => value.toLowerCase() as `0x${string}`);
 
@@ -99,36 +123,72 @@ export async function verifyVNextDeployment(
     throw new Error("VNext deployment identity mismatch");
   }
 
-  const campaignReads = await Promise.all([
+  const campaignWiringReads = await Promise.all([
     client.readContract({ address: manifest.campaignEscrow, abi: vnextCampaignAbi, functionName: "supportedToken" }),
     client.readContract({ address: manifest.campaignEscrow, abi: vnextCampaignAbi, functionName: "reviewEngine" }),
     client.readContract({ address: manifest.campaignEscrow, abi: vnextCampaignAbi, functionName: "protocolVersion" }),
     client.readContract({ address: manifest.campaignEscrow, abi: vnextCampaignAbi, functionName: "policyHash" }),
-    client.readContract({ address: manifest.campaignEscrow, abi: vnextCampaignAbi, functionName: "milestoneSubmissionWindow" }),
-    client.readContract({ address: manifest.campaignEscrow, abi: vnextCampaignAbi, functionName: "correctionWindow" }),
   ]);
-  if (String(campaignReads[0]).toLowerCase() !== manifest.tokenAddress
-    || String(campaignReads[1]).toLowerCase() !== manifest.juryReview
-    || campaignReads[2] !== 1n
-    || String(campaignReads[3]).toLowerCase() !== manifest.policyHash.toLowerCase()
-    || campaignReads[4] !== 7n * 24n * 60n * 60n
-    || campaignReads[5] !== 7n * 24n * 60n * 60n) {
+  if (String(campaignWiringReads[0]).toLowerCase() !== manifest.tokenAddress
+    || String(campaignWiringReads[1]).toLowerCase() !== manifest.juryReview
+    || campaignWiringReads[2] !== vnextLocalPolicy.campaign.protocolVersion
+    || String(campaignWiringReads[3]).toLowerCase() !== manifest.policyHash.toLowerCase()) {
     throw new Error("VNext campaign wiring mismatch");
   }
 
-  const reviewReads = await Promise.all([
+  const campaignPolicyReads = await Promise.all([
+    client.readContract({ address: manifest.campaignEscrow, abi: vnextCampaignAbi, functionName: "milestoneSubmissionWindow" }),
+    client.readContract({ address: manifest.campaignEscrow, abi: vnextCampaignAbi, functionName: "correctionWindow" }),
+    client.readContract({ address: manifest.campaignEscrow, abi: vnextCampaignAbi, functionName: "challengeWindowDuration" }),
+    client.readContract({ address: manifest.campaignEscrow, abi: vnextCampaignAbi, functionName: "MAX_MILESTONE_CORRECTIONS" }),
+  ]);
+  if (campaignPolicyReads[0] !== vnextLocalPolicy.campaign.milestoneSubmissionWindow
+    || campaignPolicyReads[1] !== vnextLocalPolicy.campaign.correctionWindow
+    || campaignPolicyReads[2] !== vnextLocalPolicy.campaign.challengeWindowDuration
+    || campaignPolicyReads[3] !== vnextLocalPolicy.campaign.maxMilestoneCorrections) {
+    throw new Error("VNext campaign policy mismatch");
+  }
+
+  const reviewWiringReads = await Promise.all([
     client.readContract({ address: manifest.juryReview, abi: vnextReviewAbi, functionName: "registry" }),
     client.readContract({ address: manifest.juryReview, abi: vnextReviewAbi, functionName: "campaignEscrow" }),
+    client.readContract({ address: manifest.juryReview, abi: vnextReviewAbi, functionName: "randomnessProvider" }),
     client.readContract({ address: manifest.juryReview, abi: vnextReviewAbi, functionName: "protocolVersion" }),
+  ]);
+  if (String(reviewWiringReads[0]).toLowerCase() !== manifest.juryRegistry
+    || String(reviewWiringReads[1]).toLowerCase() !== manifest.campaignEscrow
+    || String(reviewWiringReads[2]).toLowerCase() !== manifest.randomnessProvider
+    || reviewWiringReads[3] !== vnextLocalPolicy.review.protocolVersion) {
+    throw new Error("VNext review wiring mismatch");
+  }
+
+  const reviewPolicyReads = await Promise.all([
+    client.readContract({ address: manifest.juryReview, abi: vnextReviewAbi, functionName: "enrollmentDuration" }),
+    client.readContract({ address: manifest.juryReview, abi: vnextReviewAbi, functionName: "commitDuration" }),
+    client.readContract({ address: manifest.juryReview, abi: vnextReviewAbi, functionName: "revealDuration" }),
+    client.readContract({ address: manifest.juryReview, abi: vnextReviewAbi, functionName: "appealWindowDuration" }),
+    client.readContract({ address: manifest.juryReview, abi: vnextReviewAbi, functionName: "randomnessTimeout" }),
+    client.readContract({ address: manifest.juryReview, abi: vnextReviewAbi, functionName: "maxEligibleJudges" }),
     client.readContract({ address: manifest.juryReview, abi: vnextReviewAbi, functionName: "MINIMUM_STAKE_FLOOR" }),
     client.readContract({ address: manifest.juryReview, abi: vnextReviewAbi, functionName: "RISK_MULTIPLIER_BPS" }),
+    client.readContract({ address: manifest.juryReview, abi: vnextReviewAbi, functionName: "appealBond" }),
+    client.readContract({ address: manifest.juryReview, abi: vnextReviewAbi, functionName: "maximumAppealRounds" }),
+    client.readContract({ address: manifest.juryReview, abi: vnextReviewAbi, functionName: "MAXIMUM_RETRIES_PER_REVIEW_LEVEL" }),
+    client.readContract({ address: manifest.juryReview, abi: vnextReviewAbi, functionName: "minoritySlashBps" }),
   ]);
-  if (String(reviewReads[0]).toLowerCase() !== manifest.juryRegistry
-    || String(reviewReads[1]).toLowerCase() !== manifest.campaignEscrow
-    || reviewReads[2] !== 1n
-    || reviewReads[3] !== 10_000_000n
-    || reviewReads[4] !== 500n) {
-    throw new Error("VNext review wiring mismatch");
+  if (reviewPolicyReads[0] !== vnextLocalPolicy.review.enrollmentDuration
+    || reviewPolicyReads[1] !== vnextLocalPolicy.review.commitDuration
+    || reviewPolicyReads[2] !== vnextLocalPolicy.review.revealDuration
+    || reviewPolicyReads[3] !== vnextLocalPolicy.review.appealWindowDuration
+    || reviewPolicyReads[4] !== vnextLocalPolicy.review.randomnessTimeout
+    || reviewPolicyReads[5] !== vnextLocalPolicy.review.maxEligibleJudges
+    || reviewPolicyReads[6] !== vnextLocalPolicy.review.minimumStakeFloor
+    || reviewPolicyReads[7] !== vnextLocalPolicy.review.riskMultiplierBps
+    || reviewPolicyReads[8] !== vnextLocalPolicy.review.appealBond
+    || reviewPolicyReads[9] !== vnextLocalPolicy.review.maximumAppealRounds
+    || reviewPolicyReads[10] !== vnextLocalPolicy.review.maximumRetriesPerReviewLevel
+    || reviewPolicyReads[11] !== vnextLocalPolicy.review.minoritySlashBps) {
+    throw new Error("VNext review policy mismatch");
   }
   const decimals = await client.readContract({
     address: manifest.tokenAddress,

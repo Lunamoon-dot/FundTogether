@@ -135,6 +135,7 @@ git commit -m "fix: project canonical VNext milestone states"
 - Modify: `backend/src/blockchain/vnext-deployment.ts`
 - Modify: `backend/scripts/campaigns/vnext-runtime-identity.test.cjs`
 - Modify: `backend/scripts/campaigns/vnext-acceptance.cjs`
+- Modify: `docs/protocol/parameters-v2-remediation.md`
 - Test: `backend/scripts/campaigns/vnext-runtime-identity.test.cjs`
 - Regenerate if required: `backend/src/blockchain/generated/vnext/JuryReview.json`
 
@@ -142,11 +143,11 @@ git commit -m "fix: project canonical VNext milestone states"
 - `verifyVNextDeployment(client, manifest)` reads campaign and review getters/constants and fails closed on any mismatch.
 - The expected matrix is sourced from the frozen remediation policy values; `policyHash` remains an identity check, not the sole policy proof.
 
-- [ ] **Step 1: Extend verifier tests with mismatch cases**
+- [x] **Step 1: Extend verifier tests with mismatch cases**
 
 Make the fake client expose all campaign/review getter values. Add one failing test for a mismatched campaign window and one for a mismatched review parameter while keeping bytecode, manifest and policy hash identical.
 
-- [ ] **Step 2: Run verifier tests and verify RED**
+- [x] **Step 2: Run verifier tests and verify RED**
 
 Run from `backend/`:
 
@@ -157,11 +158,11 @@ npm run test:vnext-runtime
 
 Expected: the mismatch cases do not fail verification until the getter matrix is implemented.
 
-- [ ] **Step 3: Implement complete policy reads**
+- [x] **Step 3: Implement complete policy reads**
 
 Read and compare campaign submission/correction/challenge windows and maximum corrections; read and compare review enrollment/commit/reveal/randomness windows, minimum stake, risk multiplier, appeal bond/window/rounds, retry limit and minority slash rate, plus existing wiring and token checks. Keep exact integer values from the registry.
 
-- [ ] **Step 4: Run verifier and acceptance-focused tests**
+- [x] **Step 4: Run verifier and acceptance-focused tests**
 
 Run:
 
@@ -172,7 +173,7 @@ npm run test:vnext-runtime
 
 Expected: matching fake deployment passes and every mismatch fails closed. The live acceptance script remains a runtime-dependent check and must not be claimed successful without a fresh Anvil/PostgreSQL run.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/src/blockchain/vnext-deployment.ts backend/scripts/campaigns/vnext-runtime-identity.test.cjs backend/scripts/campaigns/vnext-acceptance.cjs backend/src/blockchain/generated/vnext/JuryReview.json
