@@ -11,6 +11,7 @@ const milestoneStates = ['PENDING', 'SUBMITTED', 'REVIEW_ENROLLMENT', 'BASE_REVI
 export function VNextProtocolPage({ campaignId }: { campaignId?: string }) {
   const { session } = useAccountSession();
   const deployment = useQuery({ queryKey: ['vnext-deployment'], queryFn: campaignApi.vnextDeployment, retry: false });
+  const indexer = useQuery({ queryKey: ['vnext-indexer'], queryFn: ({ signal }) => campaignApi.vnextIndexer(signal), retry: false });
   const campaign = useQuery({
     queryKey: ['vnext-campaign', campaignId],
     queryFn: ({ signal }) => campaignApi.vnextCampaign(campaignId!, signal),
@@ -38,6 +39,10 @@ export function VNextProtocolPage({ campaignId }: { campaignId?: string }) {
             <div><dt className="muted">Review engine</dt><dd className="font-mono break-all">{deployment.data.juryReview}</dd></div>
           </dl>
         ) : deployment.isPending ? <p role="status" className="muted">Đang kiểm tra deployment VNext…</p> : <p className="monograph-alert monograph-alert--error">Chưa có manifest/deployment VNext local.</p>}
+        {indexer.data?.configured && <p className="text-xs text-[var(--ink-subtle)] m-0" data-vnext-read="indexer-status">
+          Indexer {indexer.data.status} · checkpoint {indexer.data.lastBlock ?? 'chưa có'} / head {indexer.data.headBlock ?? 'chưa có'} · lag {indexer.data.lagBlocks ?? 'chưa biết'} block.
+        </p>}
+        {indexer.data?.error && <p role="alert" className="text-xs text-[var(--danger)] m-0">Indexer error: {indexer.data.error}</p>}
       </section>
 
       {campaignId && campaign.error && <p role="alert" className="monograph-alert monograph-alert--error">{getErrorMessage(campaign.error)}</p>}

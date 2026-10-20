@@ -9,6 +9,7 @@ import {
   vnextChainEvents,
   vnextBackerProjections,
   vnextChallengeProjections,
+  indexerStreams,
   vnextJudgeAssignments,
   vnextJudgeLedgerProjections,
   vnextMilestoneProjections,
@@ -75,6 +76,29 @@ export class VNextController {
       ),
     );
     return buildVNextTransactionStatus(normalizedHash, events);
+  }
+
+  @Get("indexer")
+  async indexerStatus() {
+    if (!this.connection) return { configured: false };
+    const streamId = this.streamId();
+    const [stream] = await this.db.select().from(indexerStreams).where(eq(indexerStreams.streamId, streamId));
+    const headBlock = stream?.headBlock ?? null;
+    const lastBlock = stream?.lastBlock ?? null;
+    const lagBlocks = headBlock !== null && lastBlock !== null
+      ? (BigInt(headBlock) - BigInt(lastBlock)).toString()
+      : null;
+    return {
+      configured: true,
+      streamId,
+      status: stream?.status ?? "pending",
+      lastBlock,
+      lastBlockHash: stream?.lastBlockHash ?? null,
+      headBlock,
+      lagBlocks,
+      error: stream?.error ?? null,
+      updatedAt: stream?.updatedAt ?? null,
+    };
   }
 
   @Get("campaigns/:campaignId")

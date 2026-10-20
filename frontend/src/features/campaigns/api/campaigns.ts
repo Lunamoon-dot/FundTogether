@@ -153,6 +153,17 @@ export interface VNextTransactionStatus {
   state: 'INDEXING' | 'ON_CHAIN_CONFIRMED';
   eventCount: number;
 }
+export interface VNextIndexerStatus {
+  configured: boolean;
+  streamId?: string;
+  status?: string;
+  lastBlock?: string | null;
+  lastBlockHash?: string | null;
+  headBlock?: string | null;
+  lagBlocks?: string | null;
+  error?: string | null;
+  updatedAt?: string | null;
+}
 export interface VNextCampaignProjection {
   streamId: string;
   onchainCampaignId: string;
@@ -416,6 +427,7 @@ export const campaignApi = {
   preview: async (id: string, signal?: AbortSignal) => (await http.get<CampaignPreview>(`/v1/fundtogether/public/campaigns/${id}`, { signal })).data,
   deployment: async () => (await http.get<DeploymentManifest>(`${base}/deployment`)).data,
   vnextDeployment: async () => (await http.get<VNextDeployment>('/v1/fundtogether/vnext/deployment')).data,
+  vnextIndexer: async (signal?: AbortSignal) => (await http.get<VNextIndexerStatus>('/v1/fundtogether/vnext/indexer', { signal })).data,
   vnextCampaign: async (id: string, signal?: AbortSignal) => (await http.get<VNextCampaignProjection>(`/v1/fundtogether/vnext/campaigns/${id}`, { signal })).data,
   vnextMilestones: async (id: string, signal?: AbortSignal) => (await http.get<VNextMilestoneProjection[]>(`/v1/fundtogether/vnext/campaigns/${id}/milestones`, { signal })).data,
   vnextBackerPosition: async (id: string, signal?: AbortSignal) => (await http.get<VNextBackerProjection[]>(`/v1/fundtogether/vnext/campaigns/${id}/backer`, { signal })).data,

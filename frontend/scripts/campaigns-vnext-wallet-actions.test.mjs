@@ -47,6 +47,8 @@ test('VNext campaign projection exposes permissionless Creator and Backer action
   const panel = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextActionPanel.tsx'), 'utf8')
   assert.match(page, /VNextActionPanel/)
   assert.match(page, /VNextCreateCampaignPanel/)
+  assert.match(page, /vnextIndexer/)
+  assert.match(page, /indexer-status/)
   assert.match(panel, /contribute/)
   assert.match(panel, /finalizeFunding/)
   assert.match(panel, /submitMilestoneEvidence/)
