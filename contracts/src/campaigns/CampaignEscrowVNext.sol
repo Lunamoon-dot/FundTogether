@@ -386,10 +386,17 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         if (milestone.paid) revert MilestoneAlreadyPaid();
         if (
             milestone.state == VNextTypes.MilestoneState.PENDING
-                && block.timestamp >= milestone.submissionDeadline
+                && (
+                    milestone.submissionDeadline == 0
+                        || block.timestamp >= milestone.submissionDeadline
+                )
         ) revert MilestoneDeadlineExpired();
         if (
-            isCorrection && block.timestamp >= milestone.correctionDeadline
+            isCorrection
+                && (
+                    milestone.correctionDeadline == 0
+                        || block.timestamp >= milestone.correctionDeadline
+                )
         ) revert MilestoneDeadlineExpired();
         if (
             milestone.state != VNextTypes.MilestoneState.PENDING
@@ -445,9 +452,16 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
     function expireMilestoneSubmission(uint256 campaignId, uint256 milestoneId) external {
         Campaign storage campaign = _campaign(campaignId);
         Milestone storage milestone = _milestone(campaignId, milestoneId);
+        if (
+            (campaign.state != VNextTypes.CampaignState.FUNDED
+                && campaign.state != VNextTypes.CampaignState.MILESTONES_RUNNING)
+                || !_isActiveMilestone(campaignId, milestoneId, campaign.milestoneCount)
+        ) revert MilestoneDeadlineExpired();
         bool submissionExpired = milestone.state == VNextTypes.MilestoneState.PENDING
+            && milestone.submissionDeadline != 0
             && block.timestamp >= milestone.submissionDeadline;
         bool correctionExpired = milestone.state == VNextTypes.MilestoneState.CORRECTION
+            && milestone.correctionDeadline != 0
             && block.timestamp >= milestone.correctionDeadline;
         if (!submissionExpired && !correctionExpired) revert MilestoneDeadlineExpired();
 
@@ -796,6 +810,17 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         for (uint256 i = 0; i < count; i++) {
             total += milestones[campaignId][i].budget;
         }
+    }
+
+    function _isActiveMilestone(uint256 campaignId, uint256 milestoneId, uint256 count)
+        private
+        view
+        returns (bool)
+    {
+        for (uint256 i = 0; i < count; i++) {
+            if (!milestones[campaignId][i].paid) return i == milestoneId;
+        }
+        return false;
     }
 
     function _createReviewCase(

@@ -67,6 +67,29 @@ contract VNextPayoutRefundTest is Test {
         assertEq(uint8(escrow.milestoneState(campaignId, 0)), uint8(VNextTypes.MilestoneState.PAID));
     }
 
+    function test_CannotExpireInactiveFutureMilestone() public {
+        assertEq(uint8(escrow.campaignState(campaignId)), uint8(VNextTypes.CampaignState.FUNDED));
+        assertEq(uint8(escrow.milestoneState(campaignId, 1)), uint8(VNextTypes.MilestoneState.PENDING));
+        assertEq(escrow.milestoneSubmissionDeadline(campaignId, 1), 0);
+
+        vm.expectRevert(CampaignEscrowVNext.MilestoneDeadlineExpired.selector);
+        escrow.expireMilestoneSubmission(campaignId, 1);
+
+        assertEq(uint8(escrow.campaignState(campaignId)), uint8(VNextTypes.CampaignState.FUNDED));
+        assertEq(uint8(escrow.milestoneState(campaignId, 1)), uint8(VNextTypes.MilestoneState.PENDING));
+    }
+
+    function test_CannotExpireActiveMilestoneEarly() public {
+        assertEq(uint8(escrow.campaignState(campaignId)), uint8(VNextTypes.CampaignState.FUNDED));
+        assertGt(escrow.milestoneSubmissionDeadline(campaignId, 0), block.timestamp);
+
+        vm.expectRevert(CampaignEscrowVNext.MilestoneDeadlineExpired.selector);
+        escrow.expireMilestoneSubmission(campaignId, 0);
+
+        assertEq(uint8(escrow.campaignState(campaignId)), uint8(VNextTypes.CampaignState.FUNDED));
+        assertEq(uint8(escrow.milestoneState(campaignId, 0)), uint8(VNextTypes.MilestoneState.PENDING));
+    }
+
     function test_duplicatePayoutCannotSpendEscrowTwice() public {
         bytes32 reviewCaseId = _submitEvidence(0, keccak256("evidence-one"));
         review.setFinalOutcome(reviewCaseId, VNextTypes.ReviewOutcome.FINAL_PASS);
