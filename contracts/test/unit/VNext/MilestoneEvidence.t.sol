@@ -43,6 +43,7 @@ contract VNextMilestoneEvidenceTest is Test {
         token.mint(address(this), 100e6);
         token.approve(address(escrow), 100e6);
         escrow.contribute(campaignId, 100e6);
+        vm.warp(block.timestamp + 7 days);
         escrow.finalizeFunding(campaignId);
     }
 

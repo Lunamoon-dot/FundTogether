@@ -136,6 +136,15 @@ interface IVNextEvents {
         bytes32 indexed reviewCaseId, uint8 outcome, uint256 totalSlash, uint256 winners
     );
 
+    event ReviewSettlementProgress(
+        bytes32 indexed reviewCaseId,
+        uint8 outcome,
+        uint256 phase,
+        uint256 cursor,
+        uint256 enrolledCount,
+        bool complete
+    );
+
     event JudgeSlashed(bytes32 indexed reviewCaseId, address indexed judge, uint256 amount);
 
     event JudgeRewardClaimed(bytes32 indexed reviewCaseId, address indexed judge, uint256 amount);
@@ -147,6 +156,23 @@ interface IVNextEvents {
         bytes32 evidenceHash
     );
 
+    /// @notice Canonical milestone state after a permissionless review
+    /// transition. The indexer must not infer this state from a database row
+    /// or from a Judge vote event alone.
+    event MilestoneReviewStateChanged(
+        uint256 indexed campaignId,
+        uint256 indexed milestoneId,
+        bytes32 indexed reviewCaseId,
+        uint8 state,
+        uint8 outcome,
+        uint256 challengeDeadline,
+        uint256 correctionDeadline
+    );
+
+    event PublicationReviewCaseChanged(
+        uint256 indexed campaignId, bytes32 indexed reviewCaseId
+    );
+
     event MilestonePaid(
         uint256 indexed campaignId,
         uint256 indexed milestoneId,
@@ -156,6 +182,10 @@ interface IVNextEvents {
 
     event CampaignRefundsOpened(
         uint256 indexed campaignId, uint256 refundPool, uint256 contributionSnapshot
+    );
+
+    event RefundAllocationsFrozen(
+        uint256 indexed campaignId, uint256 contributorCount, uint256 refundSnapshot
     );
 
     event ChallengeOpened(

@@ -33,6 +33,7 @@ export type VNextMilestoneProjection = {
   reviewCaseId?: string;
   finalOutcome?: number;
   challengeDeadline?: string;
+  correctionDeadline?: string;
   state: number;
   paid: boolean;
   lastBlockNumber: string;
@@ -95,6 +96,15 @@ function touch(blockNumber: bigint) {
   return blockNumber.toString();
 }
 
+function milestoneForReview(state: VNextProjectionState, reviewCaseId: string) {
+  for (const milestone of state.milestones.values()) {
+    if (milestone.reviewCaseId?.toLowerCase() === reviewCaseId.toLowerCase()) return milestone;
+    const review = milestone.reviewCaseId ? state.reviews.get(milestone.reviewCaseId.toLowerCase()) : undefined;
+    if (review?.rootCaseId.toLowerCase() === reviewCaseId.toLowerCase()) return milestone;
+  }
+  return undefined;
+}
+
 export function eventIdentity(event: VNextEvent) {
   return `${event.transactionHash.toLowerCase()}:${event.logIndex}`;
 }
@@ -133,6 +143,8 @@ export function applyVNextEvent(state: VNextProjectionState, event: VNextEvent):
   if (event.eventName === "PublicationEvidenceSubmitted" && campaign) {
     campaign.publicationEvidenceHash = lower(stringValue(args, "evidenceHash"));
     campaign.publicationReviewCaseId = lower(stringValue(args, "reviewCaseId"));
+  } else if (event.eventName === "PublicationReviewCaseChanged" && campaign) {
+    campaign.publicationReviewCaseId = lower(stringValue(args, "reviewCaseId"));
   } else if (event.eventName === "PublicationFinalized" && campaign) {
     const successful = Boolean(value(args, "successful"));
     campaign.publicationOutcome = successful ? 1 : 3;
@@ -141,7 +153,7 @@ export function applyVNextEvent(state: VNextProjectionState, event: VNextEvent):
     campaign.raised = stringValue(args, "cumulativeRaised");
   } else if (event.eventName === "FundingFinalized" && campaign) {
     campaign.raised = stringValue(args, "raised");
-    campaign.state = Boolean(value(args, "successful")) ? 2 : 5;
+    campaign.state = Boolean(value(args, "successful")) ? 3 : 5;
   } else if (event.eventName === "MilestoneEvidenceSubmitted") {
     const key = `${campaignId}:${stringValue(args, "milestoneId")}`;
     state.milestones.set(key, {
@@ -162,6 +174,20 @@ export function applyVNextEvent(state: VNextProjectionState, event: VNextEvent):
       milestone.evidenceHash = lower(stringValue(args, "evidenceHash"));
       milestone.state = 2;
     }
+  } else if (event.eventName === "MilestoneReviewStateChanged") {
+    const key = `${campaignId}:${stringValue(args, "milestoneId")}`;
+    const milestone = state.milestones.get(key);
+    if (milestone) {
+      milestone.reviewCaseId = lower(stringValue(args, "reviewCaseId"));
+      milestone.state = numberValue(args, "state");
+      const outcome = numberValue(args, "outcome");
+      const challengeDeadline = stringValue(args, "challengeDeadline");
+      const correctionDeadline = stringValue(args, "correctionDeadline");
+      milestone.finalOutcome = outcome === 0 ? undefined : outcome;
+      milestone.challengeDeadline = challengeDeadline === "0" ? undefined : challengeDeadline;
+      milestone.correctionDeadline = correctionDeadline === "0" ? undefined : correctionDeadline;
+      milestone.lastBlockNumber = block;
+    }
   } else if (event.eventName === "MilestonePaid" && campaign) {
     const key = `${campaignId}:${stringValue(args, "milestoneId")}`;
     const milestone = state.milestones.get(key);
@@ -174,6 +200,9 @@ export function applyVNextEvent(state: VNextProjectionState, event: VNextEvent):
     campaign.refunded = (BigInt(campaign.refunded) + BigInt(stringValue(args, "amount"))).toString();
   } else if (event.eventName === "CampaignRefundsOpened" && campaign) {
     campaign.state = 5;
+  } else if (event.eventName === "RefundAllocationsFrozen" && campaign) {
+    // The canonical event records the completion of the entitlement snapshot;
+    // the campaign state remains REFUNDING until every backer has claimed.
   } else if (event.eventName === "CampaignCompleted" && campaign) {
     campaign.state = 4;
   } else if (event.eventName === "ReviewCaseCreated") {
@@ -241,6 +270,15 @@ export function applyVNextEvent(state: VNextProjectionState, event: VNextEvent):
         failCourts: "0",
       });
     }
+    const milestone = milestoneForReview(state, rootCaseId);
+    if (milestone) {
+      milestone.reviewCaseId = reviewCaseId;
+      milestone.finalOutcome = undefined;
+      milestone.challengeDeadline = undefined;
+      milestone.correctionDeadline = undefined;
+      milestone.state = 2;
+      milestone.lastBlockNumber = block;
+    }
   } else if (event.eventName === "FinalRulingEstablished") {
     const review = state.reviews.get(lower(stringValue(args, "reviewCaseId")));
     if (review) review.outcome = numberValue(args, "outcome");
@@ -262,6 +300,15 @@ export function applyVNextEvent(state: VNextProjectionState, event: VNextEvent):
         passCourts: "0",
         failCourts: "0",
       });
+    }
+    const milestone = milestoneForReview(state, rootCaseId);
+    if (milestone) {
+      milestone.reviewCaseId = appealCaseId;
+      milestone.finalOutcome = undefined;
+      milestone.challengeDeadline = undefined;
+      milestone.correctionDeadline = undefined;
+      milestone.state = 6;
+      milestone.lastBlockNumber = block;
     }
   }
 

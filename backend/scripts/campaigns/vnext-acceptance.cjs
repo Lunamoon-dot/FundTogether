@@ -41,11 +41,24 @@ function loadManifest() {
   return JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 }
 
+function findCampaignProjection(rows, streamId, campaignId) {
+  return rows.find(row => row.streamId === streamId && row.onchainCampaignId === campaignId.toString());
+}
+
 async function send(client, wallet, request) {
   const hash = await wallet.writeContract(request);
   const receipt = await client.waitForTransactionReceipt({ hash, confirmations: 1 });
   if (receipt.status !== 'success') throw new Error(`VNext transaction reverted: ${request.functionName}`);
   return receipt;
+}
+
+async function expectRevert(action, label) {
+  try {
+    await action();
+  } catch {
+    return;
+  }
+  throw new Error(`VNext acceptance expected revert: ${label}`);
 }
 
 async function read(client, address, abi, functionName, args = []) {
@@ -71,7 +84,7 @@ function commitment(chainId, protocolVersion, campaignId, milestoneId, evidenceR
   ], [chainId, protocolVersion, campaignId, milestoneId, evidenceRevision, caseNumber, roundId, courtId, judge, vote, salt]));
 }
 
-async function resolvePass({ client, wallets, addresses, manifest, policy, campaignId, milestoneId, evidenceRevision, caseId }) {
+async function resolveCourt({ client, wallets, addresses, manifest, policy, campaignId, milestoneId, evidenceRevision, caseId, votes }) {
   const requiredStake = await read(client, manifest.juryReview, reviewArtifact.abi, 'requiredCaseStake', [caseId]);
   for (const judge of addresses.judges) {
     await send(client, wallets[judge], { address: manifest.juryRegistry, abi: registryArtifact.abi, functionName: 'reserveCaseStake', args: [caseId, requiredStake] });
@@ -83,6 +96,7 @@ async function resolvePass({ client, wallets, addresses, manifest, policy, campa
   await send(client, wallets[addresses.deployer], { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'assignCourt', args: [caseId, 0n] });
 
   const caseNumber = await read(client, manifest.juryReview, reviewArtifact.abi, 'caseNumber', [caseId]);
+  const roundId = await read(client, manifest.juryReview, reviewArtifact.abi, 'reviewRound', [caseId]);
   const protocolVersion = await read(client, manifest.juryReview, reviewArtifact.abi, 'protocolVersion');
   const courtJudges = [];
   const salts = [];
@@ -91,18 +105,93 @@ async function resolvePass({ client, wallets, addresses, manifest, policy, campa
     courtJudges.push(judge);
     const salt = keccak256(toHex(`fundtogether-vnext-acceptance:${caseId}:${slot}`));
     salts.push(salt);
-    await send(client, wallets[judge], { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'commitVote', args: [caseId, 0n, commitment(31339n, protocolVersion, campaignId, milestoneId, evidenceRevision, caseNumber, 0n, 0n, judge, 1, salt)] });
+    const vote = votes[slot];
+    await send(client, wallets[judge], { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'commitVote', args: [caseId, 0n, commitment(31339n, protocolVersion, campaignId, milestoneId, evidenceRevision, caseNumber, roundId, 0n, judge, vote, salt)] });
   }
   assert.equal(new Set(courtJudges).size, 3, 'reference court must have three unique Judges');
 
   await advance(client, policy.commitWindowSeconds + 1);
   for (let slot = 0; slot < courtJudges.length; slot++) {
-    await send(client, wallets[courtJudges[slot]], { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'revealVote', args: [caseId, 0n, 1, salts[slot]] });
+    await send(client, wallets[courtJudges[slot]], { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'revealVote', args: [caseId, 0n, votes[slot], salts[slot]] });
   }
   await advance(client, policy.revealWindowSeconds + 1);
   await send(client, wallets[addresses.deployer], { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'finalizeCourt', args: [caseId, 0n] });
+}
+
+async function resolvePass({ client, wallets, addresses, manifest, policy, campaignId, milestoneId, evidenceRevision, caseId }) {
+  await resolveCourt({ client, wallets, addresses, manifest, policy, campaignId, milestoneId, evidenceRevision, caseId, votes: [1, 1, 1] });
   await advance(client, policy.appealWindowSeconds + 1);
   await send(client, wallets[addresses.deployer], { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'finalizeNoAppeal', args: [caseId] });
+  await settleFinalRuling({ client, wallet: wallets[addresses.deployer], manifest, caseId });
+}
+
+async function resolveFail({ client, wallets, addresses, manifest, policy, campaignId, milestoneId, evidenceRevision, caseId }) {
+  await resolveCourt({ client, wallets, addresses, manifest, policy, campaignId, milestoneId, evidenceRevision, caseId, votes: [2, 2, 1] });
+  await advance(client, policy.appealWindowSeconds + 1);
+  await send(client, wallets[addresses.deployer], { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'finalizeNoAppeal', args: [caseId] });
+  await settleFinalRuling({ client, wallet: wallets[addresses.deployer], manifest, caseId });
+}
+
+async function settleFinalRuling({ client, wallet, manifest, caseId }) {
+  for (let attempt = 0; attempt < 64; attempt++) {
+    if (await read(client, manifest.juryReview, reviewArtifact.abi, 'settlementComplete', [caseId])) return;
+    await send(client, wallet, { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'settleFinalRuling', args: [caseId, 32n] });
+  }
+  throw new Error(`VNext final ruling settlement did not complete for ${caseId}`);
+}
+
+async function settleRetryRound({ client, wallet, manifest, caseId }) {
+  await send(client, wallet, { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'prepareRetrySettlement', args: [caseId] });
+  for (let attempt = 0; attempt < 64; attempt++) {
+    if (await read(client, manifest.juryReview, reviewArtifact.abi, 'reviewCaseSettled', [caseId])) return;
+    await send(client, wallet, { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'settleCaseBatch', args: [caseId, 32n] });
+  }
+  throw new Error(`VNext retry settlement did not complete for ${caseId}`);
+}
+
+async function resolveTie({ client, wallets, addresses, manifest, policy, campaignId, milestoneId, evidenceRevision, caseId }) {
+  const requiredStake = await read(client, manifest.juryReview, reviewArtifact.abi, 'requiredCaseStake', [caseId]);
+  for (const judge of addresses.judges) {
+    await send(client, wallets[judge], { address: manifest.juryRegistry, abi: registryArtifact.abi, functionName: 'reserveCaseStake', args: [caseId, requiredStake] });
+    await send(client, wallets[judge], { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'enroll', args: [caseId] });
+  }
+  await advance(client, policy.judgeEnrollmentWindowSeconds + 1);
+  await send(client, wallets[addresses.deployer], { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'finalizeSnapshot', args: [caseId] });
+  assert.equal(await read(client, manifest.juryReview, reviewArtifact.abi, 'courtCount', [caseId]), 2n);
+  for (const courtId of [0n, 1n]) {
+    await send(client, wallets[addresses.deployer], { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'assignCourt', args: [caseId, courtId] });
+  }
+
+  const caseNumber = await read(client, manifest.juryReview, reviewArtifact.abi, 'caseNumber', [caseId]);
+  const roundId = await read(client, manifest.juryReview, reviewArtifact.abi, 'reviewRound', [caseId]);
+  const protocolVersion = await read(client, manifest.juryReview, reviewArtifact.abi, 'protocolVersion');
+  const votesByCourt = [[1, 1, 1], [2, 2, 1]];
+  const salts = [];
+  for (let courtIndex = 0; courtIndex < 2; courtIndex++) {
+    const courtId = BigInt(courtIndex);
+    const courtSalts = [];
+    for (let slot = 0; slot < 3; slot++) {
+      const judge = (await read(client, manifest.juryReview, reviewArtifact.abi, 'courtJudge', [caseId, courtId, BigInt(slot)])).toLowerCase();
+      const vote = votesByCourt[courtIndex][slot];
+      const salt = keccak256(toHex(`fundtogether-vnext-tie:${caseId}:${courtIndex}:${slot}`));
+      courtSalts.push(salt);
+      await send(client, wallets[judge], { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'commitVote', args: [caseId, courtId, commitment(31339n, protocolVersion, campaignId, milestoneId, evidenceRevision, caseNumber, roundId, courtId, judge, vote, salt)] });
+    }
+    salts.push(courtSalts);
+  }
+  await advance(client, policy.commitWindowSeconds + 1);
+  for (let courtIndex = 0; courtIndex < 2; courtIndex++) {
+    const courtId = BigInt(courtIndex);
+    for (let slot = 0; slot < 3; slot++) {
+      const judge = (await read(client, manifest.juryReview, reviewArtifact.abi, 'courtJudge', [caseId, courtId, BigInt(slot)])).toLowerCase();
+      await send(client, wallets[judge], { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'revealVote', args: [caseId, courtId, votesByCourt[courtIndex][slot], salts[courtIndex][slot]] });
+    }
+  }
+  await advance(client, policy.revealWindowSeconds + 1);
+  for (const courtId of [0n, 1n]) {
+    await send(client, wallets[addresses.deployer], { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'finalizeCourt', args: [caseId, courtId] });
+  }
+  assert.equal(await read(client, manifest.juryReview, reviewArtifact.abi, 'reviewResult', [caseId]), 3);
 }
 
 async function createCampaign({ client, wallet, manifest, goal, evidenceHash, duration }) {
@@ -114,19 +203,29 @@ async function createCampaign({ client, wallet, manifest, goal, evidenceHash, du
     args: [wallet.account.address, goal, fundingDeadline, [goal], [keccak256(toHex(`acceptance:${evidenceHash}`))], evidenceHash],
   });
   const created = eventArgs(receipt, campaignArtifact.abi, 'CampaignCreated');
-  return { id: created.campaignId, publicationCaseId: created.publicationReviewCaseId };
+  return {
+    id: created.campaignId,
+    publicationCaseId: created.publicationReviewCaseId,
+    fundingDeadline: created.fundingDeadline,
+  };
 }
 
-async function fundCampaign({ client, wallets, manifest, campaignId, backers, goal }) {
+async function fundCampaign({ client, wallets, manifest, campaignId, backers, goal, fundingDeadline }) {
   const half = goal / 2n;
   for (const [index, backer] of backers.entries()) {
     const amount = index === 0 ? half : goal - half;
     await send(client, wallets[backer], { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'contribute', args: [campaignId, amount] });
   }
+  await expectRevert(
+    () => send(client, wallets[backers[0]], { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'finalizeFunding', args: [campaignId] }),
+    'funding cannot finalize before its deadline',
+  );
+  const now = (await client.getBlock({ blockTag: 'latest' })).timestamp;
+  if (now <= fundingDeadline) await advance(client, Number(fundingDeadline - now + 1n));
   await send(client, wallets[backers[0]], { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'finalizeFunding', args: [campaignId] });
 }
 
-async function syncPersistentProjection({ client, manifest, campaignIds }) {
+async function syncPersistentProjection({ client, manifest, campaigns }) {
   const env = { ...readEnvironment(path.join(root, '.local/fundtogether/backend.env')), ...process.env };
   const databaseUrl = env.FUNDTOGETHER_VNEXT_DATABASE_URL || env.DATABASE_URL;
   if (!databaseUrl) throw new Error('VNext acceptance requires FUNDTOGETHER_VNEXT_DATABASE_URL or DATABASE_URL');
@@ -139,15 +238,31 @@ async function syncPersistentProjection({ client, manifest, campaignIds }) {
     const db = drizzle(pool, { schema });
     const indexer = new VNextIndexerService(db, { manifest, client });
     await indexer.runOnce();
-    for (const campaignId of campaignIds) {
+    const streamId = indexer.streamId();
+    const campaignIds = campaigns.map(campaign => campaign.campaignId);
+    const projectionSnapshot = async () => (await db.select().from(schema.vnextCampaignProjections))
+      .filter(row => row.streamId === streamId && campaignIds.some(campaignId => row.onchainCampaignId === campaignId.toString()))
+      .sort((left, right) => left.onchainCampaignId.localeCompare(right.onchainCampaignId))
+      .map(row => ({
+        onchainCampaignId: row.onchainCampaignId,
+        state: row.state,
+        raised: row.raised,
+        paidOut: row.paidOut,
+        refunded: row.refunded,
+        lastEventName: row.lastEventName,
+        lastBlockNumber: row.lastBlockNumber,
+      }));
+    for (const expected of campaigns) {
       const rows = await db.select().from(schema.vnextCampaignProjections);
-      const row = rows.find(item => item.onchainCampaignId === campaignId.toString());
-      assert.ok(row, `missing persistent projection for campaign ${campaignId}`);
-      const expectedState = campaignId === campaignIds[0] ? 4 : 5;
-      assert.equal(row.state, expectedState);
-      if (expectedState === 4) assert.equal(row.paidOut, '100000000');
-      if (expectedState === 5) assert.equal(row.refunded, '100000000');
+      const row = findCampaignProjection(rows, streamId, expected.campaignId);
+      assert.ok(row, `missing persistent projection for campaign ${expected.campaignId}`);
+      assert.equal(row.state, expected.state);
+      assert.equal(row.paidOut, expected.paidOut);
+      assert.equal(row.refunded, expected.refunded);
     }
+    const beforeReplay = await projectionSnapshot();
+    await indexer.runOnce();
+    assert.deepEqual(await projectionSnapshot(), beforeReplay, 'indexer replay changed VNext projection values');
   } finally {
     await pool.end();
   }
@@ -163,9 +278,10 @@ async function main() {
   const chain = defineChain({ id: 31339, name: 'FundTogether VNext local', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: [manifest.rpcUrl] } } });
   const client = createPublicClient({ chain, transport: http(manifest.rpcUrl), pollingInterval: 100 });
   const accounts = await client.request({ method: 'eth_accounts' });
-  if (accounts.length < 6) throw new Error('VNext acceptance requires a deployer, two Backers and three Judges');
-  const [deployer, backerOne, backerTwo, judgeOne, judgeTwo, judgeThree] = accounts.map(value => value.toLowerCase());
+  if (accounts.length < 9) throw new Error('VNext acceptance requires a deployer, two Backers and six Judges');
+  const [deployer, backerOne, backerTwo, judgeOne, judgeTwo, judgeThree, appealJudgeOne, appealJudgeTwo, appealJudgeThree] = accounts.map(value => value.toLowerCase());
   const addresses = { deployer, judges: [judgeOne, judgeTwo, judgeThree] };
+  const appealAddresses = { deployer, judges: [appealJudgeOne, appealJudgeTwo, appealJudgeThree] };
   const wallets = Object.fromEntries(accounts.map(address => [address.toLowerCase(), createWalletClient({ account: address, chain, transport: http(manifest.rpcUrl) })]));
   const policyHash = keccak256(toHex(policy.policyVersion));
   assert.equal(manifest.policyHash.toLowerCase(), policyHash.toLowerCase());
@@ -174,10 +290,10 @@ async function main() {
   const goal = 100000000n;
   const token = manifest.tokenAddress;
   const deployerWallet = wallets[deployer];
-  for (const holder of [deployer, backerOne, backerTwo, judgeOne, judgeTwo, judgeThree]) {
+  for (const holder of [deployer, backerOne, backerTwo, judgeOne, judgeTwo, judgeThree, appealJudgeOne, appealJudgeTwo, appealJudgeThree]) {
     await send(client, deployerWallet, { address: token, abi: tokenArtifact.abi, functionName: 'mint', args: [holder, 200000000n] });
   }
-  for (const judge of addresses.judges) {
+  for (const judge of [...addresses.judges, ...appealAddresses.judges]) {
     await send(client, wallets[judge], { address: token, abi: tokenArtifact.abi, functionName: 'approve', args: [manifest.juryRegistry, 200000000n] });
     await send(client, wallets[judge], { address: manifest.juryRegistry, abi: registryArtifact.abi, functionName: 'depositStake', args: [100000000n] });
   }
@@ -188,18 +304,26 @@ async function main() {
   const first = await createCampaign({ client, wallet: deployerWallet, manifest, goal, evidenceHash: keccak256(toHex('first-publication')), duration: 30n * 24n * 60n * 60n });
   await resolvePass({ client, wallets, addresses, manifest, policy, campaignId: first.id, milestoneId: (2n ** 256n) - 1n, evidenceRevision: 1n, caseId: first.publicationCaseId });
   await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'finalizePublication', args: [first.id] });
-  await fundCampaign({ client, wallets, manifest, campaignId: first.id, backers: [backerOne, backerTwo], goal });
+  await fundCampaign({ client, wallets, manifest, campaignId: first.id, backers: [backerOne, backerTwo], goal, fundingDeadline: first.fundingDeadline });
   const milestoneReceipt = await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'submitMilestoneEvidence', args: [first.id, 0n, keccak256(toHex('first-milestone'))] });
   const milestoneCaseId = eventArgs(milestoneReceipt, campaignArtifact.abi, 'MilestoneEvidenceSubmitted').reviewCaseId;
   await resolvePass({ client, wallets, addresses, manifest, policy, campaignId: first.id, milestoneId: 0n, evidenceRevision: 1n, caseId: milestoneCaseId });
   await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'syncFinalRuling', args: [first.id, 0n] });
+  await expectRevert(
+    () => send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'resolveChallenge', args: [first.id, 0n] }),
+    'challenge resolution is disabled by local policy',
+  );
   await advance(client, policy.challengeWindowSeconds + 1);
   await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'payMilestone', args: [first.id, 0n] });
+  await expectRevert(
+    () => send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'payMilestone', args: [first.id, 0n] }),
+    'duplicate milestone payout',
+  );
 
   const second = await createCampaign({ client, wallet: deployerWallet, manifest, goal, evidenceHash: keccak256(toHex('second-publication')), duration: 30n * 24n * 60n * 60n });
   await resolvePass({ client, wallets, addresses, manifest, policy, campaignId: second.id, milestoneId: (2n ** 256n) - 1n, evidenceRevision: 1n, caseId: second.publicationCaseId });
   await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'finalizePublication', args: [second.id] });
-  await fundCampaign({ client, wallets, manifest, campaignId: second.id, backers: [backerOne, backerTwo], goal });
+  await fundCampaign({ client, wallets, manifest, campaignId: second.id, backers: [backerOne, backerTwo], goal, fundingDeadline: second.fundingDeadline });
   await advance(client, policy.milestoneSubmissionWindowSeconds + 1);
   await send(client, wallets[backerOne], { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'expireMilestoneSubmission', args: [second.id, 0n] });
   await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'freezeRefundAllocations', args: [second.id, 10n] });
@@ -208,11 +332,67 @@ async function main() {
   assert.equal(entitlementOne + entitlementTwo, goal);
   await send(client, wallets[backerTwo], { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'claimRefund', args: [second.id] });
   await send(client, wallets[backerOne], { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'claimRefund', args: [second.id] });
+  await expectRevert(
+    () => send(client, wallets[backerOne], { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'claimRefund', args: [second.id] }),
+    'duplicate backer refund',
+  );
+
+  const noQuorum = await createCampaign({ client, wallet: deployerWallet, manifest, goal, evidenceHash: keccak256(toHex('no-quorum-publication')), duration: 30n * 24n * 60n * 60n });
+  await advance(client, policy.judgeEnrollmentWindowSeconds + 1);
+  await settleRetryRound({ client, wallet: deployerWallet, manifest, caseId: noQuorum.publicationCaseId });
+  let retryReceipt = await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'retryPublication', args: [noQuorum.id] });
+  let retryCaseId = eventArgs(retryReceipt, campaignArtifact.abi, 'PublicationReviewCaseChanged').reviewCaseId;
+  await advance(client, policy.judgeEnrollmentWindowSeconds + 1);
+  await settleRetryRound({ client, wallet: deployerWallet, manifest, caseId: retryCaseId });
+  retryReceipt = await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'retryPublication', args: [noQuorum.id] });
+  retryCaseId = eventArgs(retryReceipt, campaignArtifact.abi, 'PublicationReviewCaseChanged').reviewCaseId;
+  await advance(client, policy.judgeEnrollmentWindowSeconds + 1);
+  await send(client, deployerWallet, { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'finalizeProtocolFailure', args: [retryCaseId] });
+  await settleFinalRuling({ client, wallet: deployerWallet, manifest, caseId: retryCaseId });
+  assert.equal(await read(client, manifest.juryReview, reviewArtifact.abi, 'finalOutcome', [noQuorum.publicationCaseId]), 3);
+
+  const tieCampaign = await createCampaign({ client, wallet: deployerWallet, manifest, goal, evidenceHash: keccak256(toHex('tie-publication')), duration: 30n * 24n * 60n * 60n });
+  await resolveTie({ client, wallets, addresses: { deployer, judges: [...addresses.judges, ...appealAddresses.judges] }, manifest, policy, campaignId: tieCampaign.id, milestoneId: (2n ** 256n) - 1n, evidenceRevision: 1n, caseId: tieCampaign.publicationCaseId });
+  await settleRetryRound({ client, wallet: deployerWallet, manifest, caseId: tieCampaign.publicationCaseId });
+  const tieRetryReceipt = await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'retryPublication', args: [tieCampaign.id] });
+  const tieRetryCaseId = eventArgs(tieRetryReceipt, campaignArtifact.abi, 'PublicationReviewCaseChanged').reviewCaseId;
+  assert.notEqual(tieRetryCaseId, tieCampaign.publicationCaseId);
+
+  const appealCampaign = await createCampaign({ client, wallet: deployerWallet, manifest, goal, evidenceHash: keccak256(toHex('appeal-publication')), duration: 30n * 24n * 60n * 60n });
+  await resolveCourt({ client, wallets, addresses, manifest, policy, campaignId: appealCampaign.id, milestoneId: (2n ** 256n) - 1n, evidenceRevision: 1n, caseId: appealCampaign.publicationCaseId, votes: [2, 2, 1] });
+  await send(client, deployerWallet, { address: token, abi: tokenArtifact.abi, functionName: 'approve', args: [manifest.juryReview, 1000000n] });
+  const appealReceipt = await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'openAppeal', args: [appealCampaign.id, (2n ** 256n) - 1n] });
+  const appealCaseId = eventArgs(appealReceipt, campaignArtifact.abi, 'PublicationReviewCaseChanged').reviewCaseId;
+  await resolvePass({ client, wallets, addresses: appealAddresses, manifest, policy, campaignId: appealCampaign.id, milestoneId: (2n ** 256n) - 1n, evidenceRevision: 1n, caseId: appealCaseId });
+  await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'finalizePublication', args: [appealCampaign.id] });
+  assert.equal(await read(client, manifest.campaignEscrow, campaignArtifact.abi, 'campaignState', [appealCampaign.id]), 1);
+
+  const correctionCampaign = await createCampaign({ client, wallet: deployerWallet, manifest, goal, evidenceHash: keccak256(toHex('correction-publication')), duration: 30n * 24n * 60n * 60n });
+  await resolvePass({ client, wallets, addresses, manifest, policy, campaignId: correctionCampaign.id, milestoneId: (2n ** 256n) - 1n, evidenceRevision: 1n, caseId: correctionCampaign.publicationCaseId });
+  await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'finalizePublication', args: [correctionCampaign.id] });
+  for (const backer of [backerOne, backerTwo]) {
+    await send(client, wallets[backer], { address: token, abi: tokenArtifact.abi, functionName: 'approve', args: [manifest.campaignEscrow, goal] });
+  }
+  await fundCampaign({ client, wallets, manifest, campaignId: correctionCampaign.id, backers: [backerOne, backerTwo], goal, fundingDeadline: correctionCampaign.fundingDeadline });
+  const failedMilestoneReceipt = await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'submitMilestoneEvidence', args: [correctionCampaign.id, 0n, keccak256(toHex('failed-milestone'))] });
+  const failedMilestoneCaseId = eventArgs(failedMilestoneReceipt, campaignArtifact.abi, 'MilestoneEvidenceSubmitted').reviewCaseId;
+  await resolveFail({ client, wallets, addresses, manifest, policy, campaignId: correctionCampaign.id, milestoneId: 0n, evidenceRevision: 1n, caseId: failedMilestoneCaseId });
+  await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'syncFinalRuling', args: [correctionCampaign.id, 0n] });
+  const correctionReceipt = await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'submitMilestoneEvidence', args: [correctionCampaign.id, 0n, keccak256(toHex('corrected-milestone'))] });
+  const correctionArgs = eventArgs(correctionReceipt, campaignArtifact.abi, 'MilestoneEvidenceSubmitted');
+  assert.equal(correctionArgs.evidenceRevision, 2n);
+  const correctedCaseId = correctionArgs.reviewCaseId;
+  await resolvePass({ client, wallets, addresses: appealAddresses, manifest, policy, campaignId: correctionCampaign.id, milestoneId: 0n, evidenceRevision: 2n, caseId: correctedCaseId });
+  await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'syncFinalRuling', args: [correctionCampaign.id, 0n] });
+  await advance(client, policy.challengeWindowSeconds + 1);
+  await send(client, deployerWallet, { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'payMilestone', args: [correctionCampaign.id, 0n] });
 
   assert.equal(await read(client, manifest.campaignEscrow, campaignArtifact.abi, 'campaignState', [first.id]), 4);
   assert.equal(await read(client, manifest.campaignEscrow, campaignArtifact.abi, 'campaignPaidOut', [first.id]), goal);
   assert.equal(await read(client, manifest.campaignEscrow, campaignArtifact.abi, 'campaignState', [second.id]), 5);
   assert.equal(await read(client, manifest.campaignEscrow, campaignArtifact.abi, 'campaignRefunded', [second.id]), goal);
+  assert.equal(await read(client, manifest.campaignEscrow, campaignArtifact.abi, 'campaignState', [correctionCampaign.id]), 4);
+  assert.equal(await read(client, manifest.campaignEscrow, campaignArtifact.abi, 'campaignPaidOut', [correctionCampaign.id]), goal);
   assert.equal(await read(client, manifest.tokenAddress, tokenArtifact.abi, 'balanceOf', [manifest.campaignEscrow]), 0n);
 
   const fromBlock = BigInt(manifest.deploymentBlockNumber);
@@ -227,12 +407,23 @@ async function main() {
     }
     return undefined;
   }).filter(Boolean));
-  for (const eventName of ['MilestonePaid', 'CampaignCompleted', 'CampaignRefundsOpened', 'BackerRefundClaimed']) assert.ok(names.has(eventName), `missing canonical event ${eventName}`);
+  for (const eventName of ['MilestonePaid', 'CampaignCompleted', 'CampaignRefundsOpened', 'BackerRefundClaimed', 'ReviewRetryOpened', 'AppealOpened', 'FinalRulingEstablished', 'MilestoneRevisionSubmitted']) assert.ok(names.has(eventName), `missing canonical event ${eventName}`);
 
-  await syncPersistentProjection({ client, manifest, campaignIds: [first.id, second.id] });
+  await syncPersistentProjection({
+    client,
+    manifest,
+    campaigns: [
+      { campaignId: first.id, state: 4, paidOut: '100000000', refunded: '0' },
+      { campaignId: second.id, state: 5, paidOut: '0', refunded: '100000000' },
+      { campaignId: noQuorum.id, state: 0, paidOut: '0', refunded: '0' },
+      { campaignId: tieCampaign.id, state: 0, paidOut: '0', refunded: '0' },
+      { campaignId: appealCampaign.id, state: 1, paidOut: '0', refunded: '0' },
+      { campaignId: correctionCampaign.id, state: 4, paidOut: '100000000', refunded: '0' },
+    ],
+  });
   console.log(JSON.stringify({ status: 'PASS', protocolKind: manifest.protocolKind, chainId: manifest.chainId, payoutCampaignId: first.id.toString(), refundCampaignId: second.id.toString(), contractBalance: '0' }, null, 2));
 }
 
 if (require.main === module) main().catch(error => { console.error(error.stack || error.message); process.exitCode = 1; });
 
-module.exports = { loadManifest, loadPolicy, commitment, resolvePass };
+module.exports = { commitment, findCampaignProjection, loadManifest, loadPolicy, main, resolvePass };

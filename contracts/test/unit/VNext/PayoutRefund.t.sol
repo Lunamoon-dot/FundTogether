@@ -6,6 +6,7 @@ import { MockUSDC } from "../../mocks/MockUSDC.sol";
 import { MockReviewFinality } from "../../mocks/MockReviewFinality.sol";
 import { CampaignEscrowVNext } from "../../../src/campaigns/CampaignEscrowVNext.sol";
 import { VNextTypes } from "../../../src/campaigns/VNextTypes.sol";
+import { IVNextEvents } from "../../../src/interfaces/IVNextEvents.sol";
 
 contract VNextPayoutRefundTest is Test {
     MockUSDC private token;
@@ -15,6 +16,7 @@ contract VNextPayoutRefundTest is Test {
     address private payout = makeAddr("vnext-payout-wallet");
     address private backer = makeAddr("vnext-payout-backer");
     address private secondBacker = makeAddr("vnext-payout-second-backer");
+    address private unrelatedWallet = makeAddr("vnext-unrelated-wallet");
     uint256 private campaignId;
 
     function setUp() public {
@@ -49,6 +51,7 @@ contract VNextPayoutRefundTest is Test {
         token.approve(address(escrow), 100e6);
         escrow.contribute(campaignId, 100e6);
         vm.stopPrank();
+        vm.warp(block.timestamp + 7 days);
         escrow.finalizeFunding(campaignId);
     }
 
@@ -65,6 +68,22 @@ contract VNextPayoutRefundTest is Test {
 
         assertEq(token.balanceOf(payout), 60e6);
         assertEq(uint8(escrow.milestoneState(campaignId, 0)), uint8(VNextTypes.MilestoneState.PAID));
+    }
+
+    function test_milestoneCannotSyncBeforeJudgeSettlementCompletes() public {
+        bytes32 reviewCaseId = _submitEvidence(0, keccak256("evidence-one"));
+        review.setFinalOutcome(reviewCaseId, VNextTypes.ReviewOutcome.FINAL_PASS);
+        review.setSettlementComplete(reviewCaseId, false);
+
+        vm.expectRevert(CampaignEscrowVNext.ReviewSettlementPending.selector);
+        escrow.syncFinalRuling(campaignId, 0);
+
+        review.setSettlementComplete(reviewCaseId, true);
+        escrow.syncFinalRuling(campaignId, 0);
+        assertEq(
+            uint8(escrow.milestoneState(campaignId, 0)),
+            uint8(VNextTypes.MilestoneState.CHALLENGE_WINDOW)
+        );
     }
 
     function test_duplicatePayoutCannotSpendEscrowTwice() public {
@@ -96,23 +115,14 @@ contract VNextPayoutRefundTest is Test {
         assertEq(token.balanceOf(address(escrow)), 0);
     }
 
-    function test_activeChallengeBlocksPayoutUntilCanonicalResolution() public {
+    function test_challengeIsDisabledByLocalPolicy() public {
         bytes32 reviewCaseId = _submitEvidence(0, keccak256("evidence-one"));
         review.setFinalOutcome(reviewCaseId, VNextTypes.ReviewOutcome.FINAL_PASS);
         escrow.syncFinalRuling(campaignId, 0);
 
         vm.prank(backer);
-        bytes32 challengeCaseId =
-            escrow.openChallenge(campaignId, 0, keccak256("challenge-evidence"));
-
-        vm.warp(block.timestamp + 2 days);
-        vm.expectRevert(CampaignEscrowVNext.ChallengeActive.selector);
-        escrow.payMilestone(campaignId, 0);
-
-        review.setFinalOutcome(challengeCaseId, VNextTypes.ReviewOutcome.VERDICT_FAIL);
-        escrow.resolveChallenge(campaignId, 0);
-
-        assertEq(uint8(escrow.campaignState(campaignId)), uint8(VNextTypes.CampaignState.REFUNDING));
+        vm.expectRevert(CampaignEscrowVNext.ChallengeNotAllowed.selector);
+        escrow.openChallenge(campaignId, 0, keccak256("challenge-evidence"));
     }
 
     function test_EnforceRefundAllocationBeforeClaim() public {
@@ -127,6 +137,8 @@ contract VNextPayoutRefundTest is Test {
         vm.expectRevert(CampaignEscrowVNext.RefundAllocationIncomplete.selector);
         escrow.claimRefund(smallCampaign);
 
+        vm.expectEmit(true, false, false, true, address(escrow));
+        emit IVNextEvents.RefundAllocationsFrozen(smallCampaign, 2, 3);
         escrow.freezeRefundAllocations(smallCampaign, 10);
         vm.prank(backer);
         escrow.claimRefund(smallCampaign);
@@ -170,6 +182,18 @@ contract VNextPayoutRefundTest is Test {
         assertEq(token.balanceOf(secondBacker), 1);
     }
 
+    function test_unrelatedWalletCannotClaimAnotherBackersRefund() public {
+        uint256 smallCampaign = _createPartialRefundCampaign();
+        escrow.freezeRefundAllocations(smallCampaign, 10);
+
+        vm.prank(unrelatedWallet);
+        vm.expectRevert(CampaignEscrowVNext.NoRefund.selector);
+        escrow.claimRefund(smallCampaign);
+
+        assertFalse(escrow.refundClaimed(smallCampaign, backer));
+        assertEq(escrow.campaignRefunded(smallCampaign), 0);
+    }
+
     function _submitEvidence(uint256 milestoneId, bytes32 evidenceHash)
         private
         returns (bytes32 reviewCaseId)
@@ -209,6 +233,7 @@ contract VNextPayoutRefundTest is Test {
         token.approve(address(escrow), 2);
         escrow.contribute(smallCampaign, 2);
         vm.stopPrank();
+        vm.warp(block.timestamp + 7 days);
         escrow.finalizeFunding(smallCampaign);
 
         bytes32 firstCase = _submitEvidenceFor(smallCampaign, 0, keccak256("small-evidence"));

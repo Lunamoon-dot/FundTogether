@@ -71,6 +71,7 @@ const reservedPublicCampaignIds = new Set([
   'library',
   'resolver',
   'review',
+  'vnext',
 ]);
 
 const reservedCreatorCampaignIds = new Set(['draft', 'new', 'profile']);

@@ -13,6 +13,10 @@ interface IVNextRandomness {
     function randomSeed(bytes32 reviewCaseId) external view returns (bytes32);
 }
 
+interface IVNextCampaignContext {
+    function contributionOf(uint256 campaignId, address backer) external view returns (uint256);
+}
+
 /// @notice VNext review engine for deterministic three-Judge courts.
 /// @dev Court assignment, multi-court aggregation, commit–reveal, appeal
 /// rounds and finality are permissionless after immutable case creation. Judge
@@ -38,6 +42,7 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
     uint256 public immutable maximumAppealRounds;
     uint256 public immutable minoritySlashBps;
     uint256 public constant MAXIMUM_RETRIES_PER_REVIEW_LEVEL = 2;
+    uint256 public constant MAX_SETTLEMENT_BATCH_SIZE = 32;
 
     uint256 public reviewCaseCount;
     mapping(bytes32 => ReviewCase) private reviewCases;
@@ -69,6 +74,15 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
     mapping(bytes32 => uint256) public appealBondForCase;
     mapping(bytes32 => uint256) public retryCount;
     mapping(bytes32 => bool) public reviewCaseSettled;
+    mapping(bytes32 => VNextTypes.ReviewOutcome) public settlementOutcome;
+    mapping(bytes32 => uint256) public settlementPhase;
+    mapping(bytes32 => uint256) public settlementCursor;
+    mapping(bytes32 => uint256) public settlementTotalSlash;
+    mapping(bytes32 => uint256) public settlementWinners;
+    mapping(bytes32 => uint256) public settlementRewardPerWinner;
+    mapping(bytes32 => uint256) public settlementRewardDust;
+    mapping(bytes32 => uint256) public settlementWinnerIndex;
+    mapping(bytes32 => uint256) public finalSettlementCursor;
     mapping(bytes32 => uint256) public riskValue;
     mapping(bytes32 => uint256) public requiredCaseStake;
     mapping(bytes32 => JuryTypes.RoundStatus) public roundStatus;
@@ -126,6 +140,10 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
     error ProtocolFailureNotReady();
     error RetryNotReady();
     error RetriesExhausted();
+    error SettlementNotPrepared();
+    error SettlementPending();
+    error InvalidSettlementBatch();
+    error InvalidSettlementOutcome();
     error EscrowAlreadyLocked();
     error NotBootstrapper();
 
@@ -234,6 +252,10 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
         if (block.timestamp >= enrollmentDeadline[reviewCaseId]) revert EnrollmentClosed();
         if (reviewCase.snapshotFinalized) revert SnapshotAlreadyFinalized();
         if (msg.sender == reviewCase.creator) revert CreatorConflict();
+        if (
+            IVNextCampaignContext(campaignEscrow).contributionOf(reviewCase.campaignId, msg.sender)
+                != 0
+        ) revert CreatorConflict();
         if (enrolled[reviewCaseId][msg.sender]) revert CommitmentAlreadySubmitted();
         if (participatedInRoot[reviewCase.rootCaseId][msg.sender]) {
             revert JudgeAlreadyParticipated();
@@ -491,7 +513,7 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
             revert RetryNotReady();
         }
 
-        _settleCase(reviewCaseId, VNextTypes.ReviewOutcome.PROTOCOL_FAIL);
+        if (!reviewCaseSettled[reviewCaseId]) revert SettlementPending();
         uint256 retryRoundId = previous.roundId + 1;
         uint256 sequence = reviewCaseCount++;
         retryCaseId = VNextTypes.reviewKey(
@@ -533,6 +555,40 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
         emit ReviewRetryOpened(rootCaseId, retryRoundId, retryCaseId);
     }
 
+    /// @notice Prepares an eligible retry round for bounded protocol-failure
+    /// settlement. The retry cannot open until callers have processed every
+    /// enrolled Judge through settleCaseBatch.
+    function prepareRetrySettlement(bytes32 reviewCaseId) external {
+        ReviewCase storage previous = _case(reviewCaseId);
+        bytes32 rootCaseId = previous.rootCaseId;
+        if (latestCase[rootCaseId] != reviewCaseId) revert RetryNotReady();
+        if (finalOutcome[rootCaseId] != VNextTypes.ReviewOutcome.NONE) {
+            revert FinalRulingAlreadyEstablished();
+        }
+        if (retryCount[rootCaseId] >= MAXIMUM_RETRIES_PER_REVIEW_LEVEL) {
+            revert RetriesExhausted();
+        }
+        if (roundStatus[reviewCaseId] != JuryTypes.RoundStatus.RETRY_ELIGIBLE) {
+            if (_retryReady(previous, reviewCaseId)) {
+                roundStatus[reviewCaseId] = JuryTypes.RoundStatus.RETRY_ELIGIBLE;
+            }
+        }
+        if (roundStatus[reviewCaseId] != JuryTypes.RoundStatus.RETRY_ELIGIBLE) {
+            revert RetryNotReady();
+        }
+        _beginSettlement(reviewCaseId, VNextTypes.ReviewOutcome.PROTOCOL_FAIL);
+        _emitSettlementProgress(reviewCaseId);
+    }
+
+    /// @notice Settles one review case in a bounded number of Judge steps.
+    /// The call is permissionless and can be repeated until the case emits
+    /// ReviewCaseSettled.
+    function settleCaseBatch(bytes32 reviewCaseId, uint256 maxJudges) external nonReentrant {
+        if (maxJudges == 0) revert InvalidSettlementBatch();
+        _settleCaseBatch(reviewCaseId, _boundedBatch(maxJudges));
+        _emitSettlementProgress(reviewCaseId);
+    }
+
     /// @notice Converts the latest completed review round into a payout-
     /// consumable result only after its permissionless appeal window expires.
     function finalizeNoAppeal(bytes32 reviewCaseId)
@@ -565,7 +621,7 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
                 : VNextTypes.ReviewOutcome.PROTOCOL_FAIL;
         finalOutcome[rootCaseId] = outcome;
         finalOutcome[latestCaseId] = outcome;
-        _settleAllRounds(rootCaseId, outcome);
+        _prepareFinalSettlement(rootCaseId, outcome);
         _refundAppealBonds(rootCaseId);
         emit FinalRulingEstablished(rootCaseId, uint8(outcome));
         if (latest.roundId > 0) {
@@ -604,7 +660,7 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
         outcome = VNextTypes.ReviewOutcome.PROTOCOL_FAIL;
         finalOutcome[rootCaseId] = outcome;
         finalOutcome[latestCaseId] = outcome;
-        _settleAllRounds(rootCaseId, outcome);
+        _prepareFinalSettlement(rootCaseId, outcome);
         _refundAppealBonds(rootCaseId);
         emit FinalRulingEstablished(rootCaseId, uint8(outcome));
     }
@@ -628,6 +684,44 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
 
     function reviewRound(bytes32 reviewCaseId) external view returns (uint256) {
         return _case(reviewCaseId).roundId;
+    }
+
+    /// @notice Settles every prepared round for a final ruling, consuming at
+    /// most maxJudges work units. A work unit is one Judge settlement or one
+    /// Judge reward credit, so no call loops over an unbounded pool.
+    function settleFinalRuling(bytes32 reviewCaseId, uint256 maxJudges) external nonReentrant {
+        if (maxJudges == 0) revert InvalidSettlementBatch();
+        ReviewCase storage requested = _case(reviewCaseId);
+        bytes32 rootCaseId = requested.rootCaseId;
+        if (finalOutcome[rootCaseId] == VNextTypes.ReviewOutcome.NONE) {
+            revert SettlementNotPrepared();
+        }
+
+        uint256 remaining = _boundedBatch(maxJudges);
+        uint256 cursor = finalSettlementCursor[rootCaseId];
+        uint256 count = _settlementCaseCount(rootCaseId);
+        while (cursor < count && remaining > 0) {
+            bytes32 currentCaseId = _settlementCaseAt(rootCaseId, cursor);
+            if (!reviewCaseSettled[currentCaseId]) {
+                uint256 consumed = _settleCaseBatch(currentCaseId, remaining);
+                remaining -= consumed;
+            }
+            if (!reviewCaseSettled[currentCaseId]) break;
+            cursor++;
+        }
+        finalSettlementCursor[rootCaseId] = cursor;
+        _emitSettlementProgress(reviewCaseId);
+    }
+
+    function settlementComplete(bytes32 reviewCaseId) external view returns (bool) {
+        ReviewCase storage requested = _case(reviewCaseId);
+        bytes32 rootCaseId = requested.rootCaseId;
+        if (finalOutcome[rootCaseId] == VNextTypes.ReviewOutcome.NONE) return false;
+        uint256 count = _settlementCaseCount(rootCaseId);
+        for (uint256 i = 0; i < count; i++) {
+            if (!reviewCaseSettled[_settlementCaseAt(rootCaseId, i)]) return false;
+        }
+        return true;
     }
 
     function reviewResult(bytes32 reviewCaseId) external view returns (JuryTypes.CourtResult) {
@@ -724,15 +818,31 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
         }
     }
 
-    function _settleAllRounds(bytes32 rootCaseId, VNextTypes.ReviewOutcome outcome) private {
-        _settleCase(rootCaseId, outcome);
+    function _prepareFinalSettlement(bytes32 rootCaseId, VNextTypes.ReviewOutcome outcome)
+        private
+    {
+        _beginSettlement(rootCaseId, outcome);
         bytes32[] storage rounds = appealCases[rootCaseId];
         for (uint256 i = 0; i < rounds.length; i++) {
-            _settleCase(rounds[i], outcome);
+            _beginSettlement(rounds[i], outcome);
         }
         bytes32[] storage retries = retryCases[rootCaseId];
         for (uint256 i = 0; i < retries.length; i++) {
-            _settleCase(retries[i], outcome);
+            _beginSettlement(retries[i], outcome);
+        }
+        finalSettlementCursor[rootCaseId] = 0;
+    }
+
+    function _beginSettlement(bytes32 reviewCaseId, VNextTypes.ReviewOutcome outcome) private {
+        if (outcome == VNextTypes.ReviewOutcome.NONE) revert InvalidSettlementOutcome();
+        if (reviewCaseSettled[reviewCaseId]) return;
+        VNextTypes.ReviewOutcome configured = settlementOutcome[reviewCaseId];
+        if (configured != VNextTypes.ReviewOutcome.NONE && configured != outcome) {
+            revert InvalidSettlementOutcome();
+        }
+        if (configured == VNextTypes.ReviewOutcome.NONE) {
+            settlementOutcome[reviewCaseId] = outcome;
+            settlementPhase[reviewCaseId] = 1;
         }
     }
 
@@ -756,48 +866,124 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
                 || reviewCase.result == JuryTypes.CourtResult.TIED);
     }
 
-    function _settleCase(bytes32 reviewCaseId, VNextTypes.ReviewOutcome outcome) private {
-        if (reviewCaseSettled[reviewCaseId]) return;
-        uint256 totalSlash;
-        uint256 winners;
-        for (uint256 i = 0; i < enrolledJudges[reviewCaseId].length; i++) {
-            address judge = enrolledJudges[reviewCaseId][i];
-            uint256 slash;
-            bool winner;
-            if (VNextTypes.isSubstantive(outcome) && assignedJudge[reviewCaseId][judge]) {
-                JuryTypes.Vote vote =
-                    votes[reviewCaseId][assignedCourtId[reviewCaseId][judge]][judge];
-                winner =
-                    (outcome == VNextTypes.ReviewOutcome.FINAL_PASS && vote == JuryTypes.Vote.PASS)
-                        || (outcome == VNextTypes.ReviewOutcome.VERDICT_FAIL
-                            && vote == JuryTypes.Vote.FAIL);
-                if (!winner && vote != JuryTypes.Vote.NONE) {
-                    uint256 locked = registry.caseStake(reviewCaseId, judge);
-                    slash = locked * minoritySlashBps / 10_000;
-                    totalSlash += slash;
-                    if (slash > 0) emit JudgeSlashed(reviewCaseId, judge, slash);
+    function _settleCaseBatch(bytes32 reviewCaseId, uint256 maxJudges)
+        private
+        returns (uint256 consumed)
+    {
+        if (reviewCaseSettled[reviewCaseId]) return 0;
+        VNextTypes.ReviewOutcome outcome = settlementOutcome[reviewCaseId];
+        if (outcome == VNextTypes.ReviewOutcome.NONE) revert SettlementNotPrepared();
+
+        uint256 length = enrolledJudges[reviewCaseId].length;
+        uint256 cursor = settlementCursor[reviewCaseId];
+        uint256 end = cursor + maxJudges;
+        if (end > length) end = length;
+
+        if (settlementPhase[reviewCaseId] == 1) {
+            for (; cursor < end; cursor++) {
+                address judge = enrolledJudges[reviewCaseId][cursor];
+                uint256 slash;
+                if (VNextTypes.isSubstantive(outcome) && assignedJudge[reviewCaseId][judge]) {
+                    JuryTypes.Vote vote = votes[reviewCaseId][assignedCourtId[reviewCaseId][judge]][judge];
+                    bool winner = _isWinner(outcome, vote);
+                    if (winner) {
+                        settlementWinners[reviewCaseId]++;
+                    } else if (vote != JuryTypes.Vote.NONE) {
+                        uint256 locked = registry.caseStake(reviewCaseId, judge);
+                        slash = locked * minoritySlashBps / 10_000;
+                        settlementTotalSlash[reviewCaseId] += slash;
+                        if (slash > 0) emit JudgeSlashed(reviewCaseId, judge, slash);
+                    }
                 }
-                if (winner) winners++;
+                registry.settleCaseStake(reviewCaseId, judge, slash);
+                consumed++;
             }
-            registry.settleCaseStake(reviewCaseId, judge, slash);
+            settlementCursor[reviewCaseId] = cursor;
+            if (cursor < length) return consumed;
+
+            uint256 winners = settlementWinners[reviewCaseId];
+            if (winners == 0) {
+                _finishSettlement(reviewCaseId, outcome);
+                return consumed;
+            }
+            settlementRewardPerWinner[reviewCaseId] =
+                settlementTotalSlash[reviewCaseId] / winners;
+            settlementRewardDust[reviewCaseId] =
+                settlementTotalSlash[reviewCaseId] % winners;
+            settlementWinnerIndex[reviewCaseId] = 0;
+            settlementCursor[reviewCaseId] = 0;
+            settlementPhase[reviewCaseId] = 2;
         }
 
-        uint256 reward = winners == 0 ? 0 : totalSlash / winners;
-        if (reward > 0) {
-            for (uint256 i = 0; i < enrolledJudges[reviewCaseId].length; i++) {
-                address judge = enrolledJudges[reviewCaseId][i];
+        if (settlementPhase[reviewCaseId] == 2 && consumed < maxJudges) {
+            cursor = settlementCursor[reviewCaseId];
+            end = cursor + (maxJudges - consumed);
+            if (end > length) end = length;
+            for (; cursor < end; cursor++) {
+                consumed++;
+                address judge = enrolledJudges[reviewCaseId][cursor];
                 if (!assignedJudge[reviewCaseId][judge]) continue;
                 JuryTypes.Vote vote = votes[reviewCaseId][assignedCourtId[reviewCaseId][judge]][judge];
-                bool winner =
-                    (outcome == VNextTypes.ReviewOutcome.FINAL_PASS && vote == JuryTypes.Vote.PASS)
-                        || (outcome == VNextTypes.ReviewOutcome.VERDICT_FAIL
-                            && vote == JuryTypes.Vote.FAIL);
-                if (winner) registry.creditReward(reviewCaseId, judge, reward);
+                if (!_isWinner(outcome, vote)) continue;
+                uint256 winnerIndex = settlementWinnerIndex[reviewCaseId]++;
+                uint256 reward = settlementRewardPerWinner[reviewCaseId]
+                    + (winnerIndex < settlementRewardDust[reviewCaseId] ? 1 : 0);
+                if (reward > 0) registry.creditReward(reviewCaseId, judge, reward);
             }
+            settlementCursor[reviewCaseId] = cursor;
+            if (cursor == length) _finishSettlement(reviewCaseId, outcome);
         }
+    }
+
+    function _finishSettlement(bytes32 reviewCaseId, VNextTypes.ReviewOutcome outcome) private {
         reviewCaseSettled[reviewCaseId] = true;
+        settlementPhase[reviewCaseId] = 3;
         roundStatus[reviewCaseId] = JuryTypes.RoundStatus.SETTLED;
-        emit ReviewCaseSettled(reviewCaseId, uint8(outcome), totalSlash, winners);
+        emit ReviewCaseSettled(
+            reviewCaseId,
+            uint8(outcome),
+            settlementTotalSlash[reviewCaseId],
+            settlementWinners[reviewCaseId]
+        );
+    }
+
+    function _emitSettlementProgress(bytes32 reviewCaseId) private {
+        emit ReviewSettlementProgress(
+            reviewCaseId,
+            uint8(settlementOutcome[reviewCaseId]),
+            settlementPhase[reviewCaseId],
+            settlementCursor[reviewCaseId],
+            enrolledJudges[reviewCaseId].length,
+            reviewCaseSettled[reviewCaseId]
+        );
+    }
+
+    function _isWinner(VNextTypes.ReviewOutcome outcome, JuryTypes.Vote vote)
+        private
+        pure
+        returns (bool)
+    {
+        return (outcome == VNextTypes.ReviewOutcome.FINAL_PASS && vote == JuryTypes.Vote.PASS)
+            || (outcome == VNextTypes.ReviewOutcome.VERDICT_FAIL && vote == JuryTypes.Vote.FAIL);
+    }
+
+    function _boundedBatch(uint256 requested) private pure returns (uint256) {
+        return requested > MAX_SETTLEMENT_BATCH_SIZE ? MAX_SETTLEMENT_BATCH_SIZE : requested;
+    }
+
+    function _settlementCaseCount(bytes32 rootCaseId) private view returns (uint256) {
+        return 1 + appealCases[rootCaseId].length + retryCases[rootCaseId].length;
+    }
+
+    function _settlementCaseAt(bytes32 rootCaseId, uint256 index)
+        private
+        view
+        returns (bytes32)
+    {
+        if (index == 0) return rootCaseId;
+        uint256 appealCount = appealCases[rootCaseId].length;
+        if (index <= appealCount) return appealCases[rootCaseId][index - 1];
+        return retryCases[rootCaseId][index - appealCount - 1];
     }
 
     function _poolId(bytes32 reviewCaseId, bytes32 kind) private pure returns (bytes32) {

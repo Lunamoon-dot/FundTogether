@@ -28,6 +28,8 @@ interface IVNextReviewCaseCreator {
         external
         view
         returns (VNextTypes.ReviewOutcome outcome);
+
+    function settlementComplete(bytes32 reviewCaseId) external view returns (bool);
 }
 
 /// @notice Contract-owned campaign and contribution escrow for the VNext pilot.
@@ -110,6 +112,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
     error EvidenceReviewActive();
     error MilestoneAlreadyPaid();
     error ReviewNotFinal();
+    error ReviewSettlementPending();
     error FinalRulingAlreadySynced();
     error ChallengeWindowOpen();
     error ChallengeActive();
@@ -190,6 +193,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
                 publicationEvidenceHash_,
                 protocolVersion,
                 policyHash,
+                challengeWindowDuration,
                 milestoneSubmissionWindow,
                 correctionWindow
             )
@@ -263,6 +267,9 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         VNextTypes.ReviewOutcome outcome =
             reviewEngine.finalOutcome(campaign.publicationReviewCaseId);
         if (outcome == VNextTypes.ReviewOutcome.NONE) revert ReviewNotFinal();
+        if (!reviewEngine.settlementComplete(campaign.publicationReviewCaseId)) {
+            revert ReviewSettlementPending();
+        }
 
         campaign.publicationOutcome = outcome;
         bool successful = outcome == VNextTypes.ReviewOutcome.FINAL_PASS;
@@ -282,6 +289,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         if (campaign.state != VNextTypes.CampaignState.CREATED) revert WrongState();
         reviewCaseId = reviewEngine.openRetry(campaign.publicationReviewCaseId);
         campaign.publicationReviewCaseId = reviewCaseId;
+        emit PublicationReviewCaseChanged(campaignId, reviewCaseId);
     }
 
     function contribute(uint256 campaignId, uint256 amount) external nonReentrant {
@@ -306,14 +314,12 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
     function finalizeFunding(uint256 campaignId) external {
         Campaign storage campaign = _campaign(campaignId);
         if (campaign.state != VNextTypes.CampaignState.FUNDING) return;
-        if (campaign.raised < campaign.goal && block.timestamp < campaign.fundingDeadline) {
-            revert FundingStillOpen();
-        }
+        if (block.timestamp < campaign.fundingDeadline) revert FundingStillOpen();
 
-        bool successful = campaign.raised >= campaign.goal;
+        bool successful = campaign.raised == campaign.goal;
         emit FundingFinalized(campaignId, successful, campaign.raised);
         if (successful) {
-            campaign.state = VNextTypes.CampaignState.FUNDED;
+            campaign.state = VNextTypes.CampaignState.MILESTONES_RUNNING;
             milestones[campaignId][0].submissionDeadline =
                 block.timestamp + milestoneSubmissionWindow;
         } else {
@@ -346,6 +352,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         }
         if (campaign.refundAllocationCursor == contributorCount) {
             campaign.refundAllocationsFrozen = true;
+            emit RefundAllocationsFrozen(campaignId, contributorCount, campaign.refundSnapshot);
         }
     }
 
@@ -376,8 +383,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         Campaign storage campaign = _campaign(campaignId);
         if (msg.sender != campaign.creator) revert NotCampaignCreator();
         if (
-            campaign.state != VNextTypes.CampaignState.FUNDED
-                && campaign.state != VNextTypes.CampaignState.MILESTONES_RUNNING
+            campaign.state != VNextTypes.CampaignState.MILESTONES_RUNNING
         ) revert WrongState();
         if (evidenceHash == bytes32(0)) revert InvalidEvidence();
 
@@ -426,6 +432,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         if (revision > 1) {
             emit MilestoneRevisionSubmitted(campaignId, milestoneId, revision, evidenceHash);
         }
+        _emitMilestoneReviewState(campaignId, milestoneId, milestone);
     }
 
     /// @notice Ends a failed milestone after the frozen correction allowance
@@ -439,6 +446,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
                 || block.timestamp < milestone.correctionDeadline
         ) revert CorrectionLimitReached();
         milestone.state = VNextTypes.MilestoneState.TERMINAL;
+        _emitMilestoneReviewState(campaignId, milestoneId, milestone);
         _openRefunds(campaignId, campaign);
     }
 
@@ -446,12 +454,15 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         Campaign storage campaign = _campaign(campaignId);
         Milestone storage milestone = _milestone(campaignId, milestoneId);
         bool submissionExpired = milestone.state == VNextTypes.MilestoneState.PENDING
+            && milestone.submissionDeadline != 0
             && block.timestamp >= milestone.submissionDeadline;
         bool correctionExpired = milestone.state == VNextTypes.MilestoneState.CORRECTION
+            && milestone.correctionDeadline != 0
             && block.timestamp >= milestone.correctionDeadline;
         if (!submissionExpired && !correctionExpired) revert MilestoneDeadlineExpired();
 
         milestone.state = VNextTypes.MilestoneState.TERMINAL;
+        _emitMilestoneReviewState(campaignId, milestoneId, milestone);
         _openRefunds(campaignId, campaign);
     }
 
@@ -477,9 +488,13 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
             uint8 result = reviewEngine.reviewResult(milestone.reviewCaseId);
             if (result == 3 || result == 4) {
                 milestone.state = VNextTypes.MilestoneState.RETRY_PENDING;
+                _emitMilestoneReviewState(campaignId, milestoneId, milestone);
                 return outcome;
             }
             revert ReviewNotFinal();
+        }
+        if (!reviewEngine.settlementComplete(milestone.reviewCaseId)) {
+            revert ReviewSettlementPending();
         }
 
         milestone.finalOutcome = outcome;
@@ -493,6 +508,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
             milestone.state = VNextTypes.MilestoneState.TERMINAL;
             _openRefunds(campaignId, campaign);
         }
+        _emitMilestoneReviewState(campaignId, milestoneId, milestone);
     }
 
     /// @notice Opens the next bounded review attempt after an invalid/tied or
@@ -518,6 +534,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         milestone.reviewCaseId = reviewCaseId;
         milestone.finalOutcome = VNextTypes.ReviewOutcome.NONE;
         milestone.state = VNextTypes.MilestoneState.REVIEW_ENROLLMENT;
+        _emitMilestoneReviewState(campaignId, milestoneId, milestone);
     }
 
     /// @notice Lets an eligible Backer request the next review round. The
@@ -528,6 +545,18 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         returns (bytes32 appealCaseId)
     {
         Campaign storage campaign = _campaign(campaignId);
+        if (milestoneId == type(uint256).max) {
+            if (
+                msg.sender != campaign.creator
+                    || reviewEngine.reviewResult(campaign.publicationReviewCaseId) != 2
+            ) revert AppealNotAllowed();
+            appealCaseId = reviewEngine.openAppeal(campaign.publicationReviewCaseId, msg.sender);
+            if (appealCaseId == bytes32(0)) revert AppealNotAllowed();
+            campaign.publicationReviewCaseId = appealCaseId;
+            emit PublicationReviewCaseChanged(campaignId, appealCaseId);
+            return appealCaseId;
+        }
+
         Milestone storage milestone = _milestone(campaignId, milestoneId);
         bool creatorAppeal = msg.sender == campaign.creator
             && reviewEngine.reviewResult(milestone.reviewCaseId) == 2;
@@ -544,6 +573,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         if (appealCaseId == bytes32(0)) revert AppealNotAllowed();
         milestone.reviewCaseId = appealCaseId;
         milestone.state = VNextTypes.MilestoneState.APPEAL_WINDOW;
+        _emitMilestoneReviewState(campaignId, milestoneId, milestone);
     }
 
     /// @notice Releases exactly the frozen milestone budget after final PASS
@@ -578,65 +608,25 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         }
     }
 
-    /// @notice Opens a separate, permissionless challenge review during the
-    /// challenge window. The base evidence revision remains immutable.
+    /// @notice Challenge review is disabled by the active local policy.
     function openChallenge(uint256 campaignId, uint256 milestoneId, bytes32 challengeEvidenceHash)
         external
-        nonReentrant
         returns (bytes32 challengeCaseId)
     {
-        Campaign storage campaign = _campaign(campaignId);
-        Milestone storage milestone = _milestone(campaignId, milestoneId);
-        if (msg.sender == campaign.creator || contributions[campaignId][msg.sender] == 0) {
-            revert ChallengeNotAllowed();
-        }
-        if (
-            milestone.state != VNextTypes.MilestoneState.CHALLENGE_WINDOW
-                || block.timestamp >= milestone.challengeDeadline || milestone.challengeOpened
-        ) revert ChallengeNotAllowed();
-        if (challengeEvidenceHash == bytes32(0)) revert InvalidEvidence();
-
-        challengeCaseId = _createReviewCase(
-            campaign.creator,
-            campaignId,
-            milestoneId,
-            milestone.evidenceRevision,
-            milestone.budget
-        );
-        if (challengeCaseId == bytes32(0)) revert InvalidEvidence();
-        milestone.challengeReviewCaseId = challengeCaseId;
-        milestone.challengeEvidenceHash = challengeEvidenceHash;
-        milestone.challengeOpened = true;
-        emit ChallengeOpened(
-            campaignId, milestoneId, challengeCaseId, msg.sender, challengeEvidenceHash
-        );
+        campaignId;
+        milestoneId;
+        challengeEvidenceHash;
+        revert ChallengeNotAllowed();
     }
 
-    /// @notice Materializes the challenge case result. A challenge PASS means
-    /// the challenge failed; any other result closes the campaign to refunds.
+    /// @notice Challenge resolution is disabled by the active local policy.
     function resolveChallenge(uint256 campaignId, uint256 milestoneId)
         external
-        nonReentrant
         returns (VNextTypes.ReviewOutcome outcome)
     {
-        Campaign storage campaign = _campaign(campaignId);
-        Milestone storage milestone = _milestone(campaignId, milestoneId);
-        if (!milestone.challengeOpened || milestone.challengeReviewCaseId == bytes32(0)) {
-            revert ChallengeNotFinal();
-        }
-        outcome = reviewEngine.finalOutcome(milestone.challengeReviewCaseId);
-        if (outcome == VNextTypes.ReviewOutcome.NONE) revert ChallengeNotFinal();
-
-        milestone.challengeOpened = false;
-        if (outcome == VNextTypes.ReviewOutcome.FINAL_PASS) {
-            milestone.challengeDeadline = block.timestamp;
-        } else {
-            milestone.state = VNextTypes.MilestoneState.TERMINAL;
-            _openRefunds(campaignId, campaign);
-        }
-        emit ChallengeResolved(
-            campaignId, milestoneId, milestone.challengeReviewCaseId, uint8(outcome)
-        );
+        campaignId;
+        milestoneId;
+        revert ChallengeNotAllowed();
     }
 
     function campaignCreator(uint256 campaignId) external view returns (address) {
@@ -807,6 +797,22 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
     ) private returns (bytes32) {
         return reviewEngine.createReviewCase(
             creator, campaignId, milestoneId, evidenceRevision, riskValue
+        );
+    }
+
+    function _emitMilestoneReviewState(
+        uint256 campaignId,
+        uint256 milestoneId,
+        Milestone storage milestone
+    ) private {
+        emit MilestoneReviewStateChanged(
+            campaignId,
+            milestoneId,
+            milestone.reviewCaseId,
+            uint8(milestone.state),
+            uint8(milestone.finalOutcome),
+            milestone.challengeDeadline,
+            milestone.correctionDeadline
         );
     }
 

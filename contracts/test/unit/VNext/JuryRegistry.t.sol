@@ -135,6 +135,18 @@ contract VNextJuryRegistryTest is Test {
         registry.settleCaseStake(CASE_ID, judge, 0);
     }
 
+    function test_unknownCaseCannotSettleStake() public {
+        vm.prank(controller);
+        vm.expectRevert(JuryRegistry.UnknownCase.selector);
+        registry.settleCaseStake(CASE_ID, judge, 0);
+    }
+
+    function test_unknownCaseCannotCreditReward() public {
+        vm.prank(controller);
+        vm.expectRevert(JuryRegistry.UnknownCase.selector);
+        registry.creditReward(CASE_ID, judge, 1);
+    }
+
     function test_settlementCannotSlashMoreThanLockedCaseStake() public {
         vm.prank(judge);
         registry.depositStake(50e6);
@@ -168,6 +180,28 @@ contract VNextJuryRegistryTest is Test {
         vm.prank(judge);
         vm.expectRevert(JuryRegistry.RewardAlreadyClaimed.selector);
         registry.claimReward(CASE_ID);
+    }
+
+    function test_judgeCannotClaimAnotherJudgesReward() public {
+        address otherJudge = makeAddr("vnext-other-judge");
+
+        vm.prank(judge);
+        registry.depositStake(50e6);
+        vm.prank(controller);
+        registry.registerCase(CASE_ID, block.timestamp + 1 days, 30e6, keccak256("BASE"));
+        vm.prank(judge);
+        registry.reserveCaseStake(CASE_ID, 30e6);
+        vm.prank(controller);
+        registry.settleCaseStake(CASE_ID, judge, 5e6);
+        vm.prank(controller);
+        registry.creditReward(CASE_ID, judge, 5e6);
+
+        vm.prank(otherJudge);
+        vm.expectRevert(JuryRegistry.InvalidAmount.selector);
+        registry.claimReward(CASE_ID);
+
+        assertEq(registry.pendingReward(CASE_ID, judge), 5e6);
+        assertEq(token.balanceOf(otherJudge), 0);
     }
 
     function test_reviewControllerCanBeConfiguredOnlyOnce() public {

@@ -54,7 +54,10 @@ async function main() {
         'campaigns_review_messages', 'campaigns_review_escalations',
         'vnext_chain_events', 'vnext_campaign_projections',
         'vnext_milestone_projections', 'vnext_review_projections',
-        'vnext_judge_assignments',
+        'vnext_judge_assignments', 'vnext_case_evidence',
+        'vnext_evidence_access_tickets',
+        'vnext_backer_projections', 'vnext_challenge_projections',
+        'vnext_judge_ledger_projections',
       ];
       for (const name of required) assert.ok(publicNames.has(name), `missing table ${name}`);
       assert.equal(publicNames.has('campaign_fulfillment_batches'), false);
@@ -81,6 +84,8 @@ async function main() {
         '0006_historical_dispute_integrity', '0007_campaign_payout_requests',
         '0008_campaign_completion_surplus', '0009_surplus_claim_reorg_history',
         '0010_campaign_payout_file_purposes', '0011_vnext_projections',
+        '0012_vnext_case_evidence', '0013_vnext_financial_read_models',
+        '0014_vnext_evidence_access_tickets',
       ]);
 
       assert.equal(

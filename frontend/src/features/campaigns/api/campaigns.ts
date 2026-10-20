@@ -127,13 +127,42 @@ export interface DeploymentManifest {
 }
 export interface VNextDeployment {
   configured: boolean;
+  protocolKind?: 'FUNDTOGETHER_VNEXT';
   chainId?: 31339;
+  rpcUrl?: string;
+  abiVersion?: string;
+  abiHash?: `0x${string}`;
+  tokenDecimals?: 6;
+  confirmations?: 1;
   campaignEscrow?: `0x${string}`;
   juryRegistry?: `0x${string}`;
   juryReview?: `0x${string}`;
+  randomnessProvider?: `0x${string}`;
   tokenAddress?: `0x${string}`;
   policyHash?: `0x${string}`;
-  abiVersion?: string;
+  genesisHash?: `0x${string}`;
+  campaignCodeHash?: `0x${string}`;
+  registryCodeHash?: `0x${string}`;
+  reviewCodeHash?: `0x${string}`;
+  tokenCodeHash?: `0x${string}`;
+  deploymentBlockNumber?: string;
+  deploymentBlockHash?: `0x${string}`;
+}
+export interface VNextTransactionStatus {
+  txHash: `0x${string}`;
+  state: 'INDEXING' | 'ON_CHAIN_CONFIRMED';
+  eventCount: number;
+}
+export interface VNextIndexerStatus {
+  configured: boolean;
+  streamId?: string;
+  status?: string;
+  lastBlock?: string | null;
+  lastBlockHash?: string | null;
+  headBlock?: string | null;
+  lagBlocks?: string | null;
+  error?: string | null;
+  updatedAt?: string | null;
 }
 export interface VNextCampaignProjection {
   streamId: string;
@@ -160,9 +189,95 @@ export interface VNextMilestoneProjection {
   evidenceHash: string | null;
   reviewCaseId: string | null;
   finalOutcome: number | null;
+  challengeDeadline?: string | null;
+  correctionDeadline?: string | null;
   state: number;
   paid: boolean;
 }
+export interface VNextJudgeAssignment {
+  reviewCaseId: string;
+  roundId: string;
+  courtId: string;
+  slot: number;
+  judgeAddress: string;
+}
+export interface VNextAssignedReview {
+  streamId: string;
+  reviewCaseId: string;
+  rootCaseId: string;
+  campaignId: string;
+  milestoneId: string;
+  evidenceRevision: string;
+  roundId: string;
+  creator: string;
+  enrolledCount: string;
+  courtCount?: string;
+  finalizedCourtCount?: string;
+  passCourts?: string;
+  failCourts?: string;
+  outcome: number | null;
+  finalized: boolean;
+  lastBlockNumber: string;
+  assignments: VNextJudgeAssignment[];
+}
+export type VNextReviewWithAssignments = VNextAssignedReview;
+export interface VNextBackerProjection {
+  streamId: string;
+  onchainCampaignId: string;
+  backerAddress: string;
+  contributed: string;
+  refundEntitlement: string;
+  refundClaimed: boolean;
+  refundAllocationsFrozen: boolean;
+  indexedContributed: string;
+  indexedRefunded: string;
+  lastBlockNumber: string;
+}
+export interface VNextChallengeProjection {
+  streamId: string;
+  onchainCampaignId: string;
+  milestoneId: number;
+  challengeCaseId: string;
+  challenger: string;
+  evidenceHash: string;
+  outcome: number | null;
+  lastBlockNumber: string;
+}
+export interface VNextJudgeLedgerProjection {
+  streamId: string;
+  reviewCaseId: string;
+  judgeAddress: string;
+  reserved: string;
+  released: string;
+  settled: string;
+  caseSlashed: string;
+  rewardAccrued: string;
+  rewardClaimed: string;
+  lastBlockNumber: string;
+}
+export interface VNextCaseEvidence {
+  reviewCaseId: string;
+  evidenceHash: string;
+  sha256: string;
+  mediaType: string;
+  sizeBytes: number;
+  summary: string;
+  createdAt: string;
+  availability?: 'AVAILABLE' | 'MISSING' | 'UNAVAILABLE';
+}
+export interface VNextCaseEvidenceResponse {
+  access: 'CREATOR' | 'JUDGE' | 'CHALLENGER';
+  assignments: VNextJudgeAssignment[];
+  evidence: VNextCaseEvidence[];
+  canonicalEvidenceHash: string | null;
+  availabilityPolicy: {
+    reviewCaseId: string;
+    reviewPhase: 'ENROLLMENT' | 'VOTING' | 'FINALIZED';
+    status: 'READY' | 'WAITING_FOR_EVIDENCE' | 'TIMEOUT_RETRY_ELIGIBLE' | 'WAITING_FOR_INDEXER' | 'REVIEW_CLOSED';
+    timeoutAtSeconds: string | null;
+  };
+}
+export interface VNextEvidenceAccessTicket { state: 'EVIDENCE_AVAILABLE'; url: string; expiresAt: string; sha256: string; }
 export interface CampaignChain {
   deployment: DeploymentManifest; status: 'ON_CHAIN_CONFIRMED' | 'ORPHANED' | 'NOT_PUBLISHED'; onchainCampaignId: string | null;
   bindingTransactionHash: `0x${string}` | null;
@@ -321,8 +436,21 @@ export const campaignApi = {
   preview: async (id: string, signal?: AbortSignal) => (await http.get<CampaignPreview>(`/v1/fundtogether/public/campaigns/${id}`, { signal })).data,
   deployment: async () => (await http.get<DeploymentManifest>(`${base}/deployment`)).data,
   vnextDeployment: async () => (await http.get<VNextDeployment>('/v1/fundtogether/vnext/deployment')).data,
+  vnextIndexer: async (signal?: AbortSignal) => (await http.get<VNextIndexerStatus>('/v1/fundtogether/vnext/indexer', { signal })).data,
   vnextCampaign: async (id: string, signal?: AbortSignal) => (await http.get<VNextCampaignProjection>(`/v1/fundtogether/vnext/campaigns/${id}`, { signal })).data,
   vnextMilestones: async (id: string, signal?: AbortSignal) => (await http.get<VNextMilestoneProjection[]>(`/v1/fundtogether/vnext/campaigns/${id}/milestones`, { signal })).data,
+  vnextBackerPosition: async (id: string, signal?: AbortSignal) => (await http.get<VNextBackerProjection[]>(`/v1/fundtogether/vnext/campaigns/${id}/backer`, { signal })).data,
+  vnextChallenges: async (id: string, signal?: AbortSignal) => (await http.get<VNextChallengeProjection[]>(`/v1/fundtogether/vnext/campaigns/${id}/challenges`, { signal })).data,
+  vnextReviews: async (signal?: AbortSignal) => (await http.get<VNextReviewWithAssignments[]>('/v1/fundtogether/vnext/reviews', { signal })).data,
+  vnextAssignedReviews: async (signal?: AbortSignal) => (await http.get<VNextReviewWithAssignments[]>('/v1/fundtogether/vnext/reviews/assigned', { signal })).data,
+  vnextJudgeLedger: async (signal?: AbortSignal) => (await http.get<VNextJudgeLedgerProjection[]>('/v1/fundtogether/vnext/judge-ledger', { signal })).data,
+  vnextEvidence: async (reviewCaseId: string, signal?: AbortSignal) => (await http.get<VNextCaseEvidenceResponse>(`/v1/fundtogether/vnext/reviews/${encodeURIComponent(reviewCaseId)}/evidence`, { signal })).data,
+  vnextUploadEvidence: async (reviewCaseId: string, summary: string, file: File) => {
+    const data = new FormData(); data.append('summary', summary); data.append('file', file);
+    return (await http.post<VNextCaseEvidence>(`/v1/fundtogether/vnext/reviews/${encodeURIComponent(reviewCaseId)}/evidence`, data, { headers: { 'Content-Type': undefined }, timeout: 60000 })).data;
+  },
+  vnextEvidenceTicket: async (reviewCaseId: string, evidenceHash: string) => (await http.post<VNextEvidenceAccessTicket>(`/v1/fundtogether/vnext/reviews/${encodeURIComponent(reviewCaseId)}/evidence/${encodeURIComponent(evidenceHash)}/ticket`)).data,
+  vnextTransaction: async (txHash: string, signal?: AbortSignal) => (await http.get<VNextTransactionStatus>(`/v1/fundtogether/vnext/transactions/${txHash}`, { signal })).data,
   chain: async (id: string, signal?: AbortSignal) => (await http.get<CampaignChain>(`${base}/campaigns/${id}/chain`, { signal })).data,
   operations: async (scope: 'creator' | 'judge' | 'resolver' | 'admin', signal?: AbortSignal) =>
     (await http.get<OperationSummary[]>(`${base}/operations/${scope}`, { signal })).data,

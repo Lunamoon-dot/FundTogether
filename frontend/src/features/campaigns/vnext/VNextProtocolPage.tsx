@@ -1,12 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
 import { campaignApi } from '../api/campaigns';
 import { getErrorMessage } from '../../../lib/api/error';
+import { useAccountSession } from '../../auth/AccountSessionProvider';
+import { VNextActionPanel } from './VNextActionPanel';
+import { VNextCreateCampaignPanel } from './VNextCreateCampaignPanel';
 
 const campaignStates = ['CREATED', 'FUNDING', 'FUNDED', 'MILESTONES_RUNNING', 'COMPLETED', 'REFUNDING'];
 const milestoneStates = ['PENDING', 'SUBMITTED', 'REVIEW_ENROLLMENT', 'BASE_REVIEW', 'RETRY_PENDING', 'PROVISIONAL_RULING', 'APPEAL_WINDOW', 'FINAL_RULING', 'PAYABLE', 'CHALLENGE_WINDOW', 'PAID', 'CORRECTION', 'RESUBMIT', 'TERMINAL'];
 
 export function VNextProtocolPage({ campaignId }: { campaignId?: string }) {
+  const { session } = useAccountSession();
   const deployment = useQuery({ queryKey: ['vnext-deployment'], queryFn: campaignApi.vnextDeployment, retry: false });
+  const indexer = useQuery({ queryKey: ['vnext-indexer'], queryFn: ({ signal }) => campaignApi.vnextIndexer(signal), retry: false });
   const campaign = useQuery({
     queryKey: ['vnext-campaign', campaignId],
     queryFn: ({ signal }) => campaignApi.vnextCampaign(campaignId!, signal),
@@ -34,9 +39,14 @@ export function VNextProtocolPage({ campaignId }: { campaignId?: string }) {
             <div><dt className="muted">Review engine</dt><dd className="font-mono break-all">{deployment.data.juryReview}</dd></div>
           </dl>
         ) : deployment.isPending ? <p role="status" className="muted">Đang kiểm tra deployment VNext…</p> : <p className="monograph-alert monograph-alert--error">Chưa có manifest/deployment VNext local.</p>}
+        {indexer.data?.configured && <p className="text-xs text-[var(--ink-subtle)] m-0" data-vnext-read="indexer-status">
+          Indexer {indexer.data.status} · checkpoint {indexer.data.lastBlock ?? 'chưa có'} / head {indexer.data.headBlock ?? 'chưa có'} · lag {indexer.data.lagBlocks ?? 'chưa biết'} block.
+        </p>}
+        {indexer.data?.error && <p role="alert" className="text-xs text-[var(--danger)] m-0">Indexer error: {indexer.data.error}</p>}
       </section>
 
       {campaignId && campaign.error && <p role="alert" className="monograph-alert monograph-alert--error">{getErrorMessage(campaign.error)}</p>}
+      {!campaignId && deployment.data?.configured && <VNextCreateCampaignPanel deployment={deployment.data} />}
       {campaign.data && <>
         <section className="monograph-card space-y-3">
           <span className="monograph-card__kicker">CANONICAL PROJECTION</span>
@@ -54,6 +64,19 @@ export function VNextProtocolPage({ campaignId }: { campaignId?: string }) {
             </article>
           )) : <p className="muted">Chưa có milestone projection.</p>}
         </section>
+        {deployment.data?.configured && campaignId && campaign.data && (
+          <VNextActionPanel
+            campaignId={campaignId!}
+            userId={session?.userId}
+            campaign={campaign.data}
+            milestones={milestones.data ?? []}
+            deployment={deployment.data}
+            onRefresh={() => {
+              void campaign.refetch();
+              void milestones.refetch();
+            }}
+          />
+        )}
       </>}
     </div>
   );

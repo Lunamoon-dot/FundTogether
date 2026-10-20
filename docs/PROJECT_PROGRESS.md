@@ -9,23 +9,28 @@
 > **Status:** Current implementation evidence log. A recorded PASS applies only
 > to the named command, date and environment; it is not public-launch approval.
 
-## 2026-10-20 VNext implementation status
+## 2026-10-21 VNext implementation status
 
 - Added the pure-decentralized VNext contract core for permissionless campaign
   proposal/publication review, funding escrow, stake-backed multi-court review,
-  milestone evidence, bounded appeal/retry, challenge, exact-budget payout and
-  terminal pro-rata refunds. The contract suite reports `92/92` passing tests,
-  including the focused VNext and conservation suites; historical Resolver
-  suites remain visible for regression only.
-- Added the VNext deployment manifest/parser, read-only runtime verifier,
-  idempotent event projector/schema, read-only API and SHA-256 evidence
-  integrity helper. Backend focused VNext tests report `4/4` and the backend
-  build passes. Frontend tests report `199/199` and the production build
-  passes with the existing large-bundle warning.
-- Not yet accepted: fresh Anvil/PostgreSQL/MinIO deployment, runtime identity
-  verification against RPC `9548`, full indexer replay, and Creator/Backer/Judge
-  wallet journeys. The local MockUSDC policy is a research fixture, not a
-  public-chain or real-money release policy.
+  milestone evidence, bounded appeal/retry, exact-budget payout and terminal
+  pro-rata refunds. The current Docker Foundry suite reports `136/136` passing
+  tests; historical Resolver suites remain visible for regression only.
+- Added deployment identity verification, idempotent event projection,
+  PostgreSQL crash/replay coverage, read-only VNext APIs, private evidence
+  access tickets, and wallet-only SIWE boundaries. Current focused backend
+  evidence is `9` VNext suites / `34` tests; frontend evidence is `207` tests and a
+  successful production build.
+- Fresh local direct acceptance and a real SIWE/EIP-6963 browser vertical slice
+  pass on Anvil chain `31339`: Creator creation, direct Judge publication
+  resolution/materialization, Backer funding, chain-time deadline finalization,
+  private milestone evidence, Judge UI commit/reveal, settlement, exact payout,
+  underfunded refund allocation freeze and refund claim pass twice from clean
+  genesis/deploy cycles. The browser Create and Action panels derive deadlines
+  from the latest chain block rather than the host clock. Publication
+  materialization remains a direct permissionless contract call in the fixture;
+  production economics and public-chain release remain out of scope. See
+  [the VNext release report](protocol/VNEXT_RELEASE_REPORT.md).
 
 The detailed live ledger is [Implementation Progress VNext](protocol/IMPLEMENTATION_PROGRESS_VNEXT.md);
 the remainder of this file is pre-reset historical evidence and must not be

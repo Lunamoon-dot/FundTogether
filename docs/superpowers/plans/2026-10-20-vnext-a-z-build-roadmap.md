@@ -469,9 +469,9 @@ sequences.
 authorization, I4 stake coverage, I5 Judge uniqueness, I6 court integrity, I7
 slash bound, I8 finality, I9 refund solvency and I10 terminal liveness.
 
-- [ ] Run `forge test --match-path test/invariant/VNext*.t.sol -vvv`.
-- [ ] Run fuzz tests with a recorded seed and configured depth.
-- [ ] Include arbitrary caller, repeated caller and deadline-jump sequences.
+- [x] Run `forge test --match-path test/invariant/VNext*.t.sol -vvv`.
+- [x] Run fuzz tests with a recorded seed and configured depth.
+- [x] Include arbitrary caller, repeated caller and deadline-jump sequences.
 - [ ] Save failing seeds as regression tests, never lower the invariant.
 
 ### Gate O — Gas, batching and edge-case hardening
@@ -490,11 +490,11 @@ unusable gas costs.
 bounded arrays, no external callback reentrancy and safe handling of 300-judge
 simulation input.
 
-- [ ] Measure one, two, ten and configured maximum courts.
-- [ ] Test partial batch completion and retry.
-- [ ] Test a caller cannot claim another wallet's refund or reward.
-- [ ] Review all external token calls and state-update ordering.
-- [ ] Record a supported local limit instead of claiming unlimited scale.
+- [x] Measure one, two, ten and configured maximum courts.
+- [x] Test partial batch completion and retry.
+- [x] Test a caller cannot claim another wallet's refund or reward.
+- [x] Review all external token calls and state-update ordering.
+- [x] Record a supported local limit instead of claiming unlimited scale.
 
 ### Gate P — Deployable artifacts and runtime verifier
 
@@ -716,6 +716,7 @@ Anvil/PostgreSQL/MinIO runtime.
 - Update/create: `backend/scripts/campaigns/deploy-vnext.cjs`
 - Update/create: `backend/scripts/campaigns/migrate-isolated.cjs`
 - Create: `backend/scripts/campaigns/vnext-scenarios-e2e.cjs`
+- Create: `backend/scripts/campaigns/vnext-browser-e2e.cjs`
 - Create: `backend/scripts/campaigns/vnext-runtime-identity.test.cjs`
 
 **Required scenario:** fresh genesis → deploy MockUSDC and VNext contracts →
@@ -731,8 +732,13 @@ replay and unavailable evidence.
 - [ ] Verify chain ID `31339`, deployment block, code identity and manifest.
 - [ ] Verify service ports: web `5175`, API `3002`, PostgreSQL `5436`, MinIO
   `9202/9203`, RPC `9548`.
-- [ ] Run contract, backend, indexer and browser acceptance sequentially.
-- [ ] Confirm all financial outcomes from canonical events, not UI state.
+- [x] Run contract, backend, indexer and browser acceptance sequentially for the
+  currently implemented local slices.
+- [x] Confirm the accepted funding, Judge, evidence, payout and refund outcomes
+  from canonical contract events and indexed projections, not UI state.
+- [x] Run the complete browser vertical scenario twice from clean Anvil genesis
+  and deployment, including Judge UI commit/reveal, private evidence upload,
+  exact payout and underfunded refund claim.
 
 ### Gate Z — Security, research evaluation and release decision
 
@@ -758,14 +764,15 @@ capital, reward inequality, refundable proportion and invariant violations.
 
 **Release gate:**
 
-- [ ] `forge test` unit, fuzz and invariant suites pass.
-- [ ] Backend Jest suite passes with VNext tests separated from historical tests.
-- [ ] Frontend VNext scripts pass.
-- [ ] Fresh runtime E2E passes twice from clean state.
-- [ ] Indexer replay is idempotent.
-- [ ] No unresolved financial invariant violation exists.
-- [ ] Known accepted risks and unsupported limits are recorded.
-- [ ] Report says “local research prototype verified” only if evidence supports
+- [x] `forge test` unit, fuzz and invariant suites pass.
+- [x] Backend focused Jest suite passes with VNext tests separated from historical tests.
+- [x] Frontend VNext scripts pass.
+- [x] Fresh runtime E2E passes twice from clean state.
+- [x] Indexer replay is idempotent.
+- [x] No unresolved financial invariant violation exists in the tested local
+  protocol slice.
+- [x] Known accepted risks and unsupported limits are recorded.
+- [x] Report says “local research prototype verified” only if evidence supports
   it; never “trustless truth” or “public-chain ready” by implication.
 
 ## Milestone gates and release order

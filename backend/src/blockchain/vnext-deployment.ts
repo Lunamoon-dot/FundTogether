@@ -7,6 +7,33 @@ import reviewArtifact = require("./generated/vnext/JuryReview.json");
 import tokenAbiJson = require("./generated/fundtogether/mock-usdc.abi.json");
 
 export const vnextCampaignAbi = campaignArtifact.abi as Abi;
+// Keep an explicit event-only ABI as a compatibility fallback for deployments
+// whose historical generated artifact predates these canonical state events.
+export const vnextCampaignEventAbi = [
+  {
+    type: "event",
+    name: "MilestoneReviewStateChanged",
+    inputs: [
+      { name: "campaignId", type: "uint256", indexed: true },
+      { name: "milestoneId", type: "uint256", indexed: true },
+      { name: "reviewCaseId", type: "bytes32", indexed: true },
+      { name: "state", type: "uint8", indexed: false },
+      { name: "outcome", type: "uint8", indexed: false },
+      { name: "challengeDeadline", type: "uint256", indexed: false },
+      { name: "correctionDeadline", type: "uint256", indexed: false },
+    ],
+    anonymous: false,
+  },
+  {
+    type: "event",
+    name: "PublicationReviewCaseChanged",
+    inputs: [
+      { name: "campaignId", type: "uint256", indexed: true },
+      { name: "reviewCaseId", type: "bytes32", indexed: true },
+    ],
+    anonymous: false,
+  },
+] as Abi;
 export const vnextRegistryAbi = registryArtifact.abi as Abi;
 export const vnextReviewAbi = reviewArtifact.abi as Abi;
 export const vnextPolicyHash = keccak256(toHex("fundtogether-vnext-local-v2-remediation"));

@@ -47,9 +47,15 @@ contract VNextFundingEscrowTest is Test {
         _fund(backerOne, 60e6);
         _fund(backerTwo, 40e6);
 
+        vm.expectRevert(CampaignEscrowVNext.FundingStillOpen.selector);
+        escrow.finalizeFunding(campaignId);
+        vm.warp(block.timestamp + 7 days);
         escrow.finalizeFunding(campaignId);
 
-        assertEq(uint8(escrow.campaignState(campaignId)), uint8(VNextTypes.CampaignState.FUNDED));
+        assertEq(
+            uint8(escrow.campaignState(campaignId)),
+            uint8(VNextTypes.CampaignState.MILESTONES_RUNNING)
+        );
         assertEq(token.balanceOf(address(escrow)), 100e6);
         assertEq(token.balanceOf(payout), 0);
         assertEq(escrow.contributionOf(campaignId, backerOne), 60e6);
@@ -59,11 +65,22 @@ contract VNextFundingEscrowTest is Test {
     function test_fundingFinalizationIsIdempotent() public {
         _fund(backerOne, 100e6);
 
+        vm.expectRevert(CampaignEscrowVNext.FundingStillOpen.selector);
+        escrow.finalizeFunding(campaignId);
+        vm.warp(block.timestamp + 7 days);
         escrow.finalizeFunding(campaignId);
         escrow.finalizeFunding(campaignId);
 
         assertEq(token.balanceOf(address(escrow)), 100e6);
-        assertEq(uint8(escrow.campaignState(campaignId)), uint8(VNextTypes.CampaignState.FUNDED));
+        assertEq(
+            uint8(escrow.campaignState(campaignId)),
+            uint8(VNextTypes.CampaignState.MILESTONES_RUNNING)
+        );
+    }
+
+    function test_uninitializedMilestoneCannotExpire() public {
+        vm.expectRevert(CampaignEscrowVNext.MilestoneDeadlineExpired.selector);
+        escrow.expireMilestoneSubmission(campaignId, 0);
     }
 
     function test_failedFundingOpensFullRefund() public {
@@ -86,7 +103,7 @@ contract VNextFundingEscrowTest is Test {
     }
 
     function test_CreatorInactiveOpensRefundAfterSubmissionDeadline() public {
-        _fund(backerOne, 25e6);
+        _fund(backerOne, 100e6);
         vm.warp(block.timestamp + 7 days);
         escrow.finalizeFunding(campaignId);
 
@@ -97,11 +114,11 @@ contract VNextFundingEscrowTest is Test {
         escrow.freezeRefundAllocations(campaignId, 10);
         vm.prank(backerOne);
         escrow.claimRefund(campaignId);
-        assertEq(token.balanceOf(backerOne), 25e6);
+        assertEq(token.balanceOf(backerOne), 100e6);
     }
 
     function test_TimeoutIsPermissionless() public {
-        _fund(backerOne, 25e6);
+        _fund(backerOne, 100e6);
         vm.warp(block.timestamp + 7 days);
         escrow.finalizeFunding(campaignId);
         vm.warp(block.timestamp + 7 days);
