@@ -168,14 +168,18 @@ frontend: npm test -> 205 passed, 0 failed
 frontend: npm run build -> success (existing large-bundle warning)
 frontend: VNext static journey tests -> 6 passed, 0 failed after assigned-case read boundary
 backend: explicit VNext Jest config -> 6 suites, 25 passed, 0 failed; npm run build -> success; migration/service tests -> 4 passed
-backend: vnext-acceptance.test.cjs -> 1 passed; migrate-isolated.cjs -> success;
-deploy-vnext.cjs --create -> success; vnext-acceptance.cjs -> PASS for one
-payout and one refund campaign, persistent projection checks included.
+backend: all 9 campaign script-test files -> 35 passed; vnext-acceptance.test.cjs
+regression -> 1 passed; migrate-isolated.cjs -> success;
+deploy-vnext.cjs --create -> success; vnext-acceptance.cjs -> PASS twice,
+including one fresh Anvil genesis plus a newly created isolated PostgreSQL
+database, with one payout and one refund campaign and persistent projection
+checks included. Temporary acceptance database and Anvil were removed after
+verification.
 contracts: Docker Foundry forge build -> success (solc 0.8.24); full
 forge test -> 124 passed, 0 failed, 0 skipped; generated VNext ABIs refreshed.
 The host still lacks native Forge/Anvil; contract checks are container-backed.
-The separate acceptance run used a temporary Docker Anvil plus the existing
-local PostgreSQL service and passed the persistent projection assertions.
+The separate acceptance run used a temporary Docker Anvil plus a newly created
+isolated PostgreSQL database and passed the persistent projection assertions.
 ```
 
 The repository's default backend `npm test` currently discovers zero tests due
