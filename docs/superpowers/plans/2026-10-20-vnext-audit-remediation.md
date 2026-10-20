@@ -400,4 +400,3 @@ Use the review diff for the whole branch. Fix any Important finding with a new f
 - [ ] Step 5: Final handoff.
 
 Report changed files, commit list, exact test results, unavailable runtime tools, accepted risks and any remaining production/public-chain gates. Do not describe ABI generation, database projection or submitted transactions as financial success unless canonical runtime evidence exists.
-
