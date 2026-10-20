@@ -39,11 +39,11 @@
 - Produces the canonical active-milestone guard used by timeout and evidence submission.
 - Does not change public function signatures or frozen policy values.
 
-- [ ] **Step 1: Write failing Foundry regressions**
+- [x] **Step 1: Write failing Foundry regressions**
 
 Add tests named `test_CannotExpireBeforeFunding`, `test_CannotExpireInactiveFutureMilestone`, `test_CannotExpireActiveMilestoneEarly` and `test_SuccessfulFundingThenCreatorTimeout`. Assert campaign and milestone state before the call, expect the exact revert for invalid paths, and assert `FUNDED → REFUNDING`, `TERMINAL` and refund pool changes for the valid timeout path.
 
-- [ ] **Step 2: Run the focused tests and verify RED**
+- [x] **Step 2: Run the focused tests and verify RED**
 
 Run from `contracts/`:
 
@@ -53,15 +53,15 @@ Run from `contracts/`:
 
 Expected: the new precondition tests fail because `expireMilestoneSubmission` accepts `PENDING` milestones with deadline `0` or accepts the wrong campaign/milestone state.
 
-- [ ] **Step 3: Implement the minimal guard**
+- [x] **Step 3: Implement the minimal guard**
 
 Add an internal active-milestone lookup that returns the first unpaid milestone in order. Require `FUNDED` or `MILESTONES_RUNNING`, the selected ID to equal that active ID, and a nonzero deadline in the corresponding submission/correction branch. Add the same nonzero submission-deadline guard to `submitMilestoneEvidence` for a `PENDING` milestone.
 
-- [ ] **Step 4: Run the focused tests and verify GREEN**
+- [x] **Step 4: Run the focused tests and verify GREEN**
 
 Run the same Forge command. Expected: every new regression and existing focused test passes.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add contracts/src/campaigns/CampaignEscrowVNext.sol contracts/test/unit/VNext/FundingEscrow.t.sol contracts/test/unit/VNext/PayoutRefund.t.sol
@@ -88,11 +88,11 @@ git commit -m "fix: guard VNext milestone timeout activation"
 - `MilestoneStateChanged(campaignId, milestoneId, evidenceRevision, evidenceHash, reviewCaseId, finalOutcome, state, submissionDeadline, correctionDeadline, challengeDeadline, paid)` is the canonical state update payload.
 - Persistent and in-memory projectors consume the same event semantics.
 
-- [ ] **Step 1: Write failing contract and projector tests**
+- [x] **Step 1: Write failing contract and projector tests**
 
 Assert configuration events exist for every milestone and that a state transition event contains the new review case, final outcome and deadline values after ruling, retry, appeal, challenge resolution and timeout. Add persistent and in-memory replay tests proving the milestone row changes while the event identity remains idempotent.
 
-- [ ] **Step 2: Run the focused tests and verify RED**
+- [x] **Step 2: Run the focused tests and verify RED**
 
 Run:
 
@@ -104,11 +104,11 @@ npm run test -- --runInBand --testMatch '**/src/**/*.spec.ts' --testPathPatterns
 
 Expected: event/projection assertions fail because the events, schema fields and handlers do not exist.
 
-- [ ] **Step 3: Implement event and projection support**
+- [x] **Step 3: Implement event and projection support**
 
 Add the two events, emit them after canonical state mutation, add the two deadline columns and migration, upsert rows in the persistent indexer, and mirror the transitions in `applyVNextEvent`. Keep `CampaignRefundsOpened`, `MilestonePaid` and existing evidence events for their established financial/evidence consumers.
 
-- [ ] **Step 4: Regenerate artifacts and run focused tests**
+- [x] **Step 4: Regenerate artifacts and run focused tests**
 
 Run:
 
@@ -122,7 +122,7 @@ npm run test -- --runInBand --testMatch '**/src/**/*.spec.ts' --testPathPatterns
 
 Expected: generated artifact checks and both projector suites pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add contracts/src/interfaces/IVNextEvents.sol contracts/src/campaigns/CampaignEscrowVNext.sol contracts/test/unit/VNext/MilestoneEvidence.t.sol contracts/test/unit/VNext/PayoutRefund.t.sol backend/src/database/schema/vnext.schema.ts backend/drizzle/fundtogether/0012_vnext_milestone_state.sql backend/src/indexer/vnext-indexer.service.ts backend/src/indexer/vnext-event-projector.ts backend/src/indexer/tests/vnext-indexer.service.spec.ts backend/src/indexer/tests/vnext-event-projector.spec.ts backend/src/blockchain/generated/vnext/CampaignEscrowVNext.json

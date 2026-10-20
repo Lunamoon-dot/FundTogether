@@ -2,9 +2,11 @@
 pragma solidity 0.8.24;
 
 import { Test } from "forge-std/Test.sol";
+import { Vm } from "forge-std/Vm.sol";
 import { MockUSDC } from "../../mocks/MockUSDC.sol";
 import { MockReviewFinality } from "../../mocks/MockReviewFinality.sol";
 import { CampaignEscrowVNext } from "../../../src/campaigns/CampaignEscrowVNext.sol";
+import { IVNextEvents } from "../../../src/interfaces/IVNextEvents.sol";
 import { VNextTypes } from "../../../src/campaigns/VNextTypes.sol";
 
 contract VNextPayoutRefundTest is Test {
@@ -65,6 +67,69 @@ contract VNextPayoutRefundTest is Test {
 
         assertEq(token.balanceOf(payout), 60e6);
         assertEq(uint8(escrow.milestoneState(campaignId, 0)), uint8(VNextTypes.MilestoneState.PAID));
+    }
+
+    function test_payoutEmitsCanonicalStateForPaidAndNextMilestone() public {
+        bytes32 reviewCaseId = _submitEvidence(0, keccak256("evidence-payout-state"));
+        review.setFinalOutcome(reviewCaseId, VNextTypes.ReviewOutcome.FINAL_PASS);
+        escrow.syncFinalRuling(campaignId, 0);
+        vm.warp(block.timestamp + 2 days);
+
+        vm.recordLogs();
+        escrow.payMilestone(campaignId, 0);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        bytes32 signature = keccak256(
+            "MilestoneStateChanged(uint256,uint256,uint256,bytes32,bytes32,uint8,uint8,uint256,uint256,uint256,bool)"
+        );
+        uint256 stateEvents;
+        bool sawPaid;
+        bool sawNext;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] != signature) continue;
+            stateEvents++;
+            if (uint256(logs[i].topics[2]) == 0) sawPaid = true;
+            if (uint256(logs[i].topics[2]) == 1) sawNext = true;
+        }
+        assertEq(stateEvents, 2);
+        assertTrue(sawPaid);
+        assertTrue(sawNext);
+    }
+
+    function test_createCampaignEmitsConfigurationForEveryMilestone() public {
+        uint256[] memory budgets = new uint256[](2);
+        budgets[0] = 30e6;
+        budgets[1] = 70e6;
+        bytes32[] memory criteria = new bytes32[](2);
+        criteria[0] = keccak256("configured-one");
+        criteria[1] = keccak256("configured-two");
+
+        vm.recordLogs();
+        vm.prank(creator);
+        uint256 configuredCampaignId = escrow.createCampaign(
+            payout,
+            100e6,
+            block.timestamp + 7 days,
+            budgets,
+            criteria,
+            keccak256("configured-publication")
+        );
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        bytes32 signature = keccak256(
+            "MilestoneConfigured(uint256,uint256,uint256,bytes32)"
+        );
+        uint256 configured;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] != signature) continue;
+            configured++;
+            assertEq(uint256(logs[i].topics[1]), configuredCampaignId);
+            uint256 milestoneId = uint256(logs[i].topics[2]);
+            (uint256 budget, bytes32 criteriaHash) = abi.decode(logs[i].data, (uint256, bytes32));
+            assertEq(budget, budgets[milestoneId]);
+            assertEq(criteriaHash, criteria[milestoneId]);
+        }
+        assertEq(configured, 2);
     }
 
     function test_CannotExpireInactiveFutureMilestone() public {
@@ -136,6 +201,33 @@ contract VNextPayoutRefundTest is Test {
         escrow.resolveChallenge(campaignId, 0);
 
         assertEq(uint8(escrow.campaignState(campaignId)), uint8(VNextTypes.CampaignState.REFUNDING));
+    }
+
+    function test_successfulChallengeResolutionEmitsCanonicalMilestoneState() public {
+        bytes32 reviewCaseId = _submitEvidence(0, keccak256("evidence-challenge-pass"));
+        review.setFinalOutcome(reviewCaseId, VNextTypes.ReviewOutcome.FINAL_PASS);
+        escrow.syncFinalRuling(campaignId, 0);
+
+        vm.prank(backer);
+        bytes32 challengeCaseId =
+            escrow.openChallenge(campaignId, 0, keccak256("challenge-pass-evidence"));
+        review.setFinalOutcome(challengeCaseId, VNextTypes.ReviewOutcome.FINAL_PASS);
+
+        vm.expectEmit(true, true, false, true, address(escrow));
+        emit IVNextEvents.MilestoneStateChanged(
+            campaignId,
+            0,
+            1,
+            keccak256("evidence-challenge-pass"),
+            reviewCaseId,
+            uint8(VNextTypes.ReviewOutcome.FINAL_PASS),
+            uint8(VNextTypes.MilestoneState.CHALLENGE_WINDOW),
+            0,
+            0,
+            block.timestamp,
+            false
+        );
+        escrow.resolveChallenge(campaignId, 0);
     }
 
     function test_EnforceRefundAllocationBeforeClaim() public {

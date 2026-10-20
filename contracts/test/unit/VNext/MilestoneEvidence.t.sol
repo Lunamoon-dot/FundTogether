@@ -5,6 +5,7 @@ import { Test } from "forge-std/Test.sol";
 import { MockUSDC } from "../../mocks/MockUSDC.sol";
 import { MockReviewFinality } from "../../mocks/MockReviewFinality.sol";
 import { CampaignEscrowVNext } from "../../../src/campaigns/CampaignEscrowVNext.sol";
+import { IVNextEvents } from "../../../src/interfaces/IVNextEvents.sol";
 import { VNextTypes } from "../../../src/campaigns/VNextTypes.sol";
 
 contract VNextMilestoneEvidenceTest is Test {
@@ -58,6 +59,89 @@ contract VNextMilestoneEvidenceTest is Test {
             uint8(escrow.milestoneState(campaignId, 0)),
             uint8(VNextTypes.MilestoneState.REVIEW_ENROLLMENT)
         );
+    }
+
+    function test_syncFinalRulingEmitsCanonicalMilestoneState() public {
+        bytes32 evidenceHash = keccak256("evidence-state-event");
+        bytes32 reviewCaseId = _submitEvidence(evidenceHash);
+        review.setFinalOutcome(reviewCaseId, VNextTypes.ReviewOutcome.FINAL_PASS);
+
+        vm.expectEmit(true, true, false, true, address(escrow));
+        emit IVNextEvents.MilestoneStateChanged(
+            campaignId,
+            0,
+            1,
+            evidenceHash,
+            reviewCaseId,
+            uint8(VNextTypes.ReviewOutcome.FINAL_PASS),
+            uint8(VNextTypes.MilestoneState.CHALLENGE_WINDOW),
+            0,
+            0,
+            block.timestamp + 2 days,
+            false
+        );
+        escrow.syncFinalRuling(campaignId, 0);
+    }
+
+    function test_retryAndAppealEmitCanonicalMilestoneState() public {
+        bytes32 evidenceHash = keccak256("evidence-retry-event");
+        bytes32 reviewCaseId = _submitEvidence(evidenceHash);
+        review.setReviewResult(reviewCaseId, 3);
+
+        vm.expectEmit(true, true, false, true, address(escrow));
+        emit IVNextEvents.MilestoneStateChanged(
+            campaignId,
+            0,
+            1,
+            evidenceHash,
+            reviewCaseId,
+            uint8(VNextTypes.ReviewOutcome.NONE),
+            uint8(VNextTypes.MilestoneState.RETRY_PENDING),
+            0,
+            0,
+            0,
+            false
+        );
+        escrow.syncFinalRuling(campaignId, 0);
+
+        bytes32 retryCaseId = keccak256(abi.encode(reviewCaseId, bytes32("RETRY"), uint256(2)));
+        vm.expectEmit(true, true, false, true, address(escrow));
+        emit IVNextEvents.MilestoneStateChanged(
+            campaignId,
+            0,
+            1,
+            evidenceHash,
+            retryCaseId,
+            uint8(VNextTypes.ReviewOutcome.NONE),
+            uint8(VNextTypes.MilestoneState.REVIEW_ENROLLMENT),
+            0,
+            0,
+            0,
+            false
+        );
+        assertEq(escrow.retryMilestoneReview(campaignId, 0), retryCaseId);
+    }
+
+    function test_appealEmitsCanonicalMilestoneState() public {
+        bytes32 evidenceHash = keccak256("evidence-appeal-event");
+        bytes32 reviewCaseId = _submitEvidence(evidenceHash);
+        bytes32 appealCaseId = keccak256(abi.encode(reviewCaseId, address(this), uint256(2)));
+
+        vm.expectEmit(true, true, false, true, address(escrow));
+        emit IVNextEvents.MilestoneStateChanged(
+            campaignId,
+            0,
+            1,
+            evidenceHash,
+            appealCaseId,
+            uint8(VNextTypes.ReviewOutcome.NONE),
+            uint8(VNextTypes.MilestoneState.APPEAL_WINDOW),
+            0,
+            0,
+            0,
+            false
+        );
+        assertEq(escrow.openAppeal(campaignId, 0), appealCaseId);
     }
 
     function test_activeRevisionCannotBeReplacedBeforeResolution() public {
@@ -129,5 +213,10 @@ contract VNextMilestoneEvidenceTest is Test {
         escrow.expireMilestoneSubmission(campaignId, 0);
 
         assertEq(uint8(escrow.campaignState(campaignId)), uint8(VNextTypes.CampaignState.REFUNDING));
+    }
+
+    function _submitEvidence(bytes32 evidenceHash) private returns (bytes32 reviewCaseId) {
+        vm.prank(creator);
+        reviewCaseId = escrow.submitMilestoneEvidence(campaignId, 0, evidenceHash);
     }
 }

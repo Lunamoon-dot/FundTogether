@@ -50,6 +50,75 @@ describe("VNext event projector", () => {
     expect(state.reviews.get(caseId)?.campaignId).toBe("7");
   });
 
+  it("projects milestone configuration and canonical state transitions", () => {
+    const state = createVNextProjectionState();
+    const campaignId = 7n;
+    const evidenceHash = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const reviewCaseId = "0x1111111111111111111111111111111111111111111111111111111111111111";
+
+    applyVNextEvent(state, event("CampaignCreated", {
+      campaignId,
+      creator: "0x0000000000000000000000000000000000000001",
+      payoutWallet: "0x0000000000000000000000000000000000000002",
+      commitmentHash: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      goal: 100000000n,
+      fundingDeadline: 1000n,
+      publicationEvidenceHash: evidenceHash,
+      publicationReviewCaseId: reviewCaseId,
+      policyVersion: 1n,
+    }));
+    expect(applyVNextEvent(state, event("MilestoneConfigured", {
+      campaignId,
+      milestoneId: 0n,
+      budget: 100000000n,
+      acceptanceCriteriaHash: "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    }, 1))).toBe(true);
+    expect(applyVNextEvent(state, event("MilestoneStateChanged", {
+      campaignId,
+      milestoneId: 0n,
+      evidenceRevision: 1n,
+      evidenceHash,
+      reviewCaseId,
+      finalOutcome: 1,
+      state: 9,
+      submissionDeadline: 0n,
+      correctionDeadline: 0n,
+      challengeDeadline: 99n,
+      paid: false,
+    }, 2))).toBe(true);
+
+    expect(state.milestones.get("7:0")).toMatchObject({
+      campaignId: "7",
+      milestoneId: "0",
+      budget: "100000000",
+      acceptanceCriteriaHash: "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      evidenceRevision: "1",
+      evidenceHash,
+      reviewCaseId,
+      finalOutcome: 1,
+      state: 9,
+      submissionDeadline: "0",
+      correctionDeadline: "0",
+      challengeDeadline: "99",
+      paid: false,
+    });
+
+    applyVNextEvent(state, event("MilestoneStateChanged", {
+      campaignId,
+      milestoneId: 1n,
+      evidenceRevision: 0n,
+      evidenceHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
+      reviewCaseId: "0x0000000000000000000000000000000000000000000000000000000000000000",
+      finalOutcome: 0,
+      state: 0,
+      submissionDeadline: 0n,
+      correctionDeadline: 0n,
+      challengeDeadline: 0n,
+      paid: false,
+    }, 3));
+    expect(state.milestones.get("7:1")?.reviewCaseId).toBeUndefined();
+  });
+
   it("is idempotent for the same transaction log identity", () => {
     const state = createVNextProjectionState();
     const input = event("CampaignCreated", {

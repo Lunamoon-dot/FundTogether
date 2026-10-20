@@ -51,6 +51,11 @@ function textArg(args: Record<string, unknown>, key: string): string {
   return typeof value === "bigint" ? value.toString() : String(value ?? "");
 }
 
+function nullableHashArg(args: Record<string, unknown>, key: string): string | null {
+  const value = textArg(args, key).toLowerCase();
+  return /^0x0{64}$/.test(value) ? null : value;
+}
+
 function boolArg(args: Record<string, unknown>, key: string): boolean {
   return Boolean(arg(args, key));
 }
@@ -302,6 +307,57 @@ export class VNextIndexerService implements OnModuleInit, OnModuleDestroy {
       await tx.update(vnextCampaignProjections).set({
         state: boolArg(args, "successful") ? 2 : 5, raised: textArg(args, "raised"), lastBlockNumber: blockNumber.toString(), lastEventName: eventName, updatedAt: new Date(),
       }).where(and(eq(vnextCampaignProjections.streamId, streamId), eq(vnextCampaignProjections.onchainCampaignId, textArg(args, "campaignId"))));
+    } else if (eventName === "MilestoneConfigured") {
+      await tx.insert(vnextMilestoneProjections).values({
+        streamId,
+        onchainCampaignId: textArg(args, "campaignId"),
+        milestoneId: Number(textArg(args, "milestoneId")),
+        budget: textArg(args, "budget"),
+        acceptanceCriteriaHash: textArg(args, "acceptanceCriteriaHash").toLowerCase(),
+        evidenceRevision: "0",
+        state: 0,
+        paid: false,
+        lastBlockNumber: blockNumber.toString(),
+      }).onConflictDoUpdate({
+        target: [vnextMilestoneProjections.streamId, vnextMilestoneProjections.onchainCampaignId, vnextMilestoneProjections.milestoneId],
+        set: {
+          budget: textArg(args, "budget"),
+          acceptanceCriteriaHash: textArg(args, "acceptanceCriteriaHash").toLowerCase(),
+          lastBlockNumber: blockNumber.toString(),
+          updatedAt: new Date(),
+        },
+      });
+    } else if (eventName === "MilestoneStateChanged") {
+      await tx.insert(vnextMilestoneProjections).values({
+        streamId,
+        onchainCampaignId: textArg(args, "campaignId"),
+        milestoneId: Number(textArg(args, "milestoneId")),
+        evidenceRevision: textArg(args, "evidenceRevision"),
+        evidenceHash: nullableHashArg(args, "evidenceHash"),
+        reviewCaseId: nullableHashArg(args, "reviewCaseId"),
+        finalOutcome: Number(textArg(args, "finalOutcome")),
+        submissionDeadline: textArg(args, "submissionDeadline"),
+        correctionDeadline: textArg(args, "correctionDeadline"),
+        challengeDeadline: textArg(args, "challengeDeadline"),
+        state: Number(textArg(args, "state")),
+        paid: boolArg(args, "paid"),
+        lastBlockNumber: blockNumber.toString(),
+      }).onConflictDoUpdate({
+        target: [vnextMilestoneProjections.streamId, vnextMilestoneProjections.onchainCampaignId, vnextMilestoneProjections.milestoneId],
+        set: {
+          evidenceRevision: textArg(args, "evidenceRevision"),
+          evidenceHash: nullableHashArg(args, "evidenceHash"),
+          reviewCaseId: nullableHashArg(args, "reviewCaseId"),
+          finalOutcome: Number(textArg(args, "finalOutcome")),
+          submissionDeadline: textArg(args, "submissionDeadline"),
+          correctionDeadline: textArg(args, "correctionDeadline"),
+          challengeDeadline: textArg(args, "challengeDeadline"),
+          state: Number(textArg(args, "state")),
+          paid: boolArg(args, "paid"),
+          lastBlockNumber: blockNumber.toString(),
+          updatedAt: new Date(),
+        },
+      });
     } else if (eventName === "CampaignRefundsOpened") {
       await tx.update(vnextCampaignProjections).set({
         state: 5, lastBlockNumber: blockNumber.toString(), lastEventName: eventName, updatedAt: new Date(),

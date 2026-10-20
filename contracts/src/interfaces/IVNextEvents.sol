@@ -23,6 +23,27 @@ interface IVNextEvents {
 
     event FundingFinalized(uint256 indexed campaignId, bool successful, uint256 raised);
 
+    event MilestoneConfigured(
+        uint256 indexed campaignId,
+        uint256 indexed milestoneId,
+        uint256 budget,
+        bytes32 acceptanceCriteriaHash
+    );
+
+    event MilestoneStateChanged(
+        uint256 indexed campaignId,
+        uint256 indexed milestoneId,
+        uint256 evidenceRevision,
+        bytes32 evidenceHash,
+        bytes32 reviewCaseId,
+        uint8 finalOutcome,
+        uint8 state,
+        uint256 submissionDeadline,
+        uint256 correctionDeadline,
+        uint256 challengeDeadline,
+        bool paid
+    );
+
     event PublicationEvidenceSubmitted(
         uint256 indexed campaignId, bytes32 evidenceHash, bytes32 reviewCaseId
     );

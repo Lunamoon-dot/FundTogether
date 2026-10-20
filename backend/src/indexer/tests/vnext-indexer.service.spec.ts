@@ -164,6 +164,62 @@ describe("VNextIndexerService", () => {
     expect(fake.state.campaigns).toHaveLength(1);
   });
 
+  it("test_PersistentMilestoneStateReplayProjectsCanonicalFields", async () => {
+    const fake = createFakeDb();
+    const service = serviceWith(fake);
+    await persist(service, "stream-1", log(0), "CampaignCreated", campaignCreated());
+
+    await persist(service, "stream-1", log(1), "MilestoneConfigured", {
+      campaignId: 7n,
+      milestoneId: 0n,
+      budget: 100000000n,
+      acceptanceCriteriaHash: hash("f"),
+    });
+    expect(await persist(service, "stream-1", log(2), "MilestoneStateChanged", {
+      campaignId: 7n,
+      milestoneId: 0n,
+      evidenceRevision: 1n,
+      evidenceHash: hash("d"),
+      reviewCaseId: hash("e"),
+      finalOutcome: 1,
+      state: 9,
+      submissionDeadline: 0n,
+      correctionDeadline: 0n,
+      challengeDeadline: 99n,
+      paid: false,
+    })).toBe(true);
+
+    await persist(service, "stream-1", log(3), "MilestoneStateChanged", {
+      campaignId: 7n,
+      milestoneId: 1n,
+      evidenceRevision: 0n,
+      evidenceHash: `0x${"0".repeat(64)}`,
+      reviewCaseId: `0x${"0".repeat(64)}`,
+      finalOutcome: 0,
+      state: 0,
+      submissionDeadline: 0n,
+      correctionDeadline: 0n,
+      challengeDeadline: 0n,
+      paid: false,
+    });
+
+    expect(fake.state.milestones).toHaveLength(2);
+    expect(fake.state.milestones[0]).toMatchObject({
+      budget: "100000000",
+      acceptanceCriteriaHash: hash("f"),
+      evidenceRevision: "1",
+      evidenceHash: hash("d"),
+      reviewCaseId: hash("e"),
+      finalOutcome: 1,
+      state: 9,
+      submissionDeadline: "0",
+      correctionDeadline: "0",
+      challengeDeadline: "99",
+      paid: false,
+    });
+    expect(fake.state.milestones[1].reviewCaseId).toBeNull();
+  });
+
   it("test_IndexedEnrollmentReplayIsIdempotent", async () => {
     const fake = createFakeDb();
     const service = serviceWith(fake);

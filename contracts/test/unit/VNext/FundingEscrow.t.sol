@@ -5,6 +5,7 @@ import { Test } from "forge-std/Test.sol";
 import { MockUSDC } from "../../mocks/MockUSDC.sol";
 import { MockReviewFinality } from "../../mocks/MockReviewFinality.sol";
 import { CampaignEscrowVNext } from "../../../src/campaigns/CampaignEscrowVNext.sol";
+import { IVNextEvents } from "../../../src/interfaces/IVNextEvents.sol";
 import { VNextTypes } from "../../../src/campaigns/VNextTypes.sol";
 
 contract VNextFundingEscrowTest is Test {
@@ -81,6 +82,29 @@ contract VNextFundingEscrowTest is Test {
         assertEq(uint8(escrow.campaignState(campaignId)), uint8(VNextTypes.CampaignState.REFUNDING));
         assertEq(uint8(escrow.milestoneState(campaignId, 0)), uint8(VNextTypes.MilestoneState.TERMINAL));
         assertEq(escrow.campaignRefundPool(campaignId), 100e6);
+    }
+
+    function test_timeoutEmitsCanonicalTerminalMilestoneState() public {
+        _fund(backerOne, 100e6);
+        escrow.finalizeFunding(campaignId);
+        uint256 deadline = escrow.milestoneSubmissionDeadline(campaignId, 0);
+        vm.warp(deadline + 1);
+
+        vm.expectEmit(true, true, false, true, address(escrow));
+        emit IVNextEvents.MilestoneStateChanged(
+            campaignId,
+            0,
+            0,
+            bytes32(0),
+            bytes32(0),
+            uint8(VNextTypes.ReviewOutcome.NONE),
+            uint8(VNextTypes.MilestoneState.TERMINAL),
+            deadline,
+            0,
+            0,
+            false
+        );
+        escrow.expireMilestoneSubmission(campaignId, 0);
     }
 
     function test_fundingFinalizationIsIdempotent() public {

@@ -28,10 +28,14 @@ export type VNextCampaignProjection = {
 export type VNextMilestoneProjection = {
   campaignId: string;
   milestoneId: string;
+  budget?: string;
+  acceptanceCriteriaHash?: string;
   evidenceRevision: string;
   evidenceHash?: string;
   reviewCaseId?: string;
   finalOutcome?: number;
+  submissionDeadline?: string;
+  correctionDeadline?: string;
   challengeDeadline?: string;
   state: number;
   paid: boolean;
@@ -91,6 +95,11 @@ function lower(value: string) {
   return value.toLowerCase();
 }
 
+function optionalHash(args: Record<string, unknown>, key: string): string | undefined {
+  const hash = lower(stringValue(args, key));
+  return /^0x0{64}$/.test(hash) ? undefined : hash;
+}
+
 function touch(blockNumber: bigint) {
   return blockNumber.toString();
 }
@@ -142,9 +151,45 @@ export function applyVNextEvent(state: VNextProjectionState, event: VNextEvent):
   } else if (event.eventName === "FundingFinalized" && campaign) {
     campaign.raised = stringValue(args, "raised");
     campaign.state = Boolean(value(args, "successful")) ? 2 : 5;
+  } else if (event.eventName === "MilestoneConfigured") {
+    const milestoneId = stringValue(args, "milestoneId");
+    const key = `${campaignId}:${milestoneId}`;
+    const existing = state.milestones.get(key);
+    state.milestones.set(key, {
+      ...existing,
+      campaignId,
+      milestoneId,
+      budget: stringValue(args, "budget"),
+      acceptanceCriteriaHash: lower(stringValue(args, "acceptanceCriteriaHash")),
+      evidenceRevision: existing?.evidenceRevision ?? "0",
+      state: existing?.state ?? 0,
+      paid: existing?.paid ?? false,
+      lastBlockNumber: block,
+    });
+  } else if (event.eventName === "MilestoneStateChanged") {
+    const milestoneId = stringValue(args, "milestoneId");
+    const key = `${campaignId}:${milestoneId}`;
+    const existing = state.milestones.get(key);
+    state.milestones.set(key, {
+      ...existing,
+      campaignId,
+      milestoneId,
+      evidenceRevision: stringValue(args, "evidenceRevision"),
+      evidenceHash: optionalHash(args, "evidenceHash"),
+      reviewCaseId: optionalHash(args, "reviewCaseId"),
+      finalOutcome: numberValue(args, "finalOutcome"),
+      submissionDeadline: stringValue(args, "submissionDeadline"),
+      correctionDeadline: stringValue(args, "correctionDeadline"),
+      challengeDeadline: stringValue(args, "challengeDeadline"),
+      state: numberValue(args, "state"),
+      paid: Boolean(value(args, "paid")),
+      lastBlockNumber: block,
+    });
   } else if (event.eventName === "MilestoneEvidenceSubmitted") {
     const key = `${campaignId}:${stringValue(args, "milestoneId")}`;
+    const existing = state.milestones.get(key);
     state.milestones.set(key, {
+      ...existing,
       campaignId,
       milestoneId: stringValue(args, "milestoneId"),
       evidenceRevision: stringValue(args, "evidenceRevision"),
@@ -161,6 +206,7 @@ export function applyVNextEvent(state: VNextProjectionState, event: VNextEvent):
       milestone.evidenceRevision = stringValue(args, "evidenceRevision");
       milestone.evidenceHash = lower(stringValue(args, "evidenceHash"));
       milestone.state = 2;
+      milestone.lastBlockNumber = block;
     }
   } else if (event.eventName === "MilestonePaid" && campaign) {
     const key = `${campaignId}:${stringValue(args, "milestoneId")}`;
