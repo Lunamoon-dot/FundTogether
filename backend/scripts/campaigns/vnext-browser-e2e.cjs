@@ -1,11 +1,13 @@
 // Local-only VNext browser acceptance. It uses Anvil's unlocked test wallets,
 // real SIWE, the real Nest API, the real Vite app and the real indexer.
 const assert = require('node:assert/strict');
+const { createHash } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { Client } = require('pg');
-const { createPublicClient, createWalletClient, defineChain, getAddress, http } = require('viem');
+const { PDFDocument } = require('pdf-lib');
+const { createPublicClient, createWalletClient, defineChain, encodeAbiParameters, getAddress, http, keccak256, toHex } = require('viem');
 const { SiweMessage } = require('siwe');
 const { loadPolicy, resolvePass } = require('./vnext-acceptance.cjs');
 
@@ -26,6 +28,8 @@ const rpcUrl = 'http://127.0.0.1:9548';
 const client = createPublicClient({ chain, transport: http(rpcUrl), pollingInterval: 100 });
 const wallet = account => createWalletClient({ account, chain, transport: http(rpcUrl) });
 const campaignArtifact = JSON.parse(fs.readFileSync(path.join(root, 'contracts/out/CampaignEscrowVNext.sol/CampaignEscrowVNext.json')));
+const registryArtifact = JSON.parse(fs.readFileSync(path.join(root, 'contracts/out/JuryRegistry.sol/JuryRegistry.json')));
+const reviewArtifact = JSON.parse(fs.readFileSync(path.join(root, 'contracts/out/JuryReview.sol/JuryReview.json')));
 const tokenArtifact = JSON.parse(fs.readFileSync(path.join(root, 'contracts/out/MockUSDC.sol/MockUSDC.json')));
 const databaseName = `fundtogether_vnext_browser_${process.pid}`;
 const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
@@ -34,6 +38,26 @@ let app;
 let db;
 let vite;
 let browser;
+
+async function sendDirect(account, request) {
+  const hash = await wallet(account).writeContract(request);
+  const receipt = await client.waitForTransactionReceipt({ hash, confirmations: 1 });
+  assert.equal(receipt.status, 'success', `VNext direct transaction reverted: ${request.functionName}`);
+  return receipt;
+}
+
+async function advanceChain(seconds) {
+  await client.request({ method: 'evm_increaseTime', params: [seconds] });
+  await client.request({ method: 'evm_mine' });
+}
+
+function voteCommitment({ campaignId, milestoneId, evidenceRevision, caseNumber, roundId, courtId, judge, vote, salt, protocolVersion }) {
+  return keccak256(encodeAbiParameters([
+    { type: 'uint256' }, { type: 'uint256' }, { type: 'uint256' }, { type: 'uint256' },
+    { type: 'uint256' }, { type: 'uint256' }, { type: 'uint256' }, { type: 'uint256' },
+    { type: 'address' }, { type: 'uint8' }, { type: 'bytes32' },
+  ], [31339n, protocolVersion, campaignId, milestoneId, evidenceRevision, caseNumber, roundId, courtId, judge, vote, salt]));
+}
 
 async function waitForCanonical(context, apiUrl, transactionHash) {
   for (let attempt = 0; attempt < 90; attempt++) {
@@ -59,6 +83,43 @@ async function waitForCampaignProjection(context, apiUrl, campaignId, expectedSt
   return undefined;
 }
 
+async function waitForMilestoneProjection(context, apiUrl, campaignId, predicate) {
+  for (let attempt = 0; attempt < 90; attempt++) {
+    const response = await context.request.get(`${apiUrl}/v1/fundtogether/vnext/campaigns/${campaignId}/milestones`);
+    if (response.ok()) {
+      const milestones = await response.json();
+      const milestone = milestones.find(item => String(item.milestoneId) === '0');
+      if (milestone && predicate(milestone)) return milestone;
+    }
+    await wait(1000);
+  }
+  return undefined;
+}
+
+async function waitForEvidence(context, apiUrl, reviewCaseId) {
+  for (let attempt = 0; attempt < 90; attempt++) {
+    const response = await context.request.get(`${apiUrl}/v1/fundtogether/vnext/reviews/${encodeURIComponent(reviewCaseId)}/evidence`);
+    if (response.ok()) {
+      const evidence = await response.json();
+      if (evidence.availabilityPolicy?.status === 'READY' && evidence.evidence?.some(item => item.availability === 'AVAILABLE')) return evidence;
+    }
+    await wait(1000);
+  }
+  return undefined;
+}
+
+async function waitForAssignments(context, apiUrl, reviewCaseId) {
+  for (let attempt = 0; attempt < 90; attempt++) {
+    const response = await context.request.get(`${apiUrl}/v1/fundtogether/vnext/reviews/${encodeURIComponent(reviewCaseId)}/assignments`);
+    if (response.ok()) {
+      const assignments = await response.json();
+      if (assignments.length === 3) return assignments;
+    }
+    await wait(1000);
+  }
+  return undefined;
+}
+
 async function waitForUiReceipt(page) {
   const receiptStatus = page.getByRole('status').filter({ hasText: /Receipt on-chain đã thành công|Indexer đã xác nhận canonical/ });
   try {
@@ -71,6 +132,14 @@ async function waitForUiReceipt(page) {
   const transactionHash = transactionText.match(/0x[0-9a-fA-F]{64}/)?.[0];
   assert.ok(transactionHash, `missing transaction hash in UI status: ${transactionText}`);
   return { transactionHash, transactionText };
+}
+
+async function waitForEnabled(locator, page, label) {
+  for (let attempt = 0; attempt < 30; attempt++) {
+    if (await locator.isEnabled().catch(() => false)) return;
+    await wait(1000);
+  }
+  throw new Error(`VNext browser ${label} stayed disabled:\n${await page.locator('body').innerText()}`);
 }
 
 async function waitForCampaignPageState(page, campaignUrl, expectedState) {
@@ -96,6 +165,49 @@ async function connectWallet(page) {
     if (!(await linkedHeading.isVisible().catch(() => false))) throw error;
   }
   await linkedHeading.waitFor();
+}
+
+async function connectWalletOnCampaignPage(page, campaignUrl, expectedState) {
+  await waitForCampaignPageState(page, campaignUrl, expectedState);
+  await connectWallet(page);
+  await page.goto(campaignUrl);
+  await page.getByText(expectedState, { exact: true }).waitFor();
+}
+
+async function prepareThreeJudgeCourt({ accounts, manifest, campaignId, milestoneId, evidenceRevision, reviewCaseId }) {
+  const policy = loadPolicy();
+  const requiredStake = await client.readContract({ address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'requiredCaseStake', args: [reviewCaseId] });
+  for (const judge of accounts.slice(3, 6)) {
+    await sendDirect(judge, { address: manifest.juryRegistry, abi: registryArtifact.abi, functionName: 'reserveCaseStake', args: [reviewCaseId, requiredStake] });
+    await sendDirect(judge, { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'enroll', args: [reviewCaseId] });
+  }
+  await advanceChain(policy.judgeEnrollmentWindowSeconds + 1);
+  await sendDirect(accounts[0], { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'finalizeSnapshot', args: [reviewCaseId] });
+  await sendDirect(accounts[0], { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'assignCourt', args: [reviewCaseId, 0n] });
+  const caseNumber = await client.readContract({ address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'caseNumber', args: [reviewCaseId] });
+  const roundId = await client.readContract({ address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'reviewRound', args: [reviewCaseId] });
+  const protocolVersion = await client.readContract({ address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'protocolVersion' });
+  const courtJudges = [];
+  for (let slot = 0; slot < 3; slot++) {
+    courtJudges.push((await client.readContract({ address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'courtJudge', args: [reviewCaseId, 0n, BigInt(slot)] })).toLowerCase());
+  }
+  assert.equal(new Set(courtJudges).size, 3, 'browser milestone court must have three unique Judges');
+  assert.ok(courtJudges.every(judge => accounts.slice(3, 6).includes(judge)), 'browser milestone court must use the enrolled Judges');
+  return { policy, requiredStake, caseNumber, roundId, protocolVersion, courtJudges };
+}
+
+async function openJudgePage({ browser, account, apiUrl, reviewCaseId }) {
+  const context = await browser.newContext({ viewport: { width: 1365, height: 900 } });
+  await context.addInitScript(providerScript(getAddress(account)), { account: getAddress(account), rpcUrl });
+  await login(context, apiUrl, getAddress(account));
+  const page = await context.newPage();
+  page.setDefaultTimeout(30_000);
+  await connectWallet(page);
+  await page.goto(`${webOrigin}/#/campaigns/vnext/judge`);
+  await page.getByRole('heading', { name: 'Judge workspace' }).waitFor();
+  const caseCard = page.locator(`article[data-vnext-judge-case="${reviewCaseId}"]`);
+  await caseCard.getByRole('heading', { name: `Case ${reviewCaseId}` }).waitFor();
+  return { context, page, caseCard };
 }
 
 function providerScript(account) {
@@ -180,6 +292,13 @@ async function main() {
   const mintHash = await wallet(accounts[0]).writeContract({ address: manifest.tokenAddress, abi: tokenArtifact.abi, functionName: 'mint', args: [backer, 200000000n] });
   const mintReceipt = await client.waitForTransactionReceipt({ hash: mintHash, confirmations: 1 });
   assert.equal(mintReceipt.status, 'success', 'VNext browser local Backer token mint failed');
+  for (const judge of accounts.slice(3, 6)) {
+    const judgeMintHash = await wallet(accounts[0]).writeContract({ address: manifest.tokenAddress, abi: tokenArtifact.abi, functionName: 'mint', args: [judge, 200000000n] });
+    const judgeMintReceipt = await client.waitForTransactionReceipt({ hash: judgeMintHash, confirmations: 1 });
+    assert.equal(judgeMintReceipt.status, 'success', `VNext browser local Judge token mint failed for ${judge}`);
+    await sendDirect(judge, { address: manifest.tokenAddress, abi: tokenArtifact.abi, functionName: 'approve', args: [manifest.juryRegistry, 200000000n] });
+    await sendDirect(judge, { address: manifest.juryRegistry, abi: registryArtifact.abi, functionName: 'depositStake', args: [100000000n] });
+  }
 
   const database = new URL(env.DATABASE_URL);
   const adminDatabase = new Client({ connectionString: database.toString() });
@@ -280,10 +399,7 @@ async function main() {
   await login(backerContext, apiUrl, backer);
   const backerPage = await backerContext.newPage();
   backerPage.setDefaultTimeout(30_000);
-  await waitForCampaignPageState(backerPage, campaignUrl, 'FUNDING');
-  await connectWallet(backerPage);
-  await backerPage.goto(campaignUrl);
-  await backerPage.getByText('FUNDING', { exact: true }).waitFor();
+  await connectWalletOnCampaignPage(backerPage, campaignUrl, 'FUNDING');
   await backerPage.getByLabel(/Góp vốn/).fill('100000000');
   await backerPage.getByRole('button', { name: 'Approve MockUSDC', exact: true }).click();
   await waitForUiReceipt(backerPage);
@@ -295,8 +411,7 @@ async function main() {
 
   await client.request({ method: 'evm_increaseTime', params: [7 * 24 * 60 * 60 + 1] });
   await client.request({ method: 'evm_mine' });
-  await connectWallet(backerPage);
-  await waitForCampaignPageState(backerPage, campaignUrl, 'FUNDING');
+  await connectWalletOnCampaignPage(backerPage, campaignUrl, 'FUNDING');
   await backerPage.getByRole('button', { name: 'Chốt funding sau deadline', exact: true }).click();
   const fundingTransaction = await waitForUiReceipt(backerPage);
   assert.equal((await waitForCanonical(backerContext, apiUrl, fundingTransaction.transactionHash))?.state, 'ON_CHAIN_CONFIRMED', 'VNext indexer did not confirm funding finalization');
@@ -304,7 +419,151 @@ async function main() {
   assert.equal(Number(await client.readContract({ address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'campaignState', args: [BigInt(campaignId)] })), 3);
   await waitForCampaignPageState(backerPage, campaignUrl, 'MILESTONES_RUNNING');
 
-  console.log(JSON.stringify({ status: 'PASS', protocolKind: manifest.protocolKind, chainId: manifest.chainId, campaignId, backerContribution: '100000000', finalState: 'MILESTONES_RUNNING' }, null, 2));
+  const evidenceDocument = await PDFDocument.create();
+  const evidencePage = evidenceDocument.addPage([300, 180]);
+  evidencePage.drawText('FundTogether VNext milestone evidence');
+  const evidenceBuffer = Buffer.from(await evidenceDocument.save());
+  const milestoneEvidenceHash = `0x${createHash('sha256').update(evidenceBuffer).digest('hex')}`;
+  await waitForCampaignPageState(page, campaignUrl, 'MILESTONES_RUNNING');
+  await connectWallet(page);
+  await page.goto(campaignUrl);
+  const evidenceHashInput = page.getByLabel('Evidence hash cho milestone 0');
+  try {
+    await evidenceHashInput.waitFor({ state: 'visible', timeout: 5_000 });
+  } catch (error) {
+    const milestoneDebug = await context.request.get(`${apiUrl}/v1/fundtogether/vnext/campaigns/${campaignId}/milestones`);
+    console.error(`VNext browser milestone action missing. API=${await milestoneDebug.text()}\nUI=${await page.locator('body').innerText()}`);
+    throw error;
+  }
+  await evidenceHashInput.fill(milestoneEvidenceHash);
+  await page.getByRole('button', { name: 'Submit evidence revision', exact: true }).click();
+  const milestoneEvidenceTransaction = await waitForUiReceipt(page);
+  assert.equal((await waitForCanonical(context, apiUrl, milestoneEvidenceTransaction.transactionHash))?.state, 'ON_CHAIN_CONFIRMED', 'VNext indexer did not confirm milestone evidence submission');
+  const milestoneProjection = await waitForMilestoneProjection(context, apiUrl, campaignId, item => item.reviewCaseId && Number(item.state) === 2);
+  assert.ok(milestoneProjection?.reviewCaseId, 'VNext indexer did not project the milestone review case');
+  const milestoneCaseId = milestoneProjection.reviewCaseId;
+  const evidencePanel = page.locator(`section[data-vnext-evidence-case="${milestoneCaseId}"]`);
+  await evidencePanel.getByLabel('Evidence summary').fill('Browser acceptance milestone evidence');
+  await evidencePanel.locator('input[type="file"]').setInputFiles({ name: 'milestone.pdf', mimeType: 'application/pdf', buffer: evidenceBuffer });
+  await evidencePanel.getByRole('button', { name: 'Upload private evidence', exact: true }).click();
+  const evidenceStatus = await waitForEvidence(context, apiUrl, milestoneCaseId);
+  if (!evidenceStatus) {
+    const evidenceDebug = await context.request.get(`${apiUrl}/v1/fundtogether/vnext/reviews/${encodeURIComponent(milestoneCaseId)}/evidence`);
+    console.error(`VNext evidence did not become READY: ${await evidenceDebug.text()}\nUI=${await page.locator('body').innerText()}`);
+  }
+  assert.equal(evidenceStatus?.availabilityPolicy?.status, 'READY', 'VNext evidence did not become READY');
+
+  const court = await prepareThreeJudgeCourt({ accounts, manifest, reviewCaseId: milestoneCaseId });
+  const assignments = await waitForAssignments(context, apiUrl, milestoneCaseId);
+  assert.equal(assignments?.length, 3, 'VNext browser milestone assignments were not indexed');
+  const judgePages = [];
+  for (const judge of court.courtJudges) {
+    const opened = await openJudgePage({ browser, account: judge, apiUrl, reviewCaseId: milestoneCaseId });
+    const salt = `0x${createHash('sha256').update(`browser-milestone:${campaignId}:${judge}`).digest('hex')}`;
+    await opened.caseCard.getByLabel('Salt bytes32').fill(salt);
+    const commitButton = opened.caseCard.getByRole('button', { name: 'Commit vote', exact: true });
+    try {
+      await waitForEnabled(commitButton, opened.page, `Judge commit for ${judge}`);
+    } catch (error) {
+      const judgeEvidenceDebug = await opened.context.request.get(`${apiUrl}/v1/fundtogether/vnext/reviews/${encodeURIComponent(milestoneCaseId)}/evidence`);
+      console.error(`Judge evidence debug for ${judge}: ${await judgeEvidenceDebug.text()}`);
+      throw error;
+    }
+    await commitButton.click();
+    const commitTransaction = await waitForUiReceipt(opened.page);
+    assert.equal((await waitForCanonical(opened.context, apiUrl, commitTransaction.transactionHash))?.state, 'ON_CHAIN_CONFIRMED', `VNext Judge commit was not canonical for ${judge}`);
+    judgePages.push({ ...opened, judge, salt });
+  }
+
+  await advanceChain(court.policy.commitWindowSeconds + 1);
+  for (const judgePage of judgePages) {
+    await judgePage.page.reload();
+    await connectWallet(judgePage.page);
+    await judgePage.page.goto(`${webOrigin}/#/campaigns/vnext/judge`);
+    await judgePage.caseCard.getByRole('heading', { name: `Case ${milestoneCaseId}` }).waitFor();
+    await judgePage.caseCard.getByLabel('Salt bytes32').fill(judgePage.salt);
+    const revealButton = judgePage.caseCard.getByRole('button', { name: 'Reveal vote', exact: true });
+    await waitForEnabled(revealButton, judgePage.page, `Judge reveal for ${judgePage.judge}`);
+    await revealButton.click();
+    const revealTransaction = await waitForUiReceipt(judgePage.page);
+    assert.equal((await waitForCanonical(judgePage.context, apiUrl, revealTransaction.transactionHash))?.state, 'ON_CHAIN_CONFIRMED', `VNext Judge reveal was not canonical for ${judgePage.judge}`);
+  }
+
+  await advanceChain(court.policy.revealWindowSeconds + 1);
+  const finalizingJudge = judgePages[0];
+  await finalizingJudge.page.reload();
+  await connectWallet(finalizingJudge.page);
+  await finalizingJudge.page.goto(`${webOrigin}/#/campaigns/vnext/judge`);
+  await finalizingJudge.caseCard.getByRole('heading', { name: `Case ${milestoneCaseId}` }).waitFor();
+  await finalizingJudge.caseCard.getByRole('button', { name: 'Finalize court', exact: true }).click();
+  const finalCourtTransaction = await waitForUiReceipt(finalizingJudge.page);
+  assert.equal((await waitForCanonical(finalizingJudge.context, apiUrl, finalCourtTransaction.transactionHash))?.state, 'ON_CHAIN_CONFIRMED', 'VNext Judge court finalization was not canonical');
+
+  await advanceChain(court.policy.appealWindowSeconds + 1);
+  await sendDirect(accounts[0], { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'finalizeNoAppeal', args: [milestoneCaseId] });
+  for (let attempt = 0; attempt < 64; attempt++) {
+    if (await client.readContract({ address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'settlementComplete', args: [milestoneCaseId] })) break;
+    await sendDirect(accounts[0], { address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'settleFinalRuling', args: [milestoneCaseId, 32n] });
+  }
+  assert.equal(await client.readContract({ address: manifest.juryReview, abi: reviewArtifact.abi, functionName: 'settlementComplete', args: [milestoneCaseId] }), true, 'VNext milestone settlement did not complete');
+
+  await connectWalletOnCampaignPage(page, campaignUrl, 'MILESTONES_RUNNING');
+  await page.getByRole('button', { name: 'Sync final ruling', exact: true }).click();
+  const syncTransaction = await waitForUiReceipt(page);
+  assert.equal((await waitForCanonical(context, apiUrl, syncTransaction.transactionHash))?.state, 'ON_CHAIN_CONFIRMED', 'VNext milestone final ruling sync was not canonical');
+  assert.equal(Number((await waitForMilestoneProjection(context, apiUrl, campaignId, item => Number(item.state) === 9))?.state), 9, 'VNext indexer did not project the challenge window');
+
+  await advanceChain(court.policy.challengeWindowSeconds + 1);
+  await connectWalletOnCampaignPage(page, campaignUrl, 'MILESTONES_RUNNING');
+  await page.getByRole('button', { name: 'Payout milestone 0', exact: true }).click();
+  const payoutTransaction = await waitForUiReceipt(page);
+  assert.equal((await waitForCanonical(context, apiUrl, payoutTransaction.transactionHash))?.state, 'ON_CHAIN_CONFIRMED', 'VNext payout was not canonical');
+  assert.equal(await client.readContract({ address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'campaignPaidOut', args: [BigInt(campaignId)] }), 100000000n);
+  assert.equal(Number(await client.readContract({ address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'campaignState', args: [BigInt(campaignId)] })), 4);
+  assert.equal(Number((await waitForCampaignProjection(context, apiUrl, campaignId, 4))?.state), 4, 'VNext indexer did not project COMPLETED after payout');
+
+  await connectWallet(page);
+  await page.goto(`${webOrigin}/#/campaigns/vnext`);
+  await page.getByRole('heading', { name: 'Tạo Campaign VNext' }).waitFor();
+  await page.getByLabel('Payout wallet').fill(creator);
+  await page.getByLabel(/Funding goal/).fill('100000000');
+  await page.getByLabel(/Milestone acceptance criteria hash/).fill(`0x${'3'.repeat(64)}`);
+  await page.getByLabel(/Publication evidence hash/).fill(`0x${'4'.repeat(64)}`);
+  await page.getByRole('button', { name: 'Tạo campaign và mở Judge case' }).click();
+  const refundCreateTransaction = await waitForUiReceipt(page);
+  assert.equal((await waitForCanonical(context, apiUrl, refundCreateTransaction.transactionHash))?.state, 'ON_CHAIN_CONFIRMED', 'VNext refund campaign creation was not canonical');
+  const refundCampaignId = (BigInt(await client.readContract({ address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'campaignCount' })) - 1n).toString();
+  const refundPublicationCaseId = await client.readContract({ address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'publicationReviewCase', args: [BigInt(refundCampaignId)] });
+  await resolvePass({ client, wallets: judgeWallets, addresses: { deployer: accounts[0], judges: accounts.slice(3, 6) }, manifest, policy: loadPolicy(), campaignId: BigInt(refundCampaignId), milestoneId: 2n ** 256n - 1n, evidenceRevision: 1n, caseId: refundPublicationCaseId });
+  await sendDirect(accounts[0], { address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'finalizePublication', args: [BigInt(refundCampaignId)] });
+  assert.equal(Number((await waitForCampaignProjection(context, apiUrl, refundCampaignId, 1))?.state), 1, 'VNext refund campaign did not enter FUNDING');
+  const refundCampaignUrl = `${webOrigin}/#/campaigns/vnext/${refundCampaignId}`;
+  await connectWalletOnCampaignPage(backerPage, refundCampaignUrl, 'FUNDING');
+  await backerPage.getByLabel(/Góp vốn/).fill('50000000');
+  await backerPage.getByRole('button', { name: 'Approve MockUSDC', exact: true }).click();
+  await waitForUiReceipt(backerPage);
+  await backerPage.getByRole('button', { name: 'Góp vốn', exact: true }).click();
+  const refundContributionTransaction = await waitForUiReceipt(backerPage);
+  assert.equal((await waitForCanonical(backerContext, apiUrl, refundContributionTransaction.transactionHash))?.state, 'ON_CHAIN_CONFIRMED', 'VNext refund contribution was not canonical');
+  await advanceChain(7 * 24 * 60 * 60 + 1);
+  await connectWalletOnCampaignPage(backerPage, refundCampaignUrl, 'FUNDING');
+  await backerPage.getByRole('button', { name: 'Chốt funding sau deadline', exact: true }).click();
+  const refundOpenTransaction = await waitForUiReceipt(backerPage);
+  assert.equal((await waitForCanonical(backerContext, apiUrl, refundOpenTransaction.transactionHash))?.state, 'ON_CHAIN_CONFIRMED', 'VNext refund opening was not canonical');
+  assert.equal(Number((await waitForCampaignProjection(backerContext, apiUrl, refundCampaignId, 5))?.state), 5, 'VNext indexer did not project REFUNDING');
+  const balanceBeforeRefund = await client.readContract({ address: manifest.tokenAddress, abi: tokenArtifact.abi, functionName: 'balanceOf', args: [backer] });
+  await connectWalletOnCampaignPage(backerPage, refundCampaignUrl, 'REFUNDING');
+  await backerPage.getByRole('button', { name: 'Chuẩn bị entitlement refund', exact: true }).click();
+  const freezeTransaction = await waitForUiReceipt(backerPage);
+  assert.equal((await waitForCanonical(backerContext, apiUrl, freezeTransaction.transactionHash))?.state, 'ON_CHAIN_CONFIRMED', 'VNext refund allocation freeze was not canonical');
+  assert.equal(await client.readContract({ address: manifest.campaignEscrow, abi: campaignArtifact.abi, functionName: 'refundAllocationsFrozen', args: [BigInt(refundCampaignId)] }), true);
+  await connectWalletOnCampaignPage(backerPage, refundCampaignUrl, 'REFUNDING');
+  await backerPage.getByRole('button', { name: 'Claim refund', exact: true }).click();
+  const claimTransaction = await waitForUiReceipt(backerPage);
+  assert.equal((await waitForCanonical(backerContext, apiUrl, claimTransaction.transactionHash))?.state, 'ON_CHAIN_CONFIRMED', 'VNext refund claim was not canonical');
+  assert.equal(await client.readContract({ address: manifest.tokenAddress, abi: tokenArtifact.abi, functionName: 'balanceOf', args: [backer] }), balanceBeforeRefund + 50000000n);
+
+  console.log(JSON.stringify({ status: 'PASS', protocolKind: manifest.protocolKind, chainId: manifest.chainId, campaignId, backerContribution: '100000000', finalState: 'COMPLETED', payout: '100000000', refundCampaignId, refundContribution: '50000000', refundClaimed: '50000000' }, null, 2));
 } 
 
 async function cleanup() {

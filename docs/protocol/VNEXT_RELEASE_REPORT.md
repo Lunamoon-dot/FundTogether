@@ -1,6 +1,6 @@
 # FundTogether VNext — Local Release Report
 
-**Date:** 2026-10-20  
+**Date:** 2026-10-21
 **Decision:** local research prototype verified for the listed evidence slices;
 not a public-chain release, real-money release, or claim of trustless truth.
 
@@ -23,10 +23,10 @@ real-money custody are outside this decision.
 | --- | --- | --- |
 | Solidity build/tests | 136 passed, 0 failed, 0 skipped | Docker Foundry; historical contracts are included for regression visibility |
 | Stateful invariants | Campaign and Jury handlers pass 256 runs × 128,000 calls; conservation fuzz and recorded-seed state-machine fuzz pass | Local MockUSDC assumptions; not a production gas proof |
-| Backend | 11 focused suites / 38 tests passed; build passed | VNext-focused Jest selection, not a claim that every historical suite is green |
+| Backend | 9 focused VNext suites / 34 tests passed; build passed | VNext-focused Jest selection, not a claim that every historical suite is green |
 | Frontend | 207 tests passed; production build passed | Existing large-bundle warning remains |
 | Direct runtime | Fresh Anvil + isolated PostgreSQL scenario passed; payout/refund/no-quorum/tie/appeal/correction/replay paths exercised; contract balance ended at zero | One local chain and temporary database |
-| Browser runtime | SIWE + EIP-6963 wallet link, Creator campaign creation, direct Judge publication resolve/materialization, Backer allowance/contribution, chain-time deadline finalization and contract/indexer `MILESTONES_RUNNING` projection passed twice (campaigns 22 and 23) | Publication materialization is a direct permissionless contract call in this runner; Judge UI commit/reveal, evidence, payout and refund browser journeys remain open |
+| Browser runtime | SIWE + EIP-6963 wallet link, Creator campaign creation, direct Judge publication resolve/materialization, Backer funding, private evidence upload, Judge UI commit/reveal, settlement, exact payout, underfunded refund allocation freeze and refund claim passed twice from clean Anvil genesis | Publication materialization is a direct permissionless contract call in this runner; this is local browser acceptance, not production service-topology or human-wallet acceptance |
 
 The browser run also caught and fixed a projection defect: the contract moves a
 successful `FundingFinalized` campaign directly to `MILESTONES_RUNNING (3)`,
@@ -38,10 +38,9 @@ canonical event to state `3`.
 
 The following prevent a broader release decision:
 
-1. The browser funding slice is accepted, but Judge UI commit/reveal, evidence,
-   payout and refund journeys have not been accepted as one end-to-end browser
-   scenario. Publication materialization is currently exercised by a direct
-   permissionless contract call in the runner.
+1. Publication resolution/materialization is exercised by a direct
+   permissionless contract call in the browser runner; the Creator publication
+   UI is not claimed as part of this vertical browser fixture.
 2. Non-reveal penalty and service-fee/reviewer-budget economics remain frozen
    or unapproved; the local policy uses non-reveal penalty `0`.
 3. The configured local batch limit is measured, but production sizing for the

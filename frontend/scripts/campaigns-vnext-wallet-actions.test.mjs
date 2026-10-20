@@ -79,6 +79,8 @@ test('VNext campaign projection exposes permissionless Creator and Backer action
   assert.match(panel, /openAppeal/)
   assert.match(panel, /finalizeNoAppeal/)
   assert.match(panel, /finalizeProtocolFailure/)
+  assert.match(panel, /MILESTONE_CHALLENGE_WINDOW = 9/)
+  assert.match(panel, /milestone\.state === MILESTONE_CHALLENGE_WINDOW/)
   assert.doesNotMatch(panel, /approveCampaign/)
 })
 
@@ -113,6 +115,14 @@ test('VNext Judge workspace exposes stake and assigned commit-reveal actions', (
   assert.match(page, /VNextEvidencePanel/)
   assert.match(page, /vnextJudgeLedger/)
   assert.match(page, /judge-ledger/)
+  const judgeClockStart = page.indexOf('const judgeClock')
+  const judgeClockEnd = page.indexOf('const creatorConflict', judgeClockStart)
+  const judgeClock = page.slice(judgeClockStart, judgeClockEnd)
+  assert.match(judgeClock, /getBlock\(\{ blockTag: 'latest' \}\)/)
+  assert.match(judgeClock, /judgeChainTimestamp/)
+  assert.doesNotMatch(judgeClock, /Math\.floor\(Date\.now\(\) \/ 1000\)/)
+  assert.doesNotMatch(page, /functionName: 'snapshotFinalized'/)
+  assert.match(page, /snapshotFinalized: Number\(roundStatus\) >= ROUND_ASSIGNMENT_PENDING/)
   assert.doesNotMatch(page, /approveCampaign/)
 })
 

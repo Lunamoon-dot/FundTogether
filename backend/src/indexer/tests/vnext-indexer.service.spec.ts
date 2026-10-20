@@ -160,8 +160,8 @@ function createFakeDb() {
   return { db, state };
 }
 
-function serviceWith(fakeDb: ReturnType<typeof createFakeDb>) {
-  return new VNextIndexerService(fakeDb.db as any, null);
+function serviceWith(fakeDb: ReturnType<typeof createFakeDb>, connection: any = null) {
+  return new VNextIndexerService(fakeDb.db as any, connection);
 }
 
 async function persist(service: VNextIndexerService, streamId: string, item: ReturnType<typeof log>, eventName: string, args: Record<string, unknown>) {
@@ -169,6 +169,34 @@ async function persist(service: VNextIndexerService, streamId: string, item: Ret
 }
 
 describe("VNextIndexerService", () => {
+  it("test_CampaignCreatedMaterializesPendingMilestoneReadModels", async () => {
+    const fake = createFakeDb();
+    const milestoneBudget = 100000000n;
+    const acceptanceCriteriaHash = hash("f");
+    const service = serviceWith(fake, {
+      manifest: { campaignEscrow: hash("a") },
+      client: {
+        readContract: async ({ functionName, args }: any) => {
+          if (functionName === "milestoneBudget" && args[1] === 0n) return milestoneBudget;
+          if (functionName === "milestoneAcceptanceCriteria" && args[1] === 0n) return acceptanceCriteriaHash;
+          throw new Error("unknown milestone");
+        },
+      },
+    });
+
+    await persist(service, "stream-1", log(0), "CampaignCreated", campaignCreated());
+
+    expect(fake.state.milestones).toMatchObject([{
+      onchainCampaignId: "7",
+      milestoneId: 0,
+      budget: milestoneBudget.toString(),
+      acceptanceCriteriaHash,
+      evidenceRevision: "0",
+      state: 0,
+      paid: false,
+    }]);
+  });
+
   it("test_IndexedPayoutReplayIsIdempotent", async () => {
     const fake = createFakeDb();
     const service = serviceWith(fake);
@@ -216,10 +244,12 @@ describe("VNextIndexerService", () => {
     await persist(service, "stream-1", log(0), "CampaignCreated", campaignCreated());
 
     await persist(service, "stream-1", log(1), "CampaignRefundsOpened", { campaignId: 7n, refundPool: 100n, contributionSnapshot: 100n });
-    await persist(service, "stream-1", log(2), "BackerRefundClaimed", { campaignId: 7n, backer: campaignCreated().creator, amount: 100n });
+    await persist(service, "stream-1", log(2), "RefundAllocationsFrozen", { campaignId: 7n, contributorCount: 1n, refundSnapshot: 100n });
+    expect(await persist(service, "stream-1", log(2), "RefundAllocationsFrozen", { campaignId: 7n, contributorCount: 1n, refundSnapshot: 100n })).toBe(false);
+    await persist(service, "stream-1", log(3), "BackerRefundClaimed", { campaignId: 7n, backer: campaignCreated().creator, amount: 100n });
     const updates = fake.state.campaigns;
     expect(updates).toHaveLength(1);
-    expect(fake.state.events).toHaveLength(3);
+    expect(fake.state.events).toHaveLength(4);
   });
 
   it("test_PersistentCompletionEventUpdatesCampaignProjection", async () => {

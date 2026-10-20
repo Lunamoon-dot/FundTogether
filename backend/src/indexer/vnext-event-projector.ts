@@ -200,6 +200,9 @@ export function applyVNextEvent(state: VNextProjectionState, event: VNextEvent):
     campaign.refunded = (BigInt(campaign.refunded) + BigInt(stringValue(args, "amount"))).toString();
   } else if (event.eventName === "CampaignRefundsOpened" && campaign) {
     campaign.state = 5;
+  } else if (event.eventName === "RefundAllocationsFrozen" && campaign) {
+    // The canonical event records the completion of the entitlement snapshot;
+    // the campaign state remains REFUNDING until every backer has claimed.
   } else if (event.eventName === "CampaignCompleted" && campaign) {
     campaign.state = 4;
   } else if (event.eventName === "ReviewCaseCreated") {

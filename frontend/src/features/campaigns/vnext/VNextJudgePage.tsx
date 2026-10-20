@@ -101,7 +101,7 @@ function JudgeReviewCard({
     enabled: Boolean(client && deployment.juryReview && deployment.campaignEscrow && transaction.address),
     queryFn: async () => {
       if (!client || !deployment.juryReview || !deployment.campaignEscrow || !transaction.address) throw new Error('VNext review client is unavailable');
-      const [caseNumber, protocolVersion, requiredCaseStake, commitment, revealed, roundStatus, enrollmentDeadline, commitDeadline, revealDeadline, snapshotFinalized, courtAssigned, courtFinalized, contribution] = await Promise.all([
+      const [caseNumber, protocolVersion, requiredCaseStake, commitment, revealed, roundStatus, enrollmentDeadline, commitDeadline, revealDeadline, courtAssigned, courtFinalized, contribution] = await Promise.all([
         client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'caseNumber', args: [caseId] }),
         client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'protocolVersion' }),
         client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'requiredCaseStake', args: [caseId] }),
@@ -111,7 +111,6 @@ function JudgeReviewCard({
         client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'enrollmentDeadline', args: [caseId] }),
         client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'commitDeadline', args: [caseId] }),
         client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'revealDeadline', args: [caseId] }),
-        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'snapshotFinalized', args: [caseId] }),
         client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'courtAssigned', args: [caseId, courtId] }),
         currentAssignment ? client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'courtFinalized', args: [caseId, courtId] }) : false,
         client.readContract({ address: deployment.campaignEscrow, abi: campaignAbi, functionName: 'contributionOf', args: [BigInt(review.campaignId), transaction.address] }),
@@ -120,12 +119,23 @@ function JudgeReviewCard({
         caseNumber: BigInt(caseNumber as bigint), protocolVersion: BigInt(protocolVersion as bigint), requiredCaseStake: BigInt(requiredCaseStake as bigint),
         commitment: commitment as `0x${string}`, revealed: Boolean(revealed), roundStatus: Number(roundStatus),
         enrollmentDeadline: BigInt(enrollmentDeadline as bigint), commitDeadline: BigInt(commitDeadline as bigint), revealDeadline: BigInt(revealDeadline as bigint),
-        snapshotFinalized: Boolean(snapshotFinalized), courtAssigned: Boolean(courtAssigned), courtFinalized: Boolean(courtFinalized),
+        snapshotFinalized: Number(roundStatus) >= ROUND_ASSIGNMENT_PENDING, courtAssigned: Boolean(courtAssigned), courtFinalized: Boolean(courtFinalized),
         contribution: BigInt(contribution as bigint),
       };
     },
     retry: false,
   });
+  const judgeClock = useQuery({
+    queryKey: ['vnext-judge-chain-clock', client?.chain?.id],
+    enabled: Boolean(client),
+    queryFn: async () => {
+      if (!client) throw new Error('VNext Judge chain clock is unavailable');
+      return (await client.getBlock({ blockTag: 'latest' })).timestamp;
+    },
+    retry: false,
+    staleTime: 5_000,
+  });
+  const judgeChainTimestamp = judgeClock.data;
   const evidence = useQuery({
     queryKey: ['vnext-judge-case-evidence', review.reviewCaseId, transaction.address],
     queryFn: ({ signal }) => campaignApi.vnextEvidence(review.reviewCaseId, signal),
@@ -135,20 +145,19 @@ function JudgeReviewCard({
   const computedCommitment = meta.data && transaction.address && validBytes32(salt)
     ? makeCommitment(review, courtId, transaction.address, meta.data.caseNumber, meta.data.protocolVersion, vote, salt)
     : null;
-  const now = BigInt(Math.floor(Date.now() / 1000));
   const creatorConflict = Boolean(transaction.address && transaction.address.toLowerCase() === review.creator.toLowerCase());
   const contributorConflict = Boolean(meta.data?.contribution && meta.data.contribution > 0n);
   const evidenceReady = evidence.data?.availabilityPolicy.status === 'READY';
   const evidenceBlocked = Boolean(evidence.data && !evidenceReady);
-  const canEnroll = Boolean(!currentAssignment && meta.data && meta.data.roundStatus === ROUND_ENROLLMENT_OPEN && now < meta.data.enrollmentDeadline && !creatorConflict && !contributorConflict);
-  const canFinalizeSnapshot = Boolean(meta.data && meta.data.roundStatus === ROUND_ENROLLMENT_OPEN && !meta.data.snapshotFinalized && now >= meta.data.enrollmentDeadline && BigInt(review.enrolledCount) >= 3n);
+  const canEnroll = Boolean(judgeChainTimestamp !== undefined && !currentAssignment && meta.data && meta.data.roundStatus === ROUND_ENROLLMENT_OPEN && judgeChainTimestamp < meta.data.enrollmentDeadline && !creatorConflict && !contributorConflict);
+  const canFinalizeSnapshot = Boolean(judgeChainTimestamp !== undefined && meta.data && meta.data.roundStatus === ROUND_ENROLLMENT_OPEN && !meta.data.snapshotFinalized && judgeChainTimestamp >= meta.data.enrollmentDeadline && BigInt(review.enrolledCount) >= 3n);
   const canAssignCourt = Boolean(meta.data && meta.data.roundStatus === ROUND_ASSIGNMENT_PENDING && meta.data.snapshotFinalized && !meta.data.courtAssigned);
-  const canCommit = Boolean(evidenceReady && currentAssignment && meta.data?.roundStatus === ROUND_VOTING && now >= meta.data.enrollmentDeadline && now < meta.data.commitDeadline && computedCommitment && meta.data.commitment === ZERO_HASH);
-  const canReveal = Boolean(evidenceReady && currentAssignment && meta.data?.roundStatus === ROUND_VOTING && now >= meta.data.commitDeadline && now < meta.data.revealDeadline && computedCommitment === meta.data.commitment && !meta.data.revealed && validBytes32(salt));
-  const canFinalizeCourt = Boolean(currentAssignment && meta.data?.roundStatus === ROUND_VOTING && now >= meta.data.revealDeadline && !meta.data.courtFinalized);
+  const canCommit = Boolean(judgeChainTimestamp !== undefined && evidenceReady && currentAssignment && meta.data?.roundStatus === ROUND_VOTING && judgeChainTimestamp >= meta.data.enrollmentDeadline && judgeChainTimestamp < meta.data.commitDeadline && computedCommitment && meta.data.commitment === ZERO_HASH);
+  const canReveal = Boolean(judgeChainTimestamp !== undefined && evidenceReady && currentAssignment && meta.data?.roundStatus === ROUND_VOTING && judgeChainTimestamp >= meta.data.commitDeadline && judgeChainTimestamp < meta.data.revealDeadline && computedCommitment === meta.data.commitment && !meta.data.revealed && validBytes32(salt));
+  const canFinalizeCourt = Boolean(judgeChainTimestamp !== undefined && currentAssignment && meta.data?.roundStatus === ROUND_VOTING && judgeChainTimestamp >= meta.data.revealDeadline && !meta.data.courtFinalized);
 
   return (
-    <article className="monograph-card space-y-3">
+    <article className="monograph-card space-y-3" data-vnext-judge-case={review.reviewCaseId}>
       <span className="monograph-card__kicker">CANONICAL JUDGE CASE</span>
       <h2 className="monograph-card__title">Case {review.reviewCaseId}</h2>
       <p className="text-sm m-0">Campaign {review.campaignId} · milestone {review.milestoneId} · round {review.roundId} · enrolled {review.enrolledCount}</p>
@@ -157,6 +166,7 @@ function JudgeReviewCard({
       {creatorConflict && <p className="text-sm text-[var(--danger)] m-0">Creator conflict: wallet tạo case không được enroll.</p>}
       {contributorConflict && !creatorConflict && <p className="text-sm text-[var(--danger)] m-0">Contributor conflict: wallet đã góp vốn cho campaign không được enroll.</p>}
       {meta.data && <p className="text-sm text-[var(--ink-subtle)] m-0">Case stake tối thiểu: {meta.data.requiredCaseStake.toString()} token units.</p>}
+      {meta.error && <p role="alert" className="monograph-alert monograph-alert--error">Không đọc được metadata Judge từ chain: {getErrorMessage(meta.error)}</p>}
       {evidenceBlocked && <p className="text-sm text-[var(--danger)] m-0">Evidence chưa sẵn sàng ({evidence.data?.availabilityPolicy.status}); Judge không thể commit/reveal. {evidence.data?.availabilityPolicy.status === 'TIMEOUT_RETRY_ELIGIBLE' ? 'Review đã tới timeout; chỉ dùng protocol retry/fail path.' : 'Chờ storage hoặc indexer xác nhận trước deadline.'}</p>}
       {canEnroll && deployment.juryRegistry && (
         <div className="flex flex-wrap gap-2">

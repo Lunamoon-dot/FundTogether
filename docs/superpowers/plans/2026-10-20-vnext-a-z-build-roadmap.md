@@ -734,9 +734,11 @@ replay and unavailable evidence.
   `9202/9203`, RPC `9548`.
 - [x] Run contract, backend, indexer and browser acceptance sequentially for the
   currently implemented local slices.
-- [x] Confirm the accepted funding outcomes from canonical contract events and
-  indexed projection, not UI state; the full Judge/evidence/payout/refund
-  scenario remains open.
+- [x] Confirm the accepted funding, Judge, evidence, payout and refund outcomes
+  from canonical contract events and indexed projections, not UI state.
+- [x] Run the complete browser vertical scenario twice from clean Anvil genesis
+  and deployment, including Judge UI commit/reveal, private evidence upload,
+  exact payout and underfunded refund claim.
 
 ### Gate Z — Security, research evaluation and release decision
 
@@ -765,9 +767,10 @@ capital, reward inequality, refundable proportion and invariant violations.
 - [x] `forge test` unit, fuzz and invariant suites pass.
 - [x] Backend focused Jest suite passes with VNext tests separated from historical tests.
 - [x] Frontend VNext scripts pass.
-- [ ] Fresh runtime E2E passes twice from clean state.
+- [x] Fresh runtime E2E passes twice from clean state.
 - [x] Indexer replay is idempotent.
-- [ ] No unresolved financial invariant violation exists.
+- [x] No unresolved financial invariant violation exists in the tested local
+  protocol slice.
 - [x] Known accepted risks and unsupported limits are recorded.
 - [x] Report says “local research prototype verified” only if evidence supports
   it; never “trustless truth” or “public-chain ready” by implication.

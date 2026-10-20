@@ -352,6 +352,7 @@ contract CampaignEscrowVNext is ReentrancyGuard, IVNextEvents {
         }
         if (campaign.refundAllocationCursor == contributorCount) {
             campaign.refundAllocationsFrozen = true;
+            emit RefundAllocationsFrozen(campaignId, contributorCount, campaign.refundSnapshot);
         }
     }
 

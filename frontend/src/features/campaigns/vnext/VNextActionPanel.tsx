@@ -27,7 +27,7 @@ const MILESTONE_PROVISIONAL_RULING = 5;
 const MILESTONE_APPEAL_WINDOW = 6;
 const MILESTONE_CORRECTION = 12;
 const MILESTONE_RESUBMIT = 13;
-const MILESTONE_PAYABLE = 8;
+const MILESTONE_CHALLENGE_WINDOW = 9;
 const campaignAbi = campaignArtifact.abi as Abi;
 const reviewAbi = reviewArtifact.abi as Abi;
 
@@ -71,9 +71,19 @@ function VNextMilestoneActions({
     },
     retry: false,
   });
-  const now = BigInt(Math.floor(Date.now() / 1000));
-  const submissionExpired = Boolean(timing.data?.submissionDeadline && now >= timing.data.submissionDeadline);
-  const correctionExpired = Boolean(timing.data?.correctionDeadline && now >= timing.data.correctionDeadline);
+  const milestoneClock = useQuery({
+    queryKey: ['vnext-milestone-chain-clock', client?.chain?.id],
+    enabled: Boolean(client),
+    queryFn: async () => {
+      if (!client) throw new Error('VNext milestone chain clock is unavailable');
+      return (await client.getBlock({ blockTag: 'latest' })).timestamp;
+    },
+    retry: false,
+    staleTime: 5_000,
+  });
+  const milestoneChainTimestamp = milestoneClock.data;
+  const submissionExpired = Boolean(milestoneChainTimestamp !== undefined && timing.data?.submissionDeadline && milestoneChainTimestamp >= timing.data.submissionDeadline);
+  const correctionExpired = Boolean(milestoneChainTimestamp !== undefined && timing.data?.correctionDeadline && milestoneChainTimestamp >= timing.data.correctionDeadline);
   const settlement = useQuery({
     queryKey: ['vnext-review-settlement', milestone.reviewCaseId, deployment.juryReview],
     enabled: Boolean(client && deployment.juryReview && milestone.reviewCaseId),
@@ -132,7 +142,7 @@ function VNextMilestoneActions({
         </div>
       )}
 
-      {milestone.state === MILESTONE_PAYABLE && campaignNumber !== null && <button type="button" className="button button--primary" disabled={transaction.busy} onClick={() => void transaction.send('campaign', 'payMilestone', [campaignNumber, milestoneNumber])}>Payout milestone {milestone.milestoneId}</button>}
+      {milestone.state === MILESTONE_CHALLENGE_WINDOW && campaignNumber !== null && <button type="button" className="button button--primary" disabled={transaction.busy} onClick={() => void transaction.send('campaign', 'payMilestone', [campaignNumber, milestoneNumber])}>Payout milestone {milestone.milestoneId}</button>}
       {transaction.stage !== 'idle' && <p className="text-sm m-0" role="status">{vnextStageLabel(transaction.stage)}{transaction.txHash ? ` · ${transaction.txHash}` : ''}</p>}
       {transaction.error && <p className="monograph-alert monograph-alert--error" role="alert">{transaction.error}</p>}
     </article>

@@ -184,6 +184,10 @@ interface IVNextEvents {
         uint256 indexed campaignId, uint256 refundPool, uint256 contributionSnapshot
     );
 
+    event RefundAllocationsFrozen(
+        uint256 indexed campaignId, uint256 contributorCount, uint256 refundSnapshot
+    );
+
     event ChallengeOpened(
         uint256 indexed campaignId,
         uint256 indexed milestoneId,

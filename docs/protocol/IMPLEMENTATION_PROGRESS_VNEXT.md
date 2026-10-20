@@ -37,9 +37,9 @@ tests. Full web/API/browser acceptance remains separate.
 | N (partial) | `contracts/test/invariant/VNextCampaignInvariant.t.sol`, `VNextJuryInvariant.t.sol`, `contracts/test/fuzz/VNextStateMachine.t.sol` | Stateful conservation/payout and court uniqueness/stake invariants pass at 256 runs × 128,000 calls per harness; recorded-seed state-machine fuzz passes with arbitrary callers, repeated actions and deadline jumps |
 | P | `DeployVNext.s.sol`, `deploy-vnext.cjs`, `verify-vnext-runtime.cjs`, `vnext-deployment.ts` | Foundry script compiles; runtime verifier/policy identity tests: 6 passed; one-time wiring is executable |
 | P0/P1 remediation | `JuryReview.sol`, `JuryRegistry.sol`, `CampaignEscrowVNext.sol` | Retry/settlement/stake/liveness/budget/refund/court-order regressions covered; current full Foundry suite: 136 passed |
-| Q/R | `vnext-indexer.service.ts`, `vnext-event-projector.ts`, `IVNextEvents.sol`, VNext Drizzle schema | Persistent event/projection/checkpoint transaction; milestone review state/case-pointer events now project retry, appeal, ruling, correction and timeout transitions; Backer contribution/refund, challenge, court-summary and Judge ledger projections added; replay/crash/refund/completion tests remain the verification boundary |
+| Q/R | `vnext-indexer.service.ts`, `vnext-event-projector.ts`, `IVNextEvents.sol`, VNext Drizzle schema | Persistent event/projection/checkpoint transaction; milestone review state/case-pointer events now project retry, appeal, ruling, correction and timeout transitions; Backer contribution/refund, refund-allocation freeze, challenge, court-summary and Judge ledger projections added; replay/crash/refund/completion tests remain the verification boundary |
 | S/T/X | `vnext.controller.ts`, `vnext-evidence.service.ts`, `vnext-evidence.controller.ts`, `vnext.schema.ts` | Read-only projection API now exposes authenticated Backer/Judge indexed read models, assigned-Judge review reads, challenge history, indexer checkpoint/lag status, plus private VNext case-evidence upload/read ACL, canonical hash verification, short-lived user-bound evidence tickets and explicit storage-timeout/retry status |
-| U/V/W/X | `VNextProtocolPage.tsx`, `VNextCreateCampaignPanel.tsx`, `VNextActionPanel.tsx`, `VNextJudgePage.tsx`, `VNextEvidencePanel.tsx`, `backend/scripts/campaigns/vnext-browser-e2e.cjs` | VNext Creator campaign creation, private evidence, Backer actions and Judge stake/commit–reveal/reward surface added; Judge workspace now requests assigned cases only; real SIWE + EIP-6963 browser funding slice passes twice after chain-time jumps, including Backer contribution and deadline-gated funding finalization; successful `FundingFinalized` now projects `MILESTONES_RUNNING` consistently; Judge UI commit/reveal, evidence, payout/refund browser journey remains incomplete |
+| U/V/W/X | `VNextProtocolPage.tsx`, `VNextCreateCampaignPanel.tsx`, `VNextActionPanel.tsx`, `VNextJudgePage.tsx`, `VNextEvidencePanel.tsx`, `backend/scripts/campaigns/vnext-browser-e2e.cjs` | VNext Creator campaign creation, private evidence, Backer actions and Judge stake/commit–reveal/reward surface added; Judge workspace now requests assigned cases only; real SIWE + EIP-6963 browser vertical acceptance passes twice from clean Anvil genesis through evidence upload, Judge UI commit/reveal, settlement, exact payout, underfunded refund allocation freeze and refund claim; funding finalization remains deadline-gated and derives deadlines from chain time |
 
 ## Current executable behavior
 
@@ -99,6 +99,8 @@ The current VNext contract slice can:
 - emit and index canonical milestone review state/case-pointer events instead
   of inferring retry, appeal, ruling, correction or timeout state from votes or
   receipts;
+- emit and index the canonical `RefundAllocationsFrozen` transition before a
+  Backer can claim a snapshot-derived refund;
 - keep VNext case evidence in private storage, verify its SHA-256 bytes against
   the canonical on-chain evidence hash, and authorize only the Creator or an
   assigned Judge.
@@ -119,10 +121,9 @@ The following remain incomplete and must not be inferred from the passing slice:
   Challenger evidence owner; storage availability remains an off-chain
   limitation, while the local API/UI now expose timeout/retry status without
   creating a ruling or moving funds;
-- full web/API/browser runtime acceptance and long-lived service orchestration;
-  the isolated VNext chain/deploy/indexer acceptance and the browser funding
-  slice now pass, but they do not yet prove the Judge UI commit/reveal,
-  evidence, payout/refund journey or production service topology.
+- long-lived service orchestration and production service topology; the local
+  VNext chain/deploy/indexer/browser vertical acceptance is green, but it does
+  not prove public-chain readiness or human-wallet acceptance.
 
 ## Verification record
 
@@ -165,7 +166,7 @@ CampaignEscrowVNext, JuryRegistry and JuryReview artifacts were regenerated
 from that successful build.
 
 Backend focused evidence from the prior remediation checkout: VNext
-indexer/projector 8 passed; runtime identity 6 passed; real PostgreSQL VNext
+indexer/projector tests passed; runtime identity 6 passed; real PostgreSQL VNext
 replay check passed; `npm run build` completed. These are historical evidence.
 The prior runtime acceptance evidence used local Anvil chain `31339` after
 deploying policy V2 and is not a current acceptance run for this branch.
@@ -182,7 +183,8 @@ frontend: VNext static journey tests remain covered by the 207-test suite; the
 route regression keeps `/campaigns/vnext` out of the legacy public campaign
 detail matcher
 backend: `npm run build` -> success; isolated migration audit -> PASS
-backend: focused VNext Jest invocation with `--testMatch="**/*.spec.ts"` -> 11 suites, 38 passed, 0 failed
+backend: focused VNext Jest invocation with explicit VNext spec paths and
+`--testMatch="**/*.spec.ts"` -> 9 suites, 34 passed, 0 failed
 backend: real PostgreSQL crash/replay test -> 1 suite, 1 passed; event,
 projection and checkpoint rollback was verified before exactly-once replay
 backend: VNext runtime boot -> `GET /health` returned `200`, protocol
@@ -192,20 +194,22 @@ backend: `npm run test:vnext-acceptance` now creates/migrates/drops an isolated
 PostgreSQL database itself; direct fresh-chain acceptance -> `PASS`, protocol
 `FUNDTOGETHER_VNEXT`, chain `31339`, payout campaign `0`, refund campaign `1`,
 contract balance `0`
-browser: `npm run test:vnext-browser` -> `PASS` twice on campaigns `22` and
-`23` after the fresh chain/direct acceptance had advanced Anvil time; real SIWE
-session, EIP-6963 wallet link, Creator creation, direct Judge publication
-resolution/materialization, Backer allowance/contribution, 7-day chain-time
-deadline finalization and contract/indexer `MILESTONES_RUNNING` projection all
-passed; deadline creation and funding finalization use latest chain block time;
-no legacy `/public/campaigns/vnext` request remained. The runner intentionally
-uses a direct permissionless publication materialization call; Judge UI
-commit/reveal, evidence, payout and refund remain unaccepted in-browser.
+browser: `npm run test:vnext-browser` -> `PASS` twice from two clean Anvil
+genesis/deploy cycles; each run used campaign `0` for success and campaign `1`
+for refund, reached `COMPLETED`, paid `100000000`, and claimed `50000000`.
+The run covered real SIWE, EIP-6963 wallet link, Creator creation, direct
+permissionless publication resolution/materialization, private evidence upload,
+Judge UI commit/reveal, canonical settlement, payout, underfunded refund
+allocation freeze and refund claim. Deadline creation and funding finalization
+use latest chain block time; no legacy `/public/campaigns/vnext` request
+remained. The runner intentionally keeps publication materialization direct.
 contracts: focused Gate O additions -> `BatchSettlement` 3 passed,
 `JuryRegistry` 14 passed, `PayoutRefund` 9 passed; the pre-fuzz full
 `forge test --summary` run -> 134 passed, 0 failed, 0 skipped
 contracts: Docker Foundry forge build -> success (solc 0.8.24); full
 forge test -> 136 passed, 0 failed, 0 skipped; generated VNext ABIs refreshed.
+The refund path additionally asserts `RefundAllocationsFrozen` is emitted before
+claim eligibility and the persistent indexer treats that event idempotently.
 contracts: `test/fuzz/VNextStateMachine.t.sol` -> 2 passed with a recorded
 `--fuzz-seed 0x5eed5eed`; the fuzz sequence runs 128 cases and includes
 arbitrary callers, repeated funding finalization/refund attempts and deadline
@@ -222,8 +226,8 @@ checked-in `src/**/*.spec.ts` suites. A full historical backend run also needs
 RPC `127.0.0.1:9548` and currently cannot be treated as a green VNext runtime
 acceptance result.
 
-The current backend/frontend results do not imply public deployment or full
-browser acceptance. The VNext transaction endpoint reports `INDEXING` until a
+The current backend/frontend results do not imply public deployment, production
+service topology or human-wallet acceptance. The VNext transaction endpoint reports `INDEXING` until a
 canonical indexed event exists; a successful token approval intentionally ends
 at the receipt boundary because the VNext indexer does not own ERC-20 events.
 The successful `FundingFinalized` projection regression is covered by

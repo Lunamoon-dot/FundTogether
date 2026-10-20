@@ -185,6 +185,45 @@ export class VNextIndexerService implements OnModuleInit, OnModuleDestroy {
     return null;
   }
 
+  private async readCampaignMilestones(campaignId: string, goal: string, blockNumber: bigint) {
+    if (!this.connection) return [];
+    const { client, manifest } = this.connection;
+    const target = BigInt(goal);
+    const milestones: Array<{ milestoneId: number; budget: string; acceptanceCriteriaHash: string }> = [];
+    let total = 0n;
+    for (let milestoneId = 0; total < target; milestoneId++) {
+      if (milestoneId >= 256) throw new Error(`VNext campaign ${campaignId} has too many milestones`);
+      const [budget, acceptanceCriteriaHash] = await Promise.all([
+        client.readContract({
+          address: manifest.campaignEscrow,
+          abi: vnextCampaignAbi,
+          functionName: "milestoneBudget",
+          args: [BigInt(campaignId), BigInt(milestoneId)],
+          blockNumber,
+        }),
+        client.readContract({
+          address: manifest.campaignEscrow,
+          abi: vnextCampaignAbi,
+          functionName: "milestoneAcceptanceCriteria",
+          args: [BigInt(campaignId), BigInt(milestoneId)],
+          blockNumber,
+        }),
+      ]);
+      const budgetValue = BigInt(budget as bigint);
+      if (budgetValue <= 0n || total + budgetValue > target) {
+        throw new Error(`VNext campaign ${campaignId} has invalid milestone budget projection`);
+      }
+      milestones.push({
+        milestoneId,
+        budget: budgetValue.toString(),
+        acceptanceCriteriaHash: String(acceptanceCriteriaHash).toLowerCase(),
+      });
+      total += budgetValue;
+    }
+    if (total !== target) throw new Error(`VNext campaign ${campaignId} milestone budgets do not equal goal`);
+    return milestones;
+  }
+
   private async persistEvent(streamId: string, log: Log, decoded: DecodedVNextEvent) {
     return this.db.transaction(async tx => {
       await this.ensureStream(tx, streamId);
@@ -284,6 +323,20 @@ export class VNextIndexerService implements OnModuleInit, OnModuleDestroy {
         lastBlockNumber: blockNumber.toString(),
         lastEventName: eventName,
       }).onConflictDoNothing();
+      const milestones = await this.readCampaignMilestones(textArg(args, "campaignId"), textArg(args, "goal"), blockNumber);
+      for (const milestone of milestones) {
+        await tx.insert(vnextMilestoneProjections).values({
+          streamId,
+          onchainCampaignId: textArg(args, "campaignId"),
+          milestoneId: milestone.milestoneId,
+          budget: milestone.budget,
+          acceptanceCriteriaHash: milestone.acceptanceCriteriaHash,
+          evidenceRevision: "0",
+          state: 0,
+          paid: false,
+          lastBlockNumber: blockNumber.toString(),
+        }).onConflictDoNothing();
+      }
     } else if (eventName === "PublicationEvidenceSubmitted") {
       await tx.update(vnextCampaignProjections).set({
         publicationEvidenceHash: textArg(args, "evidenceHash").toLowerCase(),
@@ -328,6 +381,10 @@ export class VNextIndexerService implements OnModuleInit, OnModuleDestroy {
     } else if (eventName === "CampaignRefundsOpened") {
       await tx.update(vnextCampaignProjections).set({
         state: 5, lastBlockNumber: blockNumber.toString(), lastEventName: eventName, updatedAt: new Date(),
+      }).where(and(eq(vnextCampaignProjections.streamId, streamId), eq(vnextCampaignProjections.onchainCampaignId, textArg(args, "campaignId"))));
+    } else if (eventName === "RefundAllocationsFrozen") {
+      await tx.update(vnextCampaignProjections).set({
+        lastBlockNumber: blockNumber.toString(), lastEventName: eventName, updatedAt: new Date(),
       }).where(and(eq(vnextCampaignProjections.streamId, streamId), eq(vnextCampaignProjections.onchainCampaignId, textArg(args, "campaignId"))));
     } else if (eventName === "BackerRefundClaimed") {
       await tx.update(vnextCampaignProjections).set({
@@ -507,7 +564,7 @@ export class VNextIndexerService implements OnModuleInit, OnModuleDestroy {
       await tx.update(vnextReviewProjections).set({ lastBlockNumber: blockNumber.toString(), updatedAt: new Date() }).where(and(eq(vnextReviewProjections.streamId, streamId), eq(vnextReviewProjections.reviewCaseId, textArg(args, "reviewCaseId").toLowerCase())));
     }
 
-    if (eventName !== "CampaignCreated" && eventName !== "MilestonePaid" && eventName !== "CampaignRefundsOpened" && eventName !== "BackerRefundClaimed" && eventName !== "CampaignCompleted" && arg(args, "campaignId") !== undefined) {
+    if (eventName !== "CampaignCreated" && eventName !== "MilestonePaid" && eventName !== "CampaignRefundsOpened" && eventName !== "RefundAllocationsFrozen" && eventName !== "BackerRefundClaimed" && eventName !== "CampaignCompleted" && arg(args, "campaignId") !== undefined) {
       await tx.update(vnextCampaignProjections).set({
         lastBlockNumber: blockNumber.toString(), lastEventName: eventName, updatedAt: new Date(),
       }).where(and(eq(vnextCampaignProjections.streamId, streamId), eq(vnextCampaignProjections.onchainCampaignId, textArg(args, "campaignId"))));

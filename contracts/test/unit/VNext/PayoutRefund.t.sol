@@ -6,6 +6,7 @@ import { MockUSDC } from "../../mocks/MockUSDC.sol";
 import { MockReviewFinality } from "../../mocks/MockReviewFinality.sol";
 import { CampaignEscrowVNext } from "../../../src/campaigns/CampaignEscrowVNext.sol";
 import { VNextTypes } from "../../../src/campaigns/VNextTypes.sol";
+import { IVNextEvents } from "../../../src/interfaces/IVNextEvents.sol";
 
 contract VNextPayoutRefundTest is Test {
     MockUSDC private token;
@@ -136,6 +137,8 @@ contract VNextPayoutRefundTest is Test {
         vm.expectRevert(CampaignEscrowVNext.RefundAllocationIncomplete.selector);
         escrow.claimRefund(smallCampaign);
 
+        vm.expectEmit(true, false, false, true, address(escrow));
+        emit IVNextEvents.RefundAllocationsFrozen(smallCampaign, 2, 3);
         escrow.freezeRefundAllocations(smallCampaign, 10);
         vm.prank(backer);
         escrow.claimRefund(smallCampaign);
