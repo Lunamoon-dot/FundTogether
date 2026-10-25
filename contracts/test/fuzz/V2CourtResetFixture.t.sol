@@ -107,8 +107,11 @@ contract V2CourtResetFixtureFuzzTest is Test {
     function _commitReveal(bytes32 courtId, address judge, uint256 saltValue) internal {
         bytes32 salt = bytes32(saltValue);
         bytes32 commitment = fixture.commitmentFor(CASE_ID, courtId, judge, true, salt);
+        V2CourtResetFixture.CourtAttempt memory court = fixture.courtInfo(courtId);
+        vm.warp(court.commitDeadline - 1);
         vm.startPrank(judge);
         fixture.commitVote(CASE_ID, courtId, commitment);
+        vm.warp(court.commitDeadline);
         fixture.revealVote(CASE_ID, courtId, true, salt);
         vm.stopPrank();
     }

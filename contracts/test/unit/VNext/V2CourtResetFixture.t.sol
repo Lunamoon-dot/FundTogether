@@ -58,6 +58,27 @@ contract V2CourtResetFixtureTest is Test {
         assertEq(terms.milestoneId, 4);
     }
 
+    function test_revealCannotStartBeforeCommitWindowEnds() public {
+        _fundJudges(3, 50);
+        fixture.createCase(CASE_ID, 1, 0, 23, 10, 3);
+        bytes32 courtId = fixture.assignCourt(CASE_ID, V2CourtResetFixture.CourtLevel.COURT_1, 0);
+        V2CourtResetFixture.CourtAttempt memory court = fixture.courtInfo(courtId);
+        address judge = court.judges[0];
+        bytes32 salt = bytes32(uint256(1));
+        bytes32 commitment = fixture.commitmentFor(CASE_ID, courtId, judge, true, salt);
+
+        vm.startPrank(judge);
+        fixture.commitVote(CASE_ID, courtId, commitment);
+        vm.expectRevert(V2CourtResetFixture.CourtNotReady.selector);
+        fixture.revealVote(CASE_ID, courtId, true, salt);
+        vm.warp(court.commitDeadline);
+        fixture.revealVote(CASE_ID, courtId, true, salt);
+        vm.stopPrank();
+
+        court = fixture.courtInfo(courtId);
+        assertTrue(court.revealValid[0]);
+    }
+
     function test_R1OneOffenderPaysOneTotalAndCompliantSeatsReceiveD() public {
         _fundJudges(3, 50);
         fixture.createCase(CASE_ID, 1, 0, 23, 10, 3);
@@ -429,8 +450,11 @@ contract V2CourtResetFixtureTest is Test {
     ) internal {
         bytes32 salt = bytes32(saltValue);
         bytes32 commitment = target.commitmentFor(caseId, courtId, judge, pass, salt);
+        V2CourtResetFixture.CourtAttempt memory court = target.courtInfo(courtId);
+        vm.warp(court.commitDeadline - 1);
         vm.startPrank(judge);
         target.commitVote(caseId, courtId, commitment);
+        vm.warp(court.commitDeadline);
         target.revealVote(caseId, courtId, pass, salt);
         vm.stopPrank();
     }

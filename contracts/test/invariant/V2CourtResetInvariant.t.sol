@@ -22,6 +22,7 @@ contract V2CourtResetInvariantHandler is Test {
 
     function completeSeat(uint8 rawSeat) external {
         V2CourtResetFixture.CourtAttempt memory court = fixture.courtInfo(courtId);
+        if (block.timestamp >= court.commitDeadline) return;
         uint256 seat = uint256(rawSeat) % 3;
         if (court.commitSubmitted[seat]) return;
         address judge = court.judges[seat];
@@ -33,6 +34,7 @@ contract V2CourtResetInvariantHandler is Test {
             vm.stopPrank();
             return;
         }
+        vm.warp(court.commitDeadline);
         try fixture.revealVote(caseId, courtId, true, salt) { } catch { }
         vm.stopPrank();
     }

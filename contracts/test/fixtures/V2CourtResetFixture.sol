@@ -512,7 +512,9 @@ contract V2CourtResetFixture is V2FinancialAccountingFixture {
 
     function revealVote(bytes32 caseId, bytes32 courtId, bool pass, bytes32 salt) external {
         CourtAttempt storage court = _activeCourt(caseId, courtId);
-        if (block.timestamp >= court.revealDeadline) revert CourtNotReady();
+        if (block.timestamp < court.commitDeadline || block.timestamp >= court.revealDeadline) {
+            revert CourtNotReady();
+        }
         uint256 seat = _seatOf(court, msg.sender);
         if (!court.commitSubmitted[seat] || court.revealValid[seat]) {
             revert DuplicateVoteAction();
