@@ -75,6 +75,11 @@ contract V2FundingInvariantHandler is Test {
         commitment.policyManifest = V2FundingTypes.PolicyManifest({
             commitmentSchemaVersion: "FTV2-COMMIT-2",
             policyVersion: "fundtogether-vnext-v2-pr0-remediation-20261025",
+            supersedesCandidate: "fundtogether-vnext-v2-pr0-policy-20251025",
+            policyStatus: "PROPOSED_PENDING_APPROVAL",
+            pr1FixtureDeploymentIdentity: "fundtogether-vnext-v2-pr1-funding-fixture",
+            asset: "MockUSDC",
+            tokenDecimals: 6,
             policyManifestHash: bytes32(0),
             chainId: block.chainid,
             token: address(token),
@@ -83,15 +88,51 @@ contract V2FundingInvariantHandler is Test {
             publicationPolicy: "PUBLICATION_PRE_FUND_V1",
             evidenceDisclosurePolicy: "ReviewReferenceV1",
             daoFormulaVersion: "CWQ-1",
+            daoParticipationThresholdBps: 2_000,
+            daoTiePolicy: "ACCEPT",
+            daoEmptyElectoratePolicy: "ACCEPT",
+            daoSnapshot: "at-dao-open",
+            daoContributionCapUnits: "uint128_max",
+            daoTotalWeightArithmetic: "checked_uint256",
             daoConflictPolicyVersion: "DAO-TEMPORAL-1",
+            daoExcludeAssignedBeforeOpen: true,
+            daoExcludedAssignmentHistory: "all_court1_attempts",
+            court2SelectionAfter: "dao_finalized_appeal",
+            court2ExcludeCourt1Judges: true,
+            court2ExcludeDaoVoters: "all_valid_accept_or_appeal_ballots",
+            daoRetroactiveVoteChanges: false,
             resetPolicyVersion: "CCPS-1",
+            resetDisruptionAllowanceUnits: "10",
+            resetFinalizationAllowanceUnits: "3",
+            resetFinalizationAllowanceMinimumUnits: "3",
+            resetCostMaxUnits: "23",
+            resetFixtureCaseStakeRequirementUnits: "23",
+            requiredLockedStakeRule: "max(caseStakeRequirement,resetCostMax)",
+            resetOffenderAllocation: "equal_split_remainder_ascending_canonical_address",
+            resetRecipients: "compliant_invalid_court_judges_and_successful_finalizer",
+            actualCostReimbursementCapUnits: "0",
+            resetFundingSource: "offending_locked_stake_only",
+            publicationRewardRateBps: 0,
+            refundDustPolicy: "canonical_address_prefix",
+            rewardRounding: "floor",
             rewardRateBps: 100,
             basisPointsDenominator: 10_000,
             referenceCourtSize: 3,
             maxValidCourts: 2,
             maxResetsPerCourt: 1,
-            maxResetsPerCase: 2
+            maxResetsPerCase: 2,
+            lockedParameters: new string[](3),
+            pendingParameterGroups: new string[](6)
         });
+        commitment.policyManifest.lockedParameters[0] = "referenceCourtSize";
+        commitment.policyManifest.lockedParameters[1] = "maxValidCourts";
+        commitment.policyManifest.lockedParameters[2] = "court2ExcludeCourt1Judges";
+        commitment.policyManifest.pendingParameterGroups[0] = "commitment_schema";
+        commitment.policyManifest.pendingParameterGroups[1] = "reward_and_refund_economics";
+        commitment.policyManifest.pendingParameterGroups[2] = "CCPS-1_and_limits";
+        commitment.policyManifest.pendingParameterGroups[3] = "CWQ-1_and_threshold";
+        commitment.policyManifest.pendingParameterGroups[4] = "DAO-TEMPORAL-1";
+        commitment.policyManifest.pendingParameterGroups[5] = "publication_boundary";
         commitment.policyManifest.policyManifestHash =
             fixture.policyManifestHashFor(commitment.policyManifest);
 

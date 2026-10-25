@@ -16,6 +16,11 @@ library V2FundingTypes {
     struct PolicyManifest {
         string commitmentSchemaVersion;
         string policyVersion;
+        string supersedesCandidate;
+        string policyStatus;
+        string pr1FixtureDeploymentIdentity;
+        string asset;
+        uint256 tokenDecimals;
         bytes32 policyManifestHash;
         uint256 chainId;
         address token;
@@ -24,14 +29,41 @@ library V2FundingTypes {
         string publicationPolicy;
         string evidenceDisclosurePolicy;
         string daoFormulaVersion;
+        uint256 daoParticipationThresholdBps;
+        string daoTiePolicy;
+        string daoEmptyElectoratePolicy;
+        string daoSnapshot;
+        string daoContributionCapUnits;
+        string daoTotalWeightArithmetic;
         string daoConflictPolicyVersion;
+        bool daoExcludeAssignedBeforeOpen;
+        string daoExcludedAssignmentHistory;
+        string court2SelectionAfter;
+        bool court2ExcludeCourt1Judges;
+        string court2ExcludeDaoVoters;
+        bool daoRetroactiveVoteChanges;
         string resetPolicyVersion;
+        string resetDisruptionAllowanceUnits;
+        string resetFinalizationAllowanceUnits;
+        string resetFinalizationAllowanceMinimumUnits;
+        string resetCostMaxUnits;
+        string resetFixtureCaseStakeRequirementUnits;
+        string requiredLockedStakeRule;
+        string resetOffenderAllocation;
+        string resetRecipients;
+        string actualCostReimbursementCapUnits;
+        string resetFundingSource;
+        uint256 publicationRewardRateBps;
+        string refundDustPolicy;
+        string rewardRounding;
         uint256 rewardRateBps;
         uint256 basisPointsDenominator;
         uint256 referenceCourtSize;
         uint256 maxValidCourts;
         uint256 maxResetsPerCourt;
         uint256 maxResetsPerCase;
+        string[] lockedParameters;
+        string[] pendingParameterGroups;
     }
 
     struct CampaignCommitment {
@@ -425,33 +457,7 @@ contract V2FundingFixture is ReentrancyGuard {
                 || commitment.fundingDeadline.length != count
         ) revert InvalidCommitment();
 
-        if (
-            keccak256(bytes(manifest.commitmentSchemaVersion)) != keccak256(bytes("FTV2-COMMIT-2"))
-                || bytes(manifest.policyVersion).length == 0
-                || manifest.policyManifestHash == bytes32(0) || manifest.chainId != block.chainid
-                || manifest.token != address(token) || manifest.creator != msg.sender
-                || manifest.payoutWallet == address(0)
-                || bytes(manifest.publicationPolicy).length == 0
-                || bytes(manifest.evidenceDisclosurePolicy).length == 0
-                || bytes(manifest.daoFormulaVersion).length == 0
-                || bytes(manifest.daoConflictPolicyVersion).length == 0
-                || bytes(manifest.resetPolicyVersion).length == 0
-                || manifest.basisPointsDenominator == 0
-                || manifest.rewardRateBps > manifest.basisPointsDenominator
-                || manifest.referenceCourtSize != 3 || manifest.maxValidCourts != 2
-                || manifest.maxResetsPerCourt != 1 || manifest.maxResetsPerCase != 2
-                || keccak256(bytes(manifest.policyVersion))
-                    != keccak256(bytes("fundtogether-vnext-v2-pr0-remediation-20261025"))
-                || keccak256(bytes(manifest.publicationPolicy))
-                    != keccak256(bytes("PUBLICATION_PRE_FUND_V1"))
-                || keccak256(bytes(manifest.evidenceDisclosurePolicy))
-                    != keccak256(bytes("ReviewReferenceV1"))
-                || keccak256(bytes(manifest.daoFormulaVersion)) != keccak256(bytes("CWQ-1"))
-                || keccak256(bytes(manifest.daoConflictPolicyVersion))
-                    != keccak256(bytes("DAO-TEMPORAL-1"))
-                || keccak256(bytes(manifest.resetPolicyVersion)) != keccak256(bytes("CCPS-1"))
-                || manifest.policyManifestHash != _policyManifestHash(manifest)
-        ) revert InvalidCommitment();
+        if (!_validPolicyManifest(manifest)) revert InvalidCommitment();
 
         for (uint256 i = 0; i < count; i++) {
             if (
@@ -486,6 +492,83 @@ contract V2FundingFixture is ReentrancyGuard {
         V2FundingTypes.PolicyManifest memory preimage = manifest;
         preimage.policyManifestHash = bytes32(0);
         return keccak256(abi.encode(preimage));
+    }
+
+    function _validPolicyManifest(V2FundingTypes.PolicyManifest calldata manifest)
+        internal
+        view
+        returns (bool)
+    {
+        if (
+            !_same(manifest.commitmentSchemaVersion, "FTV2-COMMIT-2")
+                || !_same(manifest.policyVersion, "fundtogether-vnext-v2-pr0-remediation-20261025")
+                || !_same(manifest.supersedesCandidate, "fundtogether-vnext-v2-pr0-policy-20251025")
+                || !_same(manifest.policyStatus, "PROPOSED_PENDING_APPROVAL")
+                || !_same(
+                    manifest.pr1FixtureDeploymentIdentity,
+                    "fundtogether-vnext-v2-pr1-funding-fixture"
+                ) || !_same(manifest.asset, "MockUSDC") || manifest.tokenDecimals != 6
+                || manifest.policyManifestHash == bytes32(0) || manifest.chainId != block.chainid
+                || manifest.token != address(token) || manifest.creator != msg.sender
+                || manifest.payoutWallet == address(0)
+                || !_same(manifest.publicationPolicy, "PUBLICATION_PRE_FUND_V1")
+                || !_same(manifest.evidenceDisclosurePolicy, "ReviewReferenceV1")
+                || !_same(manifest.daoFormulaVersion, "CWQ-1")
+                || manifest.daoParticipationThresholdBps != 2_000
+                || !_same(manifest.daoTiePolicy, "ACCEPT")
+                || !_same(manifest.daoEmptyElectoratePolicy, "ACCEPT")
+                || !_same(manifest.daoSnapshot, "at-dao-open")
+                || !_same(manifest.daoContributionCapUnits, "uint128_max")
+                || !_same(manifest.daoTotalWeightArithmetic, "checked_uint256")
+                || !_same(manifest.daoConflictPolicyVersion, "DAO-TEMPORAL-1")
+                || !manifest.daoExcludeAssignedBeforeOpen
+                || !_same(manifest.daoExcludedAssignmentHistory, "all_court1_attempts")
+                || !_same(manifest.court2SelectionAfter, "dao_finalized_appeal")
+                || !manifest.court2ExcludeCourt1Judges
+                || !_same(manifest.court2ExcludeDaoVoters, "all_valid_accept_or_appeal_ballots")
+                || manifest.daoRetroactiveVoteChanges
+                || !_same(manifest.resetPolicyVersion, "CCPS-1")
+                || !_same(manifest.resetDisruptionAllowanceUnits, "10")
+                || !_same(manifest.resetFinalizationAllowanceUnits, "3")
+                || !_same(manifest.resetFinalizationAllowanceMinimumUnits, "3")
+                || !_same(manifest.resetCostMaxUnits, "23")
+                || !_same(manifest.resetFixtureCaseStakeRequirementUnits, "23")
+                || !_same(
+                    manifest.requiredLockedStakeRule, "max(caseStakeRequirement,resetCostMax)"
+                )
+                || !_same(
+                        manifest.resetOffenderAllocation,
+                        "equal_split_remainder_ascending_canonical_address"
+                    )
+                || !_same(
+                    manifest.resetRecipients,
+                    "compliant_invalid_court_judges_and_successful_finalizer"
+                ) || !_same(manifest.actualCostReimbursementCapUnits, "0")
+                || !_same(manifest.resetFundingSource, "offending_locked_stake_only")
+                || manifest.publicationRewardRateBps != 0
+                || !_same(manifest.refundDustPolicy, "canonical_address_prefix")
+                || !_same(manifest.rewardRounding, "floor") || manifest.basisPointsDenominator == 0
+                || manifest.rewardRateBps > manifest.basisPointsDenominator
+                || manifest.referenceCourtSize != 3 || manifest.maxValidCourts != 2
+                || manifest.maxResetsPerCourt != 1 || manifest.maxResetsPerCase != 2
+                || manifest.lockedParameters.length != 3
+                || manifest.pendingParameterGroups.length != 6
+                || manifest.policyManifestHash != _policyManifestHash(manifest)
+        ) return false;
+
+        return _same(manifest.lockedParameters[0], "referenceCourtSize")
+            && _same(manifest.lockedParameters[1], "maxValidCourts")
+            && _same(manifest.lockedParameters[2], "court2ExcludeCourt1Judges")
+            && _same(manifest.pendingParameterGroups[0], "commitment_schema")
+            && _same(manifest.pendingParameterGroups[1], "reward_and_refund_economics")
+            && _same(manifest.pendingParameterGroups[2], "CCPS-1_and_limits")
+            && _same(manifest.pendingParameterGroups[3], "CWQ-1_and_threshold")
+            && _same(manifest.pendingParameterGroups[4], "DAO-TEMPORAL-1")
+            && _same(manifest.pendingParameterGroups[5], "publication_boundary");
+    }
+
+    function _same(string calldata actual, string memory expected) internal pure returns (bool) {
+        return keccak256(bytes(actual)) == keccak256(bytes(expected));
     }
 
     function _campaign(uint256 campaignId) internal view returns (Campaign storage campaign) {
