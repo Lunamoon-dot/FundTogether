@@ -94,6 +94,7 @@ contract V2FundingFixture is ReentrancyGuard {
     mapping(uint256 => mapping(uint256 => mapping(address => bool))) public refundClaimed;
 
     uint256 private contributionSequence;
+    uint256 private fundingTransitionSequence;
     uint256 private refundSequence;
 
     error InvalidCommitment();
@@ -111,6 +112,7 @@ contract V2FundingFixture is ReentrancyGuard {
     error RefundAlreadyClaimed();
     error PreviousMilestoneNotPaid();
     error MilestoneAlreadyActive();
+    error UnsupportedTokenTransfer();
 
     event CampaignCreated(
         bytes32 indexed deploymentIdentity,
@@ -234,13 +236,27 @@ contract V2FundingFixture is ReentrancyGuard {
         uint256 cumulative = raised[campaignId][milestoneId] + amount;
         if (cumulative > milestone.fundingTarget) revert OverTarget();
 
+        uint256 custodyBefore = token.balanceOf(address(this));
         token.safeTransferFrom(msg.sender, address(this), amount);
+        uint256 custodyAfter = token.balanceOf(address(this));
+        if (custodyAfter < custodyBefore || custodyAfter - custodyBefore != amount) {
+            revert UnsupportedTokenTransfer();
+        }
         raised[campaignId][milestoneId] = cumulative;
         contributionOf[campaignId][milestoneId][msg.sender] += amount;
         uint256 sequence = ++contributionSequence;
 
         if (cumulative == milestone.fundingTarget) {
             milestone.state = V2FundingTypes.MilestoneState.FUNDED;
+            emit MilestoneFundingFinalized(
+                deploymentIdentity,
+                campaignId,
+                milestoneId,
+                true,
+                cumulative,
+                0,
+                ++fundingTransitionSequence
+            );
         }
 
         emit MilestoneContributionReceived(
@@ -270,7 +286,7 @@ contract V2FundingFixture is ReentrancyGuard {
             false,
             raised[campaignId][milestoneId],
             refundSnapshot[campaignId][milestoneId],
-            ++refundSequence
+            ++fundingTransitionSequence
         );
     }
 
@@ -286,7 +302,15 @@ contract V2FundingFixture is ReentrancyGuard {
         if (amount == 0) revert NoRefundAvailable();
 
         refundClaimed[campaignId][milestoneId][msg.sender] = true;
+        uint256 custodyBefore = token.balanceOf(address(this));
+        uint256 recipientBefore = token.balanceOf(msg.sender);
         token.safeTransfer(msg.sender, amount);
+        uint256 custodyAfter = token.balanceOf(address(this));
+        uint256 recipientAfter = token.balanceOf(msg.sender);
+        if (
+            custodyAfter > custodyBefore || custodyBefore - custodyAfter != amount
+                || recipientAfter < recipientBefore || recipientAfter - recipientBefore != amount
+        ) revert UnsupportedTokenTransfer();
         refunded[campaignId][milestoneId] += amount;
 
         emit MilestoneRefundClaimed(
@@ -327,6 +351,14 @@ contract V2FundingFixture is ReentrancyGuard {
 
     function commitmentHash(uint256 campaignId) external view returns (bytes32) {
         return _campaign(campaignId).commitmentHash;
+    }
+
+    function policyManifestHashFor(V2FundingTypes.PolicyManifest calldata manifest)
+        external
+        pure
+        returns (bytes32)
+    {
+        return _policyManifestHash(manifest);
     }
 
     function activeMilestoneId(uint256 campaignId) external view returns (uint256) {
@@ -408,6 +440,17 @@ contract V2FundingFixture is ReentrancyGuard {
                 || manifest.rewardRateBps > manifest.basisPointsDenominator
                 || manifest.referenceCourtSize != 3 || manifest.maxValidCourts != 2
                 || manifest.maxResetsPerCourt != 1 || manifest.maxResetsPerCase != 2
+                || keccak256(bytes(manifest.policyVersion))
+                    != keccak256(bytes("fundtogether-vnext-v2-pr0-remediation-20261025"))
+                || keccak256(bytes(manifest.publicationPolicy))
+                    != keccak256(bytes("PUBLICATION_PRE_FUND_V1"))
+                || keccak256(bytes(manifest.evidenceDisclosurePolicy))
+                    != keccak256(bytes("ReviewReferenceV1"))
+                || keccak256(bytes(manifest.daoFormulaVersion)) != keccak256(bytes("CWQ-1"))
+                || keccak256(bytes(manifest.daoConflictPolicyVersion))
+                    != keccak256(bytes("DAO-TEMPORAL-1"))
+                || keccak256(bytes(manifest.resetPolicyVersion)) != keccak256(bytes("CCPS-1"))
+                || manifest.policyManifestHash != _policyManifestHash(manifest)
         ) revert InvalidCommitment();
 
         for (uint256 i = 0; i < count; i++) {
@@ -433,6 +476,16 @@ contract V2FundingFixture is ReentrancyGuard {
         returns (bytes32)
     {
         return keccak256(abi.encode(deploymentIdentity, commitment));
+    }
+
+    function _policyManifestHash(V2FundingTypes.PolicyManifest calldata manifest)
+        internal
+        pure
+        returns (bytes32)
+    {
+        V2FundingTypes.PolicyManifest memory preimage = manifest;
+        preimage.policyManifestHash = bytes32(0);
+        return keccak256(abi.encode(preimage));
     }
 
     function _campaign(uint256 campaignId) internal view returns (Campaign storage campaign) {

@@ -1,6 +1,7 @@
 pragma solidity 0.8.24;
 
 import { Test } from "forge-std/Test.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { MockUSDC } from "../../mocks/MockUSDC.sol";
 import { V2FundingFixture, V2FundingTypes } from "../../fixtures/V2FundingFixture.sol";
 
@@ -22,12 +23,32 @@ contract TransferControlMockUSDC is MockUSDC {
     }
 }
 
+contract FeeOnTransferMockUSDC is ERC20 {
+    constructor() ERC20("Fee Mock USDC", "fUSDC") { }
+
+    function decimals() public pure override returns (uint8) {
+        return 6;
+    }
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+
+    function _update(address from, address to, uint256 amount) internal override {
+        if (from != address(0) && to != address(0)) {
+            uint256 fee = amount / 100;
+            super._update(from, to, amount - fee);
+            if (fee > 0) super._update(from, address(0), fee);
+        } else {
+            super._update(from, to, amount);
+        }
+    }
+}
+
 contract V2FundingFixtureTest is Test {
     uint256 internal constant LOCAL_CHAIN_ID = 31339;
     bytes32 internal constant FIXTURE_IDENTITY =
         keccak256("fundtogether-vnext-v2-pr1-funding-fixture");
-    bytes32 internal constant POLICY_MANIFEST_HASH = keccak256("complete-pr1-policy-manifest");
-
     MockUSDC internal token;
     V2FundingFixture internal fixture;
     address internal creator = makeAddr("creator");
@@ -119,6 +140,20 @@ contract V2FundingFixtureTest is Test {
         commitment = _validCommitment();
         commitment.policyManifest.commitmentSchemaVersion = "";
 
+        vm.prank(creator);
+        vm.expectRevert(V2FundingFixture.InvalidCommitment.selector);
+        fixture.createCampaign(commitment);
+
+        commitment = _validCommitment();
+        commitment.policyManifest.policyVersion = "registry-latest";
+        commitment.policyManifest.policyManifestHash =
+            fixture.policyManifestHashFor(commitment.policyManifest);
+        vm.prank(creator);
+        vm.expectRevert(V2FundingFixture.InvalidCommitment.selector);
+        fixture.createCampaign(commitment);
+
+        commitment = _validCommitment();
+        commitment.policyManifest.policyManifestHash = keccak256("arbitrary-policy-preimage");
         vm.prank(creator);
         vm.expectRevert(V2FundingFixture.InvalidCommitment.selector);
         fixture.createCampaign(commitment);
@@ -282,6 +317,10 @@ contract V2FundingFixtureTest is Test {
 
         vm.startPrank(backerB);
         token.approve(address(fixture), 600e6);
+        vm.expectEmit(true, true, true, true);
+        emit V2FundingFixture.MilestoneFundingFinalized(
+            FIXTURE_IDENTITY, campaignId, 0, true, 1_000e6, 0, 1
+        );
         fixture.contribute(campaignId, 0, 600e6);
         vm.stopPrank();
 
@@ -392,7 +431,7 @@ contract V2FundingFixtureTest is Test {
         vm.prank(backerA);
         vm.expectEmit(true, true, true, true);
         emit V2FundingFixture.MilestoneRefundClaimed(
-            FIXTURE_IDENTITY, campaignId, 0, backerA, 400e6, 2
+            FIXTURE_IDENTITY, campaignId, 0, backerA, 400e6, 1
         );
         fixture.claimFundingRefund(campaignId, 0);
         vm.prank(backerB);
@@ -418,6 +457,8 @@ contract V2FundingFixtureTest is Test {
         V2FundingFixture failingFixture = new V2FundingFixture(failingToken, FIXTURE_IDENTITY);
         V2FundingTypes.CampaignCommitment memory commitment = _validCommitment();
         commitment.policyManifest.token = address(failingToken);
+        commitment.policyManifest.policyManifestHash =
+            failingFixture.policyManifestHashFor(commitment.policyManifest);
         address backer = makeAddr("retry-refund");
         failingToken.mint(backer, 250e6);
 
@@ -446,6 +487,55 @@ contract V2FundingFixtureTest is Test {
         assertEq(failingFixture.refunded(campaignId, 0), 250e6);
         assertEq(failingToken.balanceOf(address(failingFixture)), 0);
         assertEq(failingToken.balanceOf(backer), 250e6);
+    }
+
+    function test_failedContributionTransferRollsBackLedgerAndCustody() public {
+        TransferControlMockUSDC failingToken = new TransferControlMockUSDC();
+        V2FundingFixture failingFixture = new V2FundingFixture(failingToken, FIXTURE_IDENTITY);
+        V2FundingTypes.CampaignCommitment memory commitment = _validCommitment();
+        commitment.policyManifest.token = address(failingToken);
+        commitment.policyManifest.policyManifestHash =
+            failingFixture.policyManifestHashFor(commitment.policyManifest);
+        address backer = makeAddr("failed-contribution");
+        failingToken.mint(backer, 250e6);
+
+        vm.prank(creator);
+        uint256 campaignId = failingFixture.createCampaign(commitment);
+        failingToken.setTransfersFail(true);
+        vm.startPrank(backer);
+        failingToken.approve(address(failingFixture), 250e6);
+        vm.expectRevert();
+        failingFixture.contribute(campaignId, 0, 250e6);
+        vm.stopPrank();
+
+        assertEq(failingFixture.raised(campaignId, 0), 0);
+        assertEq(failingFixture.contributionOf(campaignId, 0, backer), 0);
+        assertEq(failingToken.balanceOf(address(failingFixture)), 0);
+        assertEq(failingToken.balanceOf(backer), 250e6);
+    }
+
+    function test_feeOnTransferContributionIsRejectedAtomically() public {
+        FeeOnTransferMockUSDC feeToken = new FeeOnTransferMockUSDC();
+        V2FundingFixture feeFixture = new V2FundingFixture(feeToken, FIXTURE_IDENTITY);
+        V2FundingTypes.CampaignCommitment memory commitment = _validCommitment();
+        commitment.policyManifest.token = address(feeToken);
+        commitment.policyManifest.policyManifestHash =
+            feeFixture.policyManifestHashFor(commitment.policyManifest);
+        address backer = makeAddr("fee-contribution");
+        feeToken.mint(backer, 250e6);
+
+        vm.prank(creator);
+        uint256 campaignId = feeFixture.createCampaign(commitment);
+        vm.startPrank(backer);
+        feeToken.approve(address(feeFixture), 250e6);
+        vm.expectRevert(V2FundingFixture.UnsupportedTokenTransfer.selector);
+        feeFixture.contribute(campaignId, 0, 250e6);
+        vm.stopPrank();
+
+        assertEq(feeFixture.raised(campaignId, 0), 0);
+        assertEq(feeFixture.contributionOf(campaignId, 0, backer), 0);
+        assertEq(feeToken.balanceOf(address(feeFixture)), 0);
+        assertEq(feeToken.balanceOf(backer), 250e6);
     }
 
     function test_milestoneTwoCannotOpenWithoutPaidMilestoneOne() public {
@@ -532,7 +622,7 @@ contract V2FundingFixtureTest is Test {
         commitment.policyManifest = V2FundingTypes.PolicyManifest({
             commitmentSchemaVersion: "FTV2-COMMIT-2",
             policyVersion: "fundtogether-vnext-v2-pr0-remediation-20261025",
-            policyManifestHash: POLICY_MANIFEST_HASH,
+            policyManifestHash: bytes32(0),
             chainId: LOCAL_CHAIN_ID,
             token: address(token),
             creator: creator,
@@ -549,6 +639,8 @@ contract V2FundingFixtureTest is Test {
             maxResetsPerCourt: 1,
             maxResetsPerCase: 2
         });
+        commitment.policyManifest.policyManifestHash =
+            fixture.policyManifestHashFor(commitment.policyManifest);
 
         commitment.milestoneId = new uint256[](2);
         commitment.deliverableCommitment = new bytes32[](2);

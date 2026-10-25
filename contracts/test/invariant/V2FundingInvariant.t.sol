@@ -75,7 +75,7 @@ contract V2FundingInvariantHandler is Test {
         commitment.policyManifest = V2FundingTypes.PolicyManifest({
             commitmentSchemaVersion: "FTV2-COMMIT-2",
             policyVersion: "fundtogether-vnext-v2-pr0-remediation-20261025",
-            policyManifestHash: keccak256("invariant-pr1-policy-manifest"),
+            policyManifestHash: bytes32(0),
             chainId: block.chainid,
             token: address(token),
             creator: creator,
@@ -92,6 +92,8 @@ contract V2FundingInvariantHandler is Test {
             maxResetsPerCourt: 1,
             maxResetsPerCase: 2
         });
+        commitment.policyManifest.policyManifestHash =
+            fixture.policyManifestHashFor(commitment.policyManifest);
 
         commitment.milestoneId = new uint256[](2);
         commitment.deliverableCommitment = new bytes32[](2);

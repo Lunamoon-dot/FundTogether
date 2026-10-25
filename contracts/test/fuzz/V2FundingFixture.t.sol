@@ -8,8 +8,6 @@ contract V2FundingFixtureFuzzTest is Test {
     uint256 internal constant LOCAL_CHAIN_ID = 31339;
     bytes32 internal constant FIXTURE_IDENTITY =
         keccak256("fundtogether-vnext-v2-pr1-funding-fixture");
-    bytes32 internal constant POLICY_MANIFEST_HASH = keccak256("fuzz-pr1-policy-manifest");
-
     MockUSDC internal token;
     V2FundingFixture internal fixture;
     address internal creator = makeAddr("fuzz-creator");
@@ -118,7 +116,7 @@ contract V2FundingFixtureFuzzTest is Test {
         commitment.policyManifest = V2FundingTypes.PolicyManifest({
             commitmentSchemaVersion: "FTV2-COMMIT-2",
             policyVersion: "fundtogether-vnext-v2-pr0-remediation-20261025",
-            policyManifestHash: POLICY_MANIFEST_HASH,
+            policyManifestHash: bytes32(0),
             chainId: LOCAL_CHAIN_ID,
             token: address(token),
             creator: creator,
@@ -135,6 +133,8 @@ contract V2FundingFixtureFuzzTest is Test {
             maxResetsPerCourt: 1,
             maxResetsPerCase: 2
         });
+        commitment.policyManifest.policyManifestHash =
+            fixture.policyManifestHashFor(commitment.policyManifest);
 
         commitment.milestoneId = new uint256[](2);
         commitment.deliverableCommitment = new bytes32[](2);
