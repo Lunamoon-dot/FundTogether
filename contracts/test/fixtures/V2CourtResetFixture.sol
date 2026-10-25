@@ -519,7 +519,8 @@ contract V2CourtResetFixture is V2FinancialAccountingFixture {
         if (!court.commitSubmitted[seat] || court.revealValid[seat]) {
             revert DuplicateVoteAction();
         }
-        bytes32 expected = keccak256(abi.encode(caseId, courtId, msg.sender, pass, salt));
+        CaseRecord storage reviewCase = _case(caseId);
+        bytes32 expected = _commitmentHash(reviewCase, court, msg.sender, pass, salt);
         if (expected != court.commitments[seat]) revert InvalidVoteReveal();
         court.passVote[seat] = pass;
         court.revealValid[seat] = true;
@@ -649,10 +650,13 @@ contract V2CourtResetFixture is V2FinancialAccountingFixture {
 
     function commitmentFor(bytes32 caseId, bytes32 courtId, address judge, bool pass, bytes32 salt)
         external
-        pure
+        view
         returns (bytes32)
     {
-        return keccak256(abi.encode(caseId, courtId, judge, pass, salt));
+        CaseRecord storage reviewCase = _case(caseId);
+        CourtAttempt storage court = courts[courtId];
+        if (court.caseId != caseId) revert InvalidCourtId();
+        return _commitmentHash(reviewCase, court, judge, pass, salt);
     }
 
     function caseTerms(bytes32 caseId) external view returns (CaseRecord memory) {
@@ -749,6 +753,32 @@ contract V2CourtResetFixture is V2FinancialAccountingFixture {
                 court.level,
                 court.courtId,
                 court.attemptIndex
+            )
+        );
+    }
+
+    function _commitmentHash(
+        CaseRecord storage reviewCase,
+        CourtAttempt storage court,
+        address judge,
+        bool pass,
+        bytes32 salt
+    ) internal view returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                block.chainid,
+                resetDeploymentIdentity,
+                reviewCase.policyVersion,
+                reviewCase.campaignId,
+                reviewCase.milestoneId,
+                court.caseId,
+                court.level,
+                court.attemptIndex,
+                court.resetId,
+                court.courtId,
+                judge,
+                pass,
+                salt
             )
         );
     }
