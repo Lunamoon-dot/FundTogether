@@ -93,13 +93,13 @@ approved runtime rule.
 
 | ID | Issue | Impact | Gate |
 | --- | --- | --- | --- |
-| O1 | The repository contains no exact contribution-weighted quadratic formula, vote threshold, tie rule, anti-splitting treatment or rounding/overflow policy for BackerDAO. | P0 / blocking. A contract cannot safely implement the requested DAO without inventing semantics. | Freeze a named formula version, voter snapshot, effective-weight calculation, threshold and tie disposition. |
-| O2 | It is unresolved whether publication review, which happens before funding, is governed by BackerDAO. | P0 / blocking for one uniform review protocol. There may be no Backer voter. | Keep publication on the current pre-funding court policy or define a creator-prefunded/public electorate. |
-| O3 | The maximum number of Court Resets and exact procedural penalty for a non-committing/non-revealing Judge are unspecified. | P0 / fund-safety and liveness. Unlimited resets can grief a case; undefined penalty can exceed collateral. | Freeze reset count, per-Judge penalty, multi-offender allocation and required collateral. |
-| O4 | The task says court cost/reward comes from the milestone pool but gives only the valid-court reward reserve formula. | P0 / solvency. Reset compensation may create an unbudgeted obligation. | Decide whether reset compensation is stake-only, reserve-funded or a separately frozen reserve. |
+| O1 | CWQ-1, snapshot, threshold, tie and overflow policy remain proposed. Wallet splitting can increase weight. | Blocking PR4 and full policy adoption; not isolated PR1 funding code. | Approve the named formula, snapshot/caps, threshold/tie rule and explicit Sybil limitation. |
+| O2 | Publication has no pre-funding Backer electorate; PUBLICATION_PRE_FUND_V1 is proposed. | Blocking publication integration/user funding, not PR1's Foundry fixture. | Approve pre-funding Court 1 only and bounded correction/deadlines. |
+| O3 | Cost coverage and bounded invalid-court duties require approval of CCPS-1. | Blocking PR3; undercollateralized assignment must be impossible. | Freeze reset limits, maximum cost, per-seat collateral and single-total multi-offender allocation. |
+| O4 | CCPS-1 proposes a closed cost schedule funded only from offending locked stake. | Blocking PR3 cost/recipient accounting; not a PR1 funding input. | Approve fixed allowances, zero variable reimbursement, recipients and funded claims; never use contribution/reserve funds. |
 | O5 | Reasoning and evidence references are required for public audit, but canonical storage and disclosure format is not specified on-chain. | P1 / auditability. A database-only reasoning field cannot be authoritative. | Freeze a signed/off-chain schema and an on-chain content hash/event binding. |
 | O6 | Treatment of a Court 2 that is repeatedly reset or reaches PROTOCOL_FAIL is not specified. | P1 / terminal behavior. The system must fail closed without unlimited correction. | Freeze bounded reset/retry transitions and residual refund policy. |
-| O7 | Whether a Judge may vote in the BackerDAO for the same case is not specified. | P1 / conflict policy. A Judge could influence whether their own ruling is appealed. | Adopt or reject same-case Judge/DAO participation explicitly. |
+| O7 | DAO-TEMPORAL-1 proposes Court 1 exclusion at DAO open and actual DAO-voter exclusion from later Court 2 selection. | Blocking PR4; future assignment cannot change past votes. | Approve each new restriction separately; preserve locked Court 1/Court 2 isolation and immutable DAO history. |
 | O8 | Publication reward funding before any backer contribution is not specified. | P1 / accounting. A nonzero publication reward cannot be charged to a nonexistent milestone pool. | Keep local publication fee zero or define creator-prefunding/external subsidy. |
 
 PR0 closes the documentation disposition without closing a runtime gate by
@@ -120,9 +120,11 @@ each O1–O8. The candidate package has three deliberate boundaries:
 * Publication review is pre-funding, Court 1 only, with no BackerDAO electorate
   and no local milestone reward. A future non-zero publication subsidy requires
   a separate prefunded policy version.
-* Court Reset is bounded and separate from appeal. A missing Judge pays a
-  positive penalty from locked case stake into a separate reset pool; the
-  milestone contribution escrow and valid-court reserve are not charged.
+* Court Reset is bounded and separate from appeal. CCPS-1 requires per-seat
+  collateral for the maximum cancelled-court cost before assignment. Offenders
+  split one cost total from locked stake; the milestone contribution escrow
+  and valid-court reserve are not charged. Fixed allowances and recipient rules
+  remain pending, with no variable actual-gas reimbursement.
 
 The PR1–PR4 acceptance gates are in
 [PR1-PR4_ACCEPTANCE_CRITERIA.md](PR1-PR4_ACCEPTANCE_CRITERIA.md). These files
@@ -208,7 +210,16 @@ Before the campaign becomes pledgeable, the creator freezes:
 * acceptance-criteria hashes and deliverable identifiers;
 * evidence and reasoning disclosure policy;
 * applicable Court and DAO policy identifiers;
-* a commitment hash covering the complete ordered array.
+* a commitment hash covering the complete ordered array and economic manifest,
+  with an immutable typed schema/version and full values at campaign creation.
+
+The registry's proposed `FTV2-COMMIT-2` binds reward/reserve/payout, reset
+costs/collateral/limits/recipients, DAO/conflicts, publication/correction and
+reasoning/evidence policy. No later case, funding window or DAO opening can
+fill in missing economics or point the campaign at a changed policy version.
+PR1's isolated Foundry fixture may commit complete test-only values without
+approving them; it cannot accept user funding or be retrofitted into a funded
+campaign. Full adoption requires all committed policies approved/integrated.
 
 The campaign total target is:
 
@@ -230,12 +241,12 @@ The contract record is immutable except for state, counters and case pointers:
 | acceptanceCriteriaHash | Acceptance standard used by both courts | Campaign creation |
 | fundingTarget | Maximum accepted contribution | Campaign creation |
 | creatorPayoutBudget | Maximum creator payout after review reserve | Campaign creation |
-| judgeRewardRateBps | Fixed percentage per Judge | Before funding opens |
-| judgeRewardUnit | Integer reward per Judge in token units | Before funding opens |
-| maxReviewReserve | judgeRewardUnit × 3 × 2 | Before funding opens |
+| judgeRewardRateBps | Fixed percentage per Judge | Campaign creation |
+| judgeRewardUnit | Integer reward per Judge in token units | Campaign creation |
+| maxReviewReserve | judgeRewardUnit × 3 × 2 | Campaign creation |
 | evidenceCommitment | Hash of exact evidence revision | Evidence submission |
-| submissionDeadline | Latest evidence submission time | Milestone activation |
-| fundingDeadline | Latest time to reach target | Milestone activation |
+| submissionDeadline | Exact time or immutable activation-relative rule | Campaign creation; rule instantiated at activation |
+| fundingDeadline | Exact time or immutable activation-relative rule | Campaign creation; rule instantiated at activation |
 | financialStatus | Funding, reserve, payout, refund and settlement state | Contract transitions |
 | reviewStatus | Court, DAO, reset and final ruling state | Contract transitions |
 
@@ -329,7 +340,7 @@ evidence-reference commitment.
 
 ~~~text
 COURT_1_ENROLLMENT
-      ↓ snapshot + random assignment
+      ↓ snapshot + collateral coverage guard + random assignment
 COURT_1_COMMIT
       ↓ commit deadline
 COURT_1_REVEAL
@@ -339,29 +350,65 @@ COURT_1_REVEAL
 
 The provisional verdict is a contract result, not a database interpretation.
 When all required reveals are valid, the contract immediately opens the
-BackerDAO window. The contract emits complete vote/reveal history and the
-reasoning/evidence reference hash for each Judge position.
+BackerDAO window and freezes contributions, eligibility and prior Court 1
+assignment history. Court 2 is not assigned at this point. The contract emits
+complete vote/reveal history and the reasoning/evidence reference hash for
+each Judge position.
 
 ### 7.2. Court Reset
 
-A reset is procedural recovery for an invalid court:
+A reset is procedural recovery for an invalid court under the proposed
+`CCPS-1` cost schedule:
 
-1. mark the court INVALID;
-2. identify each Judge who missed the required duty;
-3. apply only the pre-frozen procedural penalty, bounded by locked case stake;
-4. release or settle non-offending stake under the frozen rule;
-5. preserve invalid-court and penalty records;
-6. draw three new unique Judges, excluding Judges disallowed by case policy;
-7. open a new commit/reveal window with a new courtId and resetId.
+1. after the original reveal deadline, mark the court INVALID and classify
+   each assigned seat once for missed commit and/or valid reveal;
+2. atomically debit the pre-reserved offender locks and credit the fixed
+   compensation claims; settle costs even if this attempt is terminal;
+3. release remaining stake, preserve history and the once-only settlement
+   identity, with zero valid-service reward for the invalid court;
+4. if the level's reset is still available, randomly draw three new eligible
+   Judges, exclude every prior case assignee (and Court 2 DAO voters under
+   O7), and lock sufficient fresh collateral before assignment;
+5. open a new commit/reveal window with a new courtId and resetId; otherwise
+   enter `PROTOCOL_FAIL` without a replacement.
 
-A reset does not become Court 2, reverse a substantive verdict, count as a DAO
-APPEAL, justify minority slashing or permit backend-selected replacements.
-The required locked stake must cover the maximum procedural penalty that the
-adopted reset policy can charge to one Judge. PR0's candidate policy charges a
-positive percentage of each offending Judge's locked stake into a separate
-reset compensation pool, applies one reset per Court 1/Court 2 and fails closed
-after the case cap. The exact percentage, recipient and cap remain approval
-gates in the PR0 decision record.
+```text
+Before assignment:
+  resetCostMax = 2D + F
+  requiredLockedStake = max(caseStakeRequirement, resetCostMax) per seat
+  D >= 0; F >= 3 base units; three independent sufficient reservations
+
+Invalid court with n offenders (1..3):
+  totalResetCompensation = (3 - n)D + F
+  penalty_i = equal share of this ONE total among offenders
+              + deterministic remainder by ascending canonical address
+  compliant-seat penalty = 0
+  compensation credits = D per compliant seat + F once to finalizer
+
+Valid court (n = 0): totalResetCompensation = 0; no procedural slash
+```
+
+The registry defines the exact integer allocation and R1–R10. Fixed D/F
+allowances compensate cancelled work/finalization by convention; variable
+actual-cost reimbursement is disabled (cap 0), and unprovable damages are
+excluded. Every seat must cover sole-offender liability before assignment.
+An insufficient lock prevents assignment rather than creating unpaid debt.
+Stake reserved elsewhere cannot be reused.
+
+The unsupported percentage slash is replaced by cost coverage. Slash equals
+funded compensation credits, kept outside contribution escrow and valid-court
+reward reserve. Claims are pull-based and once-only; failed transfers leave
+the funded claim retryable without blocking a replacement. An unassigned
+timeout creates no assigned-duty claim or debt.
+
+One reset per Court level and two per case are proposed. An invalid replacement
+at either level is terminal even if the other level has an unused reset.
+At most three invalid settlements are reachable in a milestone case because
+Court 1 must become valid before Court 2. D/F, collateral, recipients, caps and
+O6 terminal disposition remain `PROPOSED_PENDING_APPROVAL`.
+
+A reset never becomes Court 2, consumes the appeal allowance, reverses a
+substantive verdict or justifies minority-vote slashing.
 
 ### 7.3. BackerDAO appeal
 
@@ -371,7 +418,7 @@ to that milestone. The ballot has only two decisions:
 | Choice | Effect |
 | --- | --- |
 | ACCEPT | Close appeal and establish the Court 1 substantive result as final. |
-| APPEAL | Consume the one Court 2 allowance and open a new three-Judge review over the same evidence revision and criteria. |
+| APPEAL | Finalize DAO, consume the one Court 2 allowance, then randomly assign a new three-Judge review over the same evidence revision and criteria. |
 
 The DAO does not submit PASS or FAIL and cannot directly flip Court 1. Its only
 authority is choosing whether Court 2 opens.
@@ -382,31 +429,53 @@ must bind the formula version, snapshot identity, participation threshold, tie
 rule, checked overflow bounds and one-ballot replay guard. The formula and
 vectors remain `PROPOSED_PENDING_APPROVAL` until the policy owner signs them
 off; a deployment missing any of those fields must reject the DAO policy.
+Weights are contribution-based, not identity-based. Wallet splitting can
+increase weight and change the outcome (Q6/Q10); CWQ-1 does not guarantee
+Sybil resistance, incentive compatibility or collusion resistance.
+
+Under the proposed `DAO-TEMPORAL-1`, DAO opening excludes only Court 1
+assignees already recorded, including invalid/replacement history. They are
+excluded from eligible votes and the denominator before the immutable snapshot
+is sealed. Court 2 assignments do not yet exist and cannot be used as DAO
+exclusions. Rejected ballots never mutate the frozen denominator.
+
+After finalized APPEAL, freeze all valid DAO voters (ACCEPT and APPEAL) for
+the proposed Court 2 voter exclusion. Assignment cannot retroactively change
+eligibility, ballots, weight, participation or the DAO decision. These added
+conflict restrictions are pending; Court 1/Court 2 isolation is already locked.
 
 ### 7.4. Court 2
 
 Court 2 reuses the exact evidence revision and acceptance criteria and has:
 
 * three new unique Judges;
-* no Judge who occupied a Court 1 seat for the case;
+* no Judge who occupied any Court 1 seat for the case, including invalid and
+  replacement attempts (locked isolation);
+* selection only after finalized DAO APPEAL, with exclusion of all actual
+  valid DAO voters under the proposed O7 restriction, also on replacement;
 * a separate court/pool identity;
 * its own commit/reveal deadlines and history;
 * authority to establish final substantive PASS or FAIL.
 
 Court 2 may replace the provisional Court 1 result and becomes the source of
 the final substantive verdict. Only one Court 2 is permitted per case. If
-Court 2 is invalid, use reset; do not create another appeal round.
+Court 2 is invalid, use reset; do not create another appeal round. Failure to
+find eligible candidates follows the approved bounded timeout/protocol-failure
+path, never erasure of past DAO votes or ad hoc relaxation of conflicts.
 
 ## 8. Financial accounting model
 
 ### 8.1. Ledgers
 
-Every milestone has four separate logical ledgers:
+Use separate logical ledgers (reserve and creator budget are allocations of
+contribution escrow, not additional assets):
 
 1. Contribution escrow: canonical Backer contributions for that milestone.
 2. Review reserve: frozen maximum for valid Court 1/Court 2 service rewards.
 3. Creator payout: frozen creator payout budget.
 4. Judge stake: Judge collateral, never counted as Backer contribution.
+5. Invalid-court compensation: debited offender stake and fully funded D/F
+   claims, outside contribution escrow and valid-service Judge rewards.
 
 One physical escrow contract is acceptable, but logical sub-balances must make
 it impossible to promise one token to both a creator and a Backer.
@@ -416,17 +485,25 @@ it impossible to promise one token to both a creator and a Backer.
 For milestone m:
 
 ~~~text
-Raised_m + ExplicitInflows_m
-  = CreatorPaid_m
-  + JudgePaid_m
-  + Refunded_m
-  + EscrowRemaining_m
-  + ExplicitOutflows_m
+Raised_m = CreatorPaid_m + JudgePaid_m + Refunded_m + EscrowRemaining_m
+ResetSlashCollected = ResetCompensationPaid + ResetCompensationUnclaimed
 ~~~
 
-ExplicitInflows_m includes only defined transfers such as slashed stake
-credited to a milestone compensation pool. Judge stake deposits and withdrawals
-remain in the JuryRegistry identity.
+CCPS-1 moves offending locked stake only into the separate funded compensation
+ledger. It is never a milestone inflow, contribution, valid-service reward or
+Backer refund. Judge stake deposits/withdrawals remain in JuryRegistry; reserve
+and creator allocations are not counted a second time as assets.
+
+`JudgePaid_m` includes valid-service funds irrevocably isolated into a funded
+Judge claim ledger at settlement, including unclaimed earned rewards. A later
+withdrawal reduces that ledger, not milestone escrow a second time. Refunds
+exclude earned funded obligations even when no Judge has withdrawn yet;
+unearned reserve remains refundable. The funded service amount cannot also
+be promised to Backers:
+
+~~~text
+JudgePaid_m = JudgeRewardClaimed_m + JudgeRewardUnclaimed_m
+~~~
 
 Mandatory bounds:
 
@@ -487,7 +564,7 @@ not silently mixed into Backer refunds.
 | Any wallet | Create campaign | Valid frozen commitment, complete milestone array and policy hash | None until a later transition |
 | Creator | Open/submit evidence | Active milestone, creator wallet, deadline, exact criteria and revision | Cannot pay self directly |
 | Backer | Fund active milestone | Funding open, canonical token transfer, amount at most remaining target | Own contribution claim only |
-| Backer | Vote in BackerDAO | Snapshot contributor, one ballot, DAO window, valid formula policy | ACCEPT/APPEAL only |
+| Backer | Vote in BackerDAO | Eligible snapshot contributor under approved prior-assignment conflict policy, one ballot, DAO window, valid formula | ACCEPT/APPEAL only |
 | Judge | Deposit/lock stake | Registry balance and case eligibility | Own stake collateral only |
 | Judge | Commit/reveal | Assigned seat and correct case/court/deadline/commitment | No direct payout authority |
 | Permissionless caller | Finalize funding, court, DAO, payout or refund | Frozen deadline and state guards | Cannot redirect another claim |
@@ -505,17 +582,17 @@ not silently mixed into Backer refunds.
 | Creator changes criteria | Criteria hash and payout budget are immutable; new bytes need a revision under same criteria | Replay and altered-criteria tests. |
 | Judge collusion/bribery | Commit–reveal hides votes before reveal; it does not claim truthfulness | Accepted research limitation. |
 | Judge non-reveal griefing | Court invalid, reset selected, offending stake penalized by frozen rule | O3 blocks implementation until penalty/cap are fixed. |
-| Multiple offending Judges | No invented split; use versioned allocation after policy freeze | One, two and three offender tests. |
+| Multiple offending Judges | Split one CCPS-1 cost total among offenders; pre-lock each seat for sole-offender liability | R1–R10, exact bound and no duplicate compensation. |
 | Court 1 minority is factually correct | Majority/DAO/Court 2 can still choose the other result; no automatic minority slash | Preserve as limitation. |
-| Backer whale or wallet splitting | DAO formula must be explicit; no Sybil-resistance claim | O1 blocks implementation and requires simulation. |
-| Judge votes in own DAO appeal | Apply adopted conflict rule; do not infer it in UI | O7 policy test. |
+| Backer whale or wallet splitting | Contribution-based CWQ-1 can reward splitting; no Sybil/incentive/collusion guarantee | Q6/Q10; O1 gates PR4, no new Sybil research. |
+| Judge votes in own DAO appeal | Snapshot known Court 1 conflicts; exclude actual DAO voters from later Court 2 if approved | Temporal O7 tests; future assignments cannot alter past votes. |
 | Court 2 reverses Court 1 | Settlement consumes Court 2 final result; Court 1 history remains immutable | Both reversal directions. |
 | Invalid Court 2 | Reset, no second appeal, no substantive result from invalid court | Reset identity and appeal counter tests. |
 | Duplicate payout/reward/refund | Per-milestone, per-case and per-claim flags prevent double spend | Invariant and race tests. |
 | Token transfer failure | Revert state change; claim remains retryable | Reverting/fee-on-transfer token tests. |
 | Stale or reorged indexer | UI exposes submitted/mined/canonical/indexed stages; chain is authority | Replay/reorg and no DB-only payout tests. |
 | Evidence unavailable | Review cannot claim evidence-ready; timeout follows frozen policy | Availability/timeout tests. |
-| Reset cost exceeds locked stake | Reject policy or cap penalty before opening court | Solvency invariant; O3/O4 gate. |
+| Reset cost exceeds locked stake | Reject policy/assignment before obligations exist; never truncate promised compensation or borrow escrow | CCPS-1 collateral proof; O3/O4 gate PR3. |
 
 ## 11. Backend, frontend and indexer impact
 
@@ -574,7 +651,9 @@ V2 should retain current event identity fields and add:
 * VoteRevealed(caseId, roundId, courtId, resetId, judge, vote, reasoningHash, referenceHash)
 * CourtFinalized(caseId, roundId, courtId, resetId, outcome, validity)
 * CourtReset(caseId, resetId, previousCourtId, replacementCourtId)
-* JudgeProceduralPenalty(caseId, resetId, judge, amount)
+* CourtInvalidated(caseId, courtId, attemptIndex, offenderCount, compensationTotal)
+* JudgeProceduralPenalty(caseId, courtId, attemptIndex, judge, amount)
+* ResetCompensationAccrued(caseId, courtId, attemptIndex, recipient, amount)
 * BackerDaoOpened(caseId, snapshotId, formulaVersion, deadline)
 * BackerDaoVoteCast(caseId, voter, choice, effectiveWeight)
 * BackerDaoFinalized(caseId, choice, snapshotWeight, acceptWeight, appealWeight)
@@ -587,7 +666,9 @@ V2 should retain current event identity fields and add:
 * MilestoneRefundsOpened(campaignId, milestoneId, pool, snapshot)
 * BackerRefundClaimed(campaignId, milestoneId, backer, amount)
 
-The exact ABI is an implementation deliverable after O1–O8 are resolved.
+The exact ABI is a deliverable of each consuming implementation after its
+scoped policy approvals. Invalid-court compensation events use the unique
+attempt identity even when terminal invalidity creates no new resetId.
 
 ## 13. Contract decomposition and compatibility
 
@@ -634,8 +715,8 @@ future, independently reviewable pull request after policy gates pass.
 
 | PR | Deliverable | Required tests/gates |
 | --- | --- | --- |
-| 0 | Adopt V2 policy version; resolve O1–O8; publish parameter registry and commitment schema | [PR0 policy record](PR0_POLICY_FINALIZATION.md), [registry](parameters-v2-policy.md), exact DAO vectors and arithmetic overflow vectors |
-| 1 | Add per-milestone funding targets, active pointer, funding deadlines, contribution ledgers and no-overfunding guard | Unit/fuzz ordering, target boundary, deadline, duplicate contribution and failed transfer tests |
+| 0 | Publish V2 candidate identity, O1–O8 dispositions, scoped approval gates and complete commitment schema | [PR0 policy record](PR0_POLICY_FINALIZATION.md), [registry](parameters-v2-policy.md), exact DAO vectors and arithmetic overflow vectors |
+| 1 | Add isolated Foundry funding fixture: complete immutable terms/identity, targets, active pointer, deadlines, contribution ledger and no-overfunding | Ordering, exact target, funding-failure refund and failed-transfer tests; no dependency on PR4 numeric approval or user funding |
 | 2 | Add fixed Judge reward policy, reserve accounting, creator payout budget and pull settlement | Exact numeric examples, conservation invariant and reward/remainder/dust tests |
 | 3 | Add Court reset identity, procedural penalty and bounded replacement selection | Missing commit/reveal, one/two/three offender, collateral bound and reset-not-appeal tests |
 | 4 | Add BackerAppealDAO with frozen quadratic formula and one Court 2 | Snapshot, one ballot, formula/overflow, ACCEPT/APPEAL, tie/quorum and no-overlap tests |
@@ -653,9 +734,9 @@ future, independently reviewable pull request after policy gates pass.
 | No overfunding | Fuzzed contribution boundary and concurrent-looking calls |
 | Fixed reward reserve | Deterministic token-decimal, floor-rounding, reserve-cap and payout-positivity vectors |
 | Court 1 validity | Three unique Judges, required reveals and invalid court never becoming a verdict |
-| Court reset | Bounded reset count, penalty at most locked stake, new Judges, history preserved and reset not Court 2 |
+| Court reset | CCPS-1 R1–R10, pre-assignment coverage, one compensation total, terminal invalidity settlement, fresh Judges and reset not Court 2 |
 | DAO governance | Approved formula version, snapshot, one ballot, quadratic vectors, threshold/tie policy and ACCEPT/APPEAL only |
-| Court 2 isolation | No Court 1 overlap, same evidence/criteria and at most one appeal |
+| Court 2 isolation | Random assignment after finalized APPEAL, no Court 1 overlap, proposed actual-voter exclusion, unchanged past DAO votes and at most one appeal |
 | Final settlement | Court 1 ACCEPT and Court 2 PASS/FAIL reproduce exact accounting examples |
 | Protocol failure | No creator payout, no minority slash and residual refund per adopted policy |
 | Conservation | Per-milestone and campaign roll-up invariants with explicit inflow/outflow identities |
@@ -665,8 +746,13 @@ future, independently reviewable pull request after policy gates pass.
 | Indexing | Canonical events are idempotent/reorg-safe; projections never override chain reads |
 | Research boundary | No CEAV signal/X/high-effort/trusted-audit field appears in V2 runtime or ABI |
 
-V2 is not implementation-ready until every P0 issue is approved, the formula is
-versioned, and conservation/state-machine tests pass on a clean deployment.
+Each implementation PR is gated only by its consumed policy fields; see the
+[dependency matrix](PR1-PR4_ACCEPTANCE_CRITERIA.md#dependency-matrix). PR1's
+Foundry-only funding fixture has no direct dependency on CWQ-1, DAO thresholds
+or reset costs. It must seal complete test terms, cannot fabricate PAID or
+open M2, and cannot accept user funding. Full V2 campaign adoption requires
+all committed policies approved/versioned and integrated conservation/state-
+machine tests passing before any contribution is enabled.
 
 ## 17. Compatibility risks
 
@@ -695,7 +781,8 @@ Judge reward reserve. Those differences affect custody, authorization, state
 identity and accounting; UI labels or database projections cannot solve them.
 
 This document is a design proposal and audit, not a compatibility or deployment
-claim. PR0 supplies the concrete policy candidates and approval gates; the next
-safe action is to approve the O1–O4 economic/reset choices and then implement
-PR1–PR4 with the linked acceptance criteria. No runtime or live financial
-parameter changes are authorized by this proposal.
+claim. PR0 supplies concrete pending policy candidates and scoped approval
+gates. PR1 can be prepared as an isolated funding fixture from locked funding
+decisions; PR2/PR3/PR4 still require their financial/reset/DAO approvals. No
+runtime implementation or live financial parameter change is authorized by
+this remediation.
