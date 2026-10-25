@@ -68,9 +68,20 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
     bytes32 public immutable accountingDeploymentIdentity;
     IV2FinalOutcomeSource public immutable outcomeSource;
 
+    mapping(uint256 => mapping(uint256 => bool)) public settlementProcessed;
+    mapping(uint256 => mapping(uint256 => bytes32)) public settledCaseId;
+    mapping(uint256 => mapping(uint256 => V2FinancialAccountingTypes.FinalOutcome))
+        public finalOutcome;
+    mapping(uint256 => mapping(uint256 => uint256)) public judgePaid;
+    mapping(uint256 => mapping(uint256 => uint256)) public judgeRewardClaimed;
+    mapping(bytes32 => mapping(address => uint256)) public judgeRewardEntitlement;
+    mapping(bytes32 => mapping(address => bool)) public judgeRewardWasClaimed;
+    mapping(bytes32 => bool) public caseSettlementProcessed;
+
     error InvalidFinancialTerms();
     error InvalidFixtureIdentity();
     error InvalidOutcomeTranscript();
+    error SettlementAlreadyProcessed();
 
     constructor(
         IERC20 token_,
@@ -95,7 +106,7 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
         view
         returns (
             bytes32 caseId,
-            V2FinancialAccountingTypes.FinalOutcome finalOutcome,
+            V2FinancialAccountingTypes.FinalOutcome resolvedOutcome,
             uint256 validCourtCount
         )
     {
@@ -108,6 +119,37 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
             outcomeSource.finalizedTranscript();
         validCourtCount = _validateTranscript(transcript, campaignId, milestoneId);
         return (transcript.caseId, transcript.finalOutcome, validCourtCount);
+    }
+
+    function settleMilestone(uint256 campaignId, uint256 milestoneId) external {
+        Milestone storage milestone = _milestone(campaignId, milestoneId);
+        if (milestone.state != V2FundingTypes.MilestoneState.FUNDED) {
+            revert InvalidOutcomeTranscript();
+        }
+        if (settlementProcessed[campaignId][milestoneId]) {
+            revert SettlementAlreadyProcessed();
+        }
+
+        V2FinancialAccountingTypes.FinalizedTranscript memory transcript =
+            outcomeSource.finalizedTranscript();
+        uint256 validCourtCount = _validateTranscript(transcript, campaignId, milestoneId);
+        if (caseSettlementProcessed[transcript.caseId]) revert SettlementAlreadyProcessed();
+
+        uint256 rewardTotal = milestone.judgeRewardUnit * REFERENCE_COURT_SIZE * validCourtCount;
+        if (rewardTotal > milestone.maxReviewReserve) revert InvalidFinancialTerms();
+
+        settlementProcessed[campaignId][milestoneId] = true;
+        caseSettlementProcessed[transcript.caseId] = true;
+        settledCaseId[campaignId][milestoneId] = transcript.caseId;
+        finalOutcome[campaignId][milestoneId] = transcript.finalOutcome;
+        judgePaid[campaignId][milestoneId] = rewardTotal;
+
+        if (transcript.court1.valid) {
+            _accrueCourt(transcript.caseId, transcript.court1, milestone.judgeRewardUnit);
+        }
+        if (transcript.court2.valid) {
+            _accrueCourt(transcript.caseId, transcript.court2, milestone.judgeRewardUnit);
+        }
     }
 
     function deriveFinancialTerms(uint256 fundingTarget, uint256 rewardRateBps)
@@ -214,6 +256,20 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
             for (uint256 j = 0; j < REFERENCE_COURT_SIZE; j++) {
                 if (court1.judges[i] == court2.judges[j]) revert InvalidOutcomeTranscript();
             }
+        }
+    }
+
+    function _accrueCourt(
+        bytes32 caseId,
+        V2FinancialAccountingTypes.CourtTranscript memory court,
+        uint256 rewardUnit
+    ) internal {
+        for (uint256 i = 0; i < REFERENCE_COURT_SIZE; i++) {
+            address judge = court.judges[i];
+            if (judgeRewardEntitlement[caseId][judge] != 0) {
+                revert SettlementAlreadyProcessed();
+            }
+            judgeRewardEntitlement[caseId][judge] = rewardUnit;
         }
     }
 }

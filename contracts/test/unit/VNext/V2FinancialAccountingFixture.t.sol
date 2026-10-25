@@ -193,6 +193,125 @@ contract V2FinancialAccountingFixtureTest is Test {
         assertFalse(success);
     }
 
+    function test_validCourtAccruesTheSameFixedRewardForPassAndFail() public {
+        uint256 campaignId = _createAndFundMilestoneZero();
+        fixture.settleMilestone(campaignId, 0);
+        bytes32 caseId = keccak256("case-1");
+
+        assertEq(fixture.judgePaid(campaignId, 0), 30e6);
+        assertEq(fixture.judgeRewardEntitlement(caseId, address(0x101)), 10e6);
+        assertEq(fixture.judgeRewardEntitlement(caseId, address(0x102)), 10e6);
+        assertEq(fixture.judgeRewardEntitlement(caseId, address(0x103)), 10e6);
+
+        V2FinancialAccountingTypes.FinalizedTranscript memory failTranscript =
+            _defaultTranscript();
+        failTranscript.court1.pass = false;
+        failTranscript.finalOutcome = V2FinancialAccountingTypes.FinalOutcome.VERDICT_FAIL;
+        _deployFixture(failTranscript);
+        campaignId = _createAndFundMilestoneZero();
+        fixture.settleMilestone(campaignId, 0);
+
+        assertEq(fixture.judgePaid(campaignId, 0), 30e6);
+        assertEq(fixture.judgeRewardEntitlement(caseId, address(0x101)), 10e6);
+    }
+
+    function test_validCourtTwoAccruesBothCourtRewardsExactlyOnce() public {
+        V2FinancialAccountingTypes.FinalizedTranscript memory transcript = _courtTwoTranscript(true);
+        _deployFixture(transcript);
+        uint256 campaignId = _createAndFundMilestoneZero();
+
+        fixture.settleMilestone(campaignId, 0);
+
+        assertEq(fixture.judgePaid(campaignId, 0), 60e6);
+        assertEq(fixture.judgeRewardEntitlement(transcript.caseId, address(0x101)), 10e6);
+        assertEq(fixture.judgeRewardEntitlement(transcript.caseId, address(0x203)), 10e6);
+        vm.expectRevert(V2FinancialAccountingFixture.SettlementAlreadyProcessed.selector);
+        fixture.settleMilestone(campaignId, 0);
+        assertEq(fixture.judgePaid(campaignId, 0), 60e6);
+    }
+
+    function test_invalidCourtAccruesZeroValidServiceReward() public {
+        V2FinancialAccountingTypes.FinalizedTranscript memory transcript = _defaultTranscript();
+        transcript.court1.valid = false;
+        transcript.court1.pass = false;
+        transcript.finalOutcome = V2FinancialAccountingTypes.FinalOutcome.PROTOCOL_FAIL;
+        _deployFixture(transcript);
+        uint256 campaignId = _createAndFundMilestoneZero();
+
+        fixture.settleMilestone(campaignId, 0);
+
+        assertEq(fixture.judgePaid(campaignId, 0), 0);
+        assertEq(fixture.judgeRewardEntitlement(transcript.caseId, address(0x101)), 0);
+        assertEq(token.balanceOf(address(fixture)), 1_000e6);
+    }
+
+    function test_vectorV2CourtOnePassAccruesThirtyAndMovesNoTokens() public {
+        uint256 campaignId = _createAndFundMilestoneZero();
+        uint256 custodyBefore = token.balanceOf(address(fixture));
+
+        fixture.settleMilestone(campaignId, 0);
+
+        assertEq(fixture.judgePaid(campaignId, 0), 30e6);
+        assertEq(token.balanceOf(address(fixture)), custodyBefore);
+        assertEq(fixture.raised(campaignId, 0), 1_000e6);
+    }
+
+    function test_vectorV3CourtTwoPassAccruesSixty() public {
+        V2FinancialAccountingTypes.FinalizedTranscript memory transcript = _courtTwoTranscript(true);
+        _deployFixture(transcript);
+        uint256 campaignId = _createAndFundMilestoneZero();
+
+        fixture.settleMilestone(campaignId, 0);
+
+        assertEq(fixture.judgePaid(campaignId, 0), 60e6);
+    }
+
+    function test_vectorV4CourtTwoFailStillAccruesSixty() public {
+        V2FinancialAccountingTypes.FinalizedTranscript memory transcript = _courtTwoTranscript(false);
+        _deployFixture(transcript);
+        uint256 campaignId = _createAndFundMilestoneZero();
+
+        fixture.settleMilestone(campaignId, 0);
+
+        assertEq(fixture.judgePaid(campaignId, 0), 60e6);
+    }
+
+    function test_vectorV7FundingFailureAccruesNoReward() public {
+        V2FundingTypes.CampaignCommitment memory commitment = _validCommitment();
+        vm.prank(creator);
+        uint256 campaignId = fixture.createCampaign(commitment);
+        address backer = makeAddr("partial-backer");
+        token.mint(backer, 400e6);
+        vm.startPrank(backer);
+        token.approve(address(fixture), 400e6);
+        fixture.contribute(campaignId, 0, 400e6);
+        vm.stopPrank();
+        vm.warp(commitment.fundingDeadline[0]);
+
+        fixture.finalizeFundingFailure(campaignId, 0);
+
+        assertEq(fixture.judgePaid(campaignId, 0), 0);
+        assertEq(fixture.refundSnapshot(campaignId, 0), 400e6);
+        vm.expectRevert(V2FinancialAccountingFixture.InvalidOutcomeTranscript.selector);
+        fixture.settleMilestone(campaignId, 0);
+    }
+
+    function test_vectorV8InvalidCourtHasNoServiceRewardOrResetInflow() public {
+        V2FinancialAccountingTypes.FinalizedTranscript memory transcript = _defaultTranscript();
+        transcript.court1.valid = false;
+        transcript.court1.pass = false;
+        transcript.finalOutcome = V2FinancialAccountingTypes.FinalOutcome.PROTOCOL_FAIL;
+        _deployFixture(transcript);
+        uint256 campaignId = _createAndFundMilestoneZero();
+        uint256 custodyBefore = token.balanceOf(address(fixture));
+
+        fixture.settleMilestone(campaignId, 0);
+
+        assertEq(fixture.judgePaid(campaignId, 0), 0);
+        assertEq(token.balanceOf(address(fixture)), custodyBefore);
+        assertEq(fixture.raised(campaignId, 0), 1_000e6);
+    }
+
     function _deployFixture(V2FinancialAccountingTypes.FinalizedTranscript memory transcript)
         internal
     {
@@ -241,6 +360,25 @@ contract V2FinancialAccountingFixtureTest is Test {
                 [address(0), address(0), address(0)]
             )
         });
+    }
+
+    function _courtTwoTranscript(bool pass)
+        internal
+        pure
+        returns (V2FinancialAccountingTypes.FinalizedTranscript memory transcript)
+    {
+        transcript = _defaultTranscript();
+        transcript.appealed = true;
+        transcript.finalOutcome = pass
+            ? V2FinancialAccountingTypes.FinalOutcome.FINAL_PASS
+            : V2FinancialAccountingTypes.FinalOutcome.VERDICT_FAIL;
+        transcript.court2 = _courtTranscript(
+            true,
+            true,
+            pass,
+            keccak256("court-2"),
+            [address(0x201), address(0x202), address(0x203)]
+        );
     }
 
     function _courtTranscript(
