@@ -3,7 +3,9 @@ pragma solidity 0.8.24;
 import { Test } from "forge-std/Test.sol";
 import { MockUSDC } from "../../mocks/MockUSDC.sol";
 import {
-    V2FinancialAccountingFixture
+    ImmutableV2FinalOutcomeSource,
+    V2FinancialAccountingFixture,
+    V2FinancialAccountingTypes
 } from "../../fixtures/V2FinancialAccountingFixture.sol";
 import { V2FundingTypes } from "../../fixtures/V2FundingFixture.sol";
 
@@ -14,15 +16,14 @@ contract V2FinancialAccountingFixtureTest is Test {
 
     MockUSDC internal token;
     V2FinancialAccountingFixture internal fixture;
+    ImmutableV2FinalOutcomeSource internal source;
     address internal creator = makeAddr("creator");
     address internal payoutWallet = makeAddr("payout");
 
     function setUp() public {
         vm.chainId(LOCAL_CHAIN_ID);
         token = new MockUSDC();
-        fixture = new V2FinancialAccountingFixture(
-            token, ACCOUNTING_IDENTITY, makeAddr("immutable-outcome-source")
-        );
+        _deployFixture(_defaultTranscript());
     }
 
     function test_rewardCalculationUsesFloorTokenUnits() public view {
@@ -101,6 +102,162 @@ contract V2FinancialAccountingFixtureTest is Test {
     function test_rejectsZeroCreatorPayoutWhenReserveEqualsTarget() public {
         vm.expectRevert(V2FinancialAccountingFixture.InvalidFinancialTerms.selector);
         fixture.deriveFinancialTerms(600, 1_667);
+    }
+
+    function test_outcomeIsReadFromImmutableSourceForEveryCaller() public {
+        uint256 campaignId = _createAndFundMilestoneZero();
+
+        vm.prank(makeAddr("permissionless-finalizer-one"));
+        (bytes32 firstCaseId, V2FinancialAccountingTypes.FinalOutcome firstOutcome, uint256 firstValidCourts) =
+            fixture.validatedOutcome(campaignId, 0);
+        vm.prank(makeAddr("permissionless-finalizer-two"));
+        (bytes32 secondCaseId, V2FinancialAccountingTypes.FinalOutcome secondOutcome, uint256 secondValidCourts) =
+            fixture.validatedOutcome(campaignId, 0);
+
+        assertEq(firstCaseId, keccak256("case-1"));
+        assertEq(firstCaseId, secondCaseId);
+        assertEq(uint256(firstOutcome), uint256(V2FinancialAccountingTypes.FinalOutcome.FINAL_PASS));
+        assertEq(uint256(firstOutcome), uint256(secondOutcome));
+        assertEq(firstValidCourts, 1);
+        assertEq(firstValidCourts, secondValidCourts);
+    }
+
+    function test_transcriptRejectsMismatchedDeploymentIdentity() public {
+        V2FinancialAccountingTypes.FinalizedTranscript memory transcript = _defaultTranscript();
+        transcript.deploymentIdentity = keccak256("wrong-deployment");
+        _deployFixture(transcript);
+        uint256 campaignId = _createAndFundMilestoneZero();
+
+        vm.expectRevert(V2FinancialAccountingFixture.InvalidOutcomeTranscript.selector);
+        fixture.validatedOutcome(campaignId, 0);
+    }
+
+    function test_transcriptRejectsDuplicateJudgesInValidCourt() public {
+        V2FinancialAccountingTypes.FinalizedTranscript memory transcript = _defaultTranscript();
+        transcript.court1.judges[1] = transcript.court1.judges[0];
+        _deployFixture(transcript);
+        uint256 campaignId = _createAndFundMilestoneZero();
+
+        vm.expectRevert(V2FinancialAccountingFixture.InvalidOutcomeTranscript.selector);
+        fixture.validatedOutcome(campaignId, 0);
+    }
+
+    function test_transcriptRejectsCourtTwoWithoutValidCourtOne() public {
+        V2FinancialAccountingTypes.FinalizedTranscript memory transcript = _defaultTranscript();
+        transcript.appealed = true;
+        transcript.court1.valid = false;
+        transcript.court2 = _courtTranscript(
+            true,
+            true,
+            true,
+            keccak256("court-2"),
+            [address(0x201), address(0x202), address(0x203)]
+        );
+        _deployFixture(transcript);
+        uint256 campaignId = _createAndFundMilestoneZero();
+
+        vm.expectRevert(V2FinancialAccountingFixture.InvalidOutcomeTranscript.selector);
+        fixture.validatedOutcome(campaignId, 0);
+    }
+
+    function test_transcriptRejectsNonFinalOutcome() public {
+        V2FinancialAccountingTypes.FinalizedTranscript memory transcript = _defaultTranscript();
+        transcript.finalized = false;
+        transcript.finalOutcome = V2FinancialAccountingTypes.FinalOutcome.NONE;
+        _deployFixture(transcript);
+        uint256 campaignId = _createAndFundMilestoneZero();
+
+        vm.expectRevert(V2FinancialAccountingFixture.InvalidOutcomeTranscript.selector);
+        fixture.validatedOutcome(campaignId, 0);
+    }
+
+    function test_unauthorizedCallerCannotChooseFinalOutcome() public {
+        uint256 campaignId = _createAndFundMilestoneZero();
+        address backend = makeAddr("backend");
+
+        vm.prank(backend);
+        (bool success,) = address(fixture).call(
+            abi.encodeWithSignature("setFinalOutcome(uint256,uint256,uint8)", campaignId, 0, 2)
+        );
+        assertFalse(success);
+
+        (, V2FinancialAccountingTypes.FinalOutcome outcome,) =
+            fixture.validatedOutcome(campaignId, 0);
+        assertEq(uint256(outcome), uint256(V2FinancialAccountingTypes.FinalOutcome.FINAL_PASS));
+    }
+
+    function test_unauthorizedCallerCannotMutateOutcomeSource() public {
+        (bool success,) = address(source).call(
+            abi.encodeWithSignature("setFinalOutcome(uint8)", uint8(2))
+        );
+        assertFalse(success);
+    }
+
+    function _deployFixture(V2FinancialAccountingTypes.FinalizedTranscript memory transcript)
+        internal
+    {
+        source = new ImmutableV2FinalOutcomeSource(transcript);
+        fixture = new V2FinancialAccountingFixture(token, ACCOUNTING_IDENTITY, source);
+    }
+
+    function _createAndFundMilestoneZero() internal returns (uint256 campaignId) {
+        V2FundingTypes.CampaignCommitment memory commitment = _validCommitment();
+        vm.prank(creator);
+        campaignId = fixture.createCampaign(commitment);
+
+        address backer = makeAddr("funding-backer");
+        token.mint(backer, commitment.fundingTarget[0]);
+        vm.startPrank(backer);
+        token.approve(address(fixture), commitment.fundingTarget[0]);
+        fixture.contribute(campaignId, 0, commitment.fundingTarget[0]);
+        vm.stopPrank();
+    }
+
+    function _defaultTranscript()
+        internal
+        pure
+        returns (V2FinancialAccountingTypes.FinalizedTranscript memory transcript)
+    {
+        transcript = V2FinancialAccountingTypes.FinalizedTranscript({
+            deploymentIdentity: ACCOUNTING_IDENTITY,
+            caseId: keccak256("case-1"),
+            campaignId: 1,
+            milestoneId: 0,
+            finalized: true,
+            finalOutcome: V2FinancialAccountingTypes.FinalOutcome.FINAL_PASS,
+            appealed: false,
+            court1: _courtTranscript(
+                true,
+                true,
+                true,
+                keccak256("court-1"),
+                [address(0x101), address(0x102), address(0x103)]
+            ),
+            court2: _courtTranscript(
+                false,
+                false,
+                false,
+                bytes32(0),
+                [address(0), address(0), address(0)]
+            )
+        });
+    }
+
+    function _courtTranscript(
+        bool present,
+        bool valid,
+        bool pass,
+        bytes32 courtId,
+        address[3] memory judges
+    ) internal pure returns (V2FinancialAccountingTypes.CourtTranscript memory transcript) {
+        transcript = V2FinancialAccountingTypes.CourtTranscript({
+            present: present,
+            valid: valid,
+            pass: pass,
+            courtId: courtId,
+            attemptIndex: 0,
+            judges: judges
+        });
     }
 
     function _validCommitment()
