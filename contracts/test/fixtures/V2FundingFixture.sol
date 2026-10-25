@@ -547,11 +547,10 @@ contract V2FundingFixture is ReentrancyGuard {
                 || !_same(manifest.resetFundingSource, "offending_locked_stake_only")
                 || manifest.publicationRewardRateBps != 0
                 || !_same(manifest.refundDustPolicy, "canonical_address_prefix")
-                || !_same(manifest.rewardRounding, "floor") || manifest.basisPointsDenominator == 0
-                || manifest.rewardRateBps > manifest.basisPointsDenominator
-                || manifest.referenceCourtSize != 3 || manifest.maxValidCourts != 2
-                || manifest.maxResetsPerCourt != 1 || manifest.maxResetsPerCase != 2
-                || manifest.lockedParameters.length != 3
+                || !_same(manifest.rewardRounding, "floor") || manifest.rewardRateBps != 100
+                || manifest.basisPointsDenominator != 10_000 || manifest.referenceCourtSize != 3
+                || manifest.maxValidCourts != 2 || manifest.maxResetsPerCourt != 1
+                || manifest.maxResetsPerCase != 2 || manifest.lockedParameters.length != 3
                 || manifest.pendingParameterGroups.length != 6
                 || manifest.policyManifestHash != _policyManifestHash(manifest)
         ) return false;
