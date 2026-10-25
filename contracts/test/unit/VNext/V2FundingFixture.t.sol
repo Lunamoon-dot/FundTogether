@@ -126,6 +126,11 @@ contract V2FundingFixtureTest is Test {
         assertEq(fixture.nextCampaignId(), 0);
     }
 
+    function test_constructorRejectsAnyNonFixtureIdentity() public {
+        vm.expectRevert(V2FundingFixture.InvalidCommitment.selector);
+        new V2FundingFixture(token, keccak256("mutable-registry-alias"));
+    }
+
     function test_createCampaignRejectsEveryUnequalParallelArray() public {
         V2FundingTypes.CampaignCommitment memory commitment = _validCommitment();
 
@@ -377,6 +382,12 @@ contract V2FundingFixtureTest is Test {
         );
         assertEq(fixture.refundSnapshot(campaignId, 0), 700e6);
         assertEq(token.balanceOf(address(fixture)), 700e6);
+
+        vm.prank(backerA);
+        token.approve(address(fixture), 1);
+        vm.prank(backerA);
+        vm.expectRevert(V2FundingFixture.FundingNotOpen.selector);
+        fixture.contribute(campaignId, 0, 1);
 
         vm.prank(backerA);
         vm.expectEmit(true, true, true, true);
