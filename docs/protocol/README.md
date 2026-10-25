@@ -6,6 +6,7 @@ that the current checkout or local runtime already implements the protocol.
 
 ## Current reference
 
+- [FundTogether VNext Protocol Specification V2 — Design Proposal](FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_V2.md)
 - [FundTogether VNext Protocol Specification V1](FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_V1.md)
 - [Parameter Registry V1](parameters-v1.md)
 - [Remediation Parameter Registry V2](parameters-v2-remediation.md)
@@ -21,6 +22,9 @@ refund, failure handling, events and invariants.
 
 - The permissionless, stake-backed, milestone-gated direction is the current
   product decision.
+- The V2 file is a proposed design and audit. It does not supersede V1 or
+  change runtime behavior until the open policy issues are resolved and a
+  versioned adoption decision is recorded.
 - Numeric values in the parameter registries are frozen local research inputs.
   The current remediation deployment identity is
   `fundtogether-vnext-local-v2-remediation`; it is not public-chain or
