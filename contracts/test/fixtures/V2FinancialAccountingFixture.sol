@@ -1,6 +1,8 @@
 pragma solidity 0.8.24;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { V2FundingFixture, V2FundingTypes } from "./V2FundingFixture.sol";
 
 library V2FinancialAccountingTypes {
@@ -59,6 +61,8 @@ contract ImmutableV2FinalOutcomeSource is IV2FinalOutcomeSource {
 
 /// @notice Isolated, test-only PR2 accounting fixture. It is not deployment code.
 contract V2FinancialAccountingFixture is V2FundingFixture {
+    using SafeERC20 for IERC20;
+
     bytes32 public constant ACCOUNTING_DEPLOYMENT_IDENTITY =
         keccak256("fundtogether-vnext-v2-pr2-financial-accounting-fixture");
     uint256 public constant BASIS_POINTS_DENOMINATOR = 10_000;
@@ -77,11 +81,23 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
     mapping(bytes32 => mapping(address => uint256)) public judgeRewardEntitlement;
     mapping(bytes32 => mapping(address => bool)) public judgeRewardWasClaimed;
     mapping(bytes32 => bool) public caseSettlementProcessed;
+    mapping(uint256 => mapping(uint256 => uint256)) public creatorClaimable;
+    mapping(uint256 => mapping(uint256 => uint256)) public creatorPaid;
+    mapping(uint256 => mapping(uint256 => uint256)) public refundPool;
+    mapping(uint256 => mapping(uint256 => uint256)) public settlementRefunded;
+    mapping(uint256 => mapping(uint256 => mapping(address => bool)))
+        public settlementRefundWasClaimed;
+    mapping(uint256 => mapping(uint256 => address[])) private milestoneContributors;
+    mapping(uint256 => mapping(uint256 => mapping(address => bool))) private contributorSeen;
 
     error InvalidFinancialTerms();
     error InvalidFixtureIdentity();
     error InvalidOutcomeTranscript();
     error SettlementAlreadyProcessed();
+    error SettlementNotProcessed();
+    error NoClaimAvailable();
+    error ClaimAlreadyProcessed();
+    error UnauthorizedClaim();
 
     constructor(
         IERC20 token_,
@@ -143,6 +159,13 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
         settledCaseId[campaignId][milestoneId] = transcript.caseId;
         finalOutcome[campaignId][milestoneId] = transcript.finalOutcome;
         judgePaid[campaignId][milestoneId] = rewardTotal;
+        uint256 creatorAmount = transcript.finalOutcome
+            == V2FinancialAccountingTypes.FinalOutcome.FINAL_PASS
+            ? milestone.creatorPayoutBudget
+            : 0;
+        creatorClaimable[campaignId][milestoneId] = creatorAmount;
+        refundPool[campaignId][milestoneId] =
+            raised[campaignId][milestoneId] - rewardTotal - creatorAmount;
 
         if (transcript.court1.valid) {
             _accrueCourt(transcript.caseId, transcript.court1, milestone.judgeRewardUnit);
@@ -150,6 +173,107 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
         if (transcript.court2.valid) {
             _accrueCourt(transcript.caseId, transcript.court2, milestone.judgeRewardUnit);
         }
+    }
+
+    function claimJudgeReward(uint256 campaignId, uint256 milestoneId) external nonReentrant {
+        if (!settlementProcessed[campaignId][milestoneId]) revert SettlementNotProcessed();
+        bytes32 caseId = settledCaseId[campaignId][milestoneId];
+        if (judgeRewardWasClaimed[caseId][msg.sender]) revert ClaimAlreadyProcessed();
+        uint256 amount = judgeRewardEntitlement[caseId][msg.sender];
+        if (amount == 0) revert NoClaimAvailable();
+
+        judgeRewardWasClaimed[caseId][msg.sender] = true;
+        judgeRewardClaimed[campaignId][milestoneId] += amount;
+        _transferExact(msg.sender, amount);
+    }
+
+    function claimCreatorPayout(uint256 campaignId, uint256 milestoneId) external nonReentrant {
+        if (!settlementProcessed[campaignId][milestoneId]) revert SettlementNotProcessed();
+        Campaign storage campaign = _campaign(campaignId);
+        if (msg.sender != campaign.payoutWallet) revert UnauthorizedClaim();
+        if (creatorPaid[campaignId][milestoneId] != 0) revert ClaimAlreadyProcessed();
+        uint256 amount = creatorClaimable[campaignId][milestoneId];
+        if (amount == 0) revert NoClaimAvailable();
+
+        creatorClaimable[campaignId][milestoneId] = 0;
+        creatorPaid[campaignId][milestoneId] = amount;
+        _milestone(campaignId, milestoneId).state = V2FundingTypes.MilestoneState.PAID;
+        _transferExact(campaign.payoutWallet, amount);
+    }
+
+    function claimSettlementRefund(uint256 campaignId, uint256 milestoneId)
+        external
+        nonReentrant
+    {
+        if (!settlementProcessed[campaignId][milestoneId]) revert SettlementNotProcessed();
+        if (settlementRefundWasClaimed[campaignId][milestoneId][msg.sender]) {
+            revert ClaimAlreadyProcessed();
+        }
+        uint256 amount = settlementRefundEntitlement(campaignId, milestoneId, msg.sender);
+        if (amount == 0) revert NoClaimAvailable();
+
+        settlementRefundWasClaimed[campaignId][milestoneId][msg.sender] = true;
+        settlementRefunded[campaignId][milestoneId] += amount;
+        _transferExact(msg.sender, amount);
+    }
+
+    function settlementRefundEntitlement(
+        uint256 campaignId,
+        uint256 milestoneId,
+        address backer
+    ) public view returns (uint256) {
+        if (!settlementProcessed[campaignId][milestoneId]) return 0;
+        uint256 contribution = contributionOf[campaignId][milestoneId][backer];
+        uint256 pool = refundPool[campaignId][milestoneId];
+        if (contribution == 0 || pool == 0) return 0;
+
+        uint256 total = raised[campaignId][milestoneId];
+        uint256 entitlement = Math.mulDiv(contribution, pool, total);
+        (uint256 dust, uint256 rank) = _refundDustAndRank(campaignId, milestoneId, pool, total, backer);
+        if (rank < dust) entitlement += 1;
+        return entitlement;
+    }
+
+    function judgeRewardUnclaimed(uint256 campaignId, uint256 milestoneId)
+        public
+        view
+        returns (uint256)
+    {
+        return judgePaid[campaignId][milestoneId] - judgeRewardClaimed[campaignId][milestoneId];
+    }
+
+    function escrowRemaining(uint256 campaignId, uint256 milestoneId)
+        public
+        view
+        returns (uint256)
+    {
+        return raised[campaignId][milestoneId] - creatorPaid[campaignId][milestoneId]
+            - judgePaid[campaignId][milestoneId] - refunded[campaignId][milestoneId]
+            - settlementRefunded[campaignId][milestoneId];
+    }
+
+    function physicalCustody(uint256 campaignId, uint256 milestoneId)
+        public
+        view
+        returns (uint256)
+    {
+        return raised[campaignId][milestoneId] - creatorPaid[campaignId][milestoneId]
+            - judgeRewardClaimed[campaignId][milestoneId] - refunded[campaignId][milestoneId]
+            - settlementRefunded[campaignId][milestoneId];
+    }
+
+    function fundedLiabilities(uint256 campaignId, uint256 milestoneId)
+        public
+        view
+        returns (uint256)
+    {
+        if (settlementProcessed[campaignId][milestoneId]) {
+            return creatorClaimable[campaignId][milestoneId]
+                + judgeRewardUnclaimed(campaignId, milestoneId)
+                + refundPool[campaignId][milestoneId] - settlementRefunded[campaignId][milestoneId];
+        }
+        uint256 snapshot = refundSnapshot[campaignId][milestoneId];
+        return snapshot == 0 ? 0 : snapshot - refunded[campaignId][milestoneId];
     }
 
     function deriveFinancialTerms(uint256 fundingTarget, uint256 rewardRateBps)
@@ -271,5 +395,54 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
             }
             judgeRewardEntitlement[caseId][judge] = rewardUnit;
         }
+    }
+
+    function _afterContribution(uint256 campaignId, uint256 milestoneId, address backer)
+        internal
+        override
+    {
+        if (contributorSeen[campaignId][milestoneId][backer]) return;
+        contributorSeen[campaignId][milestoneId][backer] = true;
+
+        address[] storage contributors = milestoneContributors[campaignId][milestoneId];
+        contributors.push(backer);
+        uint256 index = contributors.length - 1;
+        while (index > 0 && uint160(contributors[index - 1]) > uint160(backer)) {
+            contributors[index] = contributors[index - 1];
+            index--;
+        }
+        contributors[index] = backer;
+    }
+
+    function _refundDustAndRank(
+        uint256 campaignId,
+        uint256 milestoneId,
+        uint256 pool,
+        uint256 total,
+        address backer
+    ) internal view returns (uint256 dust, uint256 rank) {
+        address[] storage contributors = milestoneContributors[campaignId][milestoneId];
+        uint256 allocated;
+        rank = type(uint256).max;
+        for (uint256 i = 0; i < contributors.length; i++) {
+            address contributor = contributors[i];
+            allocated += Math.mulDiv(
+                contributionOf[campaignId][milestoneId][contributor], pool, total
+            );
+            if (contributor == backer) rank = i;
+        }
+        dust = pool - allocated;
+    }
+
+    function _transferExact(address recipient, uint256 amount) internal {
+        uint256 custodyBefore = token.balanceOf(address(this));
+        uint256 recipientBefore = token.balanceOf(recipient);
+        token.safeTransfer(recipient, amount);
+        uint256 custodyAfter = token.balanceOf(address(this));
+        uint256 recipientAfter = token.balanceOf(recipient);
+        if (
+            custodyAfter > custodyBefore || custodyBefore - custodyAfter != amount
+                || recipientAfter < recipientBefore || recipientAfter - recipientBefore != amount
+        ) revert UnsupportedTokenTransfer();
     }
 }

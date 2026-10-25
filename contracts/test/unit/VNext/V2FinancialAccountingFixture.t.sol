@@ -7,7 +7,47 @@ import {
     V2FinancialAccountingFixture,
     V2FinancialAccountingTypes
 } from "../../fixtures/V2FinancialAccountingFixture.sol";
-import { V2FundingTypes } from "../../fixtures/V2FundingFixture.sol";
+import { V2FundingFixture, V2FundingTypes } from "../../fixtures/V2FundingFixture.sol";
+
+contract AccountingTransferControlMockUSDC is MockUSDC {
+    bool public transfersFail;
+
+    function setTransfersFail(bool value) external {
+        transfersFail = value;
+    }
+
+    function transfer(address to, uint256 amount) public override returns (bool) {
+        if (transfersFail) return false;
+        return super.transfer(to, amount);
+    }
+
+    function transferFrom(address from, address to, uint256 amount)
+        public
+        override
+        returns (bool)
+    {
+        if (transfersFail) return false;
+        return super.transferFrom(from, to, amount);
+    }
+}
+
+contract AccountingFeeOnTransferMockUSDC is MockUSDC {
+    bool public feeEnabled;
+
+    function setFeeEnabled(bool value) external {
+        feeEnabled = value;
+    }
+
+    function _update(address from, address to, uint256 amount) internal override {
+        if (feeEnabled && from != address(0) && to != address(0)) {
+            uint256 fee = amount / 100;
+            super._update(from, to, amount - fee);
+            if (fee > 0) super._update(from, address(0), fee);
+        } else {
+            super._update(from, to, amount);
+        }
+    }
+}
 
 contract V2FinancialAccountingFixtureTest is Test {
     uint256 internal constant LOCAL_CHAIN_ID = 31339;
@@ -312,6 +352,221 @@ contract V2FinancialAccountingFixtureTest is Test {
         assertEq(fixture.raised(campaignId, 0), 1_000e6);
     }
 
+    function test_finalPassFundsClaimsAndProtectsEarnedUnclaimedLiabilities() public {
+        uint256 campaignId = _createAndFundMilestoneZero();
+        address backer = makeAddr("funding-backer");
+        fixture.settleMilestone(campaignId, 0);
+
+        assertEq(fixture.creatorClaimable(campaignId, 0), 940e6);
+        assertEq(fixture.judgePaid(campaignId, 0), 30e6);
+        assertEq(fixture.judgeRewardUnclaimed(campaignId, 0), 30e6);
+        assertEq(fixture.refundPool(campaignId, 0), 30e6);
+        assertEq(fixture.settlementRefundEntitlement(campaignId, 0, backer), 30e6);
+        assertEq(fixture.escrowRemaining(campaignId, 0), 970e6);
+        assertEq(fixture.physicalCustody(campaignId, 0), 1_000e6);
+        assertEq(fixture.fundedLiabilities(campaignId, 0), 1_000e6);
+
+        vm.prank(backer);
+        fixture.claimSettlementRefund(campaignId, 0);
+        assertEq(fixture.judgePaid(campaignId, 0), 30e6);
+        assertEq(fixture.escrowRemaining(campaignId, 0), 940e6);
+
+        vm.prank(address(0x101));
+        fixture.claimJudgeReward(campaignId, 0);
+        assertEq(fixture.judgePaid(campaignId, 0), 30e6);
+        assertEq(fixture.judgeRewardUnclaimed(campaignId, 0), 20e6);
+        assertEq(fixture.physicalCustody(campaignId, 0), 960e6);
+        assertEq(fixture.fundedLiabilities(campaignId, 0), 960e6);
+    }
+
+    function test_verdictFailCreatesNoCreatorClaimAndRefundsRemainingEscrow() public {
+        V2FinancialAccountingTypes.FinalizedTranscript memory transcript = _defaultTranscript();
+        transcript.court1.pass = false;
+        transcript.finalOutcome = V2FinancialAccountingTypes.FinalOutcome.VERDICT_FAIL;
+        _deployFixture(transcript);
+        uint256 campaignId = _createAndFundMilestoneZero();
+
+        fixture.settleMilestone(campaignId, 0);
+
+        assertEq(fixture.creatorClaimable(campaignId, 0), 0);
+        assertEq(fixture.judgePaid(campaignId, 0), 30e6);
+        assertEq(fixture.refundPool(campaignId, 0), 970e6);
+        vm.prank(payoutWallet);
+        vm.expectRevert(V2FinancialAccountingFixture.NoClaimAvailable.selector);
+        fixture.claimCreatorPayout(campaignId, 0);
+    }
+
+    function test_protocolFailCreatesNoCreatorClaimAndRefundsAllWithoutValidCourt() public {
+        V2FinancialAccountingTypes.FinalizedTranscript memory transcript = _defaultTranscript();
+        transcript.court1.valid = false;
+        transcript.court1.pass = false;
+        transcript.finalOutcome = V2FinancialAccountingTypes.FinalOutcome.PROTOCOL_FAIL;
+        _deployFixture(transcript);
+        uint256 campaignId = _createAndFundMilestoneZero();
+
+        fixture.settleMilestone(campaignId, 0);
+
+        assertEq(fixture.creatorClaimable(campaignId, 0), 0);
+        assertEq(fixture.judgePaid(campaignId, 0), 0);
+        assertEq(fixture.refundPool(campaignId, 0), 1_000e6);
+    }
+
+    function test_creatorPayoutMarksPaidAndOnlyThenOpensMilestoneTwo() public {
+        uint256 campaignId = _createAndFundMilestoneZero();
+        fixture.settleMilestone(campaignId, 0);
+
+        vm.expectRevert();
+        fixture.openMilestoneFunding(campaignId, 1);
+        vm.prank(payoutWallet);
+        fixture.claimCreatorPayout(campaignId, 0);
+
+        assertEq(token.balanceOf(payoutWallet), 940e6);
+        assertEq(fixture.creatorPaid(campaignId, 0), 940e6);
+        assertEq(
+            uint256(fixture.milestoneState(campaignId, 0)),
+            uint256(V2FundingTypes.MilestoneState.PAID)
+        );
+        fixture.openMilestoneFunding(campaignId, 1);
+        assertEq(fixture.activeMilestoneId(campaignId), 1);
+    }
+
+    function test_duplicateClaimsCannotSpendJudgeCreatorOrBackerFundsTwice() public {
+        uint256 campaignId = _createAndFundMilestoneZero();
+        address backer = makeAddr("funding-backer");
+        fixture.settleMilestone(campaignId, 0);
+
+        vm.startPrank(address(0x101));
+        fixture.claimJudgeReward(campaignId, 0);
+        vm.expectRevert(V2FinancialAccountingFixture.ClaimAlreadyProcessed.selector);
+        fixture.claimJudgeReward(campaignId, 0);
+        vm.stopPrank();
+
+        vm.startPrank(payoutWallet);
+        fixture.claimCreatorPayout(campaignId, 0);
+        vm.expectRevert(V2FinancialAccountingFixture.ClaimAlreadyProcessed.selector);
+        fixture.claimCreatorPayout(campaignId, 0);
+        vm.stopPrank();
+
+        vm.startPrank(backer);
+        fixture.claimSettlementRefund(campaignId, 0);
+        vm.expectRevert(V2FinancialAccountingFixture.ClaimAlreadyProcessed.selector);
+        fixture.claimSettlementRefund(campaignId, 0);
+        vm.stopPrank();
+
+        assertEq(token.balanceOf(address(0x101)), 10e6);
+        assertEq(token.balanceOf(payoutWallet), 940e6);
+        assertEq(token.balanceOf(backer), 30e6);
+        assertEq(token.balanceOf(address(fixture)), 20e6);
+    }
+
+    function test_failedJudgeTransferRollsBackAndRemainsRetryable() public {
+        AccountingTransferControlMockUSDC controlled = new AccountingTransferControlMockUSDC();
+        token = controlled;
+        _deployFixture(_defaultTranscript());
+        uint256 campaignId = _createAndFundMilestoneZero();
+        fixture.settleMilestone(campaignId, 0);
+        controlled.setTransfersFail(true);
+
+        vm.prank(address(0x101));
+        vm.expectRevert();
+        fixture.claimJudgeReward(campaignId, 0);
+        assertFalse(fixture.judgeRewardWasClaimed(keccak256("case-1"), address(0x101)));
+        assertEq(fixture.judgeRewardClaimed(campaignId, 0), 0);
+
+        controlled.setTransfersFail(false);
+        vm.prank(address(0x101));
+        fixture.claimJudgeReward(campaignId, 0);
+        assertEq(controlled.balanceOf(address(0x101)), 10e6);
+    }
+
+    function test_failedCreatorTransferRollsBackAndRemainsRetryable() public {
+        AccountingTransferControlMockUSDC controlled = new AccountingTransferControlMockUSDC();
+        token = controlled;
+        _deployFixture(_defaultTranscript());
+        uint256 campaignId = _createAndFundMilestoneZero();
+        fixture.settleMilestone(campaignId, 0);
+        controlled.setTransfersFail(true);
+
+        vm.prank(payoutWallet);
+        vm.expectRevert();
+        fixture.claimCreatorPayout(campaignId, 0);
+        assertEq(fixture.creatorPaid(campaignId, 0), 0);
+        assertEq(fixture.creatorClaimable(campaignId, 0), 940e6);
+
+        controlled.setTransfersFail(false);
+        vm.prank(payoutWallet);
+        fixture.claimCreatorPayout(campaignId, 0);
+        assertEq(controlled.balanceOf(payoutWallet), 940e6);
+    }
+
+    function test_failedRefundTransferRollsBackAndRemainsRetryable() public {
+        AccountingTransferControlMockUSDC controlled = new AccountingTransferControlMockUSDC();
+        token = controlled;
+        _deployFixture(_defaultTranscript());
+        uint256 campaignId = _createAndFundMilestoneZero();
+        address backer = makeAddr("funding-backer");
+        fixture.settleMilestone(campaignId, 0);
+        controlled.setTransfersFail(true);
+
+        vm.prank(backer);
+        vm.expectRevert();
+        fixture.claimSettlementRefund(campaignId, 0);
+        assertFalse(fixture.settlementRefundWasClaimed(campaignId, 0, backer));
+        assertEq(fixture.settlementRefunded(campaignId, 0), 0);
+
+        controlled.setTransfersFail(false);
+        vm.prank(backer);
+        fixture.claimSettlementRefund(campaignId, 0);
+        assertEq(controlled.balanceOf(backer), 30e6);
+    }
+
+    function test_feeOnTransferClaimRollsBackAndRemainsRetryable() public {
+        AccountingFeeOnTransferMockUSDC feeToken = new AccountingFeeOnTransferMockUSDC();
+        token = feeToken;
+        _deployFixture(_defaultTranscript());
+        uint256 campaignId = _createAndFundMilestoneZero();
+        fixture.settleMilestone(campaignId, 0);
+        feeToken.setFeeEnabled(true);
+
+        vm.prank(address(0x101));
+        vm.expectRevert(V2FundingFixture.UnsupportedTokenTransfer.selector);
+        fixture.claimJudgeReward(campaignId, 0);
+        assertFalse(fixture.judgeRewardWasClaimed(keccak256("case-1"), address(0x101)));
+
+        feeToken.setFeeEnabled(false);
+        vm.prank(address(0x101));
+        fixture.claimJudgeReward(campaignId, 0);
+        assertEq(feeToken.balanceOf(address(0x101)), 10e6);
+    }
+
+    function test_refundDustUsesCanonicalAddressInsteadOfClaimOrder() public {
+        V2FundingTypes.CampaignCommitment memory commitment = _validCommitment();
+        commitment.fundingTarget[0] = 1_001;
+        commitment.judgeRewardUnit[0] = 10;
+        commitment.maxReviewReserve[0] = 60;
+        commitment.creatorPayoutBudget[0] = 941;
+        address[] memory backers = new address[](2);
+        uint256[] memory amounts = new uint256[](2);
+        backers[0] = address(0xA1);
+        backers[1] = address(0xB1);
+        amounts[0] = 2;
+        amounts[1] = 999;
+        uint256 campaignId = _createAndFund(commitment, backers, amounts);
+        fixture.settleMilestone(campaignId, 0);
+
+        assertEq(fixture.refundPool(campaignId, 0), 30);
+        assertEq(fixture.settlementRefundEntitlement(campaignId, 0, address(0xA1)), 1);
+        assertEq(fixture.settlementRefundEntitlement(campaignId, 0, address(0xB1)), 29);
+
+        vm.prank(address(0xB1));
+        fixture.claimSettlementRefund(campaignId, 0);
+        vm.prank(address(0xA1));
+        fixture.claimSettlementRefund(campaignId, 0);
+        assertEq(token.balanceOf(address(0xA1)), 1);
+        assertEq(token.balanceOf(address(0xB1)), 29);
+        assertEq(fixture.settlementRefunded(campaignId, 0), 30);
+    }
+
     function _deployFixture(V2FinancialAccountingTypes.FinalizedTranscript memory transcript)
         internal
     {
@@ -321,15 +576,27 @@ contract V2FinancialAccountingFixtureTest is Test {
 
     function _createAndFundMilestoneZero() internal returns (uint256 campaignId) {
         V2FundingTypes.CampaignCommitment memory commitment = _validCommitment();
+        address[] memory backers = new address[](1);
+        uint256[] memory amounts = new uint256[](1);
+        backers[0] = makeAddr("funding-backer");
+        amounts[0] = commitment.fundingTarget[0];
+        return _createAndFund(commitment, backers, amounts);
+    }
+
+    function _createAndFund(
+        V2FundingTypes.CampaignCommitment memory commitment,
+        address[] memory backers,
+        uint256[] memory amounts
+    ) internal returns (uint256 campaignId) {
         vm.prank(creator);
         campaignId = fixture.createCampaign(commitment);
-
-        address backer = makeAddr("funding-backer");
-        token.mint(backer, commitment.fundingTarget[0]);
-        vm.startPrank(backer);
-        token.approve(address(fixture), commitment.fundingTarget[0]);
-        fixture.contribute(campaignId, 0, commitment.fundingTarget[0]);
-        vm.stopPrank();
+        for (uint256 i = 0; i < backers.length; i++) {
+            token.mint(backers[i], amounts[i]);
+            vm.startPrank(backers[i]);
+            token.approve(address(fixture), amounts[i]);
+            fixture.contribute(campaignId, 0, amounts[i]);
+            vm.stopPrank();
+        }
     }
 
     function _defaultTranscript()
