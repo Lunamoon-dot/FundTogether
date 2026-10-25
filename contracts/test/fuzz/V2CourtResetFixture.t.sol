@@ -85,6 +85,30 @@ contract V2CourtResetFixtureFuzzTest is Test {
         assertEq(terms.finalizationAllowance, finalization);
     }
 
+    function testFuzz_assignCourtSkipsUnderCollateralizedCandidates(uint256 entropy) public {
+        _fundJudges(3, 22);
+        for (uint256 i = 3; i < 6; i++) {
+            _fundJudge(i, 50);
+        }
+        fixture.createCase(CASE_ID, 1, 0, 23, 10, 3);
+
+        bytes32 courtId =
+            fixture.assignCourt(CASE_ID, V2CourtResetFixture.CourtLevel.COURT_1, entropy);
+        V2CourtResetFixture.CourtAttempt memory court = fixture.courtInfo(courtId);
+
+        assertTrue(
+            court.judges[0] != court.judges[1] && court.judges[0] != court.judges[2]
+                && court.judges[1] != court.judges[2]
+        );
+        for (uint256 i = 0; i < court.judges.length; i++) {
+            assertTrue(
+                court.judges[i] != address(0x2000) && court.judges[i] != address(0x2001)
+                    && court.judges[i] != address(0x2002)
+            );
+            assertEq(fixture.stakePool().reservedStake(court.judges[i]), 23);
+        }
+    }
+
     function _newFixture() internal returns (V2CourtResetFixture result) {
         ImmutableV2FinalOutcomeSource source = new ImmutableV2FinalOutcomeSource(
             V2FinancialAccountingTypesForFuzz.transcript(ACCOUNTING_IDENTITY)
@@ -94,14 +118,18 @@ contract V2CourtResetFixtureFuzzTest is Test {
 
     function _fundJudges(uint256 count, uint256 amount) internal {
         for (uint256 i = 0; i < count; i++) {
-            address judge = address(uint160(0x2000 + i));
-            fixture.registerJudge(judge);
-            token.mint(judge, amount);
-            vm.startPrank(judge);
-            token.approve(address(fixture.stakePool()), amount);
-            fixture.depositStake(amount);
-            vm.stopPrank();
+            _fundJudge(i, amount);
         }
+    }
+
+    function _fundJudge(uint256 index, uint256 amount) internal {
+        address judge = address(uint160(0x2000 + index));
+        fixture.registerJudge(judge);
+        token.mint(judge, amount);
+        vm.startPrank(judge);
+        token.approve(address(fixture.stakePool()), amount);
+        fixture.depositStake(amount);
+        vm.stopPrank();
     }
 
     function _commitReveal(bytes32 courtId, address judge, uint256 saltValue) internal {

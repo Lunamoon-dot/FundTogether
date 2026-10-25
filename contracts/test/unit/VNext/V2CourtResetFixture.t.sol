@@ -164,11 +164,204 @@ contract V2CourtResetFixtureTest is Test {
         _fundJudges(3, 22);
         fixture.createCase(CASE_ID, 1, 0, 23, 10, 3);
 
-        vm.expectRevert(V2CourtResetStakePool.InsufficientAvailableStake.selector);
+        vm.expectRevert(V2CourtResetFixture.InvalidJudgeSet.selector);
         fixture.assignCourt(CASE_ID, V2CourtResetFixture.CourtLevel.COURT_1, 5);
         assertEq(fixture.stakePool().reservedStake(_judge(0)), 0);
         assertEq(fixture.stakePool().reservedStake(_judge(1)), 0);
         assertEq(fixture.stakePool().reservedStake(_judge(2)), 0);
+    }
+
+    function test_assignCourtSkipsUnderCollateralizedJudgesWhenThreeEligibleRemain() public {
+        for (uint256 i = 0; i < 3; i++) {
+            _fundJudge(i, 22);
+        }
+        for (uint256 i = 3; i < 6; i++) {
+            _fundJudge(i, 50);
+        }
+        fixture.createCase(CASE_ID, 1, 0, 23, 10, 3);
+
+        bytes32 courtId = fixture.assignCourt(CASE_ID, V2CourtResetFixture.CourtLevel.COURT_1, 0);
+        V2CourtResetFixture.CourtAttempt memory court = fixture.courtInfo(courtId);
+
+        for (uint256 i = 0; i < court.judges.length; i++) {
+            assertTrue(
+                court.judges[i] != _judge(0) && court.judges[i] != _judge(1)
+                    && court.judges[i] != _judge(2)
+            );
+            assertEq(fixture.stakePool().reservedStake(court.judges[i]), 23);
+        }
+        assertEq(fixture.stakePool().reservedStake(_judge(0)), 0);
+        assertEq(fixture.stakePool().reservedStake(_judge(1)), 0);
+        assertEq(fixture.stakePool().reservedStake(_judge(2)), 0);
+    }
+
+    function test_assignCourtRejectsWhenFewerThanThreeEligibleJudgesRemain() public {
+        _fundJudge(0, 50);
+        _fundJudge(1, 50);
+        _fundJudge(2, 22);
+        _fundJudge(3, 22);
+        _fundJudge(4, 22);
+        fixture.createCase(CASE_ID, 1, 0, 23, 10, 3);
+
+        vm.expectRevert(V2CourtResetFixture.InvalidJudgeSet.selector);
+        fixture.assignCourt(CASE_ID, V2CourtResetFixture.CourtLevel.COURT_1, 7);
+        for (uint256 i = 0; i < 5; i++) {
+            assertEq(fixture.stakePool().reservedStake(_judge(i)), 0);
+        }
+    }
+
+    function test_reservedCollateralCannotBeWithdrawnWhileAvailableStakeCan() public {
+        _fundJudges(3, 50);
+        fixture.createCase(CASE_ID, 1, 0, 23, 10, 3);
+        bytes32 courtId = fixture.assignCourt(CASE_ID, V2CourtResetFixture.CourtLevel.COURT_1, 8);
+        address judge = fixture.courtInfo(courtId).judges[0];
+
+        vm.startPrank(judge);
+        vm.expectRevert(V2CourtResetStakePool.InsufficientAvailableStake.selector);
+        fixture.withdrawAvailableStake(28);
+        fixture.withdrawAvailableStake(27);
+        vm.stopPrank();
+
+        assertEq(fixture.stakePool().depositedStake(judge), 23);
+        assertEq(fixture.stakePool().reservedStake(judge), 23);
+        assertEq(token.balanceOf(judge), 27);
+    }
+
+    function test_R3SameEconomicActorCanRecaptureFinalizerAllowanceBeforeGas() public {
+        _fundJudges(3, 50);
+        fixture.createCase(CASE_ID, 1, 0, 23, 10, 3);
+        bytes32 courtId = fixture.assignCourt(CASE_ID, V2CourtResetFixture.CourtLevel.COURT_1, 9);
+        V2CourtResetFixture.CourtAttempt memory court = fixture.courtInfo(courtId);
+        address finalizer = address(0xF1A1);
+        uint256 controlledStakeBefore = _depositedStake(court.judges);
+
+        _warpPastReveal(courtId);
+        vm.prank(finalizer);
+        fixture.settleInvalidCourt(CASE_ID, courtId);
+        court = fixture.courtInfo(courtId);
+
+        uint256 grossSlash = controlledStakeBefore - _depositedStake(court.judges);
+        assertEq(grossSlash, 3);
+        assertEq(fixture.settlementCompensation(court.settlementId), 3);
+        assertEq(fixture.compensationEntitlement(court.settlementId, finalizer), 3);
+        assertEq(fixture.stakePool().totalClaimLiability(), 3);
+
+        vm.prank(finalizer);
+        fixture.claimCompensation(court.settlementId);
+
+        uint256 controlledAssetsAfterClaim =
+            _depositedStake(court.judges) + token.balanceOf(finalizer);
+        assertEq(fixture.settlementPaid(court.settlementId), 3);
+        assertEq(controlledAssetsAfterClaim, controlledStakeBefore);
+        assertEq(grossSlash - token.balanceOf(finalizer), 0);
+    }
+
+    function test_court2PendingResetCannotBeConsumedByCourt1() public {
+        _fundJudges(9, 50);
+        fixture.createCase(CASE_ID, 1, 0, 23, 10, 3);
+
+        bytes32 courtOne = fixture.assignCourt(CASE_ID, V2CourtResetFixture.CourtLevel.COURT_1, 30);
+        V2CourtResetFixture.CourtAttempt memory first = fixture.courtInfo(courtOne);
+        _commitAll(CASE_ID, courtOne, first, true);
+        _warpPastReveal(courtOne);
+        fixture.finalizeValidCourt(CASE_ID, courtOne);
+        fixture.enableCourt2ForTest(CASE_ID);
+
+        bytes32 courtTwo = fixture.assignCourt(CASE_ID, V2CourtResetFixture.CourtLevel.COURT_2, 31);
+        V2CourtResetFixture.CourtAttempt memory second = fixture.courtInfo(courtTwo);
+        _commitReveal(CASE_ID, courtTwo, second.judges[1], true, 31);
+        _commitReveal(CASE_ID, courtTwo, second.judges[2], false, 32);
+        _warpPastReveal(courtTwo);
+        fixture.settleInvalidCourt(CASE_ID, courtTwo);
+
+        V2CourtResetFixture.CaseRecord memory beforeWrongLevel = fixture.caseTerms(CASE_ID);
+        uint256 claimsBeforeWrongLevel = fixture.stakePool().totalClaimLiability();
+        bool[9] memory assignedBeforeWrongLevel;
+        assertTrue(beforeWrongLevel.pendingResetId != bytes32(0));
+        assertEq(beforeWrongLevel.pendingResetCourtId, courtTwo);
+        for (uint256 i = 0; i < 9; i++) {
+            assertEq(fixture.stakePool().reservedStake(_judge(i)), 0);
+            assignedBeforeWrongLevel[i] = fixture.isCaseJudge(CASE_ID, _judge(i));
+        }
+
+        vm.expectRevert(V2CourtResetFixture.ReplacementUnavailable.selector);
+        fixture.assignCourt(CASE_ID, V2CourtResetFixture.CourtLevel.COURT_1, 32);
+
+        V2CourtResetFixture.CaseRecord memory afterWrongLevel = fixture.caseTerms(CASE_ID);
+        assertEq(afterWrongLevel.pendingResetId, beforeWrongLevel.pendingResetId);
+        assertEq(afterWrongLevel.pendingResetCourtId, beforeWrongLevel.pendingResetCourtId);
+        assertEq(afterWrongLevel.activeCourtId, bytes32(0));
+        assertEq(afterWrongLevel.resetCount, beforeWrongLevel.resetCount);
+        assertEq(afterWrongLevel.levelResetCount[0], beforeWrongLevel.levelResetCount[0]);
+        assertEq(afterWrongLevel.levelResetCount[1], beforeWrongLevel.levelResetCount[1]);
+        assertEq(afterWrongLevel.nextAttemptIndex[0], beforeWrongLevel.nextAttemptIndex[0]);
+        assertEq(afterWrongLevel.nextAttemptIndex[1], beforeWrongLevel.nextAttemptIndex[1]);
+        assertEq(fixture.caseCourtHistory(CASE_ID).length, 2);
+        assertEq(fixture.stakePool().totalClaimLiability(), claimsBeforeWrongLevel);
+        for (uint256 i = 0; i < 9; i++) {
+            assertEq(fixture.stakePool().reservedStake(_judge(i)), 0);
+            assertEq(fixture.isCaseJudge(CASE_ID, _judge(i)), assignedBeforeWrongLevel[i]);
+        }
+
+        bytes32 replacementTwo =
+            fixture.assignCourt(CASE_ID, V2CourtResetFixture.CourtLevel.COURT_2, 33);
+        V2CourtResetFixture.CourtAttempt memory replacement = fixture.courtInfo(replacementTwo);
+        assertEq(uint256(replacement.level), uint256(V2CourtResetFixture.CourtLevel.COURT_2));
+        assertEq(replacement.resetId, beforeWrongLevel.pendingResetId);
+        assertEq(fixture.caseTerms(CASE_ID).pendingResetId, bytes32(0));
+        assertEq(fixture.caseTerms(CASE_ID).pendingResetCourtId, bytes32(0));
+    }
+
+    function test_court1InvalidCanOnlyCreateCourt1Replacement() public {
+        _fundJudges(6, 50);
+        fixture.createCase(CASE_ID, 1, 0, 23, 10, 3);
+        bytes32 courtOne = fixture.assignCourt(CASE_ID, V2CourtResetFixture.CourtLevel.COURT_1, 34);
+        V2CourtResetFixture.CourtAttempt memory first = fixture.courtInfo(courtOne);
+        _commitReveal(CASE_ID, courtOne, first.judges[1], true, 34);
+        _commitReveal(CASE_ID, courtOne, first.judges[2], false, 35);
+        _warpPastReveal(courtOne);
+        fixture.settleInvalidCourt(CASE_ID, courtOne);
+
+        bytes32 pendingResetId = fixture.caseTerms(CASE_ID).pendingResetId;
+        bytes32 replacementOne =
+            fixture.assignCourt(CASE_ID, V2CourtResetFixture.CourtLevel.COURT_1, 35);
+        V2CourtResetFixture.CourtAttempt memory replacement = fixture.courtInfo(replacementOne);
+
+        assertEq(uint256(replacement.level), uint256(V2CourtResetFixture.CourtLevel.COURT_1));
+        assertEq(replacement.resetId, pendingResetId);
+    }
+
+    function test_validCourt1CannotBeAssignedTwice() public {
+        _fundJudges(3, 50);
+        fixture.createCase(CASE_ID, 1, 0, 23, 10, 3);
+        bytes32 courtOne = fixture.assignCourt(CASE_ID, V2CourtResetFixture.CourtLevel.COURT_1, 36);
+        V2CourtResetFixture.CourtAttempt memory first = fixture.courtInfo(courtOne);
+        _commitAll(CASE_ID, courtOne, first, true);
+        _warpPastReveal(courtOne);
+        fixture.finalizeValidCourt(CASE_ID, courtOne);
+
+        vm.expectRevert(V2CourtResetFixture.ReplacementUnavailable.selector);
+        fixture.assignCourt(CASE_ID, V2CourtResetFixture.CourtLevel.COURT_1, 37);
+    }
+
+    function test_validCourt2CannotBeAssignedTwice() public {
+        _fundJudges(6, 50);
+        fixture.createCase(CASE_ID, 1, 0, 23, 10, 3);
+        bytes32 courtOne = fixture.assignCourt(CASE_ID, V2CourtResetFixture.CourtLevel.COURT_1, 38);
+        V2CourtResetFixture.CourtAttempt memory first = fixture.courtInfo(courtOne);
+        _commitAll(CASE_ID, courtOne, first, true);
+        _warpPastReveal(courtOne);
+        fixture.finalizeValidCourt(CASE_ID, courtOne);
+        fixture.enableCourt2ForTest(CASE_ID);
+
+        bytes32 courtTwo = fixture.assignCourt(CASE_ID, V2CourtResetFixture.CourtLevel.COURT_2, 39);
+        V2CourtResetFixture.CourtAttempt memory second = fixture.courtInfo(courtTwo);
+        _commitAll(CASE_ID, courtTwo, second, false);
+        _warpPastReveal(courtTwo);
+        fixture.finalizeValidCourt(CASE_ID, courtTwo);
+
+        vm.expectRevert(V2CourtResetFixture.ReplacementUnavailable.selector);
+        fixture.assignCourt(CASE_ID, V2CourtResetFixture.CourtLevel.COURT_2, 40);
     }
 
     function test_R6TwoResetsAreSeparateFromAppealAndKeepHistory() public {
@@ -398,6 +591,16 @@ contract V2CourtResetFixtureTest is Test {
         _fundJudgesOn(fixture, token, count, amount);
     }
 
+    function _fundJudge(uint256 index, uint256 amount) internal {
+        address judge = _judge(index);
+        fixture.registerJudge(judge);
+        token.mint(judge, amount);
+        vm.startPrank(judge);
+        token.approve(address(fixture.stakePool()), amount);
+        fixture.depositStake(amount);
+        vm.stopPrank();
+    }
+
     function _fundJudgesOn(
         V2CourtResetFixture target,
         IERC20 targetToken,
@@ -417,6 +620,12 @@ contract V2CourtResetFixtureTest is Test {
 
     function _judge(uint256 index) internal pure returns (address) {
         return address(uint160(0x1000 + index));
+    }
+
+    function _depositedStake(address[3] memory judges) internal view returns (uint256 total) {
+        for (uint256 i = 0; i < judges.length; i++) {
+            total += fixture.stakePool().depositedStake(judges[i]);
+        }
     }
 
     function _commitAll(

@@ -133,6 +133,7 @@ contract V2CourtResetFixture is V2FinancialAccountingFixture {
         uint256 requiredLockedStake;
         bytes32 activeCourtId;
         bytes32 pendingResetId;
+        bytes32 pendingResetCourtId;
         bool court1Valid;
         bool court2GateEnabled;
         bool court2Valid;
@@ -384,6 +385,7 @@ contract V2CourtResetFixture is V2FinancialAccountingFixture {
             requiredLockedStake: requiredLockedStake,
             activeCourtId: bytes32(0),
             pendingResetId: bytes32(0),
+            pendingResetCourtId: bytes32(0),
             court1Valid: false,
             court2GateEnabled: false,
             court2Valid: false,
@@ -417,6 +419,8 @@ contract V2CourtResetFixture is V2FinancialAccountingFixture {
         emit Court2GateEnabledForTest(resetDeploymentIdentity, caseId);
     }
 
+    /// @dev `entropy` is a deterministic test seam, not unbiased production randomness or Sybil resistance.
+    ///      Selection linearly scans this Foundry-only judge pool and is not a production-scale registry.
     function assignCourt(bytes32 caseId, CourtLevel level, uint256 entropy)
         external
         returns (bytes32 courtId)
@@ -428,6 +432,9 @@ contract V2CourtResetFixture is V2FinancialAccountingFixture {
             if (!reviewCase.court2GateEnabled || !reviewCase.court1Valid) {
                 revert CourtTwoNotEnabled();
             }
+            if (reviewCase.court2Valid) revert ReplacementUnavailable();
+        } else if (level == CourtLevel.COURT_1) {
+            if (reviewCase.court1Valid) revert ReplacementUnavailable();
         } else if (level != CourtLevel.COURT_1) {
             revert InvalidCourtLevel();
         }
@@ -435,19 +442,29 @@ contract V2CourtResetFixture is V2FinancialAccountingFixture {
         uint256 levelIndex = uint256(level);
         uint256 attemptIndex = reviewCase.nextAttemptIndex[levelIndex];
         if (attemptIndex > MAX_RESETS_PER_COURT) revert ReplacementUnavailable();
+        bytes32 resetId;
+        bytes32 previousCourtId;
         if (attemptIndex == 0 && reviewCase.pendingResetId != bytes32(0)) {
             revert ReplacementUnavailable();
         }
-        if (attemptIndex > 0 && reviewCase.pendingResetId == bytes32(0)) {
-            revert ReplacementUnavailable();
+        if (attemptIndex > 0) {
+            previousCourtId = reviewCase.pendingResetCourtId;
+            CourtAttempt storage previousCourt = courts[previousCourtId];
+            if (
+                reviewCase.pendingResetId == bytes32(0) || previousCourtId == bytes32(0)
+                    || previousCourt.caseId != caseId || previousCourt.level != level
+                    || !previousCourt.invalid || !previousCourt.settled
+                    || previousCourt.attemptIndex + 1 != attemptIndex
+            ) revert ReplacementUnavailable();
+            resetId = reviewCase.pendingResetId;
         }
-        address[3] memory judges = _selectJudges(caseId, level, attemptIndex, entropy);
+        address[3] memory judges =
+            _selectJudges(caseId, level, attemptIndex, entropy, reviewCase.requiredLockedStake);
         for (uint256 i = 0; i < judges.length; i++) {
             stakePool.reserve(judges[i], reviewCase.requiredLockedStake);
             caseJudgeAssigned[caseId][judges[i]] = true;
         }
 
-        bytes32 resetId = attemptIndex == 0 ? bytes32(0) : reviewCase.pendingResetId;
         courtId = keccak256(
             abi.encode(
                 reviewCase.policyVersion,
@@ -475,9 +492,8 @@ contract V2CourtResetFixture is V2FinancialAccountingFixture {
         reviewCase.nextAttemptIndex[levelIndex] = attemptIndex + 1;
         if (attemptIndex > 0) {
             reviewCase.pendingResetId = bytes32(0);
+            reviewCase.pendingResetCourtId = bytes32(0);
             _caseResetHistory[caseId].push(resetId);
-            bytes32 previousCourtId =
-                _caseCourtHistory[caseId][_caseCourtHistory[caseId].length - 1];
             emit CourtReset(
                 resetDeploymentIdentity, caseId, resetId, previousCourtId, courtId, level
             );
@@ -621,6 +637,7 @@ contract V2CourtResetFixture is V2FinancialAccountingFixture {
             );
         } else {
             reviewCase.pendingResetId = keccak256(abi.encode(settlementId, "replacement"));
+            reviewCase.pendingResetCourtId = court.courtId;
         }
 
         emit CourtInvalidated(
@@ -689,18 +706,23 @@ contract V2CourtResetFixture is V2FinancialAccountingFixture {
         return settlementCompensation[settlementId] - settlementPaid[settlementId];
     }
 
-    function _selectJudges(bytes32 caseId, CourtLevel level, uint256 attemptIndex, uint256 entropy)
-        internal
-        view
-        returns (address[3] memory selected)
-    {
+    function _selectJudges(
+        bytes32 caseId,
+        CourtLevel level,
+        uint256 attemptIndex,
+        uint256 entropy,
+        uint256 requiredLockedStake
+    ) internal view returns (address[3] memory selected) {
         if (judgePool.length < 3) revert InvalidJudgeSet();
         uint256 start =
             uint256(keccak256(abi.encode(caseId, level, attemptIndex, entropy))) % judgePool.length;
         uint256 selectedCount;
         for (uint256 offset = 0; offset < judgePool.length && selectedCount < 3; offset++) {
             address candidate = judgePool[(start + offset) % judgePool.length];
-            if (caseJudgeAssigned[caseId][candidate]) continue;
+            if (
+                caseJudgeAssigned[caseId][candidate]
+                    || stakePool.availableStake(candidate) < requiredLockedStake
+            ) continue;
             selected[selectedCount++] = candidate;
         }
         if (selectedCount != 3) revert InvalidJudgeSet();
