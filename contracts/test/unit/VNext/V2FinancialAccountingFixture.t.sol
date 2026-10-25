@@ -1,6 +1,7 @@
 pragma solidity 0.8.24;
 
 import { Test } from "forge-std/Test.sol";
+import { Vm } from "forge-std/Vm.sol";
 import { MockUSDC } from "../../mocks/MockUSDC.sol";
 import {
     ImmutableV2FinalOutcomeSource,
@@ -21,11 +22,7 @@ contract AccountingTransferControlMockUSDC is MockUSDC {
         return super.transfer(to, amount);
     }
 
-    function transferFrom(address from, address to, uint256 amount)
-        public
-        override
-        returns (bool)
-    {
+    function transferFrom(address from, address to, uint256 amount) public override returns (bool) {
         if (transfersFail) return false;
         return super.transferFrom(from, to, amount);
     }
@@ -53,6 +50,20 @@ contract V2FinancialAccountingFixtureTest is Test {
     uint256 internal constant LOCAL_CHAIN_ID = 31339;
     bytes32 internal constant ACCOUNTING_IDENTITY =
         keccak256("fundtogether-vnext-v2-pr2-financial-accounting-fixture");
+    bytes32 internal constant JUDGE_REWARD_ACCRUED_SIGNATURE = keccak256(
+        "JudgeRewardAccrued(bytes32,bytes32,uint256,uint256,bytes32,uint256,address,uint256,uint256,uint256)"
+    );
+    bytes32 internal constant JUDGE_REWARD_CLAIMED_SIGNATURE =
+        keccak256("JudgeRewardClaimed(bytes32,bytes32,address,uint256,uint256,uint256,uint256)");
+    bytes32 internal constant MILESTONE_RESERVE_REFUNDED_SIGNATURE =
+        keccak256("MilestoneReserveRefunded(bytes32,uint256,uint256,bytes32,uint256,uint256)");
+    bytes32 internal constant MILESTONE_PAID_SIGNATURE =
+        keccak256("MilestonePaid(bytes32,uint256,uint256,bytes32,address,uint256,uint256)");
+    bytes32 internal constant MILESTONE_REFUNDS_OPENED_SIGNATURE = keccak256(
+        "MilestoneRefundsOpened(bytes32,uint256,uint256,bytes32,uint256,uint256,uint256)"
+    );
+    bytes32 internal constant BACKER_REFUND_CLAIMED_SIGNATURE =
+        keccak256("BackerRefundClaimed(bytes32,uint256,uint256,bytes32,address,uint256,uint256)");
 
     MockUSDC internal token;
     V2FinancialAccountingFixture internal fixture;
@@ -81,17 +92,12 @@ contract V2FinancialAccountingFixtureTest is Test {
         uint256 campaignId = fixture.createCampaign(commitment);
 
         (
-            ,
-            ,
-            ,
+            ,,,
             uint256 target,
             uint256 frozenCreatorBudget,
             uint256 rateBps,
             uint256 frozenRewardUnit,
-            uint256 frozenReserve,
-            ,
-            ,
-
+            uint256 frozenReserve,,,
         ) = fixture.milestoneTerms(campaignId, 0);
         (uint256 derivedRewardUnit, uint256 derivedReserve, uint256 derivedCreatorBudget) =
             fixture.deriveFinancialTerms(target, rateBps);
@@ -148,11 +154,17 @@ contract V2FinancialAccountingFixtureTest is Test {
         uint256 campaignId = _createAndFundMilestoneZero();
 
         vm.prank(makeAddr("permissionless-finalizer-one"));
-        (bytes32 firstCaseId, V2FinancialAccountingTypes.FinalOutcome firstOutcome, uint256 firstValidCourts) =
-            fixture.validatedOutcome(campaignId, 0);
+        (
+            bytes32 firstCaseId,
+            V2FinancialAccountingTypes.FinalOutcome firstOutcome,
+            uint256 firstValidCourts
+        ) = fixture.validatedOutcome(campaignId, 0);
         vm.prank(makeAddr("permissionless-finalizer-two"));
-        (bytes32 secondCaseId, V2FinancialAccountingTypes.FinalOutcome secondOutcome, uint256 secondValidCourts) =
-            fixture.validatedOutcome(campaignId, 0);
+        (
+            bytes32 secondCaseId,
+            V2FinancialAccountingTypes.FinalOutcome secondOutcome,
+            uint256 secondValidCourts
+        ) = fixture.validatedOutcome(campaignId, 0);
 
         assertEq(firstCaseId, keccak256("case-1"));
         assertEq(firstCaseId, secondCaseId);
@@ -187,11 +199,7 @@ contract V2FinancialAccountingFixtureTest is Test {
         transcript.appealed = true;
         transcript.court1.valid = false;
         transcript.court2 = _courtTranscript(
-            true,
-            true,
-            true,
-            keccak256("court-2"),
-            [address(0x201), address(0x202), address(0x203)]
+            true, true, true, keccak256("court-2"), [address(0x201), address(0x202), address(0x203)]
         );
         _deployFixture(transcript);
         uint256 campaignId = _createAndFundMilestoneZero();
@@ -216,9 +224,10 @@ contract V2FinancialAccountingFixtureTest is Test {
         address backend = makeAddr("backend");
 
         vm.prank(backend);
-        (bool success,) = address(fixture).call(
-            abi.encodeWithSignature("setFinalOutcome(uint256,uint256,uint8)", campaignId, 0, 2)
-        );
+        (bool success,) = address(fixture)
+            .call(
+                abi.encodeWithSignature("setFinalOutcome(uint256,uint256,uint8)", campaignId, 0, 2)
+            );
         assertFalse(success);
 
         (, V2FinancialAccountingTypes.FinalOutcome outcome,) =
@@ -227,9 +236,8 @@ contract V2FinancialAccountingFixtureTest is Test {
     }
 
     function test_unauthorizedCallerCannotMutateOutcomeSource() public {
-        (bool success,) = address(source).call(
-            abi.encodeWithSignature("setFinalOutcome(uint8)", uint8(2))
-        );
+        (bool success,) =
+            address(source).call(abi.encodeWithSignature("setFinalOutcome(uint8)", uint8(2)));
         assertFalse(success);
     }
 
@@ -243,8 +251,7 @@ contract V2FinancialAccountingFixtureTest is Test {
         assertEq(fixture.judgeRewardEntitlement(caseId, address(0x102)), 10e6);
         assertEq(fixture.judgeRewardEntitlement(caseId, address(0x103)), 10e6);
 
-        V2FinancialAccountingTypes.FinalizedTranscript memory failTranscript =
-            _defaultTranscript();
+        V2FinancialAccountingTypes.FinalizedTranscript memory failTranscript = _defaultTranscript();
         failTranscript.court1.pass = false;
         failTranscript.finalOutcome = V2FinancialAccountingTypes.FinalOutcome.VERDICT_FAIL;
         _deployFixture(failTranscript);
@@ -307,7 +314,8 @@ contract V2FinancialAccountingFixtureTest is Test {
     }
 
     function test_vectorV4CourtTwoFailStillAccruesSixty() public {
-        V2FinancialAccountingTypes.FinalizedTranscript memory transcript = _courtTwoTranscript(false);
+        V2FinancialAccountingTypes.FinalizedTranscript memory transcript =
+            _courtTwoTranscript(false);
         _deployFixture(transcript);
         uint256 campaignId = _createAndFundMilestoneZero();
 
@@ -567,6 +575,229 @@ contract V2FinancialAccountingFixtureTest is Test {
         assertEq(fixture.settlementRefunded(campaignId, 0), 30);
     }
 
+    function test_eventsOneCourtPassAccrueThenOpenReserveRefund() public {
+        uint256 campaignId = _createAndFundMilestoneZero();
+
+        vm.recordLogs();
+        fixture.settleMilestone(campaignId, 0);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        assertEq(logs.length, 5);
+        _assertAccrual(logs[0], campaignId, keccak256("court-1"), address(0x101), 50e6, 1);
+        _assertAccrual(logs[1], campaignId, keccak256("court-1"), address(0x102), 40e6, 2);
+        _assertAccrual(logs[2], campaignId, keccak256("court-1"), address(0x103), 30e6, 3);
+        _assertReserveRefund(logs[3], campaignId, 30e6, 4);
+        _assertRefundsOpened(logs[4], campaignId, 30e6, 1_000e6, 5);
+    }
+
+    function test_eventsTwoCourtPassAccrualOrder() public {
+        _deployFixture(_courtTwoTranscript(true));
+        uint256 campaignId = _createAndFundMilestoneZero();
+
+        vm.recordLogs();
+        fixture.settleMilestone(campaignId, 0);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        assertEq(logs.length, 6);
+        _assertAccrual(logs[0], campaignId, keccak256("court-1"), address(0x101), 50e6, 1);
+        _assertAccrual(logs[1], campaignId, keccak256("court-1"), address(0x102), 40e6, 2);
+        _assertAccrual(logs[2], campaignId, keccak256("court-1"), address(0x103), 30e6, 3);
+        _assertAccrual(logs[3], campaignId, keccak256("court-2"), address(0x201), 20e6, 4);
+        _assertAccrual(logs[4], campaignId, keccak256("court-2"), address(0x202), 10e6, 5);
+        _assertAccrual(logs[5], campaignId, keccak256("court-2"), address(0x203), 0, 6);
+    }
+
+    function test_eventsTwoCourtFailAccrueThenOpenRefunds() public {
+        _deployFixture(_courtTwoTranscript(false));
+        uint256 campaignId = _createAndFundMilestoneZero();
+
+        vm.recordLogs();
+        fixture.settleMilestone(campaignId, 0);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        assertEq(logs.length, 7);
+        for (uint256 i = 0; i < 6; i++) {
+            assertEq(logs[i].topics[0], JUDGE_REWARD_ACCRUED_SIGNATURE);
+        }
+        _assertRefundsOpened(logs[6], campaignId, 940e6, 1_000e6, 7);
+    }
+
+    function test_claimEventsFollowSuccessfulTransfers() public {
+        uint256 campaignId = _createAndFundMilestoneZero();
+        address backer = makeAddr("funding-backer");
+        fixture.settleMilestone(campaignId, 0);
+
+        vm.recordLogs();
+        vm.prank(address(0x101));
+        fixture.claimJudgeReward(campaignId, 0);
+        Vm.Log[] memory judgeLogs = vm.getRecordedLogs();
+        _assertJudgeClaim(judgeLogs[judgeLogs.length - 1], campaignId, address(0x101), 10e6, 6);
+
+        vm.recordLogs();
+        vm.prank(payoutWallet);
+        fixture.claimCreatorPayout(campaignId, 0);
+        Vm.Log[] memory creatorLogs = vm.getRecordedLogs();
+        _assertCreatorPaid(creatorLogs[creatorLogs.length - 1], campaignId, 940e6, 7);
+
+        vm.recordLogs();
+        vm.prank(backer);
+        fixture.claimSettlementRefund(campaignId, 0);
+        Vm.Log[] memory backerLogs = vm.getRecordedLogs();
+        _assertBackerRefund(backerLogs[backerLogs.length - 1], campaignId, backer, 30e6, 8);
+    }
+
+    function test_failedTransferEmitsNoClaimEventAndRollsBackSequence() public {
+        AccountingTransferControlMockUSDC controlled = new AccountingTransferControlMockUSDC();
+        token = controlled;
+        _deployFixture(_defaultTranscript());
+        uint256 campaignId = _createAndFundMilestoneZero();
+        fixture.settleMilestone(campaignId, 0);
+        uint256 sequenceBefore = fixture.accountingTransitionSequence();
+        controlled.setTransfersFail(true);
+
+        vm.recordLogs();
+        vm.prank(address(0x101));
+        vm.expectRevert();
+        fixture.claimJudgeReward(campaignId, 0);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        assertEq(logs.length, 0);
+        assertEq(fixture.accountingTransitionSequence(), sequenceBefore);
+        assertFalse(fixture.judgeRewardWasClaimed(keccak256("case-1"), address(0x101)));
+    }
+
+    function _assertAccrual(
+        Vm.Log memory log,
+        uint256 campaignId,
+        bytes32 courtId,
+        address judge,
+        uint256 reserveRemaining,
+        uint256 sequence
+    ) internal view {
+        assertEq(log.emitter, address(fixture));
+        assertEq(log.topics[0], JUDGE_REWARD_ACCRUED_SIGNATURE);
+        assertEq(log.topics[1], ACCOUNTING_IDENTITY);
+        assertEq(log.topics[2], keccak256("case-1"));
+        assertEq(log.topics[3], bytes32(uint256(0)));
+        (
+            uint256 loggedCampaignId,
+            bytes32 loggedCourtId,
+            uint256 attemptIndex,
+            address loggedJudge,
+            uint256 amount,
+            uint256 loggedReserveRemaining,
+            uint256 loggedSequence
+        ) = abi.decode(log.data, (uint256, bytes32, uint256, address, uint256, uint256, uint256));
+        assertEq(loggedCampaignId, campaignId);
+        assertEq(loggedCourtId, courtId);
+        assertEq(attemptIndex, 0);
+        assertEq(loggedJudge, judge);
+        assertEq(amount, 10e6);
+        assertEq(loggedReserveRemaining, reserveRemaining);
+        assertEq(loggedSequence, sequence);
+    }
+
+    function _assertReserveRefund(
+        Vm.Log memory log,
+        uint256 campaignId,
+        uint256 amount,
+        uint256 sequence
+    ) internal view {
+        assertEq(log.emitter, address(fixture));
+        assertEq(log.topics[0], MILESTONE_RESERVE_REFUNDED_SIGNATURE);
+        assertEq(log.topics[1], ACCOUNTING_IDENTITY);
+        assertEq(log.topics[2], bytes32(campaignId));
+        assertEq(log.topics[3], bytes32(uint256(0)));
+        (bytes32 caseId, uint256 loggedAmount, uint256 loggedSequence) =
+            abi.decode(log.data, (bytes32, uint256, uint256));
+        assertEq(caseId, keccak256("case-1"));
+        assertEq(loggedAmount, amount);
+        assertEq(loggedSequence, sequence);
+    }
+
+    function _assertRefundsOpened(
+        Vm.Log memory log,
+        uint256 campaignId,
+        uint256 pool,
+        uint256 snapshot,
+        uint256 sequence
+    ) internal view {
+        assertEq(log.emitter, address(fixture));
+        assertEq(log.topics[0], MILESTONE_REFUNDS_OPENED_SIGNATURE);
+        assertEq(log.topics[1], ACCOUNTING_IDENTITY);
+        assertEq(log.topics[2], bytes32(campaignId));
+        assertEq(log.topics[3], bytes32(uint256(0)));
+        (bytes32 caseId, uint256 loggedPool, uint256 loggedSnapshot, uint256 loggedSequence) =
+            abi.decode(log.data, (bytes32, uint256, uint256, uint256));
+        assertEq(caseId, keccak256("case-1"));
+        assertEq(loggedPool, pool);
+        assertEq(loggedSnapshot, snapshot);
+        assertEq(loggedSequence, sequence);
+    }
+
+    function _assertJudgeClaim(
+        Vm.Log memory log,
+        uint256 campaignId,
+        address judge,
+        uint256 amount,
+        uint256 sequence
+    ) internal view {
+        assertEq(log.emitter, address(fixture));
+        assertEq(log.topics[0], JUDGE_REWARD_CLAIMED_SIGNATURE);
+        assertEq(log.topics[1], ACCOUNTING_IDENTITY);
+        assertEq(log.topics[2], keccak256("case-1"));
+        assertEq(log.topics[3], bytes32(uint256(uint160(judge))));
+        (
+            uint256 loggedCampaignId,
+            uint256 milestoneId,
+            uint256 loggedAmount,
+            uint256 loggedSequence
+        ) = abi.decode(log.data, (uint256, uint256, uint256, uint256));
+        assertEq(loggedCampaignId, campaignId);
+        assertEq(milestoneId, 0);
+        assertEq(loggedAmount, amount);
+        assertEq(loggedSequence, sequence);
+    }
+
+    function _assertCreatorPaid(
+        Vm.Log memory log,
+        uint256 campaignId,
+        uint256 amount,
+        uint256 sequence
+    ) internal view {
+        assertEq(log.emitter, address(fixture));
+        assertEq(log.topics[0], MILESTONE_PAID_SIGNATURE);
+        assertEq(log.topics[1], ACCOUNTING_IDENTITY);
+        assertEq(log.topics[2], bytes32(campaignId));
+        assertEq(log.topics[3], bytes32(uint256(0)));
+        (bytes32 caseId, address creatorAddress, uint256 loggedAmount, uint256 loggedSequence) =
+            abi.decode(log.data, (bytes32, address, uint256, uint256));
+        assertEq(caseId, keccak256("case-1"));
+        assertEq(creatorAddress, payoutWallet);
+        assertEq(loggedAmount, amount);
+        assertEq(loggedSequence, sequence);
+    }
+
+    function _assertBackerRefund(
+        Vm.Log memory log,
+        uint256 campaignId,
+        address backer,
+        uint256 amount,
+        uint256 sequence
+    ) internal view {
+        assertEq(log.emitter, address(fixture));
+        assertEq(log.topics[0], BACKER_REFUND_CLAIMED_SIGNATURE);
+        assertEq(log.topics[1], ACCOUNTING_IDENTITY);
+        assertEq(log.topics[2], bytes32(campaignId));
+        assertEq(log.topics[3], bytes32(uint256(0)));
+        (bytes32 caseId, address loggedBacker, uint256 loggedAmount, uint256 loggedSequence) =
+            abi.decode(log.data, (bytes32, address, uint256, uint256));
+        assertEq(caseId, keccak256("case-1"));
+        assertEq(loggedBacker, backer);
+        assertEq(loggedAmount, amount);
+        assertEq(loggedSequence, sequence);
+    }
+
     function _deployFixture(V2FinancialAccountingTypes.FinalizedTranscript memory transcript)
         internal
     {
@@ -620,11 +851,7 @@ contract V2FinancialAccountingFixtureTest is Test {
                 [address(0x101), address(0x102), address(0x103)]
             ),
             court2: _courtTranscript(
-                false,
-                false,
-                false,
-                bytes32(0),
-                [address(0), address(0), address(0)]
+                false, false, false, bytes32(0), [address(0), address(0), address(0)]
             )
         });
     }
@@ -640,11 +867,7 @@ contract V2FinancialAccountingFixtureTest is Test {
             ? V2FinancialAccountingTypes.FinalOutcome.FINAL_PASS
             : V2FinancialAccountingTypes.FinalOutcome.VERDICT_FAIL;
         transcript.court2 = _courtTranscript(
-            true,
-            true,
-            pass,
-            keccak256("court-2"),
-            [address(0x201), address(0x202), address(0x203)]
+            true, true, pass, keccak256("court-2"), [address(0x201), address(0x202), address(0x203)]
         );
     }
 

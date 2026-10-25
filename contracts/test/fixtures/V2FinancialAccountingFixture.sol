@@ -71,11 +71,12 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
 
     bytes32 public immutable accountingDeploymentIdentity;
     IV2FinalOutcomeSource public immutable outcomeSource;
+    uint256 public accountingTransitionSequence;
 
     mapping(uint256 => mapping(uint256 => bool)) public settlementProcessed;
     mapping(uint256 => mapping(uint256 => bytes32)) public settledCaseId;
-    mapping(uint256 => mapping(uint256 => V2FinancialAccountingTypes.FinalOutcome))
-        public finalOutcome;
+    mapping(uint256 => mapping(uint256 => V2FinancialAccountingTypes.FinalOutcome)) public
+        finalOutcome;
     mapping(uint256 => mapping(uint256 => uint256)) public judgePaid;
     mapping(uint256 => mapping(uint256 => uint256)) public judgeRewardClaimed;
     mapping(bytes32 => mapping(address => uint256)) public judgeRewardEntitlement;
@@ -85,8 +86,8 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
     mapping(uint256 => mapping(uint256 => uint256)) public creatorPaid;
     mapping(uint256 => mapping(uint256 => uint256)) public refundPool;
     mapping(uint256 => mapping(uint256 => uint256)) public settlementRefunded;
-    mapping(uint256 => mapping(uint256 => mapping(address => bool)))
-        public settlementRefundWasClaimed;
+    mapping(uint256 => mapping(uint256 => mapping(address => bool))) public
+        settlementRefundWasClaimed;
     mapping(uint256 => mapping(uint256 => address[])) private milestoneContributors;
     mapping(uint256 => mapping(uint256 => mapping(address => bool))) private contributorSeen;
 
@@ -99,13 +100,73 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
     error ClaimAlreadyProcessed();
     error UnauthorizedClaim();
 
+    event JudgeRewardAccrued(
+        bytes32 indexed deploymentIdentity,
+        bytes32 indexed caseId,
+        uint256 indexed milestoneId,
+        uint256 campaignId,
+        bytes32 courtId,
+        uint256 attemptIndex,
+        address judge,
+        uint256 amount,
+        uint256 reserveRemaining,
+        uint256 transitionSequence
+    );
+
+    event JudgeRewardClaimed(
+        bytes32 indexed deploymentIdentity,
+        bytes32 indexed caseId,
+        address indexed judge,
+        uint256 campaignId,
+        uint256 milestoneId,
+        uint256 amount,
+        uint256 transitionSequence
+    );
+
+    event MilestoneReserveRefunded(
+        bytes32 indexed deploymentIdentity,
+        uint256 indexed campaignId,
+        uint256 indexed milestoneId,
+        bytes32 caseId,
+        uint256 amount,
+        uint256 transitionSequence
+    );
+
+    event MilestonePaid(
+        bytes32 indexed deploymentIdentity,
+        uint256 indexed campaignId,
+        uint256 indexed milestoneId,
+        bytes32 caseId,
+        address creator,
+        uint256 amount,
+        uint256 transitionSequence
+    );
+
+    event MilestoneRefundsOpened(
+        bytes32 indexed deploymentIdentity,
+        uint256 indexed campaignId,
+        uint256 indexed milestoneId,
+        bytes32 caseId,
+        uint256 pool,
+        uint256 snapshot,
+        uint256 transitionSequence
+    );
+
+    event BackerRefundClaimed(
+        bytes32 indexed deploymentIdentity,
+        uint256 indexed campaignId,
+        uint256 indexed milestoneId,
+        bytes32 caseId,
+        address backer,
+        uint256 amount,
+        uint256 transitionSequence
+    );
+
     constructor(
         IERC20 token_,
         bytes32 accountingDeploymentIdentity_,
         IV2FinalOutcomeSource outcomeSource_
-    )
-        V2FundingFixture(token_, keccak256("fundtogether-vnext-v2-pr1-funding-fixture"))
-    {
+    ) V2FundingFixture(token_, keccak256("fundtogether-vnext-v2-pr1-funding-fixture")) {
         if (
             accountingDeploymentIdentity_ != ACCOUNTING_DEPLOYMENT_IDENTITY
                 || address(outcomeSource_) == address(0)
@@ -167,11 +228,58 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
         refundPool[campaignId][milestoneId] =
             raised[campaignId][milestoneId] - rewardTotal - creatorAmount;
 
+        uint256 reserveRemaining = milestone.maxReviewReserve;
         if (transcript.court1.valid) {
-            _accrueCourt(transcript.caseId, transcript.court1, milestone.judgeRewardUnit);
+            reserveRemaining = _accrueCourt(
+                transcript.caseId,
+                campaignId,
+                milestoneId,
+                transcript.court1,
+                milestone.judgeRewardUnit,
+                reserveRemaining
+            );
         }
         if (transcript.court2.valid) {
-            _accrueCourt(transcript.caseId, transcript.court2, milestone.judgeRewardUnit);
+            reserveRemaining = _accrueCourt(
+                transcript.caseId,
+                campaignId,
+                milestoneId,
+                transcript.court2,
+                milestone.judgeRewardUnit,
+                reserveRemaining
+            );
+        }
+
+        _emitSettlementRefundEvents(campaignId, milestoneId, transcript.caseId, reserveRemaining);
+    }
+
+    function _emitSettlementRefundEvents(
+        uint256 campaignId,
+        uint256 milestoneId,
+        bytes32 caseId,
+        uint256 reserveRemaining
+    ) internal {
+        if (reserveRemaining != 0) {
+            emit MilestoneReserveRefunded(
+                accountingDeploymentIdentity,
+                campaignId,
+                milestoneId,
+                caseId,
+                reserveRemaining,
+                _nextAccountingTransitionSequence()
+            );
+        }
+        uint256 milestoneRefundPool = refundPool[campaignId][milestoneId];
+        if (milestoneRefundPool != 0) {
+            emit MilestoneRefundsOpened(
+                accountingDeploymentIdentity,
+                campaignId,
+                milestoneId,
+                caseId,
+                milestoneRefundPool,
+                raised[campaignId][milestoneId],
+                _nextAccountingTransitionSequence()
+            );
         }
     }
 
@@ -185,6 +293,15 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
         judgeRewardWasClaimed[caseId][msg.sender] = true;
         judgeRewardClaimed[campaignId][milestoneId] += amount;
         _transferExact(msg.sender, amount);
+        emit JudgeRewardClaimed(
+            accountingDeploymentIdentity,
+            caseId,
+            msg.sender,
+            campaignId,
+            milestoneId,
+            amount,
+            _nextAccountingTransitionSequence()
+        );
     }
 
     function claimCreatorPayout(uint256 campaignId, uint256 milestoneId) external nonReentrant {
@@ -199,12 +316,18 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
         creatorPaid[campaignId][milestoneId] = amount;
         _milestone(campaignId, milestoneId).state = V2FundingTypes.MilestoneState.PAID;
         _transferExact(campaign.payoutWallet, amount);
+        emit MilestonePaid(
+            accountingDeploymentIdentity,
+            campaignId,
+            milestoneId,
+            settledCaseId[campaignId][milestoneId],
+            campaign.payoutWallet,
+            amount,
+            _nextAccountingTransitionSequence()
+        );
     }
 
-    function claimSettlementRefund(uint256 campaignId, uint256 milestoneId)
-        external
-        nonReentrant
-    {
+    function claimSettlementRefund(uint256 campaignId, uint256 milestoneId) external nonReentrant {
         if (!settlementProcessed[campaignId][milestoneId]) revert SettlementNotProcessed();
         if (settlementRefundWasClaimed[campaignId][milestoneId][msg.sender]) {
             revert ClaimAlreadyProcessed();
@@ -215,13 +338,22 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
         settlementRefundWasClaimed[campaignId][milestoneId][msg.sender] = true;
         settlementRefunded[campaignId][milestoneId] += amount;
         _transferExact(msg.sender, amount);
+        emit BackerRefundClaimed(
+            accountingDeploymentIdentity,
+            campaignId,
+            milestoneId,
+            settledCaseId[campaignId][milestoneId],
+            msg.sender,
+            amount,
+            _nextAccountingTransitionSequence()
+        );
     }
 
-    function settlementRefundEntitlement(
-        uint256 campaignId,
-        uint256 milestoneId,
-        address backer
-    ) public view returns (uint256) {
+    function settlementRefundEntitlement(uint256 campaignId, uint256 milestoneId, address backer)
+        public
+        view
+        returns (uint256)
+    {
         if (!settlementProcessed[campaignId][milestoneId]) return 0;
         uint256 contribution = contributionOf[campaignId][milestoneId][backer];
         uint256 pool = refundPool[campaignId][milestoneId];
@@ -229,7 +361,8 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
 
         uint256 total = raised[campaignId][milestoneId];
         uint256 entitlement = Math.mulDiv(contribution, pool, total);
-        (uint256 dust, uint256 rank) = _refundDustAndRank(campaignId, milestoneId, pool, total, backer);
+        (uint256 dust, uint256 rank) =
+            _refundDustAndRank(campaignId, milestoneId, pool, total, backer);
         if (rank < dust) entitlement += 1;
         return entitlement;
     }
@@ -351,7 +484,9 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
         V2FinancialAccountingTypes.CourtTranscript memory court,
         bool expectedPresent
     ) internal pure {
-        if (court.present != expectedPresent) revert InvalidOutcomeTranscript();
+        if (court.present != expectedPresent) {
+            revert InvalidOutcomeTranscript();
+        }
         if (!expectedPresent) {
             if (
                 court.valid || court.pass || court.courtId != bytes32(0) || court.attemptIndex != 0
@@ -366,8 +501,7 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
             if (
                 court.judges[0] == address(0) || court.judges[1] == address(0)
                     || court.judges[2] == address(0) || court.judges[0] == court.judges[1]
-                    || court.judges[0] == court.judges[2]
-                    || court.judges[1] == court.judges[2]
+                    || court.judges[0] == court.judges[2] || court.judges[1] == court.judges[2]
             ) revert InvalidOutcomeTranscript();
         }
     }
@@ -385,16 +519,37 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
 
     function _accrueCourt(
         bytes32 caseId,
+        uint256 campaignId,
+        uint256 milestoneId,
         V2FinancialAccountingTypes.CourtTranscript memory court,
-        uint256 rewardUnit
-    ) internal {
+        uint256 rewardUnit,
+        uint256 reserveRemaining
+    ) internal returns (uint256) {
         for (uint256 i = 0; i < REFERENCE_COURT_SIZE; i++) {
             address judge = court.judges[i];
             if (judgeRewardEntitlement[caseId][judge] != 0) {
                 revert SettlementAlreadyProcessed();
             }
             judgeRewardEntitlement[caseId][judge] = rewardUnit;
+            reserveRemaining -= rewardUnit;
+            emit JudgeRewardAccrued(
+                accountingDeploymentIdentity,
+                caseId,
+                milestoneId,
+                campaignId,
+                court.courtId,
+                court.attemptIndex,
+                judge,
+                rewardUnit,
+                reserveRemaining,
+                _nextAccountingTransitionSequence()
+            );
         }
+        return reserveRemaining;
+    }
+
+    function _nextAccountingTransitionSequence() internal returns (uint256) {
+        return ++accountingTransitionSequence;
     }
 
     function _afterContribution(uint256 campaignId, uint256 milestoneId, address backer)
