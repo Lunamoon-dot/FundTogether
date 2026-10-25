@@ -4,6 +4,24 @@ import { Test } from "forge-std/Test.sol";
 import { MockUSDC } from "../../mocks/MockUSDC.sol";
 import { V2FundingFixture, V2FundingTypes } from "../../fixtures/V2FundingFixture.sol";
 
+contract TransferControlMockUSDC is MockUSDC {
+    bool public transfersFail;
+
+    function setTransfersFail(bool value) external {
+        transfersFail = value;
+    }
+
+    function transfer(address to, uint256 amount) public override returns (bool) {
+        if (transfersFail) return false;
+        return super.transfer(to, amount);
+    }
+
+    function transferFrom(address from, address to, uint256 amount) public override returns (bool) {
+        if (transfersFail) return false;
+        return super.transferFrom(from, to, amount);
+    }
+}
+
 contract V2FundingFixtureTest is Test {
     uint256 internal constant LOCAL_CHAIN_ID = 31339;
     bytes32 internal constant FIXTURE_IDENTITY = keccak256("fundtogether-vnext-v2-pr1-funding-fixture");
@@ -235,6 +253,215 @@ contract V2FundingFixtureTest is Test {
         assertEq(fixture.policyVersion(campaignId), "fundtogether-vnext-v2-pr0-remediation-20261025");
         (, , , uint256 fundingTarget, , , , , , , ) = fixture.milestoneTerms(campaignId, 0);
         assertEq(fundingTarget, 1_000e6);
+    }
+
+    function test_contributionsUseActiveMilestoneLedgerAndExactTargetCustody() public {
+        V2FundingTypes.CampaignCommitment memory commitment = _validCommitment();
+        uint256 campaignId = _createCampaign(commitment);
+        address backerA = makeAddr("backer-a");
+        address backerB = makeAddr("backer-b");
+        token.mint(backerA, 400e6);
+        token.mint(backerB, 600e6);
+
+        vm.startPrank(backerA);
+        token.approve(address(fixture), 400e6);
+        vm.expectEmit(true, true, true, true);
+        emit V2FundingFixture.MilestoneContributionReceived(
+            FIXTURE_IDENTITY, campaignId, 0, backerA, 400e6, 400e6, 1
+        );
+        fixture.contribute(campaignId, 0, 400e6);
+        vm.stopPrank();
+
+        vm.startPrank(backerB);
+        token.approve(address(fixture), 600e6);
+        fixture.contribute(campaignId, 0, 600e6);
+        vm.stopPrank();
+
+        assertEq(fixture.raised(campaignId, 0), 1_000e6);
+        assertEq(fixture.contributionOf(campaignId, 0, backerA), 400e6);
+        assertEq(fixture.contributionOf(campaignId, 0, backerB), 600e6);
+        assertEq(token.balanceOf(address(fixture)), 1_000e6);
+        assertEq(token.balanceOf(payoutWallet), 0);
+        assertEq(
+            uint256(fixture.milestoneState(campaignId, 0)),
+            uint256(V2FundingTypes.MilestoneState.FUNDED)
+        );
+        assertEq(
+            uint256(fixture.milestoneState(campaignId, 1)),
+            uint256(V2FundingTypes.MilestoneState.DECLARED)
+        );
+        assertEq(fixture.activeMilestoneId(campaignId), 0);
+    }
+
+    function test_contributeRejectsInactiveZeroOverTargetAndExpiredFunding() public {
+        V2FundingTypes.CampaignCommitment memory commitment = _validCommitment();
+        uint256 campaignId = _createCampaign(commitment);
+        address backer = makeAddr("funding-backer");
+        token.mint(backer, 2_001e6);
+        vm.startPrank(backer);
+        token.approve(address(fixture), type(uint256).max);
+
+        vm.expectRevert(V2FundingFixture.NotActiveMilestone.selector);
+        fixture.contribute(campaignId, 1, 1);
+        vm.expectRevert(V2FundingFixture.ZeroContribution.selector);
+        fixture.contribute(campaignId, 0, 0);
+        fixture.contribute(campaignId, 0, 900e6);
+        vm.expectRevert(V2FundingFixture.OverTarget.selector);
+        fixture.contribute(campaignId, 0, 101e6);
+        vm.stopPrank();
+
+        assertEq(fixture.raised(campaignId, 0), 900e6);
+        assertEq(token.balanceOf(address(fixture)), 900e6);
+
+        vm.warp(commitment.fundingDeadline[0]);
+        vm.prank(backer);
+        vm.expectRevert(V2FundingFixture.FundingDeadlinePassed.selector);
+        fixture.contribute(campaignId, 0, 100e6);
+
+        assertEq(fixture.raised(campaignId, 0), 900e6);
+        assertEq(token.balanceOf(address(fixture)), 900e6);
+    }
+
+    function test_exactTargetSuccessCannotBeFinalizedAsFailureOrContributedAgain() public {
+        V2FundingTypes.CampaignCommitment memory commitment = _validCommitment();
+        uint256 campaignId = _createCampaign(commitment);
+        address backer = makeAddr("exact-backer");
+        token.mint(backer, 1_000e6);
+
+        vm.startPrank(backer);
+        token.approve(address(fixture), type(uint256).max);
+        fixture.contribute(campaignId, 0, 1_000e6);
+        vm.expectRevert(V2FundingFixture.FundingNotOpen.selector);
+        fixture.contribute(campaignId, 0, 1);
+        vm.stopPrank();
+
+        vm.warp(commitment.fundingDeadline[0]);
+        vm.expectRevert(V2FundingFixture.FundingNotOpen.selector);
+        fixture.finalizeFundingFailure(campaignId, 0);
+
+        assertEq(token.balanceOf(address(fixture)), 1_000e6);
+        assertEq(token.balanceOf(payoutWallet), 0);
+        assertEq(fixture.refundSnapshot(campaignId, 0), 0);
+    }
+
+    function test_fundingFailureSnapshotsCustodyAndAllowsEachBackerRefund() public {
+        V2FundingTypes.CampaignCommitment memory commitment = _validCommitment();
+        uint256 campaignId = _createCampaign(commitment);
+        address backerA = makeAddr("refund-a");
+        address backerB = makeAddr("refund-b");
+        token.mint(backerA, 400e6);
+        token.mint(backerB, 300e6);
+
+        vm.startPrank(backerA);
+        token.approve(address(fixture), 400e6);
+        fixture.contribute(campaignId, 0, 400e6);
+        vm.stopPrank();
+        vm.startPrank(backerB);
+        token.approve(address(fixture), 300e6);
+        fixture.contribute(campaignId, 0, 300e6);
+        vm.stopPrank();
+
+        vm.warp(commitment.fundingDeadline[0]);
+        vm.expectEmit(true, true, true, true);
+        emit V2FundingFixture.MilestoneFundingFinalized(
+            FIXTURE_IDENTITY, campaignId, 0, false, 700e6, 700e6, 1
+        );
+        fixture.finalizeFundingFailure(campaignId, 0);
+
+        assertEq(
+            uint256(fixture.milestoneState(campaignId, 0)),
+            uint256(V2FundingTypes.MilestoneState.REFUNDING)
+        );
+        assertEq(fixture.refundSnapshot(campaignId, 0), 700e6);
+        assertEq(token.balanceOf(address(fixture)), 700e6);
+
+        vm.prank(backerA);
+        vm.expectEmit(true, true, true, true);
+        emit V2FundingFixture.MilestoneRefundClaimed(
+            FIXTURE_IDENTITY, campaignId, 0, backerA, 400e6, 2
+        );
+        fixture.claimFundingRefund(campaignId, 0);
+        vm.prank(backerB);
+        fixture.claimFundingRefund(campaignId, 0);
+
+        assertTrue(fixture.refundClaimed(campaignId, 0, backerA));
+        assertTrue(fixture.refundClaimed(campaignId, 0, backerB));
+        assertEq(fixture.refunded(campaignId, 0), 700e6);
+        assertEq(token.balanceOf(address(fixture)), 0);
+        assertEq(token.balanceOf(backerA), 400e6);
+        assertEq(token.balanceOf(backerB), 300e6);
+
+        vm.prank(backerA);
+        vm.expectRevert(V2FundingFixture.RefundAlreadyClaimed.selector);
+        fixture.claimFundingRefund(campaignId, 0);
+        vm.prank(makeAddr("no-refund"));
+        vm.expectRevert(V2FundingFixture.NoRefundAvailable.selector);
+        fixture.claimFundingRefund(campaignId, 0);
+    }
+
+    function test_failedRefundTransferRollsBackClaimAndCanBeRetried() public {
+        TransferControlMockUSDC failingToken = new TransferControlMockUSDC();
+        V2FundingFixture failingFixture = new V2FundingFixture(failingToken, FIXTURE_IDENTITY);
+        V2FundingTypes.CampaignCommitment memory commitment = _validCommitment();
+        commitment.policyManifest.token = address(failingToken);
+        address backer = makeAddr("retry-refund");
+        failingToken.mint(backer, 250e6);
+
+        vm.prank(creator);
+        uint256 campaignId = failingFixture.createCampaign(commitment);
+        vm.startPrank(backer);
+        failingToken.approve(address(failingFixture), 250e6);
+        failingFixture.contribute(campaignId, 0, 250e6);
+        vm.stopPrank();
+
+        vm.warp(commitment.fundingDeadline[0]);
+        failingFixture.finalizeFundingFailure(campaignId, 0);
+        failingToken.setTransfersFail(true);
+
+        vm.prank(backer);
+        vm.expectRevert();
+        failingFixture.claimFundingRefund(campaignId, 0);
+        assertFalse(failingFixture.refundClaimed(campaignId, 0, backer));
+        assertEq(failingFixture.refunded(campaignId, 0), 0);
+        assertEq(failingToken.balanceOf(address(failingFixture)), 250e6);
+
+        failingToken.setTransfersFail(false);
+        vm.prank(backer);
+        failingFixture.claimFundingRefund(campaignId, 0);
+        assertTrue(failingFixture.refundClaimed(campaignId, 0, backer));
+        assertEq(failingFixture.refunded(campaignId, 0), 250e6);
+        assertEq(failingToken.balanceOf(address(failingFixture)), 0);
+        assertEq(failingToken.balanceOf(backer), 250e6);
+    }
+
+    function test_milestoneTwoCannotOpenWithoutPaidMilestoneOne() public {
+        V2FundingTypes.CampaignCommitment memory commitment = _validCommitment();
+        uint256 campaignId = _createCampaign(commitment);
+
+        vm.expectRevert(V2FundingFixture.PreviousMilestoneNotPaid.selector);
+        fixture.openMilestoneFunding(campaignId, 1);
+        vm.expectRevert(V2FundingFixture.PreviousMilestoneNotPaid.selector);
+        fixture.openMilestoneFunding(campaignId, 0);
+
+        address backer = makeAddr("first-milestone");
+        token.mint(backer, 1_000e6);
+        vm.startPrank(backer);
+        token.approve(address(fixture), 1_000e6);
+        fixture.contribute(campaignId, 0, 1_000e6);
+        vm.stopPrank();
+
+        vm.expectRevert(V2FundingFixture.PreviousMilestoneNotPaid.selector);
+        fixture.openMilestoneFunding(campaignId, 1);
+        assertEq(fixture.activeMilestoneId(campaignId), 0);
+        assertEq(token.balanceOf(payoutWallet), 0);
+    }
+
+    function _createCampaign(V2FundingTypes.CampaignCommitment memory commitment)
+        internal
+        returns (uint256 campaignId)
+    {
+        vm.prank(creator);
+        campaignId = fixture.createCampaign(commitment);
     }
 
     function _expectInvalid(V2FundingTypes.CampaignCommitment memory commitment) internal {
