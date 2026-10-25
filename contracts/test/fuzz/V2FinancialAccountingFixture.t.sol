@@ -64,10 +64,9 @@ contract V2FinancialAccountingFixtureFuzzTest is Test {
         assertLt(target * 100, (unit + 1) * 10_000);
     }
 
-    function testFuzz_validCourtCountAndVerdictDoNotChangePerSeatReward(
-        bool appealed,
-        bool pass
-    ) public {
+    function testFuzz_validCourtCountAndVerdictDoNotChangePerSeatReward(bool appealed, bool pass)
+        public
+    {
         V2FinancialAccountingTypes.FinalizedTranscript memory transcript =
             _transcript(appealed, pass);
         _deploy(transcript);

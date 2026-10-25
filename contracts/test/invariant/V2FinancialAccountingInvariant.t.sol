@@ -94,15 +94,12 @@ contract V2FinancialAccountingInvariantTest is Test {
 
     function setUp() public {
         vm.chainId(LOCAL_CHAIN_ID);
-        (passToken, passFixture, passCampaign) = _scenario(
-            V2FinancialAccountingTypes.FinalOutcome.FINAL_PASS, true, true
-        );
-        (failToken, failFixture, failCampaign) = _scenario(
-            V2FinancialAccountingTypes.FinalOutcome.VERDICT_FAIL, true, false
-        );
-        (protocolToken, protocolFixture, protocolCampaign) = _scenario(
-            V2FinancialAccountingTypes.FinalOutcome.PROTOCOL_FAIL, false, false
-        );
+        (passToken, passFixture, passCampaign) =
+            _scenario(V2FinancialAccountingTypes.FinalOutcome.FINAL_PASS, true, true);
+        (failToken, failFixture, failCampaign) =
+            _scenario(V2FinancialAccountingTypes.FinalOutcome.VERDICT_FAIL, true, false);
+        (protocolToken, protocolFixture, protocolCampaign) =
+            _scenario(V2FinancialAccountingTypes.FinalOutcome.PROTOCOL_FAIL, false, false);
 
         targetContract(
             address(new V2FinancialAccountingHandler(passToken, passFixture, passCampaign, PAYOUT))
@@ -140,8 +137,7 @@ contract V2FinancialAccountingInvariantTest is Test {
     function invariant_invalidCourtEarnsNoServiceReward() public view {
         assertEq(protocolFixture.judgePaid(protocolCampaign, 0), 0);
         assertEq(
-            protocolFixture.judgeRewardEntitlement(keccak256("invariant-case"), address(0x101)),
-            0
+            protocolFixture.judgeRewardEntitlement(keccak256("invariant-case"), address(0x101)), 0
         );
     }
 
@@ -165,12 +161,14 @@ contract V2FinancialAccountingInvariantTest is Test {
         uint256 raised = fixture.raised(campaignId, 0);
         uint256 creatorPaid = fixture.creatorPaid(campaignId, 0);
         uint256 judgePaid = fixture.judgePaid(campaignId, 0);
-        uint256 refunded = fixture.refunded(campaignId, 0) + fixture.settlementRefunded(campaignId, 0);
-        assertEq(raised, creatorPaid + judgePaid + refunded + fixture.escrowRemaining(campaignId, 0));
+        uint256 refunded =
+            fixture.refunded(campaignId, 0) + fixture.settlementRefunded(campaignId, 0);
+        assertEq(
+            raised, creatorPaid + judgePaid + refunded + fixture.escrowRemaining(campaignId, 0)
+        );
         assertEq(
             judgePaid,
-            fixture.judgeRewardClaimed(campaignId, 0)
-                + fixture.judgeRewardUnclaimed(campaignId, 0)
+            fixture.judgeRewardClaimed(campaignId, 0) + fixture.judgeRewardUnclaimed(campaignId, 0)
         );
         assertEq(fixture.physicalCustody(campaignId, 0), token.balanceOf(address(fixture)));
     }
@@ -228,11 +226,7 @@ contract V2FinancialAccountingInvariantTest is Test {
         }
     }
 
-    function _scenario(
-        V2FinancialAccountingTypes.FinalOutcome outcome,
-        bool validCourt,
-        bool pass
-    )
+    function _scenario(V2FinancialAccountingTypes.FinalOutcome outcome, bool validCourt, bool pass)
         internal
         returns (
             InvariantTransferControlMockUSDC token,
@@ -288,10 +282,11 @@ contract V2FinancialAccountingInvariantTest is Test {
         });
     }
 
-    function _commitment(
-        MockUSDC token,
-        V2FinancialAccountingFixture fixture
-    ) internal view returns (V2FundingTypes.CampaignCommitment memory commitment) {
+    function _commitment(MockUSDC token, V2FinancialAccountingFixture fixture)
+        internal
+        view
+        returns (V2FundingTypes.CampaignCommitment memory commitment)
+    {
         commitment.policyManifest = V2FundingTypes.PolicyManifest({
             commitmentSchemaVersion: "FTV2-COMMIT-2",
             policyVersion: "fundtogether-vnext-v2-pr0-remediation-20261025",
