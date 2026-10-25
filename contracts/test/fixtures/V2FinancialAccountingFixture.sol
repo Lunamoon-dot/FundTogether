@@ -385,7 +385,11 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
             - settlementRefunded[campaignId][milestoneId];
     }
 
-    function physicalCustody(uint256 campaignId, uint256 milestoneId)
+    function physicalTokenCustody() public view returns (uint256) {
+        return token.balanceOf(address(this));
+    }
+
+    function milestoneCustodyAttribution(uint256 campaignId, uint256 milestoneId)
         public
         view
         returns (uint256)

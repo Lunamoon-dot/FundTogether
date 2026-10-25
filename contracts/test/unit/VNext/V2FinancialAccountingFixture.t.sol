@@ -5,6 +5,7 @@ import { Vm } from "forge-std/Vm.sol";
 import { MockUSDC } from "../../mocks/MockUSDC.sol";
 import {
     ImmutableV2FinalOutcomeSource,
+    IV2FinalOutcomeSource,
     V2FinancialAccountingFixture,
     V2FinancialAccountingTypes
 } from "../../fixtures/V2FinancialAccountingFixture.sol";
@@ -172,6 +173,18 @@ contract V2FinancialAccountingFixtureTest is Test {
         assertEq(uint256(firstOutcome), uint256(secondOutcome));
         assertEq(firstValidCourts, 1);
         assertEq(firstValidCourts, secondValidCourts);
+    }
+
+    function test_constructorRejectsWrongAccountingIdentity() public {
+        vm.expectRevert(V2FinancialAccountingFixture.InvalidFixtureIdentity.selector);
+        new V2FinancialAccountingFixture(token, keccak256("wrong-accounting-identity"), source);
+    }
+
+    function test_constructorRejectsNoncanonicalOutcomeSourceRuntime() public {
+        vm.expectRevert(V2FinancialAccountingFixture.InvalidFixtureIdentity.selector);
+        new V2FinancialAccountingFixture(
+            token, ACCOUNTING_IDENTITY, IV2FinalOutcomeSource(address(this))
+        );
     }
 
     function test_transcriptRejectsMismatchedDeploymentIdentity() public {
@@ -371,7 +384,7 @@ contract V2FinancialAccountingFixtureTest is Test {
         assertEq(fixture.refundPool(campaignId, 0), 30e6);
         assertEq(fixture.settlementRefundEntitlement(campaignId, 0, backer), 30e6);
         assertEq(fixture.escrowRemaining(campaignId, 0), 970e6);
-        assertEq(fixture.physicalCustody(campaignId, 0), 1_000e6);
+        assertEq(fixture.milestoneCustodyAttribution(campaignId, 0), 1_000e6);
         assertEq(fixture.fundedLiabilities(campaignId, 0), 1_000e6);
 
         vm.prank(backer);
@@ -383,8 +396,18 @@ contract V2FinancialAccountingFixtureTest is Test {
         fixture.claimJudgeReward(campaignId, 0);
         assertEq(fixture.judgePaid(campaignId, 0), 30e6);
         assertEq(fixture.judgeRewardUnclaimed(campaignId, 0), 20e6);
-        assertEq(fixture.physicalCustody(campaignId, 0), 960e6);
+        assertEq(fixture.milestoneCustodyAttribution(campaignId, 0), 960e6);
         assertEq(fixture.fundedLiabilities(campaignId, 0), 960e6);
+    }
+
+    function test_physicalCustodyIsGlobalAndMilestoneAttributionRemainsScoped() public {
+        uint256 firstCampaignId = _createAndFundMilestoneZero();
+        uint256 secondCampaignId = _createAndFundMilestoneZero();
+
+        assertEq(fixture.physicalTokenCustody(), 2_000e6);
+        assertEq(fixture.physicalTokenCustody(), token.balanceOf(address(fixture)));
+        assertEq(fixture.milestoneCustodyAttribution(firstCampaignId, 0), 1_000e6);
+        assertEq(fixture.milestoneCustodyAttribution(secondCampaignId, 0), 1_000e6);
     }
 
     function test_verdictFailCreatesNoCreatorClaimAndRefundsRemainingEscrow() public {
@@ -417,6 +440,25 @@ contract V2FinancialAccountingFixtureTest is Test {
         assertEq(fixture.creatorClaimable(campaignId, 0), 0);
         assertEq(fixture.judgePaid(campaignId, 0), 0);
         assertEq(fixture.refundPool(campaignId, 0), 1_000e6);
+    }
+
+    function test_protocolFailAfterValidCourtOneProtectsEarnedRewardAndRefundsRest() public {
+        V2FinancialAccountingTypes.FinalizedTranscript memory transcript = _courtTwoTranscript(true);
+        transcript.court2.valid = false;
+        transcript.court2.pass = false;
+        transcript.finalOutcome = V2FinancialAccountingTypes.FinalOutcome.PROTOCOL_FAIL;
+        _deployFixture(transcript);
+        uint256 campaignId = _createAndFundMilestoneZero();
+
+        fixture.settleMilestone(campaignId, 0);
+
+        assertEq(fixture.creatorClaimable(campaignId, 0), 0);
+        assertEq(fixture.judgePaid(campaignId, 0), 30e6);
+        assertEq(fixture.judgeRewardEntitlement(transcript.caseId, address(0x101)), 10e6);
+        assertEq(fixture.judgeRewardEntitlement(transcript.caseId, address(0x201)), 0);
+        assertEq(fixture.refundPool(campaignId, 0), 970e6);
+        assertEq(fixture.fundedLiabilities(campaignId, 0), 1_000e6);
+        assertEq(fixture.milestoneCustodyAttribution(campaignId, 0), 1_000e6);
     }
 
     function test_creatorPayoutMarksPaidAndOnlyThenOpensMilestoneTwo() public {

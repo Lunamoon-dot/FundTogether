@@ -139,7 +139,7 @@ contract V2FinancialAccountingFixtureFuzzTest is Test {
         uint256 campaignId = _fund(400e6, 600e6);
         fixture.settleMilestone(campaignId, 0);
         address judge = transcript.court1.judges[bound(uint256(judgeSeed), 0, 2)];
-        uint256 custodyBefore = fixture.physicalCustody(campaignId, 0);
+        uint256 custodyBefore = fixture.milestoneCustodyAttribution(campaignId, 0);
         uint256 liabilitiesBefore = fixture.fundedLiabilities(campaignId, 0);
         controlled.setTransfersFail(true);
 
@@ -148,7 +148,7 @@ contract V2FinancialAccountingFixtureFuzzTest is Test {
         fixture.claimJudgeReward(campaignId, 0);
 
         assertEq(fixture.judgeRewardClaimed(campaignId, 0), 0);
-        assertEq(fixture.physicalCustody(campaignId, 0), custodyBefore);
+        assertEq(fixture.milestoneCustodyAttribution(campaignId, 0), custodyBefore);
         assertEq(fixture.fundedLiabilities(campaignId, 0), liabilitiesBefore);
     }
 

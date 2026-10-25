@@ -170,14 +170,18 @@ contract V2FinancialAccountingInvariantTest is Test {
             judgePaid,
             fixture.judgeRewardClaimed(campaignId, 0) + fixture.judgeRewardUnclaimed(campaignId, 0)
         );
-        assertEq(fixture.physicalCustody(campaignId, 0), token.balanceOf(address(fixture)));
+        assertEq(fixture.milestoneCustodyAttribution(campaignId, 0), fixture.physicalTokenCustody());
+        assertEq(fixture.physicalTokenCustody(), token.balanceOf(address(fixture)));
     }
 
     function _assertSolvent(V2FinancialAccountingFixture fixture, uint256 campaignId)
         internal
         view
     {
-        assertLe(fixture.fundedLiabilities(campaignId, 0), fixture.physicalCustody(campaignId, 0));
+        assertLe(
+            fixture.fundedLiabilities(campaignId, 0),
+            fixture.milestoneCustodyAttribution(campaignId, 0)
+        );
     }
 
     function _assertBounds(
