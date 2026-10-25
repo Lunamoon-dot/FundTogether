@@ -137,6 +137,17 @@ contract V2CourtResetInvariantTest is StdInvariant, Test {
         }
     }
 
+    function invariant_stakePoolCustodyMatchesDepositsAndLiability() public view {
+        uint256 deposited;
+        for (uint256 i = 0; i < 3; i++) {
+            deposited += fixture.stakePool().depositedStake(address(uint160(0x3000 + i)));
+        }
+        assertEq(
+            token.balanceOf(address(fixture.stakePool())),
+            deposited + fixture.stakePool().totalClaimLiability()
+        );
+    }
+
     function invariant_noValidServiceRewardIsCreatedByReset() public view {
         assertEq(fixture.judgePaid(1, 0), 0);
         assertEq(fixture.physicalTokenCustody(), 0);
