@@ -276,6 +276,7 @@ contract V2FundingFixture is ReentrancyGuard {
         }
         raised[campaignId][milestoneId] = cumulative;
         contributionOf[campaignId][milestoneId][msg.sender] += amount;
+        _afterContribution(campaignId, milestoneId, msg.sender);
         uint256 sequence = ++contributionSequence;
 
         if (cumulative == milestone.fundingTarget) {
@@ -625,4 +626,6 @@ contract V2FundingFixture is ReentrancyGuard {
         if (milestoneId >= campaign.milestoneCount) revert InvalidMilestone();
         milestone = milestones[campaignId][milestoneId];
     }
+
+    function _afterContribution(uint256, uint256, address) internal virtual { }
 }
