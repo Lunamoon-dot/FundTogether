@@ -102,7 +102,32 @@ approved runtime rule.
 | O7 | Whether a Judge may vote in the BackerDAO for the same case is not specified. | P1 / conflict policy. A Judge could influence whether their own ruling is appealed. | Adopt or reject same-case Judge/DAO participation explicitly. |
 | O8 | Publication reward funding before any backer contribution is not specified. | P1 / accounting. A nonzero publication reward cannot be charged to a nonexistent milestone pool. | Keep local publication fee zero or define creator-prefunding/external subsidy. |
 
-No code change should close an open issue by implication.
+PR0 closes the documentation disposition without closing a runtime gate by
+implication. The authoritative dispositions, proposed values, approval owners
+and exact test vectors are maintained in
+[PR0_POLICY_FINALIZATION.md](PR0_POLICY_FINALIZATION.md) and
+[parameters-v2-policy.md](parameters-v2-policy.md). Any item marked
+`PROPOSED_PENDING_APPROVAL` remains blocked for runtime implementation.
+
+### 2.5. PR0 policy package
+
+PR0 preserves every locked decision above and records a concrete candidate for
+each O1–O8. The candidate package has three deliberate boundaries:
+
+* BackerDAO remains a two-choice ACCEPT/APPEAL ballot. `CWQ-1` uses an integer
+  square-root of the contribution snapshot as the candidate quadratic weight;
+  it does not claim to solve wallet splitting or Sybil behavior.
+* Publication review is pre-funding, Court 1 only, with no BackerDAO electorate
+  and no local milestone reward. A future non-zero publication subsidy requires
+  a separate prefunded policy version.
+* Court Reset is bounded and separate from appeal. A missing Judge pays a
+  positive penalty from locked case stake into a separate reset pool; the
+  milestone contribution escrow and valid-court reserve are not charged.
+
+The PR1–PR4 acceptance gates are in
+[PR1-PR4_ACCEPTANCE_CRITERIA.md](PR1-PR4_ACCEPTANCE_CRITERIA.md). These files
+are policy-review artifacts; they do not imply that the current VNext runtime
+implements V2.
 
 ## 3. Current repository audit
 
@@ -238,8 +263,9 @@ The contract rejects a milestone when:
 
 Floor rounding is conservative: it cannot overpay a Judge or make the reserve
 larger than the frozen target. Percentage remainder stays in milestone
-accounting and follows the explicit refund/payout rule; it is not silently
-assigned to an operator.
+accounting and is included in the frozen creator budget on FINAL_PASS or in the
+remaining refund balance on failure; it is not silently assigned to an
+operator. The registry contains the exact vectors and approval status.
 
 ## 6. Sequential milestone funding state machine
 
@@ -330,9 +356,12 @@ A reset is procedural recovery for an invalid court:
 
 A reset does not become Court 2, reverse a substantive verdict, count as a DAO
 APPEAL, justify minority slashing or permit backend-selected replacements.
-The required locked stake must cover the maximum procedural compensation that
-the adopted reset policy can charge to one Judge. The reset cap, multi-offender
-split, compensation recipient and exact collateral bound are O3.
+The required locked stake must cover the maximum procedural penalty that the
+adopted reset policy can charge to one Judge. PR0's candidate policy charges a
+positive percentage of each offending Judge's locked stake into a separate
+reset compensation pool, applies one reset per Court 1/Court 2 and fails closed
+after the case cap. The exact percentage, recipient and cap remain approval
+gates in the PR0 decision record.
 
 ### 7.3. BackerDAO appeal
 
@@ -347,10 +376,12 @@ to that milestone. The ballot has only two decisions:
 The DAO does not submit PASS or FAIL and cannot directly flip Court 1. Its only
 authority is choosing whether Court 2 opens.
 
-The exact contribution-weighted quadratic function is intentionally unspecified.
-Repository inspection found no approved formula. V2 deployment must reject a
-DAO policy missing formula version, snapshot, threshold, tie rule, overflow
-bounds and vote replay guard.
+PR0 names the candidate contribution-weighted quadratic formula `CWQ-1`:
+`effectiveWeight = floor_sqrt(snapshotContributionInTokenBaseUnits)`. The DAO
+must bind the formula version, snapshot identity, participation threshold, tie
+rule, checked overflow bounds and one-ballot replay guard. The formula and
+vectors remain `PROPOSED_PENDING_APPROVAL` until the policy owner signs them
+off; a deployment missing any of those fields must reject the DAO policy.
 
 ### 7.4. Court 2
 
@@ -442,11 +473,12 @@ is created. For terminal reviewed failure:
 
 ~~~text
 RefundPool_m = Raised_m - CreatorPaid_m - JudgePaid_m
-               + explicitly refundable unused reserve
 ~~~
 
-The implementation must document which reserve units are already in
-EscrowRemaining_m so a token is not counted twice.
+`RefundPool_m` is evaluated from the remaining escrow after already-authorized
+payments. Unused reserve is therefore already included in the expression and
+must not be added again. Reset penalties are a separate stake inflow and are
+not silently mixed into Backer refunds.
 
 ## 9. Actor × action × authorization matrix
 
@@ -602,7 +634,7 @@ future, independently reviewable pull request after policy gates pass.
 
 | PR | Deliverable | Required tests/gates |
 | --- | --- | --- |
-| 0 | Adopt V2 policy version; resolve O1–O8; publish parameter registry and commitment schema | Policy lint, decision-register review, exact DAO formula vectors and arithmetic overflow vectors |
+| 0 | Adopt V2 policy version; resolve O1–O8; publish parameter registry and commitment schema | [PR0 policy record](PR0_POLICY_FINALIZATION.md), [registry](parameters-v2-policy.md), exact DAO vectors and arithmetic overflow vectors |
 | 1 | Add per-milestone funding targets, active pointer, funding deadlines, contribution ledgers and no-overfunding guard | Unit/fuzz ordering, target boundary, deadline, duplicate contribution and failed transfer tests |
 | 2 | Add fixed Judge reward policy, reserve accounting, creator payout budget and pull settlement | Exact numeric examples, conservation invariant and reward/remainder/dust tests |
 | 3 | Add Court reset identity, procedural penalty and bounded replacement selection | Missing commit/reveal, one/two/three offender, collateral bound and reset-not-appeal tests |
@@ -622,7 +654,7 @@ future, independently reviewable pull request after policy gates pass.
 | Fixed reward reserve | Deterministic token-decimal, floor-rounding, reserve-cap and payout-positivity vectors |
 | Court 1 validity | Three unique Judges, required reveals and invalid court never becoming a verdict |
 | Court reset | Bounded reset count, penalty at most locked stake, new Judges, history preserved and reset not Court 2 |
-| DAO governance | Formula version, snapshot, one ballot, quadratic vectors and ACCEPT/APPEAL only |
+| DAO governance | Approved formula version, snapshot, one ballot, quadratic vectors, threshold/tie policy and ACCEPT/APPEAL only |
 | Court 2 isolation | No Court 1 overlap, same evidence/criteria and at most one appeal |
 | Final settlement | Court 1 ACCEPT and Court 2 PASS/FAIL reproduce exact accounting examples |
 | Protocol failure | No creator payout, no minority slash and residual refund per adopted policy |
@@ -633,7 +665,7 @@ future, independently reviewable pull request after policy gates pass.
 | Indexing | Canonical events are idempotent/reorg-safe; projections never override chain reads |
 | Research boundary | No CEAV signal/X/high-effort/trusted-audit field appears in V2 runtime or ABI |
 
-V2 is not implementation-ready until every P0 issue is closed, the formula is
+V2 is not implementation-ready until every P0 issue is approved, the formula is
 versioned, and conservation/state-machine tests pass on a clean deployment.
 
 ## 17. Compatibility risks
@@ -663,6 +695,7 @@ Judge reward reserve. Those differences affect custody, authorization, state
 identity and accounting; UI labels or database projections cannot solve them.
 
 This document is a design proposal and audit, not a compatibility or deployment
-claim. The next safe action is to resolve the P0 open issues, especially the
-exact quadratic DAO policy and reset/reward solvency rules, before writing
-Solidity or changing live financial parameters.
+claim. PR0 supplies the concrete policy candidates and approval gates; the next
+safe action is to approve the O1–O4 economic/reset choices and then implement
+PR1–PR4 with the linked acceptance criteria. No runtime or live financial
+parameter changes are authorized by this proposal.
