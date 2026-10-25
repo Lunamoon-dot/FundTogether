@@ -280,6 +280,13 @@ contract V2FundingFixture is ReentrancyGuard {
 
         if (cumulative == milestone.fundingTarget) {
             milestone.state = V2FundingTypes.MilestoneState.FUNDED;
+        }
+
+        emit MilestoneContributionReceived(
+            deploymentIdentity, campaignId, milestoneId, msg.sender, amount, cumulative, sequence
+        );
+
+        if (cumulative == milestone.fundingTarget) {
             emit MilestoneFundingFinalized(
                 deploymentIdentity,
                 campaignId,
@@ -290,10 +297,6 @@ contract V2FundingFixture is ReentrancyGuard {
                 ++fundingTransitionSequence
             );
         }
-
-        emit MilestoneContributionReceived(
-            deploymentIdentity, campaignId, milestoneId, msg.sender, amount, cumulative, sequence
-        );
     }
 
     function finalizeFundingFailure(uint256 campaignId, uint256 milestoneId) external {
@@ -468,12 +471,50 @@ contract V2FundingFixture is ReentrancyGuard {
                     || commitment.judgeRewardRateBps[i] > manifest.basisPointsDenominator
                     || commitment.judgeRewardUnit[i] == 0 || commitment.maxReviewReserve[i] == 0
                     || commitment.maxReviewReserve[i] >= commitment.fundingTarget[i]
-                    || commitment.creatorPayoutBudget[i] + commitment.maxReviewReserve[i]
-                        > commitment.fundingTarget[i]
                     || commitment.fundingDeadline[i] <= block.timestamp
                     || commitment.submissionDeadline[i] <= commitment.fundingDeadline[i]
             ) revert InvalidCommitment();
+
+            _validateFrozenRewardTerms(
+                manifest,
+                commitment.fundingTarget[i],
+                commitment.creatorPayoutBudget[i],
+                commitment.judgeRewardRateBps[i],
+                commitment.judgeRewardUnit[i],
+                commitment.maxReviewReserve[i]
+            );
         }
+    }
+
+    function _validateFrozenRewardTerms(
+        V2FundingTypes.PolicyManifest calldata manifest,
+        uint256 fundingTarget,
+        uint256 creatorPayoutBudget,
+        uint256 judgeRewardRateBps,
+        uint256 judgeRewardUnit,
+        uint256 maxReviewReserve
+    ) internal pure {
+        if (fundingTarget > type(uint256).max / judgeRewardRateBps) {
+            revert InvalidCommitment();
+        }
+        uint256 expectedRewardUnit =
+            fundingTarget * judgeRewardRateBps / manifest.basisPointsDenominator;
+        if (expectedRewardUnit == 0 || expectedRewardUnit != judgeRewardUnit) {
+            revert InvalidCommitment();
+        }
+        if (expectedRewardUnit > type(uint256).max / manifest.referenceCourtSize) {
+            revert InvalidCommitment();
+        }
+        uint256 expectedReserve = expectedRewardUnit * manifest.referenceCourtSize;
+        if (expectedReserve > type(uint256).max / manifest.maxValidCourts) {
+            revert InvalidCommitment();
+        }
+        expectedReserve *= manifest.maxValidCourts;
+        if (
+            expectedReserve == 0 || expectedReserve >= fundingTarget
+                || maxReviewReserve != expectedReserve
+                || creatorPayoutBudget != fundingTarget - expectedReserve
+        ) revert InvalidCommitment();
     }
 
     function _commitmentHash(V2FundingTypes.CampaignCommitment calldata commitment)
@@ -502,7 +543,7 @@ contract V2FundingFixture is ReentrancyGuard {
         if (
             !_same(manifest.commitmentSchemaVersion, "FTV2-COMMIT-2")
                 || !_same(manifest.policyVersion, "fundtogether-vnext-v2-pr0-remediation-20261025")
-                || !_same(manifest.supersedesCandidate, "fundtogether-vnext-v2-pr0-policy-20251025")
+                || !_same(manifest.supersedesCandidate, "fundtogether-vnext-v2-pr0-policy-20261025")
                 || !_same(manifest.policyStatus, "PROPOSED_PENDING_APPROVAL")
                 || !_same(
                     manifest.pr1FixtureDeploymentIdentity,
