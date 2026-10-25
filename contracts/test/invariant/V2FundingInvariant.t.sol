@@ -75,7 +75,7 @@ contract V2FundingInvariantHandler is Test {
         commitment.policyManifest = V2FundingTypes.PolicyManifest({
             commitmentSchemaVersion: "FTV2-COMMIT-2",
             policyVersion: "fundtogether-vnext-v2-pr0-remediation-20261025",
-            supersedesCandidate: "fundtogether-vnext-v2-pr0-policy-20251025",
+            supersedesCandidate: "fundtogether-vnext-v2-pr0-policy-20261025",
             policyStatus: "PROPOSED_PENDING_APPROVAL",
             pr1FixtureDeploymentIdentity: "fundtogether-vnext-v2-pr1-funding-fixture",
             asset: "MockUSDC",
@@ -152,10 +152,10 @@ contract V2FundingInvariantHandler is Test {
             commitment.deliverableCommitment[i] = keccak256(abi.encode("invariant-deliverable", i));
             commitment.acceptanceCriteriaHash[i] = keccak256(abi.encode("invariant-criteria", i));
             commitment.fundingTarget[i] = TARGET + i * 100e6;
-            commitment.creatorPayoutBudget[i] = 940e6 + i * 100e6;
+            commitment.creatorPayoutBudget[i] = i == 0 ? 940e6 : 1_034e6;
             commitment.judgeRewardRateBps[i] = 100;
-            commitment.judgeRewardUnit[i] = 10e6;
-            commitment.maxReviewReserve[i] = 60e6;
+            commitment.judgeRewardUnit[i] = i == 0 ? 10e6 : 11e6;
+            commitment.maxReviewReserve[i] = i == 0 ? 60e6 : 66e6;
             commitment.fundingDeadline[i] = block.timestamp + 7 days + i * 14 days;
             commitment.submissionDeadline[i] = block.timestamp + 14 days + i * 14 days;
         }

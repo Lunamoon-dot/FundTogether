@@ -1,6 +1,7 @@
 pragma solidity 0.8.24;
 
 import { Test } from "forge-std/Test.sol";
+import { Vm } from "forge-std/Vm.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { MockUSDC } from "../../mocks/MockUSDC.sol";
 import { V2FundingFixture, V2FundingTypes } from "../../fixtures/V2FundingFixture.sol";
@@ -55,6 +56,12 @@ contract V2FundingFixtureTest is Test {
     uint256 internal constant LOCAL_CHAIN_ID = 31339;
     bytes32 internal constant FIXTURE_IDENTITY =
         keccak256("fundtogether-vnext-v2-pr1-funding-fixture");
+    bytes32 internal constant CONTRIBUTION_EVENT_SIGNATURE = keccak256(
+        "MilestoneContributionReceived(bytes32,uint256,uint256,address,uint256,uint256,uint256)"
+    );
+    bytes32 internal constant FUNDING_FINALIZED_EVENT_SIGNATURE = keccak256(
+        "MilestoneFundingFinalized(bytes32,uint256,uint256,bool,uint256,uint256,uint256)"
+    );
     MockUSDC internal token;
     V2FundingFixture internal fixture;
     address internal creator = makeAddr("creator");
@@ -133,6 +140,76 @@ contract V2FundingFixtureTest is Test {
         assertEq(submissionDeadline, commitment.submissionDeadline[0]);
         assertEq(fundingDeadline, commitment.fundingDeadline[0]);
         assertEq(uint256(state), uint256(V2FundingTypes.MilestoneState.FUNDING_OPEN));
+    }
+
+    function test_acceptsTheRegistrySupersedesCandidateIdentifier() public {
+        V2FundingTypes.CampaignCommitment memory commitment = _validCommitment();
+
+        assertEq(
+            commitment.policyManifest.supersedesCandidate,
+            "fundtogether-vnext-v2-pr0-policy-20261025"
+        );
+        assertGt(_createCampaign(commitment), 0);
+    }
+
+    function test_rejectsTheLegacySupersedesCandidateIdentifier() public {
+        V2FundingTypes.CampaignCommitment memory commitment = _validCommitment();
+        commitment.policyManifest.supersedesCandidate = "fundtogether-vnext-v2-pr0-policy-20251025";
+        commitment.policyManifest.policyManifestHash =
+            fixture.policyManifestHashFor(commitment.policyManifest);
+
+        _expectInvalid(commitment);
+    }
+
+    function test_storesTheV2FrozenRewardArithmeticForMilestoneOne() public {
+        V2FundingTypes.CampaignCommitment memory commitment = _validCommitment();
+        uint256 campaignId = _createCampaign(commitment);
+
+        (
+            uint256 milestoneId,
+            bytes32 deliverableCommitment,
+            bytes32 acceptanceCriteriaHash,
+            uint256 fundingTarget,
+            uint256 creatorPayoutBudget,
+            uint256 judgeRewardRateBps,
+            uint256 judgeRewardUnit,
+            uint256 maxReviewReserve,
+            uint256 submissionDeadline,
+            uint256 fundingDeadline,
+            V2FundingTypes.MilestoneState state
+        ) = fixture.milestoneTerms(campaignId, 1);
+
+        assertEq(milestoneId, 1);
+        assertTrue(deliverableCommitment != bytes32(0));
+        assertTrue(acceptanceCriteriaHash != bytes32(0));
+        assertEq(fundingTarget, 1_100e6);
+        assertEq(creatorPayoutBudget, 1_034e6);
+        assertEq(judgeRewardRateBps, 100);
+        assertEq(judgeRewardUnit, 11e6);
+        assertEq(maxReviewReserve, 66e6);
+        assertGt(submissionDeadline, fundingDeadline);
+        assertEq(uint256(state), uint256(V2FundingTypes.MilestoneState.DECLARED));
+    }
+
+    function test_rejectsARewardUnitThatDoesNotMatchTheFrozenFormula() public {
+        V2FundingTypes.CampaignCommitment memory commitment = _validCommitment();
+        commitment.judgeRewardUnit[1] = 10e6;
+
+        _expectInvalid(commitment);
+    }
+
+    function test_rejectsAReviewReserveThatDoesNotMatchTheFrozenFormula() public {
+        V2FundingTypes.CampaignCommitment memory commitment = _validCommitment();
+        commitment.maxReviewReserve[1] = 60e6;
+
+        _expectInvalid(commitment);
+    }
+
+    function test_rejectsACreatorPayoutThatDoesNotMatchTheFrozenFormula() public {
+        V2FundingTypes.CampaignCommitment memory commitment = _validCommitment();
+        commitment.creatorPayoutBudget[1] = 1_033e6;
+
+        _expectInvalid(commitment);
     }
 
     function test_createCampaignRejectsInvalidDeadlineAndPolicyIdentity() public {
@@ -344,6 +421,34 @@ contract V2FundingFixtureTest is Test {
             uint256(V2FundingTypes.MilestoneState.DECLARED)
         );
         assertEq(fixture.activeMilestoneId(campaignId), 0);
+    }
+
+    function test_exactTargetEmitsContributionBeforeFundingFinalization() public {
+        V2FundingTypes.CampaignCommitment memory commitment = _validCommitment();
+        uint256 campaignId = _createCampaign(commitment);
+        address backer = makeAddr("ordered-events-backer");
+        token.mint(backer, 1_000e6);
+
+        vm.startPrank(backer);
+        token.approve(address(fixture), 1_000e6);
+        vm.recordLogs();
+        fixture.contribute(campaignId, 0, 1_000e6);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        vm.stopPrank();
+
+        uint256 fixtureLogCount;
+        bytes32 firstFixtureEvent;
+        bytes32 secondFixtureEvent;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].emitter != address(fixture)) continue;
+            if (fixtureLogCount == 0) firstFixtureEvent = logs[i].topics[0];
+            if (fixtureLogCount == 1) secondFixtureEvent = logs[i].topics[0];
+            fixtureLogCount++;
+        }
+
+        assertEq(fixtureLogCount, 2);
+        assertEq(firstFixtureEvent, CONTRIBUTION_EVENT_SIGNATURE);
+        assertEq(secondFixtureEvent, FUNDING_FINALIZED_EVENT_SIGNATURE);
     }
 
     function test_contributeRejectsInactiveZeroOverTargetAndExpiredFunding() public {
@@ -667,7 +772,7 @@ contract V2FundingFixtureTest is Test {
         commitment.policyManifest = V2FundingTypes.PolicyManifest({
             commitmentSchemaVersion: "FTV2-COMMIT-2",
             policyVersion: "fundtogether-vnext-v2-pr0-remediation-20261025",
-            supersedesCandidate: "fundtogether-vnext-v2-pr0-policy-20251025",
+            supersedesCandidate: "fundtogether-vnext-v2-pr0-policy-20261025",
             policyStatus: "PROPOSED_PENDING_APPROVAL",
             pr1FixtureDeploymentIdentity: "fundtogether-vnext-v2-pr1-funding-fixture",
             asset: "MockUSDC",
@@ -744,10 +849,10 @@ contract V2FundingFixtureTest is Test {
             commitment.deliverableCommitment[i] = keccak256(abi.encode("deliverable", i));
             commitment.acceptanceCriteriaHash[i] = keccak256(abi.encode("criteria", i));
             commitment.fundingTarget[i] = 1_000e6 + i * 100e6;
-            commitment.creatorPayoutBudget[i] = 940e6 + i * 100e6;
+            commitment.creatorPayoutBudget[i] = i == 0 ? 940e6 : 1_034e6;
             commitment.judgeRewardRateBps[i] = 100;
-            commitment.judgeRewardUnit[i] = 10e6;
-            commitment.maxReviewReserve[i] = 60e6;
+            commitment.judgeRewardUnit[i] = i == 0 ? 10e6 : 11e6;
+            commitment.maxReviewReserve[i] = i == 0 ? 60e6 : 66e6;
             commitment.fundingDeadline[i] = block.timestamp + 7 days + i * 14 days;
             commitment.submissionDeadline[i] = block.timestamp + 14 days + i * 14 days;
         }
