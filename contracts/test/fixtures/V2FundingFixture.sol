@@ -244,13 +244,7 @@ contract V2FundingFixture is ReentrancyGuard {
         }
 
         emit MilestoneContributionReceived(
-            deploymentIdentity,
-            campaignId,
-            milestoneId,
-            msg.sender,
-            amount,
-            cumulative,
-            sequence
+            deploymentIdentity, campaignId, milestoneId, msg.sender, amount, cumulative, sequence
         );
     }
 
@@ -296,12 +290,7 @@ contract V2FundingFixture is ReentrancyGuard {
         refunded[campaignId][milestoneId] += amount;
 
         emit MilestoneRefundClaimed(
-            deploymentIdentity,
-            campaignId,
-            milestoneId,
-            msg.sender,
-            amount,
-            ++refundSequence
+            deploymentIdentity, campaignId, milestoneId, msg.sender, amount, ++refundSequence
         );
     }
 
@@ -385,7 +374,10 @@ contract V2FundingFixture is ReentrancyGuard {
         );
     }
 
-    function _validateCommitment(V2FundingTypes.CampaignCommitment calldata commitment) internal view {
+    function _validateCommitment(V2FundingTypes.CampaignCommitment calldata commitment)
+        internal
+        view
+    {
         V2FundingTypes.PolicyManifest calldata manifest = commitment.policyManifest;
         uint256 count = commitment.milestoneId.length;
         if (count == 0) revert InvalidCommitment();
@@ -402,13 +394,10 @@ contract V2FundingFixture is ReentrancyGuard {
         ) revert InvalidCommitment();
 
         if (
-            keccak256(bytes(manifest.commitmentSchemaVersion))
-                != keccak256(bytes("FTV2-COMMIT-2"))
+            keccak256(bytes(manifest.commitmentSchemaVersion)) != keccak256(bytes("FTV2-COMMIT-2"))
                 || bytes(manifest.policyVersion).length == 0
-                || manifest.policyManifestHash == bytes32(0)
-                || manifest.chainId != block.chainid
-                || manifest.token != address(token)
-                || manifest.creator != msg.sender
+                || manifest.policyManifestHash == bytes32(0) || manifest.chainId != block.chainid
+                || manifest.token != address(token) || manifest.creator != msg.sender
                 || manifest.payoutWallet == address(0)
                 || bytes(manifest.publicationPolicy).length == 0
                 || bytes(manifest.evidenceDisclosurePolicy).length == 0
@@ -417,29 +406,24 @@ contract V2FundingFixture is ReentrancyGuard {
                 || bytes(manifest.resetPolicyVersion).length == 0
                 || manifest.basisPointsDenominator == 0
                 || manifest.rewardRateBps > manifest.basisPointsDenominator
-                || manifest.referenceCourtSize != 3
-                || manifest.maxValidCourts != 2
-                || manifest.maxResetsPerCourt != 1
-                || manifest.maxResetsPerCase != 2
+                || manifest.referenceCourtSize != 3 || manifest.maxValidCourts != 2
+                || manifest.maxResetsPerCourt != 1 || manifest.maxResetsPerCase != 2
         ) revert InvalidCommitment();
 
         for (uint256 i = 0; i < count; i++) {
             if (
-                commitment.milestoneId[i] != i
-                    || commitment.deliverableCommitment[i] == bytes32(0)
+                commitment.milestoneId[i] != i || commitment.deliverableCommitment[i] == bytes32(0)
                     || commitment.acceptanceCriteriaHash[i] == bytes32(0)
-                    || commitment.fundingTarget[i] == 0
-                    || commitment.creatorPayoutBudget[i] == 0
+                    || commitment.fundingTarget[i] == 0 || commitment.creatorPayoutBudget[i] == 0
                     || commitment.judgeRewardRateBps[i] == 0
                     || commitment.judgeRewardRateBps[i] > manifest.basisPointsDenominator
-                    || commitment.judgeRewardUnit[i] == 0
-                    || commitment.maxReviewReserve[i] == 0
+                    || commitment.judgeRewardUnit[i] == 0 || commitment.maxReviewReserve[i] == 0
                     || commitment.maxReviewReserve[i] >= commitment.fundingTarget[i]
                     || commitment.creatorPayoutBudget[i] + commitment.maxReviewReserve[i]
                         > commitment.fundingTarget[i]
                     || commitment.fundingDeadline[i] <= block.timestamp
                     || commitment.submissionDeadline[i] <= commitment.fundingDeadline[i]
-        ) revert InvalidCommitment();
+            ) revert InvalidCommitment();
         }
     }
 
@@ -448,12 +432,7 @@ contract V2FundingFixture is ReentrancyGuard {
         view
         returns (bytes32)
     {
-        return keccak256(
-            abi.encode(
-                deploymentIdentity,
-                commitment
-            )
-        );
+        return keccak256(abi.encode(deploymentIdentity, commitment));
     }
 
     function _campaign(uint256 campaignId) internal view returns (Campaign storage campaign) {

@@ -24,7 +24,8 @@ contract TransferControlMockUSDC is MockUSDC {
 
 contract V2FundingFixtureTest is Test {
     uint256 internal constant LOCAL_CHAIN_ID = 31339;
-    bytes32 internal constant FIXTURE_IDENTITY = keccak256("fundtogether-vnext-v2-pr1-funding-fixture");
+    bytes32 internal constant FIXTURE_IDENTITY =
+        keccak256("fundtogether-vnext-v2-pr1-funding-fixture");
     bytes32 internal constant POLICY_MANIFEST_HASH = keccak256("complete-pr1-policy-manifest");
 
     MockUSDC internal token;
@@ -250,8 +251,10 @@ contract V2FundingFixtureTest is Test {
         commitment.policyManifest.policyVersion = "mutated-after-create";
 
         assertEq(fixture.commitmentHash(campaignId), expectedHash);
-        assertEq(fixture.policyVersion(campaignId), "fundtogether-vnext-v2-pr0-remediation-20261025");
-        (, , , uint256 fundingTarget, , , , , , , ) = fixture.milestoneTerms(campaignId, 0);
+        assertEq(
+            fixture.policyVersion(campaignId), "fundtogether-vnext-v2-pr0-remediation-20261025"
+        );
+        (,,, uint256 fundingTarget,,,,,,,) = fixture.milestoneTerms(campaignId, 0);
         assertEq(fundingTarget, 1_000e6);
     }
 
@@ -510,7 +513,11 @@ contract V2FundingFixtureTest is Test {
         commitment.fundingDeadline[1] = uintValue;
     }
 
-    function _validCommitment() internal view returns (V2FundingTypes.CampaignCommitment memory commitment) {
+    function _validCommitment()
+        internal
+        view
+        returns (V2FundingTypes.CampaignCommitment memory commitment)
+    {
         commitment.policyManifest = V2FundingTypes.PolicyManifest({
             commitmentSchemaVersion: "FTV2-COMMIT-2",
             policyVersion: "fundtogether-vnext-v2-pr0-remediation-20261025",
@@ -562,11 +569,6 @@ contract V2FundingFixtureTest is Test {
         view
         returns (bytes32)
     {
-        return keccak256(
-            abi.encode(
-                FIXTURE_IDENTITY,
-                commitment
-            )
-        );
+        return keccak256(abi.encode(FIXTURE_IDENTITY, commitment));
     }
 }
