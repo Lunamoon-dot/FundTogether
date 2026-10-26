@@ -179,8 +179,9 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
     }
 
     function validatedOutcome(uint256 campaignId, uint256 milestoneId)
-        external
+        public
         view
+        virtual
         returns (
             bytes32 caseId,
             V2FinancialAccountingTypes.FinalOutcome resolvedOutcome,
@@ -198,7 +199,17 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
         return (transcript.caseId, transcript.finalOutcome, validCourtCount);
     }
 
-    function settleMilestone(uint256 campaignId, uint256 milestoneId) external {
+    function settleMilestone(uint256 campaignId, uint256 milestoneId) public virtual {
+        V2FinancialAccountingTypes.FinalizedTranscript memory transcript =
+            outcomeSource.finalizedTranscript();
+        _settleMilestone(campaignId, milestoneId, transcript);
+    }
+
+    function _settleMilestone(
+        uint256 campaignId,
+        uint256 milestoneId,
+        V2FinancialAccountingTypes.FinalizedTranscript memory transcript
+    ) internal {
         Milestone storage milestone = _milestone(campaignId, milestoneId);
         if (milestone.state != V2FundingTypes.MilestoneState.FUNDED) {
             revert InvalidOutcomeTranscript();
@@ -207,8 +218,6 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
             revert SettlementAlreadyProcessed();
         }
 
-        V2FinancialAccountingTypes.FinalizedTranscript memory transcript =
-            outcomeSource.finalizedTranscript();
         uint256 validCourtCount = _validateTranscript(transcript, campaignId, milestoneId);
         if (caseSettlementProcessed[transcript.caseId]) revert SettlementAlreadyProcessed();
 
@@ -558,6 +567,7 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
 
     function _afterContribution(uint256 campaignId, uint256 milestoneId, address backer)
         internal
+        virtual
         override
     {
         if (contributorSeen[campaignId][milestoneId][backer]) return;
@@ -571,6 +581,14 @@ contract V2FinancialAccountingFixture is V2FundingFixture {
             index--;
         }
         contributors[index] = backer;
+    }
+
+    function _milestoneContributors(uint256 campaignId, uint256 milestoneId)
+        internal
+        view
+        returns (address[] storage contributors)
+    {
+        return milestoneContributors[campaignId][milestoneId];
     }
 
     function _refundDustAndRank(
