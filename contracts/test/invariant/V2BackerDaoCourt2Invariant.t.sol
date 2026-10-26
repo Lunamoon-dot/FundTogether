@@ -186,13 +186,13 @@ contract V2BackerDaoCourt2SettlementInvariantTest is StdInvariant, Test {
         _finalizeCourt(fixture, caseId, court1, end != WorkflowEnd.COURT2_PASS);
         fixture.openDao(caseId);
         if (end == WorkflowEnd.ACCEPT) {
-            fixture.finalizeDao(caseId);
+            _finalizeDaoAfterVoting(fixture, caseId);
             return V2BackerDaoCourt2SettlementHandler.Workflow(fixture, campaignId, caseId);
         }
 
         vm.prank(voter);
         fixture.castDaoBallot(caseId, V2BackerDaoCourt2Fixture.DaoChoice.APPEAL);
-        fixture.finalizeDao(caseId);
+        _finalizeDaoAfterVoting(fixture, caseId);
         bytes32 court2 = fixture.assignCourt(caseId, V2CourtResetFixture.CourtLevel.COURT_2, 2);
         if (end == WorkflowEnd.COURT2_PASS) {
             _finalizeCourt(fixture, caseId, court2, true);
@@ -265,6 +265,11 @@ contract V2BackerDaoCourt2SettlementInvariantTest is StdInvariant, Test {
     {
         vm.warp(fixture.courtInfo(courtId).revealDeadline);
         fixture.settleInvalidCourt(caseId, courtId);
+    }
+
+    function _finalizeDaoAfterVoting(V2BackerDaoCourt2Fixture fixture, bytes32 caseId) internal {
+        vm.warp(fixture.daoCaseInfo(caseId).votingDeadline);
+        fixture.finalizeDao(caseId);
     }
 
     function _commitment(

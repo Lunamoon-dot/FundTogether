@@ -39,6 +39,7 @@ contract V2BackerDaoCourt2FixtureTest is Test {
         assertEq(fixture.daoPolicyStatus(), "PROPOSED_PENDING_APPROVAL");
         assertEq(fixture.DAO_POLICY_VERSION(), keccak256("CWQ-1/DAO-TEMPORAL-1"));
         assertEq(fixture.DAO_CONTRIBUTION_CAP(), type(uint128).max);
+        assertEq(fixture.DAO_VOTING_DURATION(), 1 days);
     }
 
     function test_Q1TieDefaultsToAccept() public view {
@@ -242,7 +243,9 @@ contract V2BackerDaoCourt2FixtureTest is Test {
         _createFinalizedCourt1(zeroCase, judgeBackers, amounts, true);
         fixture.openDao(zeroCase);
         assertEq(fixture.daoCaseInfo(zeroCase).totalWeight, 0);
+        vm.expectRevert(V2BackerDaoCourt2Fixture.DaoVotingWindowOpen.selector);
         fixture.finalizeDao(zeroCase);
+        _finalizeDaoAfterVoting(zeroCase);
         assertEq(
             uint256(fixture.daoCaseInfo(zeroCase).decision),
             uint256(V2BackerDaoCourt2Fixture.DaoChoice.ACCEPT)
@@ -258,11 +261,50 @@ contract V2BackerDaoCourt2FixtureTest is Test {
         fixture.openDao(thresholdCase);
         vm.prank(small);
         fixture.castDaoBallot(thresholdCase, V2BackerDaoCourt2Fixture.DaoChoice.APPEAL);
-        fixture.finalizeDao(thresholdCase);
+        _finalizeDaoAfterVoting(thresholdCase);
         assertEq(
             uint256(fixture.daoCaseInfo(thresholdCase).decision),
             uint256(V2BackerDaoCourt2Fixture.DaoChoice.ACCEPT)
         );
+    }
+
+    function test_daoVotingWindowFreezesDeadlineAndRejectsPrematureFinalize() public {
+        address appealVoter = address(0xA701);
+        address lateVoter = address(0xA702);
+        bytes32 caseId = keccak256("dao-voting-window");
+        (uint256 campaignId,) = _createFinalizedCourt1(
+            caseId, _addresses(appealVoter, lateVoter), _values(4_000_000, 1_000_000), true
+        );
+        fixture.openDao(caseId);
+
+        V2BackerDaoCourt2Fixture.DaoCase memory opened = fixture.daoCaseInfo(caseId);
+        assertEq(opened.openedAt, block.timestamp);
+        assertEq(opened.votingDeadline, opened.openedAt + fixture.DAO_VOTING_DURATION());
+        vm.expectRevert(V2BackerDaoCourt2Fixture.DaoVotingWindowOpen.selector);
+        fixture.finalizeDao(caseId);
+        assertFalse(fixture.daoCaseInfo(caseId).finalized);
+        assertFalse(fixture.caseTerms(caseId).court2GateEnabled);
+        vm.expectRevert(V2FinancialAccountingFixture.InvalidOutcomeTranscript.selector);
+        fixture.settleMilestone(campaignId, 0);
+        assertEq(fixture.creatorClaimable(campaignId, 0), 0);
+        vm.prank(payoutWallet);
+        vm.expectRevert(V2FinancialAccountingFixture.SettlementNotProcessed.selector);
+        fixture.claimCreatorPayout(campaignId, 0);
+
+        vm.warp(opened.votingDeadline - 1);
+        vm.prank(appealVoter);
+        fixture.castDaoBallot(caseId, V2BackerDaoCourt2Fixture.DaoChoice.APPEAL);
+        vm.warp(opened.votingDeadline);
+        vm.prank(lateVoter);
+        vm.expectRevert(V2BackerDaoCourt2Fixture.DaoVotingWindowClosed.selector);
+        fixture.castDaoBallot(caseId, V2BackerDaoCourt2Fixture.DaoChoice.APPEAL);
+
+        vm.prank(address(0xA703));
+        fixture.finalizeDao(caseId);
+        V2BackerDaoCourt2Fixture.DaoCase memory finalized = fixture.daoCaseInfo(caseId);
+        assertEq(finalized.finalizedAt, opened.votingDeadline);
+        assertEq(uint256(finalized.decision), uint256(V2BackerDaoCourt2Fixture.DaoChoice.APPEAL));
+        assertTrue(fixture.caseTerms(caseId).court2GateEnabled);
     }
 
     function test_court2RequiresFinalizedAppealAndBypassAlwaysReverts() public {
@@ -276,7 +318,10 @@ contract V2BackerDaoCourt2FixtureTest is Test {
         fixture.assignCourt(caseId, V2CourtResetFixture.CourtLevel.COURT_2, 7);
 
         fixture.openDao(caseId);
+        vm.expectRevert(V2BackerDaoCourt2Fixture.DaoVotingWindowOpen.selector);
         fixture.finalizeDao(caseId);
+        assertFalse(fixture.caseTerms(caseId).court2GateEnabled);
+        _finalizeDaoAfterVoting(caseId);
         vm.expectRevert(V2CourtResetFixture.CourtTwoNotEnabled.selector);
         fixture.assignCourt(caseId, V2CourtResetFixture.CourtLevel.COURT_2, 7);
 
@@ -285,7 +330,7 @@ contract V2BackerDaoCourt2FixtureTest is Test {
         fixture.openDao(appealCase);
         vm.prank(backer);
         fixture.castDaoBallot(appealCase, V2BackerDaoCourt2Fixture.DaoChoice.APPEAL);
-        fixture.finalizeDao(appealCase);
+        _finalizeDaoAfterVoting(appealCase);
         assertTrue(fixture.caseTerms(appealCase).court2GateEnabled);
     }
 
@@ -306,6 +351,7 @@ contract V2BackerDaoCourt2FixtureTest is Test {
         _registerAndFundJudge(nonVotingBacker, 50);
         _registerAndFundJudge(address(0xD004), 50);
         _registerAndFundJudge(address(0xD005), 50);
+        _registerAndFundJudge(creator, 50);
 
         fixture.openDao(caseId);
         assertFalse(fixture.daoEligible(caseId, judges[0]));
@@ -316,7 +362,7 @@ contract V2BackerDaoCourt2FixtureTest is Test {
         fixture.castDaoBallot(caseId, V2BackerDaoCourt2Fixture.DaoChoice.APPEAL);
         vm.prank(acceptVoter);
         fixture.castDaoBallot(caseId, V2BackerDaoCourt2Fixture.DaoChoice.ACCEPT);
-        fixture.finalizeDao(caseId);
+        _finalizeDaoAfterVoting(caseId);
         DaoSnapshot memory snapshot = _daoSnapshot(caseId, appealVoter, acceptVoter);
         uint256 requiredLockedStake = fixture.caseTerms(caseId).requiredLockedStake;
         assertGe(fixture.stakePool().availableStake(appealVoter), requiredLockedStake);
@@ -379,6 +425,48 @@ contract V2BackerDaoCourt2FixtureTest is Test {
         assertEq(fixture.daoCaseInfo(caseId).totalWeight, 0);
     }
 
+    function test_creatorEligibleStakeNeverSelfJudgesCourt1OrReplacement() public {
+        _deployWithJudges(6);
+        _registerAndFundJudge(creator, 100);
+        bytes32 caseId = keccak256("creator-court1-and-replacement");
+        _createFundedWorkflowCase(caseId, address(0xC101));
+
+        uint256 initialEntropy =
+            _entropySelectingPoolIndex(caseId, V2CourtResetFixture.CourtLevel.COURT_1, 0, 7, 6);
+        bytes32 initialCourt =
+            fixture.assignCourt(caseId, V2CourtResetFixture.CourtLevel.COURT_1, initialEntropy);
+        _assertCreatorExcluded(fixture.courtInfo(initialCourt));
+        assertEq(fixture.stakePool().availableStake(creator), 100);
+
+        _warpPastReveal(initialCourt);
+        fixture.settleInvalidCourt(caseId, initialCourt);
+        uint256 replacementEntropy =
+            _entropySelectingPoolIndex(caseId, V2CourtResetFixture.CourtLevel.COURT_1, 1, 7, 6);
+        bytes32 replacement =
+            fixture.assignCourt(caseId, V2CourtResetFixture.CourtLevel.COURT_1, replacementEntropy);
+        _assertCreatorExcluded(fixture.courtInfo(replacement));
+        assertEq(fixture.stakePool().availableStake(creator), 100);
+    }
+
+    function test_creatorExclusionRejectsCourt1WithoutThreeNonCreatorJudgesAtomically() public {
+        _deployWithJudges(2);
+        _registerAndFundJudge(creator, 100);
+        bytes32 caseId = keccak256("creator-court1-exhaustion");
+        _createFundedWorkflowCase(caseId, address(0xC102));
+
+        uint256 creatorAvailable = fixture.stakePool().availableStake(creator);
+        uint256 firstAvailable = fixture.stakePool().availableStake(judges[0]);
+        uint256 secondAvailable = fixture.stakePool().availableStake(judges[1]);
+        vm.expectRevert(V2CourtResetFixture.InvalidJudgeSet.selector);
+        fixture.assignCourt(caseId, V2CourtResetFixture.CourtLevel.COURT_1, 1);
+
+        assertEq(fixture.stakePool().availableStake(creator), creatorAvailable);
+        assertEq(fixture.stakePool().availableStake(judges[0]), firstAvailable);
+        assertEq(fixture.stakePool().availableStake(judges[1]), secondAvailable);
+        assertEq(fixture.caseCourtHistory(caseId).length, 0);
+        assertEq(fixture.caseTerms(caseId).activeCourtId, bytes32(0));
+    }
+
     function test_court2ExcludesCreatorAndBindsFrozenCourt1Material() public {
         _deployWithJudges(3);
         address backer = address(0xC201);
@@ -393,7 +481,7 @@ contract V2BackerDaoCourt2FixtureTest is Test {
         fixture.openDao(caseId);
         vm.prank(backer);
         fixture.castDaoBallot(caseId, V2BackerDaoCourt2Fixture.DaoChoice.APPEAL);
-        fixture.finalizeDao(caseId);
+        _finalizeDaoAfterVoting(caseId);
         bytes32 court2 = fixture.assignCourt(caseId, V2CourtResetFixture.CourtLevel.COURT_2, 18);
 
         V2BackerDaoCourt2Fixture.ReviewMaterial memory court1Material =
@@ -419,7 +507,7 @@ contract V2BackerDaoCourt2FixtureTest is Test {
         fixture.openDao(caseId);
         vm.prank(backer);
         fixture.castDaoBallot(caseId, V2BackerDaoCourt2Fixture.DaoChoice.APPEAL);
-        fixture.finalizeDao(caseId);
+        _finalizeDaoAfterVoting(caseId);
 
         vm.prank(payoutWallet);
         vm.expectRevert(V2FinancialAccountingFixture.SettlementNotProcessed.selector);
@@ -459,7 +547,7 @@ contract V2BackerDaoCourt2FixtureTest is Test {
         fixture.openDao(caseId);
         vm.prank(backer);
         fixture.castDaoBallot(caseId, V2BackerDaoCourt2Fixture.DaoChoice.APPEAL);
-        fixture.finalizeDao(caseId);
+        _finalizeDaoAfterVoting(caseId);
 
         bytes32 court2 = fixture.assignCourt(caseId, V2CourtResetFixture.CourtLevel.COURT_2, 15);
         _finalizeCourt(caseId, court2, true);
@@ -486,7 +574,7 @@ contract V2BackerDaoCourt2FixtureTest is Test {
         fixture.openDao(caseId);
         vm.prank(backer);
         fixture.castDaoBallot(caseId, V2BackerDaoCourt2Fixture.DaoChoice.APPEAL);
-        fixture.finalizeDao(caseId);
+        _finalizeDaoAfterVoting(caseId);
 
         bytes32 firstCourt2 =
             fixture.assignCourt(caseId, V2CourtResetFixture.CourtLevel.COURT_2, 12);
@@ -536,7 +624,7 @@ contract V2BackerDaoCourt2FixtureTest is Test {
         fixture.castDaoBallot(caseId, V2BackerDaoCourt2Fixture.DaoChoice.APPEAL);
         vm.prank(voterThree);
         fixture.castDaoBallot(caseId, V2BackerDaoCourt2Fixture.DaoChoice.APPEAL);
-        fixture.finalizeDao(caseId);
+        _finalizeDaoAfterVoting(caseId);
 
         V2BackerDaoCourt2Fixture.DaoCase memory frozen = fixture.daoCaseInfo(caseId);
         vm.expectRevert(V2CourtResetFixture.InvalidJudgeSet.selector);
@@ -558,6 +646,14 @@ contract V2BackerDaoCourt2FixtureTest is Test {
             judges[i] = address(uint160(0x1000 + i));
             _registerAndFundJudge(judges[i], 100);
         }
+    }
+
+    function _createFundedWorkflowCase(bytes32 caseId, address backer) internal {
+        V2FundingTypes.CampaignCommitment memory commitment = _validCommitment(1_000_000);
+        vm.prank(creator);
+        uint256 campaignId = fixture.createCampaign(commitment);
+        _contribute(campaignId, backer, 1_000_000);
+        fixture.createWorkflowCase(caseId, campaignId, 0, 23, 10, 3);
     }
 
     function _registerAndFundJudge(address judge, uint256 amount) internal {
@@ -621,6 +717,32 @@ contract V2BackerDaoCourt2FixtureTest is Test {
         vm.warp(fixture.courtInfo(courtId).revealDeadline);
     }
 
+    function _finalizeDaoAfterVoting(bytes32 caseId) internal {
+        vm.warp(fixture.daoCaseInfo(caseId).votingDeadline);
+        fixture.finalizeDao(caseId);
+    }
+
+    function _entropySelectingPoolIndex(
+        bytes32 caseId,
+        V2CourtResetFixture.CourtLevel level,
+        uint256 attemptIndex,
+        uint256 poolLength,
+        uint256 expectedStart
+    ) internal pure returns (uint256 entropy) {
+        while (
+            uint256(keccak256(abi.encode(caseId, level, attemptIndex, entropy))) % poolLength
+                != expectedStart
+        ) {
+            entropy++;
+        }
+    }
+
+    function _assertCreatorExcluded(V2CourtResetFixture.CourtAttempt memory court) internal view {
+        for (uint256 i = 0; i < 3; i++) {
+            assertTrue(court.judges[i] != creator);
+        }
+    }
+
     function _assertInitialCourt2Selection(
         V2CourtResetFixture.CourtAttempt memory court,
         address appealVoter,
@@ -631,6 +753,7 @@ contract V2BackerDaoCourt2FixtureTest is Test {
         for (uint256 i = 0; i < 3; i++) {
             assertTrue(court.judges[i] != appealVoter);
             assertTrue(court.judges[i] != acceptVoter);
+            assertTrue(court.judges[i] != creator);
             if (court.judges[i] == nonVotingBacker) nonVoterSelected = true;
             for (uint256 j = 0; j < 3; j++) {
                 assertTrue(court.judges[i] != judges[j]);
@@ -643,10 +766,11 @@ contract V2BackerDaoCourt2FixtureTest is Test {
         V2CourtResetFixture.CourtAttempt memory court,
         address appealVoter,
         address acceptVoter
-    ) internal pure {
+    ) internal view {
         for (uint256 i = 0; i < 3; i++) {
             assertTrue(court.judges[i] != appealVoter);
             assertTrue(court.judges[i] != acceptVoter);
+            assertTrue(court.judges[i] != creator);
         }
     }
 

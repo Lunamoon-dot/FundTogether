@@ -17,6 +17,8 @@ contract V2BackerDaoCourt2Fixture is V2CourtResetFixture {
     uint256 public constant DAO_PARTICIPATION_THRESHOLD_BPS = 2_000;
     uint256 public constant DAO_BPS_DENOMINATOR = 10_000;
     uint256 public constant DAO_CONTRIBUTION_CAP = type(uint128).max;
+    /// @dev Research-fixture policy only; no early-close policy is approved or implemented.
+    uint256 public constant DAO_VOTING_DURATION = 1 days;
     uint256 public constant COURT2_ASSIGNMENT_TIMEOUT = 1 days;
 
     enum DaoChoice {
@@ -28,6 +30,8 @@ contract V2BackerDaoCourt2Fixture is V2CourtResetFixture {
     struct DaoCase {
         uint256 campaignId;
         uint256 milestoneId;
+        uint256 openedAt;
+        uint256 votingDeadline;
         uint256 eligibleWalletCount;
         uint256 totalWeight;
         uint256 acceptWeight;
@@ -64,6 +68,8 @@ contract V2BackerDaoCourt2Fixture is V2CourtResetFixture {
     error DaoAlreadyFinalized();
     error DaoIneligibleVoter();
     error DaoDuplicateBallot();
+    error DaoVotingWindowOpen();
+    error DaoVotingWindowClosed();
     error InvalidDaoChoice();
     error SnapshotContributionCapExceeded();
     error Court2BypassDisabled();
@@ -76,6 +82,8 @@ contract V2BackerDaoCourt2Fixture is V2CourtResetFixture {
         uint256 indexed campaignId,
         uint256 milestoneId,
         bytes32 policyVersion,
+        uint256 openedAt,
+        uint256 votingDeadline,
         uint256 eligibleWalletCount,
         uint256 totalWeight,
         string policyStatus
@@ -203,6 +211,8 @@ contract V2BackerDaoCourt2Fixture is V2CourtResetFixture {
 
         dao.campaignId = reviewCase.campaignId;
         dao.milestoneId = reviewCase.milestoneId;
+        dao.openedAt = block.timestamp;
+        dao.votingDeadline = block.timestamp + DAO_VOTING_DURATION;
         dao.opened = true;
 
         address[] storage contributors =
@@ -230,6 +240,8 @@ contract V2BackerDaoCourt2Fixture is V2CourtResetFixture {
             dao.campaignId,
             dao.milestoneId,
             DAO_POLICY_VERSION,
+            dao.openedAt,
+            dao.votingDeadline,
             dao.eligibleWalletCount,
             dao.totalWeight,
             "PROPOSED_PENDING_APPROVAL"
@@ -240,6 +252,7 @@ contract V2BackerDaoCourt2Fixture is V2CourtResetFixture {
         DaoCase storage dao = daoCases[caseId];
         if (!dao.opened) revert DaoNotOpen();
         if (dao.finalized) revert DaoAlreadyFinalized();
+        if (block.timestamp >= dao.votingDeadline) revert DaoVotingWindowClosed();
         if (choice == DaoChoice.NONE) revert InvalidDaoChoice();
         if (!daoEligible[caseId][msg.sender]) revert DaoIneligibleVoter();
         if (daoVoted[caseId][msg.sender]) revert DaoDuplicateBallot();
@@ -261,6 +274,7 @@ contract V2BackerDaoCourt2Fixture is V2CourtResetFixture {
         DaoCase storage dao = daoCases[caseId];
         if (!dao.opened) revert DaoNotOpen();
         if (dao.finalized) revert DaoAlreadyFinalized();
+        if (block.timestamp < dao.votingDeadline) revert DaoVotingWindowOpen();
 
         DaoChoice decision = _daoDecision(dao.totalWeight, dao.acceptWeight, dao.appealWeight);
 
@@ -356,17 +370,13 @@ contract V2BackerDaoCourt2Fixture is V2CourtResetFixture {
         uint256 entropy,
         uint256 requiredLockedStake
     ) internal view override returns (address[3] memory selected) {
-        if (level != CourtLevel.COURT_2) {
-            return super._selectJudges(caseId, level, attemptIndex, entropy, requiredLockedStake);
-        }
-
         if (judgePool.length < 3) revert InvalidJudgeSet();
         uint256 start =
             uint256(keccak256(abi.encode(caseId, level, attemptIndex, entropy))) % judgePool.length;
         uint256 selectedCount;
         for (uint256 offset = 0; offset < judgePool.length && selectedCount < 3; offset++) {
             address candidate = judgePool[(start + offset) % judgePool.length];
-            if (!_isEligibleCourt2Judge(caseId, candidate, requiredLockedStake)) continue;
+            if (!_isEligibleWorkflowJudge(caseId, level, candidate, requiredLockedStake)) continue;
             selected[selectedCount++] = candidate;
         }
         if (selectedCount != 3) revert InvalidJudgeSet();
@@ -378,17 +388,23 @@ contract V2BackerDaoCourt2Fixture is V2CourtResetFixture {
         returns (uint256 count)
     {
         for (uint256 i = 0; i < judgePool.length; i++) {
-            if (_isEligibleCourt2Judge(caseId, judgePool[i], requiredLockedStake)) count++;
+            if (_isEligibleWorkflowJudge(
+                    caseId, CourtLevel.COURT_2, judgePool[i], requiredLockedStake
+                )) {
+                count++;
+            }
         }
     }
 
-    function _isEligibleCourt2Judge(bytes32 caseId, address candidate, uint256 requiredLockedStake)
-        internal
-        view
-        returns (bool)
-    {
+    function _isEligibleWorkflowJudge(
+        bytes32 caseId,
+        CourtLevel level,
+        address candidate,
+        uint256 requiredLockedStake
+    ) internal view returns (bool) {
         return candidate != workflowReviewMaterial[caseId].creator
-            && !caseJudgeAssigned[caseId][candidate] && !daoVoted[caseId][candidate]
+            && !caseJudgeAssigned[caseId][candidate]
+            && (level != CourtLevel.COURT_2 || !daoVoted[caseId][candidate])
             && stakePool.availableStake(candidate) >= requiredLockedStake;
     }
 
