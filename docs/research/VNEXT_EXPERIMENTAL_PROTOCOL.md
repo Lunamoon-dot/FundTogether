@@ -202,6 +202,34 @@ beta_appeal  = P(DAO_APPEAL | Court 1 correct)
 
 A simplified analytical model may instead take `alpha_appeal` and `beta_appeal` as direct inputs, but it must use a separate model identifier and result table. Direct-input analytical results must never be pooled with full generated-ballot results.
 
+### 4.7 Signal taxonomy and falsifiable Backer-DAO scenarios
+
+The signal parameters must be interpreted as a pair, not as two independent
+quality knobs that are silently restricted to informative signals. Define
+`s = signal_sensitivity` and `f = signal_false_alarm`:
+
+| Signal class | Illustrative `(s, f)` | Interpretation |
+| --- | --- | --- |
+| Informative | `(0.80, 0.20)` | Appeal signals are more likely when Court 1 is wrong than when it is correct. |
+| Non-informative | `(0.50, 0.50)` | The signal is independent of Court 1 correctness in the marginal binary model. |
+| Misleading | `(0.20, 0.80)` | The signal is more likely when Court 1 is correct and can systematically point DAO weight in the wrong direction. |
+
+The primary screening design must include all three classes, plus the wider
+declared sensitivity grid. It must not discard cells where `s < f`, and it
+must report signal quality, participation, CWQ-1 weight concentration,
+strategic abstention, and wallet splitting jointly. The Backer signal remains
+private and truth-conditioned only inside the simulator's data-generating
+oracle; no mechanism actor receives `Y_c` or `I_c`.
+
+For every paired B2-versus-B1 comparison, run the same case, Judge potential
+outcomes, contributions, attacker budget, and identity-keyed streams across
+the informative, non-informative, and misleading classes. Report whether
+Court 2 changes the final outcome, including `beneficial_reversal_rate`,
+`harmful_reversal_rate`, coverage, protocol failure, and all-trial
+correctness. A positive result only in informative cells is conditional
+evidence; a misleading-cell loss is a required negative region, not a reason
+to remove the scenario.
+
 ## 5. Parameter matrix
 
 All levels are synthetic experimental inputs. None is empirically calibrated unless a future source and calibration procedure are published.
@@ -217,6 +245,7 @@ All levels are synthetic experimental inputs. None is empirically calibrated unl
 | Attacker wallets | 1, 2, 4, 8, 16 | Fixed-total-stake split |
 | Backer signal sensitivity | 0.50, 0.65, 0.80, 0.95 | `P(APPEAL_SIGNAL | Court 1 incorrect)` |
 | Backer signal false-alarm rate | 0.05, 0.20, 0.35, 0.50 | `P(APPEAL_SIGNAL | Court 1 correct)` |
+| Signal class pair | `(0.80,0.20)`, `(0.50,0.50)`, `(0.20,0.80)` | Informative, non-informative, and misleading primary anchors; `s < f` is permitted |
 | DAO participation | 0.10, 0.20, 0.50, 0.80, 1.00 | Generated per eligible wallet/weight as specified |
 | Wallet contribution split | 1, 2, 4, 8, 16 wallets | Fixed controlled contribution |
 | Strategic abstention/collusion | declared strategy grid | Signal- and control-dependent behavior |
@@ -398,6 +427,8 @@ Before any inferential run:
 - [ ] Court 1-to-Court 2 dependence remains under fresh identities because `P_c` is shared;
 - [ ] Court 2 has the same primary marginal quality as Court 1;
 - [ ] generated DAO ballots reproduce configured signal, participation, exclusion, and strategy probabilities;
+- [ ] informative, non-informative, and misleading `(s, f)` scenarios reproduce their configured signal rates, including cells where `s < f`;
+- [ ] paired B2-versus-B1 results preserve the same latent cases and streams across all signal classes, and beneficial versus harmful Court 2 reversals are separately reported;
 - [ ] measured `alpha_appeal` and `beta_appeal` are outputs in the full ballot model;
 - [ ] keyed-stream replay is bit-for-bit stable and adding B2-only draws does not alter B0/B1 outcomes;
 - [ ] Q6/Q10 and the CCPS-1 same-actor finalizer vector reproduce exactly;
