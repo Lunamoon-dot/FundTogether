@@ -96,15 +96,23 @@ contract V2FinancialAccountingFixtureFuzzTest is Test {
         assertEq(firstEntitlement + secondEntitlement, 30e6);
 
         if (reverseOrder) {
-            vm.prank(second);
-            fixture.claimSettlementRefund(campaignId, 0);
-            vm.prank(first);
-            fixture.claimSettlementRefund(campaignId, 0);
+            if (secondEntitlement != 0) {
+                vm.prank(second);
+                fixture.claimSettlementRefund(campaignId, 0);
+            }
+            if (firstEntitlement != 0) {
+                vm.prank(first);
+                fixture.claimSettlementRefund(campaignId, 0);
+            }
         } else {
-            vm.prank(first);
-            fixture.claimSettlementRefund(campaignId, 0);
-            vm.prank(second);
-            fixture.claimSettlementRefund(campaignId, 0);
+            if (firstEntitlement != 0) {
+                vm.prank(first);
+                fixture.claimSettlementRefund(campaignId, 0);
+            }
+            if (secondEntitlement != 0) {
+                vm.prank(second);
+                fixture.claimSettlementRefund(campaignId, 0);
+            }
         }
 
         assertEq(fixture.settlementRefunded(campaignId, 0), 30e6);

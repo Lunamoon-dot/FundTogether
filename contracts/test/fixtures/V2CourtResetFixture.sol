@@ -173,7 +173,7 @@ contract V2CourtResetFixture is V2FinancialAccountingFixture {
     mapping(bytes32 => CourtAttempt) private courts;
     mapping(bytes32 => bytes32[]) private _caseCourtHistory;
     mapping(bytes32 => bytes32[]) private _caseResetHistory;
-    mapping(bytes32 => mapping(address => bool)) private caseJudgeAssigned;
+    mapping(bytes32 => mapping(address => bool)) internal caseJudgeAssigned;
     mapping(address => bool) public registeredJudge;
     address[] public judgePool;
 
@@ -412,7 +412,11 @@ contract V2CourtResetFixture is V2FinancialAccountingFixture {
 
     /// @dev This is an explicit test seam for PR4's already-finalized appeal.
     /// It records no ballots, weights or DAO state and has no financial authority.
-    function enableCourt2ForTest(bytes32 caseId) external {
+    function enableCourt2ForTest(bytes32 caseId) external virtual {
+        _enableCourt2Gate(caseId);
+    }
+
+    function _enableCourt2Gate(bytes32 caseId) internal {
         CaseRecord storage reviewCase = _case(caseId);
         if (!reviewCase.court1Valid || reviewCase.protocolFailed) revert CourtTwoNotEnabled();
         reviewCase.court2GateEnabled = true;
@@ -422,7 +426,8 @@ contract V2CourtResetFixture is V2FinancialAccountingFixture {
     /// @dev `entropy` is a deterministic test seam, not unbiased production randomness or Sybil resistance.
     ///      Selection linearly scans this Foundry-only judge pool and is not a production-scale registry.
     function assignCourt(bytes32 caseId, CourtLevel level, uint256 entropy)
-        external
+        public
+        virtual
         returns (bytes32 courtId)
     {
         CaseRecord storage reviewCase = _case(caseId);
@@ -706,13 +711,29 @@ contract V2CourtResetFixture is V2FinancialAccountingFixture {
         return settlementCompensation[settlementId] - settlementPaid[settlementId];
     }
 
+    /// @dev PR4 uses this only for a timed Court 2 assignment-exhaustion terminal path.
+    ///      No court was assigned, so it creates no CCPS-1 slash or compensation liability.
+    function _failUnassignedCourt2(bytes32 caseId, bytes32 settlementId) internal {
+        CaseRecord storage reviewCase = _case(caseId);
+        if (
+            settlementId == bytes32(0) || !reviewCase.court1Valid || !reviewCase.court2GateEnabled
+                || reviewCase.court2Valid || reviewCase.protocolFailed
+                || reviewCase.activeCourtId != bytes32(0)
+        ) revert CourtTwoNotEnabled();
+
+        reviewCase.protocolFailed = true;
+        emit CourtProtocolFailed(
+            resetDeploymentIdentity, caseId, settlementId, CourtLevel.COURT_2, bytes32(0)
+        );
+    }
+
     function _selectJudges(
         bytes32 caseId,
         CourtLevel level,
         uint256 attemptIndex,
         uint256 entropy,
         uint256 requiredLockedStake
-    ) internal view returns (address[3] memory selected) {
+    ) internal view virtual returns (address[3] memory selected) {
         if (judgePool.length < 3) revert InvalidJudgeSet();
         uint256 start =
             uint256(keccak256(abi.encode(caseId, level, attemptIndex, entropy))) % judgePool.length;

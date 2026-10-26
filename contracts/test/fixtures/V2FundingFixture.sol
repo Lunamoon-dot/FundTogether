@@ -401,6 +401,19 @@ contract V2FundingFixture is ReentrancyGuard {
         return _campaign(campaignId).activeMilestoneId;
     }
 
+    function campaignCreator(uint256 campaignId) external view returns (address) {
+        return _campaign(campaignId).creator;
+    }
+
+    function milestoneReviewTerms(uint256 campaignId, uint256 milestoneId)
+        external
+        view
+        returns (bytes32 deliverableCommitment, bytes32 acceptanceCriteriaHash)
+    {
+        Milestone storage milestone = _milestone(campaignId, milestoneId);
+        return (milestone.deliverableCommitment, milestone.acceptanceCriteriaHash);
+    }
+
     function milestoneState(uint256 campaignId, uint256 milestoneId)
         external
         view
