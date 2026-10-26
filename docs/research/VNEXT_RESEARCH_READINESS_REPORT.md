@@ -6,16 +6,24 @@
 **Checked-out state:** dirty and 35 commits behind the local `origin/main` ref  
 **Scope:** source-of-truth audit and research-readiness assessment only.
 
+**Remediation review date:** 2026-10-27 (Asia/Ho_Chi_Minh)  
+**PR #21 state independently verified:** `MERGED`; publication head `6cf97a17fb4ed1eec83eb7bf99cc29f515fc2a33`  
+**Documentation-remediation baseline:** `origin/main@e90face3e1d7bf8aebf2cdece92ea5766af45674`
+
+The 2026-10-26 checkout metadata above is preserved as historical audit evidence. It describes the original dirty desktop checkout, not the clean isolated worktree used for this follow-up review. PR #21 was already merged when remediation began, so this revision is a separate documentation-only follow-up and does not rewrite the merged branch or `main`.
+
 ## Executive decision
 
 | Area | Decision | Reason |
 |---|---|---|
-| Isolated fixture and simulation design | **Conditional GO** | The remote baseline contains test-only V2 fixtures and a useful acceptance-test shape. They are suitable as research inputs after the revision and policy manifest are pinned. |
+| Pilot model validation | **Conditional GO** | The corrected protocol is internally specified well enough to implement validation-only pilot code later. Pilot output cannot be treated as confirmatory or as owner approval. |
+| Full confirmatory Monte Carlo | **NO-GO** | Minimum effects, premium limits, confidence/multiplicity choices, rare-event precision, replication cap, stopping rules, scenario weights, and final decision rule remain `PENDING_OWNER_APPROVAL`. |
+| Foundry fixture remediation | **Conditional GO in a separate task** | The RFC now defines bounded candidate semantics and acceptance tests, but this documentation task did not modify or run fixtures. Economic and timeout policies remain pending. |
 | V2 runtime implementation or user funding | **NO-GO** | The checked-out runtime is a partial VNext slice and is not storage- or transition-compatible with the V2 design. Several economic, governance, evidence, and liveness decisions remain `PROPOSED_PENDING_APPROVAL`. |
 | Production/public-chain deployment | **NO-GO** | No source audit in this report establishes integrated contract/indexer/backend/frontend acceptance, production randomness, gas scalability, evidence availability, or security of the proposed policy. |
 | Claim that V2 is superior to simpler juries | **NO-GO** | No controlled simulation results were supplied or run. The current artifacts define candidate mechanisms and test seams, not comparative scientific evidence. |
 
-**Verification statement:** This audit used repository inspection, Git metadata, and read-only inspection of the requested `origin/main` baseline. No test, build, deployment, Anvil reset, or destructive command was run for this report. Documentation claims about earlier test runs are recorded as documented claims, not independently re-run evidence.
+**Verification statement:** The original audit and this remediation used repository inspection, Git metadata, the V2 policy package, and PR1-PR4 fixture/test source. No simulation, calibration, Solidity test, build, deployment, Anvil reset, or destructive command was run. Earlier test-run claims remain documented claims, not independently re-run evidence.
 
 ## 1. Source-of-truth map
 
@@ -118,6 +126,9 @@ The local documentation also records historical build/test claims. Those claims 
 | `JudgePaid` equals only rewards already claimed | **False assumption** | Earned-but-unclaimed reward is a liability and must be included in custody accounting |
 | Fewer than three eligible Judges can always be solved by retrying assignment | **False assumption** | A bounded timeout and terminal policy are required to prevent indefinite escrow immobilization |
 | Existing VNext invariants cover V2 conservation and cross-case liabilities | **Not confirmed** | New V2-specific invariant and integration tests are required |
+| Fresh Court 2 wallets make errors independent of Court 1 | **False assumption** | Shared case/evidence difficulty induces cross-court dependence even with no wallet overlap |
+| A terminal `PROTOCOL_FAIL` is a successful substantive resolution | **False assumption** | Report terminal completion and substantive resolution separately |
+| The full DAO model may use `alpha_appeal`/`beta_appeal` as both inputs and outputs | **False assumption** | They are outputs of generated ballots; a direct-input analytical model must be separate |
 
 ## 4. Main architectural blockers and minimum hardening direction
 
@@ -146,12 +157,9 @@ The transition must be permissionless where safe, but each permissionless action
 
 **Finding.** The V2 Court Reset fixture has a bounded reset/collateral model, but it uses deterministic test assignment and does not establish production-scale eligibility or randomness. The current runtime also has no V2 proof that assignment cannot remain unavailable indefinitely.
 
-**Minimum research default.** Start the assignment timeout when the case becomes eligible for assignment and the required stake is reserved. Permit additional eligible Judges until the deadline. After timeout, allow a permissionless finalizer to choose between:
+**Minimum research default.** Use the RFC's pending **T1-B atomic close, assign-or-fail** semantics. The assignment deadline starts at `CASE_READY`. Before it, permissionless assignment is allowed. At or after it, ordinary assignment is disabled and a permissionless close transaction must atomically assign when at least three eligible Judges exist, otherwise finalize unassigned `PROTOCOL_FAIL`. The closer cannot choose failure while enough candidates exist.
 
-1. a bounded reset if the policy-defined reset collateral is fully reserved; or
-2. terminal `PROTOCOL_FAIL` if the maximum reset budget or eligible-pool condition is exhausted.
-
-Do not slash when no Judge was assigned and no procedural duty was accepted. Keep prior valid-court liabilities intact, refund remaining milestone escrow under the approved rule, and record a unique case/level/reset event. Compare this against a simpler fixed-time terminal-failure policy in simulation; do not assume reset is better.
+Eligibility is checked at the close transaction in the isolated default; a true deadline snapshot needs a separate bounded snapshot policy. Selection entropy must be fixed before the closer can exploit transaction timing. Do not slash when nobody was assigned. An unassigned protocol failure creates no service/reset liability and opens the remaining contribution escrow for pull refunds after terminal accounting.
 
 **Required proof obligation.** Under the declared assumptions, every path must either assign a court, enter a bounded reset, or reach a terminal state. The ledger must reserve any reset compensation before assignment and must not draw it from creator/backer milestone escrow or an unfunded reward reserve.
 
@@ -161,7 +169,9 @@ Do not slash when no Judge was assigned and no procedural duty was accepted. Kee
 
 **Finding.** Contributor lists and refund entitlement processing are potentially large. The current refund path is incremental, but V2 DAO snapshot and contributor-weight work is not integrated into the runtime. A single unbounded creation/finalization loop is an availability risk.
 
-**Recommendation.** For the isolated V2 fixture, use a bounded/paginated on-chain snapshot that stores contributor identities and weights, while maintaining aggregate totals incrementally during snapshot processing. This keeps the DAO denominator and refund entitlement contract-authoritative without one unbounded call. Use O(1) refund claims after the snapshot; consider a Merkle claim root only if measured gas requires it and the protocol adds an on-chain root challenge or fraud-proof path.
+**Recommendation.** For the isolated V2 fixture, use a bounded/paginated on-chain snapshot that stores contributor identities and weights, while maintaining aggregate totals incrementally during snapshot processing. This keeps the DAO denominator and refund entitlement contract-authoritative without one unbounded call. Use O(1) refund claims after entitlement finalization; consider a Merkle claim root only if measured gas requires it and the protocol adds an on-chain root challenge or fraud-proof path.
+
+Refund dust must follow the current candidate registry exactly: calculate checked floor base entitlements, then allocate one extra base unit to each of the first `dust` positive contributors in ascending canonical-address order. A two-pass stored-cursor process freezes every base entitlement and then the canonical dust prefix. Claims remain closed until both passes finalize. A single lowest-address dust recipient is not equivalent and is rejected by this review.
 
 **Trade-offs.** Incremental state is simplest and easiest to audit but has storage cost. Pagination is compatible with permissionless progress but requires idempotent cursors. A root reduces iteration but adds trust, data-availability, and challenge complexity. The hybrid option is acceptable only with an on-chain commitment and a recoverable dispute mechanism.
 
@@ -180,11 +190,23 @@ Do not slash when no Judge was assigned and no procedural duty was accepted. Kee
 The V2 accounting target is:
 
 ```text
-Raised_m = CreatorPaid_m + JudgePaid_m + Refunded_m + EscrowRemaining_m
-JudgePaid_m = JudgeClaimed_m + JudgeUnclaimed_m
+Refunded_m = refunded_m + settlementRefunded_m
+
+raised_m
+  = creatorPaid_m + judgePaid_m + Refunded_m + escrowRemaining_m
+
+judgePaid_m
+  = judgeRewardClaimed_m + JudgeRewardUnclaimed_m
+
+milestoneCustodyAttribution_m
+  = escrowRemaining_m + JudgeRewardUnclaimed_m
+
+sum_m(milestoneCustodyAttribution_m) <= physicalTokenCustody
 ```
 
-The model must additionally isolate reset compensation from milestone escrow and reward reserve, handle mixed `FINAL_PASS`, `VERDICT_FAIL`, and `PROTOCOL_FAIL`, preserve liabilities for unclaimed rewards, and keep each campaign/milestone/case namespace independent.
+Here `judgePaid_m` is the funded reward allocation, while `judgeRewardClaimed_m` is transferred. `escrowRemaining_m` already contains unclaimed creator and Backer-refund allocations; they must not be added again. The aggregate inequality becomes equality only when every live milestone is included and there are no foreign/unattributed deposits or other custody sources. Post-settlement `fundedLiabilities_m` is checked separately and should equal `milestoneCustodyAttribution_m` under the fixture construction.
+
+The model must additionally isolate CCPS-1 stake custody from crowdfunding custody, handle mixed `FINAL_PASS`, `VERDICT_FAIL`, and `PROTOCOL_FAIL`, preserve liabilities for unclaimed rewards, and keep each campaign/milestone/case namespace independent.
 
 **Minimum acceptance set.** Test partial claims in every order; failed and fee-on-transfer token operations; payout failure and retry; refund dust; duplicate claims; reentrancy; simultaneous cases; valid minority rewards; invalid-court zero service reward; reset compensation; and cross-campaign aggregation. An invariant is not established merely because a fixture formula looks correct; custody, event sequencing, and live transfer effects must be connected.
 
@@ -215,7 +237,7 @@ The research fixture may use a clearly labeled candidate manifest. It must not c
 | R7 | **High** | Unclaimed Judge rewards or reset obligations are double-counted or unfunded | V2 fixture proposes separate ledgers; live integration absent | Cross-case custody invariant and failed-transfer/idempotency tests |
 | R8 | **High** | Backend/indexer projection diverges from chain authority | Architecture requires event-driven projections; V2 events/projections are not integrated | Canonical event schema, replay/idempotency tests, and chain-first UI state |
 | R9 | **Medium** | Test-only seams are mistaken for deployment security | MockReviewFinality and deterministic fixture entropy are explicit seams | Label fixtures, block direct seam use from production, and test live boundaries separately |
-| R10 | **Medium** | Scientific result is underpowered or incomparable | No common seeds, pilot precision, raw-result schema, or results were supplied | Pre-register factors, paired seeds, pilot-based sample size, CIs/effect sizes, and falsification gates |
+| R10 | **Medium** | Scientific result is underpowered, selectively resolved, or incomparable | Identity-keyed streams and metrics are now specified, but thresholds, sample size, stopping, scenario weights, and results remain unfrozen/unavailable | Approve preregistration table, validate the generator in a pilot, then freeze confirmatory design before results |
 | R11 | **Medium** | Current dirty/behind checkout causes source drift | HEAD differs from requested baseline and prohibited runtime files are locally modified | Pin the audit/implementation revision before any follow-up change; preserve the current worktree |
 
 ## 6. Scientific novelty assessment
@@ -232,7 +254,7 @@ The strongest defensible contribution is an **instance-level, reproducible proto
 2. a bounded stake-backed Court Reset with an explicitly separate compensation ledger;
 3. BackerDAO-gated Court 2 with temporal conflict exclusions;
 4. conservation and liability invariants spanning creator, backers, Judges, and reset obligations; and
-5. adversarial comparisons against B0 and B1 using common seeds and declared synthetic assumptions.
+5. adversarial comparisons against B0 and B1 using identity-keyed paired streams and declared synthetic assumptions.
 
 The Q6/Q10 wallet-splitting behavior is a useful negative result and boundary condition, not evidence that CWQ-1 is fair. The fixtures can support a reproducible evaluation contribution only if the model is frozen, baselines are comparable, results are independently rerunnable, and conclusions are limited to the declared finite/synthetic assumptions.
 
@@ -254,7 +276,7 @@ This contribution is research evidence, not production-readiness evidence.
 
 ### Research question
 
-> Does collateral-backed Court Reset combined with DAO-gated Court 2 improve adjudication correctness and recovery under failures or adversarial behavior compared with simpler jury mechanisms, at an acceptable financial cost, latency, and liveness trade-off?
+> Under a declared finite synthetic model, does collateral-backed Court Reset combined with DAO-gated Court 2 improve substantive adjudication correctness and recovery from procedural failure compared with simpler jury mechanisms, at an acceptable financial cost, latency, and capital-lock premium?
 
 The answer must remain open.
 
@@ -262,48 +284,64 @@ The answer must remain open.
 
 | Model | Required behavior | Must not include |
 |---|---|---|
-| B0 | One three-Judge court, fixed eligibility, commit/reveal, one final result and settlement | Reset, DAO, Court 2 |
-| B1 | B0 plus bounded Court Reset and CCPS-1-like stake-only compensation | DAO/Court 2, unbounded retries |
-| B2 | Court 1, bounded reset, BackerDAO ACCEPT/APPEAL, Court 2, settlement, and the proposed accounting | Unverified real-world Kleros/GenLayer claims |
+| B0 | One three-Judge court; all reveals required; two-of-three substantive verdict or `PROTOCOL_FAIL` | Reset, DAO, Court 2 |
+| B1 | B0 plus one bounded fresh Court 1 reset and CCPS-1 stake-only compensation | DAO/Court 2, unbounded retries |
+| B2 | B1 Court 1; generated BackerDAO ACCEPT/APPEAL ballots; one fresh Court 2 with the same primary Judge model; proposed accounting | Privileged truth, intrinsically better Court 2 Judges, or unverified real-world protocol claims |
 
-All models must receive the same case distribution, ground truth, Judge population, quality model, adversarial budget, stake assumptions, and paired seeds. Differences in capabilities and costs must be represented as model parameters rather than hidden implementation advantages.
+All models receive the same case/truth/evidence latent, Judge population, stable attributes, potential Judge-case behavior, adversarial capital, stake assumptions, and contribution capital. Identity-keyed streams—not a shared draw cursor—preserve potential outcomes when B1/B2 consume extra reset, DAO, or Court 2 draws.
 
-### Minimum factors
+### Corrected dependence and DAO model
 
-Independent accuracy; correlated errors; non-reveal probability; pool size and collateral eligibility; colluding Judge percentage; attacker-controlled wallets/stake; DAO participation and detection quality; contribution splitting; Court 2 reversal behavior; capital locked; reset/appeal frequency; and gas/timeout assumptions. Each range must be labeled either as a literature-backed estimate or a synthetic sensitivity range. Do not invent empirical parameters.
+The primary correlated-error model is shared-case Beta-Bernoulli:
+
+```text
+P_case ~ Beta(a * (1/rho - 1), (1-a) * (1/rho - 1))
+Correct_j | P_case ~ Bernoulli(P_case)
+```
+
+For `0 < rho < 1`, marginal correctness is `a` and pairwise within-case correlation is `rho`; `rho = 0` is an explicit independent-Bernoulli special case. Court 1 and Court 2 share `P_case`, so fresh wallets do not erase shared-evidence error. Stable Judge heterogeneity is a separate logistic random-effects sensitivity model and cannot reuse the closed-form `rho` interpretation.
+
+Backers receive imperfect private signals about whether Court 1 is wrong; they never observe truth. Eligibility exclusions, participation, strategic abstention, attacker control, contribution splitting, and `floor_sqrt(contribution)` weights generate actual ballots. In the full DAO model, `alpha_appeal = P(DAO_APPEAL | Court 1 incorrect)` and `beta_appeal = P(DAO_APPEAL | Court 1 correct)` are measured outputs. A direct-input analytical model is separate and cannot be pooled.
 
 ### Metrics and statistical method
 
-- **Correctness:** final accuracy, false PASS, false FAIL, correction rate, harmful reversal rate.
-- **Liveness:** terminal-resolution probability, `PROTOCOL_FAIL`, stuck probability, time-to-terminal.
+- **Resolution:** substantive resolution (`FINAL_PASS`/`VERDICT_FAIL`) and terminal completion (including `PROTOCOL_FAIL`) with different denominators.
+- **Correctness:** conditional substantive accuracy, correct substantive outcomes/all trials, false PASS/all trials, false FAIL/all trials, and coverage.
+- **Liveness:** protocol-failure rate, stuck rate, censoring-aware time to substantive resolution, and time to any terminal state.
 - **Economics:** service rewards, slashing/compensation, attacker net gain/loss, locked stake, reserve use, escrow immobilization, and independently measured gas.
 - **Adversarial:** Sybil appeal-flip rate, collusion success, strategic non-reveal profitability, and selection-manipulation advantage.
 
-Use common random numbers and paired seeds across models, independent replications, raw configuration/result files, and a pilot that chooses sample size from target interval width or power for predeclared effect sizes. Report paired differences, confidence intervals, effect sizes, and sensitivity rather than averages alone. Wilson/exact intervals are suitable for bounded binary rates; bootstrap or appropriate paired intervals can summarize heavy-tailed cost/latency outputs. Simulation conclusions must be labeled simulation-generated, not empirical observations.
+Use deterministic domain-separated streams keyed by master seed, replication, domain, and entity identity for truth/difficulty, stable Judge quality, Judge-case vote/non-reveal, control/collusion, selection, DAO signal/participation/strategy, and timing. Analyze within-replication paired differences and independent replication clusters. `PROTOCOL_FAIL`/`STUCK` are censored or competing events for substantive time, not fictitious resolved times.
 
 ### Hypotheses and falsification
 
-- **H1:** Court Reset improves liveness under non-reveal. Reject if, across the predeclared non-reveal range, B1 does not improve terminal resolution or materially increases stuck/locked capital beyond the decision threshold.
-- **H2:** DAO-gated Court 2 improves final accuracy only when appeal selection is sufficiently informative. Reject if B2 fails to improve accuracy in the informative-selection regime, or improves it only by exceeding the predeclared cost/latency bound.
-- **H3:** CWQ-1 wallet splitting can change outcomes without increasing contributed capital. Reject only if the defined splitting counterexample cannot be reproduced under the frozen formula; otherwise treat reproduction as confirmation of the limitation.
-- **H4:** CCPS-1 cost coverage does not necessarily imply positive net attacker cost. Reject if the attacker cannot achieve non-positive net cost across the declared attack model; otherwise retain the warning that coverage is not deterrence.
+- **H1:** Court Reset improves substantive resolution under non-reveal. A rise only in terminal `PROTOCOL_FAIL` does not support H1.
+- **H2:** Generated DAO selection plus same-quality Court 2 improves all-trial correct substantive outcomes within frozen coverage/cost bounds.
+- **H3a:** deterministically reproduce CWQ-1 Q6/Q10 splitting; failure invalidates the simulation implementation.
+- **H3b:** estimate splitting flip frequency/severity under frozen contribution and attacker distributions; finite non-observation cannot erase H3a.
+- **H4a:** deterministically reproduce CCPS-1 coverage and same-actor finalizer recapture arithmetic; failure invalidates the simulation implementation.
+- **H4b:** estimate attacker profitability/deterrence sensitivity under declared control, gas, rewards, and finalizer assumptions.
 - **H5:** Full VNext imposes additional cost and latency that may outweigh improvements in some scenarios. Reject only if B2 is never worse than B0/B1 within the predeclared cost/latency bounds; any region where B2 loses is a valid result.
 
-Abandon B2 in favor of B0 or B1 when the pilot/main study shows no robust correctness or liveness improvement, when improvements require unrealistic or unverified assumptions, when Sybil/collusion cost dominates, or when B2 violates an escrow-immobilization or liability bound that B0/B1 satisfy.
+The Experimental Protocol now names the primary comparisons and a preregistration decision table, but numerical minimum effects, premium limits, confidence/multiplicity choices, rare-event precision, sample size, stopping rules, replication cap, scenario weights, and retain/reject thresholds all remain `PENDING_OWNER_APPROVAL`. Pilot model validation may proceed; confirmatory inference may not.
+
+Reject Full VNext for a declared region when it misses the frozen all-trial correctness/coverage benefit, violates any frozen cost/latency/capital/adversarial bound, depends on privileged Court 2 information, or is Pareto-dominated by B0/B1. Negative regions must remain in the report.
 
 ## 8. Go/no-go criteria
 
-### GO for isolated fixture remediation and simulation
+### Conditional GO for pilot model validation
 
-Proceed only when all are true:
+The corrected design is internally consistent enough for a later validation-only pilot. The pilot is limited to implementing and checking the declared generator, keyed-stream replay, analytical `a`/`rho` targets, DAO signal/ballot logic, outcome classification, deterministic H3a/H4a vectors, and variance/precision estimates. It must use pinned source/model versions and publish raw validation output.
 
-- the exact source revision is pinned and the checked-out/remote baseline discrepancy is resolved or intentionally documented;
-- the fixture policy manifest is complete, versioned, and still marked pending where approval is absent;
-- fixtures cannot accept user funds, fabricate a production `PAID`/M2 transition, or act as deployment contracts;
-- deterministic seams, transcript sources, and synthetic parameters are documented as limitations;
-- unit/fuzz/invariant acceptance commands are defined and their outputs will be archived when actually run;
-- B0/B1/B2 share inputs, seeds, ground truth, and raw-result schemas;
-- the pilot has a precision/power rule and explicit falsification thresholds.
+Pilot results are exploratory. They cannot approve policy, support a superiority claim, choose thresholds after inspection, or be pooled into the confirmatory sample unless that reuse was preregistered before pilot results were opened.
+
+### NO-GO for full confirmatory Monte Carlo
+
+Do not start confirmatory runs until the owner freezes every `PENDING_OWNER_APPROVAL` preregistration row: primary cells and outcomes, minimum effects, cost/latency/capital limits, attacker criterion, confidence and multiplicity, rare-event bound, sample size, `N_max`, stopping/futility rules, aggregation weights, confirmatory seeds, and retain/reject decision logic. Random-stream algorithm/version and all policy parameter values must also be immutable before unblinding.
+
+### Conditional GO for Foundry fixture remediation in a separate task
+
+The RFC supplies reviewable candidate semantics and acceptance tests for atomic assignment close, prefix dust pagination, and aggregate accounting. Fixture changes may proceed only as isolated test work under explicit scope. T1-B timing/randomness/eligibility, refund economics, CWQ-1, CCPS-1, and other pending policy values remain candidates and cannot be promoted by fixture code. This documentation remediation did not modify or run Solidity.
 
 ### NO-GO for V2 runtime or user funding
 
@@ -319,19 +357,20 @@ Do not integrate or fund until all are true:
 
 ### NO-GO for a scientific superiority claim
 
-No superiority claim is permitted without common-seed comparisons, a declared synthetic/literature parameter basis, raw reproducible results, uncertainty intervals, sensitivity analysis, and reported negative regions.
+No superiority claim is permitted without the frozen confirmatory design, identity-keyed paired comparisons, validated synthetic/literature parameter basis, raw reproducible results, uncertainty intervals, multiplicity treatment, sensitivity analysis, and all negative regions.
 
 ## 9. Ordered next steps
 
-1. **Pin the source baseline.** Reconcile the checked-out `467a654` worktree with the requested `origin/main@fb0e346` in a separate, explicitly authorized workflow. Preserve the existing dirty worktree; do not reset it as part of this report.
+1. **Keep source identities explicit.** Preserve the historical `467a654` dirty-checkout audit, PR #21 head `6cf97a1`, and this follow-up's `origin/main@e90face` baseline as different evidence points. Any future code task must pin its own clean revision; do not reset the desktop checkout.
 2. **Freeze the policy boundary.** Review O1-O8, record owner decisions, and publish an approved/pending status for each parameter. Keep all pending values out of runtime authorization.
 3. **Keep the four V2 fixtures isolated.** Treat them as test models. Run their documented unit/fuzz/invariant commands only in a later verification step, and archive exact outputs, compiler revision, and policy identity.
 4. **Define the integrated transition and event contract.** Resolve funding/evidence/case binding, timeout/reset exhaustion, temporal exclusions, and terminal financial treatment before touching production implementation.
-5. **Build B0/B1/B2 from the same input generator.** Include ground truth, Judge quality/correlation, non-reveal, stake/collusion, DAO participation, splitting, and Court 2 behavior as explicit configuration.
-6. **Run a pilot and sensitivity analysis.** Choose replications from interval width or power, then run the main study with paired seeds and raw-result preservation.
-7. **Benchmark gas and liveness.** Increase contributor/Judge/case counts until failure or unacceptable margin; use measured thresholds to choose incremental, paginated, or challenged-root processing.
-8. **Implement only approved slices in dependency order:** funding/accounting, reset, DAO/Court 2, evidence/final ruling, indexer projections, then backend/UI and disposable local acceptance.
-9. **Re-audit before deployment.** Require actual test/build/deployment evidence, independent security review, and explicit acceptance of residual Sybil, collusion, bribery, inactivity, randomness, and evidence-truth risks.
+5. **Approve or explicitly defer preregistration decisions.** Freeze primary cells/outcomes, effect and premium thresholds, interval/multiplicity rules, rare-event precision, sample size/cap/stopping, aggregation weights, and retain/reject logic before confirmatory work.
+6. **Implement and validate the common generator in a later task.** Use identity-keyed streams, shared case difficulty, same-quality courts, generated DAO ballots, H3a/H4a deterministic vectors, and raw-result preservation. Run only a validation pilot first.
+7. **Freeze the confirmatory design after pilot review.** If validation passes, archive pilot diagnostics and freeze independent confirmatory seeds/configuration; otherwise repair the model without making outcome claims.
+8. **Benchmark gas and liveness.** Increase contributor/Judge/case counts until failure or unacceptable margin; use measured thresholds to choose incremental, paginated, or challenged-root processing.
+9. **Implement only approved slices in dependency order:** funding/accounting, reset, DAO/Court 2, evidence/final ruling, indexer projections, then backend/UI and disposable local acceptance.
+10. **Re-audit before deployment.** Require actual test/build/deployment evidence, independent security review, and explicit acceptance of residual Sybil, collusion, bribery, inactivity, randomness, and evidence-truth risks.
 
 ## 10. Dependency matrix
 
@@ -340,7 +379,7 @@ No superiority claim is permitted without common-seed comparisons, a declared sy
 | Revision/deployment identity and complete commitment manifest | Required | Required | Required | Candidate manifest exists in remote baseline; checkout is not aligned |
 | Per-milestone target, ordered opening, exact-target/refund boundary | Required for PR1 | Required | Required | V2 fixture design exists; current runtime is campaign-level |
 | Reward rate, denominator, reserve, payout, refund, dust, failed transfer | PR2 input | Required for cost model | Required | Pending approval; accounting fixture exists |
-| `Raised = CreatorPaid + JudgePaid + Refunded + EscrowRemaining` and unclaimed liabilities | PR2 tests | Required | Required | Fixture target; live integration absent |
+| Exact PR2 allocation, custody-attribution, and funded-liability identities | PR2 tests | Required | Required | Reconciled in RFC; live integration absent |
 | CCPS-1 D/F cost, collateral, recipient, reset limits, terminal behavior | PR3 input | Required | Required | Pending approval; reset fixture exists |
 | Court 1/Court 2 assignment timeout and exhaustion | PR3/PR4 boundary | Required | Required | Pending; deterministic fixture seam only |
 | CWQ-1 formula, cap, threshold, tie/empty, self-contribution | PR4 input | Required | Required | Pending; splitting limitation known |
@@ -350,10 +389,56 @@ No superiority claim is permitted without common-seed comparisons, a declared sy
 | Contributor/refund/DAO processing scalability | Benchmark fixture boundaries | Required as cost factor | Required | Not measured in this audit |
 | Token custody, fee/failing transfer, reentrancy, idempotent claims | Required | Required for economic model | Required | Partial local coverage; V2 integration absent |
 | Canonical events, indexer idempotency, backend/UI transaction states | Not needed for pure fixture | Optional observation model | Required | Architecture specified; V2 integration absent |
-| Common seeds, ground truth, raw schema, CI/effect-size rule | No | Required | No | Not yet supplied |
-| Independent security/economic/scientific review | No | Recommended | Required before public launch | Not established |
+| Identity-keyed streams, ground truth, raw schema, CI/effect-size rule | No | Required | No | Design supplied; implementation/validation not run |
+| Confirmatory thresholds, scenario weights, stopping and replication cap | No | Required | No | `PENDING_OWNER_APPROVAL`; confirmatory run blocked |
+| Independent security/economic/scientific review | No | Recommended | Required before public launch | This document contains conceptual review only; external review and empirical execution remain outstanding |
 
-## 11. Source references and verification ledger
+## 11. Independent conceptual reviews
+
+These reviews are separate document/source analyses. They are not a Solidity audit, empirical calibration, or external peer review.
+
+### 11.1 Scientific methodology review
+
+**Coverage:** probability equations and parameter identification; Court 1/Court 2 dependence; DAO signal and ballot generation; baseline fairness; paired sampling; selective-resolution bias; censoring; deterministic versus stochastic hypotheses; falsifiability; multiplicity, sizing, stopping, and rare events.
+
+**Findings and remediation:**
+
+- The prior per-Judge Beta draw represented between-Judge heterogeneity, not positive within-case correlation. It is replaced by an analytically checked shared-case Beta-Bernoulli primary model; stable Judge heterogeneity is a separate sensitivity model.
+- The prior B2 factors could silently grant Court 2 better information and did not generate DAO ballots. Primary Court 2 now shares the Court 1 quality/evidence process, while imperfect Backer signals, participation, exclusions, splitting, collusion, and abstention generate ballots. `alpha_appeal`/`beta_appeal` are outputs in that model.
+- Terminal completion could hide procedural failure. Substantive resolution, terminal completion, protocol failure, stuck state, conditional accuracy, all-trial correctness, coverage, and censoring-aware times are now separate.
+- Two sequential seeds were insufficient common-random-number control. Domain- and identity-keyed potential outcomes now prevent B2-only draws from shifting B0/B1.
+- H3/H4 mixed known counterexamples with finite-sample discovery. They are split into deterministic implementation validations (H3a/H4a) and quantitative frequency/profitability questions (H3b/H4b).
+
+**Residuals:** numerical decision thresholds, scenario weights, calibration sources, sample size, stopping, and rare-event precision remain owner decisions. No parameter was empirically calibrated and no model code was run. Scientific conceptual result: **pilot validation conditional GO; confirmatory NO-GO**.
+
+### 11.2 Protocol/security review
+
+**Coverage:** milestone allocation and physical custody; earned/unclaimed claims; refund dust and claim idempotency; batch ordering; assignment deadline griefing; authorization; stake versus contribution custody; terminal liabilities; candidate-pool and gas assumptions.
+
+**Findings and remediation:**
+
+- The prior RFC's single dust recipient contradicted `canonical_address_prefix`. The corrected two-pass algorithm stores floor entitlements and gives one extra unit to each of the first `dust` ascending canonical addresses, with immutable cursors and replay/finalization guards.
+- The prior aggregate prose added claims already contained in `escrowRemaining`. The corrected definitions match PR2 fields and distinguish allocation, successful transfer, funded liability, scoped custody attribution, and aggregate physical custody.
+- The prior T1 rule did not resolve a deadline reached with three eligible Judges but no assignment transaction. T1-B now atomically assigns when possible or fails when fewer than three exist; the closer cannot select failure. Eligibility snapshot, entropy, duration, and production adoption remain pending.
+- CCPS-1 stake/compensation remains separate from crowdfunding escrow even when token type is the same. No unassigned case can create a slash, reward, or compensation claim.
+
+**Residuals:** production randomness/fallback, bounded selection gas, contributor-order maintenance, token behavior, refund-policy approval, and integrated multi-contract solvency are unresolved. Protocol conceptual result: **isolated fixture remediation conditional GO; production integration NO-GO**.
+
+### 11.3 Specification-consistency review
+
+**Coverage:** V1/V2 specifications, PR0 policy record, parameter registry, PR1-PR4 acceptance criteria, four V2 fixtures, relevant tests, all three research documents, PR #21 Git state, and historical audit metadata.
+
+**Findings and remediation:**
+
+- B0/B1/B2, H1-H5/H3a-H4b, `a`/`rho`, outcome denominators, and pilot/confirmatory gates now use the same meanings across the research documents.
+- Prefix dust now matches `refundDustPolicy = canonical_address_prefix` and the accounting fixture's ascending contributor semantics.
+- Financial equations now match `raised`, `creatorPaid`, `judgePaid`, `judgeRewardClaimed`, `refunded`, `settlementRefunded`, `escrowRemaining`, `milestoneCustodyAttribution`, `fundedLiabilities`, and `physicalTokenCustody`.
+- Historical `467a654`/`fb0e346` metadata is preserved and explicitly separated from merged PR #21 head `6cf97a1` and remediation baseline `e90face`.
+- All O1-O8/CWQ-1/CCPS-1/reward/refund/randomness/evidence values remain pending where the registry marks them pending.
+
+**Residuals:** the research documents propose T1-B and paginated algorithms not implemented by the current fixtures. Source alignment does not equal passing tests or runtime adoption. Specification conceptual result: **documents aligned for independent review; runtime remains NO-GO**.
+
+## 12. Source references and verification ledger
 
 ### Current checked-out sources
 
@@ -369,7 +454,7 @@ No superiority claim is permitted without common-seed comparisons, a declared sy
 - `contracts/test/mocks/MockReviewFinality.sol`: test-only direct finality seam.
 - `contracts/test/unit/VNext/**`, `contracts/test/fuzz/VNextStateMachine.t.sol`, and `contracts/test/invariant/**`: checked-out partial VNext tests and invariants.
 
-### Requested remote baseline, read-only inspected
+### Historical requested remote baseline, read-only inspected
 
 - `origin/main@fb0e346:docs/protocol/FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_V2.md`: V2 decision register, implementation gap, accounting, reset, DAO/Court 2, dependency plan, and research boundaries.
 - `origin/main@fb0e346:docs/protocol/PR0_POLICY_FINALIZATION.md:L1-L22,L25-L68,L71-L86,L89-L180,L185-L260,L273-L312`: pending policy status, O1-O8, campaign boundary, and PR dependencies.
@@ -381,16 +466,23 @@ No superiority claim is permitted without common-seed comparisons, a declared sy
 - `origin/main@fb0e346:contracts/test/fixtures/V2BackerDaoCourt2Fixture.sol`: deterministic CWQ-1/DAO/Court 2 adapter, temporal exclusions, and exhaustion path.
 - Corresponding `origin/main@fb0e346:contracts/test/unit/VNext/V2*.t.sol`, `contracts/test/fuzz/V2*.t.sol`, and `contracts/test/invariant/V2*.t.sol`: inspected test definitions; not executed in this audit.
 
+### Remediation baseline and merged publication state
+
+- GitHub PR #21 was verified `MERGED` with head `6cf97a17fb4ed1eec83eb7bf99cc29f515fc2a33`; it was not rewritten.
+- `origin/main@e90face3e1d7bf8aebf2cdece92ea5766af45674` was the clean follow-up base.
+- Current V2 spec/policy/acceptance documents and PR1-PR4 fixture/test source were inspected from that base before remediation.
+- Only the three research Markdown files were changed; runtime and test source were read-only evidence.
+
 ### Verification limits
 
 - No test command was run.
 - No build or compiler command was run.
 - No Anvil, deployment, database, indexer, or frontend acceptance run was performed.
 - No security property is claimed beyond what the inspected source structure explicitly supports.
-- The remote baseline was inspected with read-only Git commands; it was not checked out and no runtime file was edited.
+- The original dirty checkout was inspected only with read-only commands and was not reset, cleaned, staged, or edited. The follow-up used the existing isolated worktree.
 
 ## Final readiness conclusion
 
-FundTogether VNext deserves further **research-fixture and simulation work**, but not runtime adoption or public funding. The most important next decision is not whether to add Court 2: it is whether the project can freeze an approved policy and an integrated, bounded accounting/state model that makes funding, evidence, court duties, reset compensation, refunds, and unclaimed liabilities simultaneously auditable.
+FundTogether VNext is ready only for a later **pilot model-validation implementation** and separately scoped **isolated Foundry fixture remediation**. Full confirmatory Monte Carlo is **NO-GO** until hypotheses, numerical thresholds, scenario weights, parameters, identity-keyed stream rules, sizing, stopping, and replication caps are frozen. Runtime adoption, user funding, and public-chain deployment remain **NO-GO**.
 
-The minimum defensible contribution is a reproducible comparison of B0, B1, and B2 under shared synthetic assumptions, including negative results for wallet splitting, reset economics, and full-system cost. Until that evidence and the policy/integration gates exist, V2 should remain a labeled research proposal with isolated fixtures—not a production protocol claim.
+The minimum defensible contribution is a reproducible paired comparison of B0, B1, and B2 under shared synthetic assumptions, including substantive coverage, all-trial correctness, negative regions, deterministic wallet-splitting/finalizer counterexamples, and full-system cost. Until that evidence and the policy/integration gates exist, V2 remains a labeled research proposal with isolated fixtures—not a production protocol claim.

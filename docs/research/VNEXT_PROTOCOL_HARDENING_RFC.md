@@ -252,16 +252,27 @@ The PR4 fixture has a Court 2 assignment-exhaustion seam, but the base `assignCo
 
 | Policy | Behavior | Strength | Cost/risk |
 | --- | --- | --- | --- |
-| **T1: fixed enrollment deadline** | At `CASE_READY`, freeze `assignmentDeadline = now + T_assign`. Judges may register, deposit, and become eligible until the deadline. At deadline, any caller either assigns three seats or finalizes `PROTOCOL_FAIL`. | Simplest bounded proof; no retry loop; no unpaid assigned-duty liability if no seats exist. | A temporarily thin pool fails even if Judges would arrive shortly after the deadline. |
+| **T1-A: hard close/fail** | Assignment is allowed only before `assignmentDeadline`. At or after the deadline, any caller finalizes `PROTOCOL_FAIL`, even if three eligible Judges exist. | Smallest state machine and strongest wall-clock bound. | A caller can deliberately wait, converting an assignable case into failure. Existing candidates and escrow can be griefed by transaction omission. |
+| **T1-B: atomic close, assign-or-fail** | Assignment is allowed before the deadline. At or after it, ordinary assignment is disabled and any caller invokes one close transition that atomically assigns three eligible Judges if possible, otherwise finalizes `PROTOCOL_FAIL`. | Bounded and prevents the closer from choosing failure while enough candidates exist. | The close call needs bounded selection and precommitted/unbiasable entropy; a large eligibility scan would reintroduce a gas-liveness failure. |
+| **T1-C: assignment grace period** | Enrollment closes at one deadline, assignment remains possible during a second bounded grace period, then exhaustion finalizes. | Separates candidate formation from transaction inclusion. | Adds a second deadline, more immobilization, and a new griefing/timing surface. |
 | **T2: bounded attempt windows** | Permit at most `A` selection attempts, each with its own short window. A failed attempt may be retried after fresh eligibility is observed; after `A`, finalize `PROTOCOL_FAIL`. | Gives the pool more than one opportunity and preserves history. | More state, more griefing surface, and more latency; each attempt must revalidate collateral and uniqueness. |
 
 ### 5.3 Recommended isolated-fixture default
 
-Use **T1** for isolated research testing, with all durations and `A`-like values marked `PROPOSED_PENDING_APPROVAL`. The assignment deadline starts when the case reaches `CASE_READY`, not when a caller first happens to invoke `assignCourt`. A Judge may join before the deadline. After the deadline, a permissionless caller may finalize exhaustion only when fewer than three eligible candidates remain.
+Use **T1-B** for an isolated research fixture, with duration, entropy source, eligibility-freeze rule, and production adoption marked `PROPOSED_PENDING_APPROVAL`. The deadline starts when the case reaches `CASE_READY`, not when a caller first invokes assignment.
+
+Recommended boundary semantics:
+
+1. Before `assignmentDeadline`, permissionless `assignCourt` may atomically choose three unique eligible Judges and reserve all three collateral amounts.
+2. At `block.timestamp >= assignmentDeadline`, ordinary `assignCourt` is disabled. A permissionless `closeAssignmentWindow` executes exactly one atomic branch.
+3. The close transition evaluates the eligible set at that transaction. If at least three candidates exist, it must assign; the caller cannot select `PROTOCOL_FAIL`. If fewer than three exist, it records unassigned exhaustion and finalizes `PROTOCOL_FAIL`.
+4. Eligibility changes before close are visible under this default. A true deadline snapshot would require a separately approved bounded snapshot process; block time alone cannot materialize an on-chain snapshot.
+5. The assignment entropy must be committed or otherwise fixed before the close caller can choose transaction timing. Deterministic fixture entropy is acceptable only as a test seam.
+6. Repeated close/assignment calls revert after the first successful transition. A failed reservation or token/stake operation reverts the entire transition and leaves the case pending for retry.
 
 The selection function must not promise success. It either returns three unique Judges and reserves their full required collateral atomically, or returns a bounded failure that leaves the case unassigned. If no case was assigned, no Judge has an assigned-duty penalty, no valid service reward is accrued, and no compensation claim exists.
 
-### 5.4 Liability proof under T1
+### 5.4 Liability proof under T1-B
 
 For every assigned seat:
 
@@ -275,8 +286,10 @@ The resulting terminal paths are:
 
 ```text
 CASE_READY
-   ├─ three eligible Judges before deadline → COURT1_ACTIVE
-   └─ fewer than three at deadline → PROTOCOL_FAIL, refund path
+   ├─ assign before deadline with three eligible Judges → COURT1_ACTIVE
+   └─ deadline reached → closeAssignmentWindow
+         ├─ at least three eligible → atomic assignment → COURT1_ACTIVE
+         └─ fewer than three eligible → PROTOCOL_FAIL, refund path
 
 COURT1_ACTIVE
    ├─ all three valid reveals → substantive Court 1 result
@@ -285,7 +298,11 @@ COURT1_ACTIVE
 
 ### 5.5 Remaining liveness limits
 
-T1 cannot guarantee liveness if the chain is halted, the token transfer primitive remains unavailable, the configured eligible set has fewer than three candidates, the maximum gas needed for finalization exceeds the block limit, or no transaction is included. It guarantees only a protocol-visible terminal path once the chain is live and the bounded finalization call can execute.
+An unassigned `PROTOCOL_FAIL` authorizes no creator payout, service reward, slash, or reset compensation. After the terminal accounting transition, the milestone's remaining contribution escrow becomes a funded Backer refund liability under the frozen refund policy. Claims remain pull-based and idempotent. Failure to complete refund-entitlement preparation must not relabel or erase the protocol failure.
+
+Required boundary tests cover: one second before deadline; exactly at deadline; after deadline with two candidates; after deadline with exactly three and more than three candidates; eligibility gained/lost before close; delayed malicious caller; caller-supplied entropy rejection; duplicate close; assignment/close race ordering; partial collateral-reservation failure with atomic rollback; no slash/reward on unassigned failure; and exact terminal refund/funded-liability accounting.
+
+T1-B cannot guarantee liveness if the chain is halted, the bounded selection/finalization call exceeds the block gas limit, the approved randomness source fails without a fallback, or no transaction is included. It guarantees only a protocol-visible path once the chain is live and the bounded close call can execute. Production semantics remain pending owner approval.
 
 ## 6. A3 — Bounded contributor, DAO, and refund processing
 
@@ -320,7 +337,42 @@ DAO_FINALIZED
 
 The snapshot stores, for each eligible wallet, its immutable snapshot contribution, weight, ballot status, and an index. It stores `totalWeight` and `eligibleWalletCount` incrementally. No ballot is accepted until the snapshot is complete. The contribution ledger may continue to receive later milestones, but later contributions cannot affect the frozen snapshot.
 
-For refunds, use an immutable refund snapshot with per-wallet base entitlement computed in bounded batches. Store the single canonical dust recipient (for example the lowest canonical address in the frozen eligible set) and add the deterministic remainder only to that wallet's entitlement. A claim reads one stored entitlement and never scans all contributors. If batch computation is not complete, claims remain closed rather than using a partial denominator.
+For refunds, preserve the policy registry's candidate `canonical_address_prefix` rule; do not collapse all dust into one lowest-address wallet. Freeze the positive-contribution wallets in strictly ascending canonical address order. For wallet `i`:
+
+```text
+base_i = floor(contribution_i * RefundPool / ContributionSnapshot)
+allocatedBase = sum(base_i)
+dust = RefundPool - allocatedBase
+
+entitlement_i = base_i + 1, if canonicalRank_i < dust
+              = base_i,     otherwise
+```
+
+Use checked multiplication or a full-precision `mulDiv` floor operation. Each fractional remainder is less than one base unit, so with `n` positive-contribution wallets, `0 <= dust < n`. Exactly the first `dust` wallets receive one extra base unit. A wallet with `base_i = 0` may still receive one dust unit when its canonical rank is in the prefix; that is the policy's deterministic conservation behavior.
+
+Use a two-phase bounded, resumable state machine:
+
+```text
+REFUND_SNAPSHOT_FROZEN
+  -> BASE_PROCESSING(cursor, allocatedBase)
+  -> BASE_COMPLETE(dust frozen)
+  -> DUST_PROCESSING(dustCursor)
+  -> ENTITLEMENTS_FINALIZED
+  -> CLAIMS_OPEN
+```
+
+`processRefundBaseBatch(maxItems)` reads the stored cursor, processes the next canonical interval, stores each `base_i` and rank, adds to `allocatedBase`, and advances the cursor once. When `cursor == contributorCount`, `finalizeRefundBase` freezes `dust` after checking `allocatedBase <= RefundPool` and `dust < contributorCount` (with an explicit empty-set rule). `processRefundDustBatch(maxItems)` adds one exactly once to ranks `[dustCursor, min(dustCursor + maxItems, dust))`. It never chooses recipients from call order. Finalization opens claims only when the base pass and complete dust prefix are recorded.
+
+Callers cannot supply an arbitrary start index; if an API includes `expectedCursor`, it must equal the stored cursor or revert. Phase, cursor, per-wallet preparation, finalization, and claim flags make replay idempotent. A reverted batch leaves cursor, totals, and entitlements unchanged. A completed batch cannot be replayed, dust cannot be assigned twice, contributor order cannot change after freeze, and claims remain closed while either pass is incomplete.
+
+Deterministic acceptance vectors must include:
+
+- a positive contributor whose floor `base_i` is zero, both outside and inside the dust prefix;
+- a nonzero dust case proving each of the first `dust` canonical addresses receives exactly one extra unit and total entitlement equals `RefundPool`;
+- multiple partial base and dust batches producing the same mapping as one complete calculation;
+- an out-of-order or stale cursor call reverting without state change;
+- repeated batch/finalization calls reverting or remaining no-ops according to the declared interface; and
+- duplicate claim rejection plus failed-transfer rollback that leaves the claim retryable.
 
 The production alternative can be a hybrid root only after a root format, availability, fraud challenge, finality, and dust policy are approved. Do not move authoritative balances to PostgreSQL.
 
@@ -361,20 +413,67 @@ Stake-qualified registration limits spam and ensures collateral coverage. It doe
 
 ### 8.1 Ledger definitions
 
-For milestone `m`:
+The PR2 fixture uses both allocation ledgers and transfer counters. For milestone `m`, the exact meanings are:
 
 ```text
-Raised_m       = confirmed contributions received for m
-CreatorPaid_m  = successful creator payout transfers
-JudgePaid_m    = valid service reward funded into Judge claims
-Refunded_m     = successful Backer refund transfers
-EscrowRemaining_m = unallocated milestone custody after funded claims
+raised_m               = confirmed contributions received for m
+creatorPaid_m          = successful creator payout transfers
+judgePaid_m            = valid service reward allocated/funded at settlement
+judgeRewardClaimed_m   = successful Judge reward transfers
+refunded_m             = successful pre-review funding-failure refunds
+settlementRefunded_m   = successful post-settlement Backer refunds
+Refunded_m             = refunded_m + settlementRefunded_m
 
-Raised_m = CreatorPaid_m + JudgePaid_m + Refunded_m + EscrowRemaining_m
-JudgePaid_m = JudgeClaimed_m + JudgeUnclaimed_m
+JudgeRewardUnclaimed_m = judgePaid_m - judgeRewardClaimed_m
+
+escrowRemaining_m
+  = raised_m - creatorPaid_m - judgePaid_m
+    - refunded_m - settlementRefunded_m
+
+milestoneCustodyAttribution_m
+  = raised_m - creatorPaid_m - judgeRewardClaimed_m
+    - refunded_m - settlementRefunded_m
 ```
 
-`JudgePaid_m` is funded/irrevocably isolated reward liability, not only the amount a Judge has withdrawn. A later `JudgeClaimed_m` transfer must not debit milestone escrow a second time. Physical token custody additionally includes unclaimed creator payout, unclaimed Judge rewards, unclaimed Backer refunds, and `EscrowRemaining_m`.
+`judgePaid_m` is an accounting allocation: the valid-service amount is irrevocably removed from `escrowRemaining_m` even before withdrawal. `judgeRewardClaimed_m`, `creatorPaid_m`, `refunded_m`, and `settlementRefunded_m` are transfer counters. `refundPool_m` and `creatorClaimable_m` are funded liabilities, not extra assets.
+
+The following identities hold by the fixture definitions:
+
+```text
+raised_m
+  = creatorPaid_m + judgePaid_m + Refunded_m + escrowRemaining_m
+
+judgePaid_m
+  = judgeRewardClaimed_m + JudgeRewardUnclaimed_m
+
+milestoneCustodyAttribution_m
+  = escrowRemaining_m + JudgeRewardUnclaimed_m
+```
+
+Do not add `creatorClaimable_m` or unclaimed Backer refunds to `escrowRemaining_m`: those liabilities are already inside it. Do not add `JudgeRewardUnclaimed_m` to `escrowRemaining_m` when proving the first allocation identity: `judgePaid_m` already includes it. The separate custody-attribution identity adds only unclaimed Judge rewards because `escrowRemaining_m` excluded the full `judgePaid_m` allocation at settlement.
+
+`fundedLiabilities_m` is checked separately:
+
+```text
+before reviewed settlement, when a funding-failure refund snapshot exists:
+  fundedLiabilities_m = refundSnapshot_m - refunded_m
+
+after reviewed settlement:
+  fundedLiabilities_m
+    = creatorClaimable_m
+      + JudgeRewardUnclaimed_m
+      + refundPool_m - settlementRefunded_m
+```
+
+Under the fixture's valid settlement construction and complete entitlement preparation, post-settlement `fundedLiabilities_m == milestoneCustodyAttribution_m`. This equality is a solvency check derived from the settled allocation, not permission to count either side twice.
+
+`physicalTokenCustody` is the ERC20 balance of the accounting contract across every milestone/campaign plus any foreign or otherwise unattributed token deposits. Therefore:
+
+```text
+sum_m(milestoneCustodyAttribution_m) <= physicalTokenCustody
+```
+
+Equality is expected only when the sum covers every live milestone attributed to that contract, there are no foreign/unattributed deposits, no other token sources or liabilities share the custody address, and exact-transfer token behavior holds. The left side is scoped ledger attribution; the right side is aggregate physical custody.
 
 Reset compensation is a separate stake-pool ledger:
 
@@ -382,7 +481,7 @@ Reset compensation is a separate stake-pool ledger:
 ResetSlashCollected = ResetCompensationPaid + ResetCompensationUnclaimed
 ```
 
-It is not `Raised_m`, `JudgePaid_m`, or a Backer refund. Across all campaigns and milestones, token custody must cover the sum of every unclaimed obligation in each custody contract; no per-case proof may assume that the contract holds only one campaign.
+It is not `raised_m`, `judgePaid_m`, a milestone inflow, or a Backer refund. Even if stake and crowdfunding custody use the same ERC20 token type, their contracts, sources, claims, and conservation equations remain separate. A cross-contract aggregate may reconcile physical balances, but it must not net a stake surplus against an underfunded milestone liability.
 
 ### 8.2 Outcome matrix
 
@@ -414,14 +513,25 @@ Add a multi-campaign/multi-milestone handler that interleaves:
 Prove after every action:
 
 ```text
-sum(milestone ledgers) + unclaimed obligations
-    <= actual token custody for the relevant contract
+for each m:
+  raised_m = creatorPaid_m + judgePaid_m + Refunded_m + escrowRemaining_m
+  judgePaid_m = judgeRewardClaimed_m + JudgeRewardUnclaimed_m
+  milestoneCustodyAttribution_m
+    = escrowRemaining_m + JudgeRewardUnclaimed_m
+
+across included milestones:
+  sum(milestoneCustodyAttribution_m) <= physicalTokenCustody
+
+after settlement:
+  fundedLiabilities_m = milestoneCustodyAttribution_m
 
 no claim flag transitions twice
 no case settlement consumes the same case twice
 no reward reserve is also counted as refund escrow
 no reset stake enters contribution conservation
 ```
+
+The first three equalities are ledger identities that should be asserted for every state transition. The aggregate inequality and funded-liability coverage are independent custody/solvency checks. Tests must also inject a foreign token transfer to prove why aggregate equality is conditional rather than universal.
 
 Existing isolated invariants cover important slices but do not establish this cross-case proof, evidence binding, scalable processing, or real randomness.
 
@@ -435,7 +545,7 @@ All rows below are **`PROPOSED_PENDING_APPROVAL`** unless explicitly marked lock
 | CWQ-1 | One-wallet-one-vote; linear contribution; `floor_sqrt` contribution; Merkle/root variant | CWQ-1 only as an explicit test candidate | Approve formula, cap, checked arithmetic, tie and threshold | Wallet splitting and collusion resistance |
 | DAO threshold and duration | No threshold; fixed participation threshold; quorum plus timeout | Candidate 20% effective-weight threshold, fixed window, tie/unmet threshold → `ACCEPT` | Pre-register threshold and timeout; test empty electorate | Participation quality and strategic abstention |
 | CCPS-1 | No penalty; fixed no-show fee; collateralized D/F schedule; variable reimbursement | CCPS-1 with stake-only funding, one reset per level, two per case, no variable reimbursement | Approve D/F, recipients, collateral, reset and terminal rules | Deterrence and attacker net cost |
-| Court 1 exhaustion | Infinite wait; bounded retry; fixed assignment deadline | T1 fixed deadline → `PROTOCOL_FAIL` | Approve duration and terminal refund path | Availability of honest Judges after deployment |
+| Court 1 exhaustion | Hard close/fail; atomic assign-or-fail; grace period; bounded attempts | T1-B atomic close: assign if at least three eligible, otherwise `PROTOCOL_FAIL` | Approve duration, entropy, eligibility check/snapshot, and terminal refund path | Availability of honest Judges and bounded close gas after deployment |
 | Court 2 exhaustion | Reopen DAO; relax conflict; bounded timeout | Bounded timeout → `PROTOCOL_FAIL`; never rewrite DAO | Approve timeout and no-candidate semantics | Whether strict conflicts are worth liveness loss |
 | Randomness | deterministic mock; block-derived seed; network VRF; commit/reveal seed | Deterministic mock only for fixture; no production claim | Approve source, bias analysis, fallback, and timeout | Selection manipulation and network availability |
 | Evidence availability/revision | hash only; manifest check; public bytes; creator resubmission | Frozen revision plus explicit availability check; new revision for correction | Approve canonical serialization, disclosure, retry, and deadline | Truth, authorship, and durable availability |
@@ -463,8 +573,10 @@ Before isolated fixture remediation:
 - [ ] Evidence revision, availability, freeze, timeout, and case binding are versioned.
 - [ ] Every case transcript includes campaign, milestone, revision, criteria, policy, and case identity.
 - [ ] Court 1 assignment has a deterministic start point and permissionless bounded exhaustion.
+- [ ] At/after the assignment deadline, a closer cannot choose `PROTOCOL_FAIL` while three eligible Judges can be atomically reserved and assigned.
 - [ ] No unassigned timeout creates a Judge debt or uses contribution escrow.
 - [ ] Snapshot and refund operations have bounded per-transaction work.
+- [ ] Refund entitlements reproduce the ascending canonical-address prefix dust rule across partial batches and retries.
 - [ ] Judge registration requires stake-qualified eligibility and active-set removal on withdrawal.
 - [ ] Aggregate custody covers concurrent campaigns, unclaimed rewards, refunds, payouts, and reset claims.
 - [ ] All pending policy values remain labeled `PROPOSED_PENDING_APPROVAL`.
