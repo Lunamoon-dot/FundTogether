@@ -253,24 +253,47 @@ The PR4 fixture has a Court 2 assignment-exhaustion seam, but the base `assignCo
 | Policy | Behavior | Strength | Cost/risk |
 | --- | --- | --- | --- |
 | **T1-A: hard close/fail** | Assignment is allowed only before `assignmentDeadline`. At or after the deadline, any caller finalizes `PROTOCOL_FAIL`, even if three eligible Judges exist. | Smallest state machine and strongest wall-clock bound. | A caller can deliberately wait, converting an assignable case into failure. Existing candidates and escrow can be griefed by transaction omission. |
-| **T1-B: atomic close, assign-or-fail** | Assignment is allowed before the deadline. At or after it, ordinary assignment is disabled and any caller invokes one close transition that atomically assigns three eligible Judges if possible, otherwise finalizes `PROTOCOL_FAIL`. | Bounded and prevents the closer from choosing failure while enough candidates exist. | The close call needs bounded selection and precommitted/unbiasable entropy; a large eligibility scan would reintroduce a gas-liveness failure. |
+| **T1-B: atomic close, assign-or-fail with recovery** | Assignment is allowed before the deadline. At or after it, ordinary assignment is disabled and any caller invokes one close transition. It assigns three eligible Judges when the declared selection path can prove that assignment is available; otherwise it records a typed recovery reason rather than inferring insufficient eligibility. A finite recovery budget ends in `PROTOCOL_FAIL`. | Bounded and prevents the closer from choosing failure while enough candidates exist, while making selection failure observable and retryable. | The close call needs bounded selection, precommitted/unbiasable entropy, and an explicit recovery policy; a large eligibility scan would reintroduce a gas-liveness failure. |
 | **T1-C: assignment grace period** | Enrollment closes at one deadline, assignment remains possible during a second bounded grace period, then exhaustion finalizes. | Separates candidate formation from transaction inclusion. | Adds a second deadline, more immobilization, and a new griefing/timing surface. |
 | **T2: bounded attempt windows** | Permit at most `A` selection attempts, each with its own short window. A failed attempt may be retried after fresh eligibility is observed; after `A`, finalize `PROTOCOL_FAIL`. | Gives the pool more than one opportunity and preserves history. | More state, more griefing surface, and more latency; each attempt must revalidate collateral and uniqueness. |
 
+The following failure reasons are distinct and must be emitted/stored rather
+than collapsed into “fewer than three eligible”:
+
+| Reason | Meaning | Permitted consequence |
+| --- | --- | --- |
+| `INSUFFICIENT_ELIGIBLE` | The bounded eligible index/snapshot proves fewer than three candidates satisfy stake, conflict, uniqueness, and case rules. | Terminal `PROTOCOL_FAIL` after the approved close condition. |
+| `DRAW_BUDGET_EXHAUSTED` | The selection algorithm did not find three candidates within its declared draw/rejection budget; this does not prove the pool has fewer than three eligible wallets. | `SELECTION_RECOVERY_PENDING`, then bounded retry or terminal failure. |
+| `RANDOMNESS_UNAVAILABLE` | The approved entropy source or its fallback did not produce usable entropy before its deadline. | `SELECTION_RECOVERY_PENDING` or a separately approved randomness timeout. |
+| `COLLATERAL_CHANGED` | A candidate ceased to satisfy the reservation requirement before atomic reservation. | Retry with a fresh eligibility check; no partial reservation. |
+| `GAS_BOUNDED_FAILURE` | The declared close/selection operation cannot execute within its gas bound. | Recovery or terminal failure under the approved bound; never an implicit success. |
+| `CALLER_DID_NOT_SUBMIT` | No permissionless caller submitted a close/retry transaction. | A caller-omission timeout may finalize only under an explicitly approved policy. |
+
 ### 5.3 Recommended isolated-fixture default
 
-Use **T1-B** for an isolated research fixture, with duration, entropy source, eligibility-freeze rule, and production adoption marked `PROPOSED_PENDING_APPROVAL`. The deadline starts when the case reaches `CASE_READY`, not when a caller first invokes assignment.
+Use **T1-B with a typed selection-recovery state** for an isolated research
+fixture, with duration, entropy source, eligibility-freeze rule, recovery
+budget, and production adoption marked `PROPOSED_PENDING_APPROVAL`. The
+deadline starts when the case reaches `CASE_READY`, not when a caller first
+invokes assignment. A candidate count of three is not itself a guarantee that
+a bounded draw/rejection algorithm will find three candidates.
 
 Recommended boundary semantics:
 
 1. Before `assignmentDeadline`, permissionless `assignCourt` may atomically choose three unique eligible Judges and reserve all three collateral amounts.
 2. At `block.timestamp >= assignmentDeadline`, ordinary `assignCourt` is disabled. A permissionless `closeAssignmentWindow` executes exactly one atomic branch.
-3. The close transition evaluates the eligible set at that transaction. If at least three candidates exist, it must assign; the caller cannot select `PROTOCOL_FAIL`. If fewer than three exist, it records unassigned exhaustion and finalizes `PROTOCOL_FAIL`.
+3. The close transition evaluates the eligible index/snapshot and selection result. If the declared candidate-selection path proves that at least three candidates can be atomically assigned, it must assign; the caller cannot select `PROTOCOL_FAIL`. If the proof establishes fewer than three eligible candidates, it records `INSUFFICIENT_ELIGIBLE` and finalizes `PROTOCOL_FAIL`. A draw-budget, randomness, gas, or reservation failure enters `SELECTION_RECOVERY_PENDING` with its typed reason.
 4. Eligibility changes before close are visible under this default. A true deadline snapshot would require a separately approved bounded snapshot process; block time alone cannot materialize an on-chain snapshot.
 5. The assignment entropy must be committed or otherwise fixed before the close caller can choose transaction timing. Deterministic fixture entropy is acceptable only as a test seam.
-6. Repeated close/assignment calls revert after the first successful transition. A failed reservation or token/stake operation reverts the entire transition and leaves the case pending for retry.
+6. Repeated close/assignment calls revert after the first successful transition. A failed reservation or token/stake operation reverts the entire transition and leaves the case in recovery for retry; it does not rewrite the failure as insufficient eligibility.
 
-The selection function must not promise success. It either returns three unique Judges and reserves their full required collateral atomically, or returns a bounded failure that leaves the case unassigned. If no case was assigned, no Judge has an assigned-duty penalty, no valid service reward is accrued, and no compensation claim exists.
+The selection function must not promise success. It either returns three
+unique Judges and reserves their full required collateral atomically, or
+returns a typed bounded failure. A bounded failure leaves the case
+unassigned, but does not immediately become `PROTOCOL_FAIL` unless the reason
+is `INSUFFICIENT_ELIGIBLE` or the finite recovery policy has been exhausted.
+If no case was assigned, no Judge has an assigned-duty penalty, no valid
+service reward is accrued, and no compensation claim exists.
 
 ### 5.4 Liability proof under T1-B
 
@@ -288,8 +311,12 @@ The resulting terminal paths are:
 CASE_READY
    ├─ assign before deadline with three eligible Judges → COURT1_ACTIVE
    └─ deadline reached → closeAssignmentWindow
-         ├─ at least three eligible → atomic assignment → COURT1_ACTIVE
-         └─ fewer than three eligible → PROTOCOL_FAIL, refund path
+         ├─ proven three eligible and selectable → COURT1_ACTIVE
+         ├─ proven fewer than three → PROTOCOL_FAIL, refund path
+         └─ draw/randomness/collateral/gas failure
+               → SELECTION_RECOVERY_PENDING(reason)
+                    ├─ finite retry succeeds → COURT1_ACTIVE
+                    └─ recovery budget exhausted → PROTOCOL_FAIL, refund path
 
 COURT1_ACTIVE
    ├─ all three valid reveals → substantive Court 1 result
@@ -300,15 +327,48 @@ COURT1_ACTIVE
 
 An unassigned `PROTOCOL_FAIL` authorizes no creator payout, service reward, slash, or reset compensation. After the terminal accounting transition, the milestone's remaining contribution escrow becomes a funded Backer refund liability under the frozen refund policy. Claims remain pull-based and idempotent. Failure to complete refund-entitlement preparation must not relabel or erase the protocol failure.
 
-Required boundary tests cover: one second before deadline; exactly at deadline; after deadline with two candidates; after deadline with exactly three and more than three candidates; eligibility gained/lost before close; delayed malicious caller; caller-supplied entropy rejection; duplicate close; assignment/close race ordering; partial collateral-reservation failure with atomic rollback; no slash/reward on unassigned failure; and exact terminal refund/funded-liability accounting.
+Required boundary tests cover: one second before deadline; exactly at deadline;
+after deadline with two candidates; after deadline with exactly three and more
+than three candidates; exactly three candidates where the bounded draw budget
+fails; eligibility gained/lost before close; delayed malicious caller;
+caller-supplied entropy rejection; randomness unavailable; duplicate close;
+assignment/close race ordering; partial collateral-reservation failure with
+atomic rollback; gas-bounded failure; finite recovery retry and exhaustion;
+no slash/reward on unassigned failure; and exact terminal
+refund/funded-liability accounting. Each test must assert the recorded reason
+and must not treat a selection failure as proof of an undersized eligible set.
 
-T1-B cannot guarantee liveness if the chain is halted, the bounded selection/finalization call exceeds the block gas limit, the approved randomness source fails without a fallback, or no transaction is included. It guarantees only a protocol-visible path once the chain is live and the bounded close call can execute. Production semantics remain pending owner approval.
+T1-B cannot guarantee liveness if the chain is halted, the bounded
+selection/finalization call exceeds the block gas limit, the approved
+randomness source fails without a fallback, or no transaction is included. It
+guarantees only a protocol-visible path once the chain is live and the bounded
+close/recovery calls can execute. The finite recovery budget, caller-omission
+timeout, and terminal treatment of each typed reason remain pending owner
+approval.
 
 ## 6. A3 — Bounded contributor, DAO, and refund processing
 
 ### 6.1 Current risk
 
-`V2BackerDaoCourt2Fixture.openDao` loops through every contributor. The accounting fixture maintains a sorted contributor array by insertion, and `_refundDustAndRank` scans all contributors during a refund entitlement query. These loops are suitable for small vectors but can make a permissionless funding path or individual claim exceed the block gas limit as contributor count grows.
+`V2BackerDaoCourt2Fixture.openDao` loops through every contributor. The
+accounting fixture maintains a sorted contributor array by insertion: every
+new contributor may shift the existing suffix, so contribution recording and
+canonical-order construction are O(n) in the worst case. The accounting
+fixture's `_refundDustAndRank` also scans all contributors during a refund
+entitlement query. These loops are suitable for small vectors but can make a
+permissionless funding path or individual claim exceed the block gas limit as
+contributor count grows. Refund pagination alone does not bound the earlier
+contribution/order-construction cost.
+
+Separate the scalability problem into three layers:
+
+1. **Contribution recording:** accept and idempotently record a wallet's
+   confirmed contribution without shifting an unbounded array.
+2. **Canonical order construction:** materialize the immutable ascending
+   `canonical_address_prefix` order needed by DAO/refund policy, with bounded
+   permissionless progress and a clear completeness proof.
+3. **Refund preparation and claims:** compute bases/dust in bounded batches and
+   make post-finalization claims O(1), independent of total contributor count.
 
 ### 6.2 Alternatives
 
@@ -319,9 +379,34 @@ T1-B cannot guarantee liveness if the chain is halted, the bounded selection/fin
 | Merkle/proof claims | Root publisher is trusted or a challenge/fraud-proof mechanism exists | O(log n) claims; root generation is off-chain | Wrong root, unavailable tree, fraudulent weight, and challenge timing become protocol risks; dust and voter uniqueness need separate commitments | Low without a new root/challenge policy |
 | Hybrid off-chain computation with on-chain verification | A committed root plus verifier and a dispute mechanism | Efficient on-chain path after root publication | Backend/root is not financial authority only if fraud can be challenged and finality is permissionless; otherwise it violates the boundary | Low; largest implementation and policy surface |
 
+For the missing recording/order layer, compare these explicit options before
+choosing a fixture path:
+
+| Order approach | Per-contribution cost | Total/order cost | Main risk or dependency |
+| --- | --- | --- | --- |
+| Current sorted insertion | O(1) best case, O(n) worst case shifting | Paid incrementally, worst-case O(n²) over reverse insertion | Simple and exact, but vulnerable to adversarial order and unbounded contribution-time gas |
+| Append-only registry plus bounded canonical-order preparation | O(1) recording target; bounded preparation batches | O(n) or O(n log n) depending on the selected preparation primitive | Needs an authenticated, replay-safe, permissionless order builder; no claim may open before completeness |
+| Authenticated sorted index/proof-based order | O(log n) or bounded proof work per update/claim, depending on primitive | Amortized/index construction cost | Requires a specified proof/index format, update rules, availability, and challenge semantics |
+
+Every option must be evaluated for worst-case per-transaction gas, total gas,
+storage, Sybil fragmentation, ordering correctness, replay/idempotency,
+permissionless progress/liveness, and integration with the DAO snapshot and
+refund policy. The current sorted insertion remains a useful small-vector
+reference, not evidence of production scalability.
+
 ### 6.3 Recommendation
 
-Use **paginated on-chain snapshot processing** for the isolated V2 research fixture. It is the smallest design that preserves wallet-level eligibility, snapshot immutability, deterministic weight calculation, and no trusted financial root.
+For a minimal bounded research fixture, use **append-only contribution
+recording plus a bounded canonical-order preparation phase**, followed by the
+existing paginated snapshot/refund passes. The fixture must select and state
+the order primitive (an authenticated sorted index/proof or another bounded,
+on-chain-complete mechanism) before claiming that order construction is
+bounded. Keep the current sorted-insertion implementation as a small-vector
+reference for exactness and regression comparison; do not present it as the
+recommended scalable path. This preserves wallet-level eligibility,
+snapshot immutability, deterministic weight calculation, and no trusted
+financial root while leaving the order primitive as an explicit research
+dependency rather than silently assuming it away.
 
 Recommended flow:
 
@@ -373,6 +458,14 @@ Deterministic acceptance vectors must include:
 - an out-of-order or stale cursor call reverting without state change;
 - repeated batch/finalization calls reverting or remaining no-ops according to the declared interface; and
 - duplicate claim rejection plus failed-transfer rollback that leaves the claim retryable.
+
+The contribution/order benchmark must additionally include random and reverse
+insertion order, many contributors receiving dust, multiple preparation and
+refund batches, duplicate processing, missing contributors, incorrect-order
+rejection, claim cost independent of total contributor count after
+finalization, and exact conservation. It must record per-contribution and
+order-preparation gas separately from snapshot/refund gas. No production
+scalability conclusion is permitted before these measurements.
 
 The production alternative can be a hybrid root only after a root format, availability, fraud challenge, finality, and dust policy are approved. Do not move authoritative balances to PostgreSQL.
 
@@ -545,7 +638,7 @@ All rows below are **`PROPOSED_PENDING_APPROVAL`** unless explicitly marked lock
 | CWQ-1 | One-wallet-one-vote; linear contribution; `floor_sqrt` contribution; Merkle/root variant | CWQ-1 only as an explicit test candidate | Approve formula, cap, checked arithmetic, tie and threshold | Wallet splitting and collusion resistance |
 | DAO threshold and duration | No threshold; fixed participation threshold; quorum plus timeout | Candidate 20% effective-weight threshold, fixed window, tie/unmet threshold → `ACCEPT` | Pre-register threshold and timeout; test empty electorate | Participation quality and strategic abstention |
 | CCPS-1 | No penalty; fixed no-show fee; collateralized D/F schedule; variable reimbursement | CCPS-1 with stake-only funding, one reset per level, two per case, no variable reimbursement | Approve D/F, recipients, collateral, reset and terminal rules | Deterrence and attacker net cost |
-| Court 1 exhaustion | Hard close/fail; atomic assign-or-fail; grace period; bounded attempts | T1-B atomic close: assign if at least three eligible, otherwise `PROTOCOL_FAIL` | Approve duration, entropy, eligibility check/snapshot, and terminal refund path | Availability of honest Judges and bounded close gas after deployment |
+| Court 1 exhaustion | Hard close/fail; atomic assign-or-fail with recovery; grace period; bounded attempts | T1-B with typed selection recovery: assign when the approved selection path proves availability; recover bounded draw/randomness/collateral/gas failures; terminally fail only for proven insufficiency or exhausted recovery | Approve duration, entropy, eligibility check/snapshot, reason codes, recovery budget, caller-omission timeout, and terminal refund path | Availability of honest Judges, selection coverage, and bounded close/recovery gas after deployment |
 | Court 2 exhaustion | Reopen DAO; relax conflict; bounded timeout | Bounded timeout → `PROTOCOL_FAIL`; never rewrite DAO | Approve timeout and no-candidate semantics | Whether strict conflicts are worth liveness loss |
 | Randomness | deterministic mock; block-derived seed; network VRF; commit/reveal seed | Deterministic mock only for fixture; no production claim | Approve source, bias analysis, fallback, and timeout | Selection manipulation and network availability |
 | Evidence availability/revision | hash only; manifest check; public bytes; creator resubmission | Frozen revision plus explicit availability check; new revision for correction | Approve canonical serialization, disclosure, retry, and deadline | Truth, authorship, and durable availability |
@@ -562,7 +655,7 @@ The candidate numbers `D=10`, `F=3`, `resetCostMax=23`, `1%`, `20%`, and local t
 | PR2 accounting | reward rate, reserve, creator payout, refund dust, failed-transfer policy | multi-outcome conservation and claim tests | live Court authority from a mock transcript |
 | PR3 reset | CCPS-1 D/F, collateral, recipients, reset limits, terminal behavior | R1–R10 plus aggregate stake-liability invariants | minority slashing or contribution-funded compensation |
 | PR4 DAO/Court 2 | CWQ-1, snapshot, threshold, conflicts, randomness, exhaustion | Q1–Q10, temporal tests, Court 2 settlement and exhaustion tests | Sybil resistance or correctness claims |
-| Scalable contributor processing | snapshot batching, contributor index, refund dust | gas benchmark and bounded-call tests | backend-calculated roots without proof |
+| Scalable contributor processing | append-only recording, canonical-order primitive, snapshot batching, contributor index, refund dust | gas benchmark and bounded-call tests for recording, order construction, snapshot, and claims | backend-calculated roots without proof or an unbounded sorted insertion path |
 | Judge registry | minimum collateral, active-set lifecycle, selection seed, draw cap | selection fairness/coverage and exhaustion tests | a claim of anti-collusion or anti-Sybil security |
 | Production integration | all policy groups approved and versioned | canonical events, idempotent indexer, fresh vertical acceptance | public-chain or real-money launch until separately approved |
 
@@ -573,9 +666,11 @@ Before isolated fixture remediation:
 - [ ] Evidence revision, availability, freeze, timeout, and case binding are versioned.
 - [ ] Every case transcript includes campaign, milestone, revision, criteria, policy, and case identity.
 - [ ] Court 1 assignment has a deterministic start point and permissionless bounded exhaustion.
-- [ ] At/after the assignment deadline, a closer cannot choose `PROTOCOL_FAIL` while three eligible Judges can be atomically reserved and assigned.
+- [ ] At/after the assignment deadline, a closer cannot choose `PROTOCOL_FAIL` while the approved selection path proves that three eligible Judges can be atomically reserved and assigned.
+- [ ] `INSUFFICIENT_ELIGIBLE`, `DRAW_BUDGET_EXHAUSTED`, `RANDOMNESS_UNAVAILABLE`, `COLLATERAL_CHANGED`, `GAS_BOUNDED_FAILURE`, and caller omission are distinct recorded conditions with bounded recovery/terminal rules.
 - [ ] No unassigned timeout creates a Judge debt or uses contribution escrow.
-- [ ] Snapshot and refund operations have bounded per-transaction work.
+- [ ] Contribution recording, canonical-order construction, snapshot, and refund operations have bounded per-transaction work.
+- [ ] Reverse-insertion and large-contributor benchmarks do not rely on sorted insertion as a scalability claim.
 - [ ] Refund entitlements reproduce the ascending canonical-address prefix dust rule across partial batches and retries.
 - [ ] Judge registration requires stake-qualified eligibility and active-set removal on withdrawal.
 - [ ] Aggregate custody covers concurrent campaigns, unclaimed rewards, refunds, payouts, and reset claims.
