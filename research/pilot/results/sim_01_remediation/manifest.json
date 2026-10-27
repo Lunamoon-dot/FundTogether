@@ -1,0 +1,58 @@
+{
+  "cell_count": 32,
+  "dependency_versions": {
+    "matplotlib": "3.10.3",
+    "numpy": "2.2.6",
+    "pytest": "8.4.1",
+    "scipy": "1.15.3"
+  },
+  "experiment_id": "SIM-01",
+  "figure_paths": [
+    "figures/comparative_resolution.png",
+    "figures/dao_reversal_diagnostics.png",
+    "figures/court2_eligibility_overlap.png"
+  ],
+  "master_seed": 20261027,
+  "model_version": "fundtogether-sim-01-paired-v2",
+  "overlap_ratios_requested": [
+    0.0,
+    0.25,
+    0.5,
+    1.0
+  ],
+  "python_version": "3.12.10",
+  "random_stream_version": "blake2b-256-numpy-pcg64dxsm-v1",
+  "raw_record_count": 9216,
+  "raw_sha256": "90d7c4c33c08430a2067d9a882f6f58c9c06a48f68685b77792b6875ce03c842",
+  "replications_per_cell": 32,
+  "repository_commit": "d0c81c88b543fad859a119921a45b999719ff0d3",
+  "research_spec_commit": "58ad19b237758f776418ac64eed09a8c4031bffe",
+  "schema_version": "sim-01-comparative-raw-v2",
+  "signal_treatments": [
+    {
+      "false_alarm": 0.2,
+      "sensitivity": 0.8,
+      "treatment_id": "informative"
+    },
+    {
+      "false_alarm": 0.5,
+      "sensitivity": 0.5,
+      "treatment_id": "non_informative"
+    },
+    {
+      "false_alarm": 0.8,
+      "sensitivity": 0.2,
+      "treatment_id": "misleading"
+    }
+  ],
+  "uncertainty_treatment": {
+    "capital_note": "total backer contribution capital is fixed by slot index; partial overlap changes which wallet owns a slot and this is recorded in raw JSONL",
+    "clustering": "base_case_id is the paired unit; overlap is a named treatment",
+    "interval": "no confirmatory intervals; paired differences retain scenario-level observations for future preregistration",
+    "overlap_definition": "number of Judge identities also represented as Backers divided by eligible Judge identities",
+    "overlap_rounding": "nearest integer, half up; realized ratio is overlap_judge_count / judge_pool_size",
+    "status": "exploratory_only",
+    "zero_denominator": "null"
+  },
+  "workflow_model_version": "sim-01-b0-b1-b2-overlap-remediation-v1"
+}
