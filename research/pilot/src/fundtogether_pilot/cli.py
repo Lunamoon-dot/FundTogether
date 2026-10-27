@@ -4,7 +4,9 @@ import argparse
 import json
 from pathlib import Path
 
-from .config import load_config
+from .comparative import run_comparative
+from .comparative_schema import validate_comparative_jsonl_schema
+from .config import load_comparative_config, load_config
 from .reporting import write_report
 from .validation import run_pilot, validate_jsonl_schema
 
@@ -29,6 +31,17 @@ def _parser() -> argparse.ArgumentParser:
 
     schema = commands.add_parser("verify-schema", help="validate raw JSONL fields")
     schema.add_argument("path")
+
+    comparative = commands.add_parser(
+        "run-sim01", help="execute the paired SIM-01 exploratory comparison"
+    )
+    comparative.add_argument("--config", required=True)
+    comparative.add_argument("--output", required=True)
+
+    comparative_schema = commands.add_parser(
+        "verify-sim01-schema", help="validate typed SIM-01 comparative JSONL"
+    )
+    comparative_schema.add_argument("path")
     return parser
 
 
@@ -37,6 +50,26 @@ def main() -> None:
     if args.command == "verify-schema":
         count = validate_jsonl_schema(args.path)
         print(json.dumps({"path": args.path, "records": count, "status": "PASS"}))
+        return
+
+    if args.command == "verify-sim01-schema":
+        count = validate_comparative_jsonl_schema(args.path)
+        print(json.dumps({"path": args.path, "records": count, "status": "PASS"}))
+        return
+
+    if args.command == "run-sim01":
+        config = load_comparative_config(args.config)
+        result = run_comparative(config, args.output)
+        print(
+            json.dumps(
+                {
+                    "output": str(Path(args.output)),
+                    "raw_records": result["manifest"]["raw_record_count"],
+                    "raw_sha256": result["manifest"]["raw_sha256"],
+                },
+                sort_keys=True,
+            )
+        )
         return
 
     if args.command == "report":

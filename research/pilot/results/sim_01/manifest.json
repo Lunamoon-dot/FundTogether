@@ -1,0 +1,48 @@
+{
+  "cell_count": 8,
+  "dependency_versions": {
+    "matplotlib": "3.10.3",
+    "numpy": "2.2.6",
+    "pytest": "8.4.1",
+    "scipy": "1.15.3"
+  },
+  "experiment_id": "SIM-01",
+  "figure_paths": [
+    "figures/comparative_resolution.png",
+    "figures/dao_reversal_diagnostics.png"
+  ],
+  "master_seed": 20261027,
+  "model_version": "fundtogether-sim-01-paired-v1",
+  "python_version": "3.12.10",
+  "random_stream_version": "blake2b-256-numpy-pcg64dxsm-v1",
+  "raw_record_count": 2304,
+  "raw_sha256": "3808dd7109196d102ac93034e6f686996f80415e493f46068805d2e5b1a87e49",
+  "replications_per_cell": 32,
+  "repository_commit": "1b3fc71bf0e714afc2d7a9a36f243523b3ccd0ae",
+  "research_spec_commit": "58ad19b237758f776418ac64eed09a8c4031bffe",
+  "schema_version": "sim-01-comparative-raw-v1",
+  "signal_treatments": [
+    {
+      "false_alarm": 0.2,
+      "sensitivity": 0.8,
+      "treatment_id": "informative"
+    },
+    {
+      "false_alarm": 0.5,
+      "sensitivity": 0.5,
+      "treatment_id": "non_informative"
+    },
+    {
+      "false_alarm": 0.8,
+      "sensitivity": 0.2,
+      "treatment_id": "misleading"
+    }
+  ],
+  "uncertainty_treatment": {
+    "clustering": "base_case_id is the paired unit",
+    "interval": "no confirmatory intervals; paired differences retain scenario-level observations for future preregistration",
+    "status": "exploratory_only",
+    "zero_denominator": "null"
+  },
+  "workflow_model_version": "sim-01-b0-b1-b2-integrated-dao-v1"
+}
