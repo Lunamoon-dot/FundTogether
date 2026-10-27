@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -27,6 +28,10 @@ class BaseScenario:
     judge_control_state: tuple[str, ...]
     backer_population: tuple[str, ...]
     contribution_snapshot: tuple[WalletSnapshot, ...]
+    overlap_ratio_requested: float
+    overlap_judge_count: int
+    overlap_ratio_realized: float
+    judge_backer_overlap_judges: tuple[str, ...]
     attacker_capital: int
     potential_judge_behaviors: tuple[tuple[str, JudgeObservation], ...]
     random_stream_version: str
@@ -54,6 +59,13 @@ class BaseScenario:
 def _check_probability(name: str, value: float) -> None:
     if not 0.0 <= value <= 1.0:
         raise ValueError(f"{name} must be in [0, 1]")
+
+
+def _overlap_judge_count(judge_count: int, ratio: float) -> int:
+    _check_probability("judge_backer_overlap_ratio", ratio)
+    # The experiment uses nearest-integer, half-up rounding so a requested
+    # ratio has one deterministic realized role assignment across replays.
+    return min(judge_count, int(math.floor(judge_count * ratio + 0.5)))
 
 
 def make_signal_treatments(values: Iterable[dict[str, object]]) -> tuple[SignalTreatment, ...]:
@@ -90,6 +102,7 @@ def generate_base_scenario(
     contribution_scale: int = 1_000_000,
     judge_stake: int = 50,
     attacker_capital: int = 0,
+    judge_backer_overlap_ratio: float = 1.0,
 ) -> BaseScenario:
     if judge_pool_size < 3:
         raise ValueError("judge_pool_size must be at least three non-creator Judges")
@@ -100,10 +113,15 @@ def generate_base_scenario(
 
     judge_ids = tuple(f"judge-{index:03d}" for index in range(judge_pool_size))
     judge_population = (*judge_ids, creator_id)
+    overlap_judge_count = _overlap_judge_count(judge_pool_size, judge_backer_overlap_ratio)
+    if overlap_judge_count > backers_per_case:
+        raise ValueError(
+            "backers_per_case must be at least the realized Judge–Backer overlap count"
+        )
+    overlap_judges = judge_ids[:overlap_judge_count]
     backer_population = (
-        (*judge_ids, *(f"backer-{index:03d}" for index in range(backers_per_case - judge_pool_size)))
-        if backers_per_case >= judge_pool_size
-        else tuple(f"backer-{index:03d}" for index in range(backers_per_case))
+        *overlap_judges,
+        *(f"backer-{index:03d}" for index in range(backers_per_case - overlap_judge_count)),
     )
     contributions = tuple(
         WalletSnapshot(wallet_id, (index + 1) ** 2 * contribution_scale)
@@ -134,6 +152,10 @@ def generate_base_scenario(
         judge_control_state=(),
         backer_population=backer_population,
         contribution_snapshot=contributions,
+        overlap_ratio_requested=judge_backer_overlap_ratio,
+        overlap_judge_count=overlap_judge_count,
+        overlap_ratio_realized=overlap_judge_count / judge_pool_size,
+        judge_backer_overlap_judges=overlap_judges,
         attacker_capital=attacker_capital,
         potential_judge_behaviors=potential,
         random_stream_version=STREAM_VERSION,

@@ -5,7 +5,9 @@ import hashlib
 import importlib.metadata
 import json
 import platform
+from collections import Counter
 from dataclasses import dataclass
+from math import comb
 from pathlib import Path
 from typing import Any
 
@@ -137,7 +139,7 @@ def _final_court1(
 
 def _blank_record(config: PilotConfig, base: BaseScenario, treatment: SignalTreatment, model: str) -> dict[str, Any]:
     return {
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": config["schema_version"],
         "experiment_id": config["experiment_id"],
         "model_version": config["model_version"],
         "workflow_model_version": config["workflow_model_version"],
@@ -155,6 +157,7 @@ def _blank_record(config: PilotConfig, base: BaseScenario, treatment: SignalTrea
         "signal_sensitivity": treatment.sensitivity,
         "signal_false_alarm": treatment.false_alarm,
         "judge_population": list(base.judge_population),
+        "creator_id": base.creator_id,
         "judge_stake_state": dict(base.judge_stake_state),
         "judge_control_state": list(base.judge_control_state),
         "backer_population": list(base.backer_population),
@@ -162,6 +165,11 @@ def _blank_record(config: PilotConfig, base: BaseScenario, treatment: SignalTrea
             {"wallet_id": wallet.wallet_id, "contribution": wallet.contribution}
             for wallet in base.contribution_snapshot
         ],
+        "backer_total_contribution": sum(wallet.contribution for wallet in base.contribution_snapshot),
+        "overlap_ratio_requested": base.overlap_ratio_requested,
+        "overlap_judge_count": base.overlap_judge_count,
+        "overlap_ratio_realized": base.overlap_ratio_realized,
+        "judge_backer_overlap_judges": list(base.judge_backer_overlap_judges),
         "attacker_capital": base.attacker_capital,
         "judge_pool_level": base.judge_pool_level,
         "judge_pool_size": base.judge_pool_size,
@@ -174,6 +182,7 @@ def _blank_record(config: PilotConfig, base: BaseScenario, treatment: SignalTrea
         "court1_final_judges": [],
         "court1_final_valid": False,
         "court1_verdict": None,
+        "court1_assignee_count": 0,
         "dao_finalized": None if model != "B2" else False,
         "dao_decision": None,
         "dao_eligible_wallets": None,
@@ -182,6 +191,8 @@ def _blank_record(config: PilotConfig, base: BaseScenario, treatment: SignalTrea
         "dao_cast_weight": None,
         "dao_accept_weight": None,
         "dao_appeal_weight": None,
+        "dao_eligible_judge_count": None,
+        "dao_voting_judge_count": None,
         "backer_observations": None,
         "court2_opened": False,
         "court2_judges": [] if model == "B2" else [],
@@ -193,6 +204,14 @@ def _blank_record(config: PilotConfig, base: BaseScenario, treatment: SignalTrea
         "court2_final_judges": [] if model == "B2" else [],
         "court2_final_valid": False,
         "court2_final_verdict": None,
+        "court2_eligible_judges_before_dao": None,
+        "court2_eligible_judges_after_dao": None,
+        "court2_excluded_by_court1_count": None,
+        "court2_excluded_by_dao_count": None,
+        "court2_excluded_by_creator_count": None,
+        "court2_assignment_attempted": False,
+        "court2_assignment_succeeded": False,
+        "court2_exhaustion_reason": None,
         "final_verdict": None,
         "final_state": "PROTOCOL_FAIL",
         "substantively_resolved": False,
@@ -234,6 +253,10 @@ def _apply_attempt(record: dict[str, Any], attempt: CourtAttempt, *, reset: bool
         record["court2_reset_valid"] = bool(attempt.result and attempt.result.valid)
         record["court2_reset_verdict"] = attempt.result.verdict if attempt.result else None
         record["court2_assignments"] += int(attempt.assigned)
+    if attempt.level == "court1":
+        record["court1_assignee_count"] = len(
+            set(record["court1_initial_judges"]) | set(record["court1_reset_judges"])
+        )
 
 
 def _set_substantive_result(record: dict[str, Any], final: CourtAttempt) -> None:
@@ -242,6 +265,33 @@ def _set_substantive_result(record: dict[str, Any], final: CourtAttempt) -> None
     record["court1_final_judges"] = list(final.judge_ids)
     record["court1_final_valid"] = True
     record["court1_verdict"] = final.result.verdict
+
+
+def _update_court2_eligibility(record: dict[str, Any], base: BaseScenario) -> None:
+    judge_ids = set(base.judge_population) - {base.creator_id}
+    court1_history = set(record["court1_initial_judges"]) | set(record["court1_reset_judges"])
+    overlap_judges = set(base.judge_backer_overlap_judges)
+    dao_voters = set(record["dao_voters"] or [])
+    before_dao = judge_ids - court1_history
+    after_dao = before_dao - dao_voters
+    record["court1_assignee_count"] = len(court1_history)
+    record["dao_eligible_judge_count"] = len(overlap_judges - court1_history)
+    record["dao_voting_judge_count"] = len(overlap_judges & dao_voters)
+    record["court2_eligible_judges_before_dao"] = len(before_dao)
+    record["court2_eligible_judges_after_dao"] = len(after_dao)
+    record["court2_excluded_by_court1_count"] = len(judge_ids & court1_history)
+    record["court2_excluded_by_dao_count"] = len(dao_voters & before_dao)
+    record["court2_excluded_by_creator_count"] = int(base.creator_id in base.judge_population)
+
+
+def _court2_exhaustion_category(failure_reason: str | None) -> str | None:
+    if failure_reason is None:
+        return None
+    if "INSUFFICIENT_JUDGE_SUPPLY" in failure_reason:
+        return "INSUFFICIENT_ELIGIBLE_JUDGE_SUPPLY"
+    if "NONREVEAL_FAILURE" in failure_reason:
+        return "NONREVEAL_PROCEDURAL_FAILURE"
+    return "OTHER_PROCEDURAL_FAILURE"
 
 
 def _finalize(record: dict[str, Any], verdict: str | None, failure_reason: str | None = None) -> dict[str, Any]:
@@ -341,6 +391,7 @@ def _dao_for_b2(
     record["dao_appeal_weight"] = result.appeal_weight
     record["backer_observations"] = typed_observations
     record["ballots_cast"] = len(result.voters)
+    _update_court2_eligibility(record, base)
     return result.decision
 
 
@@ -374,6 +425,7 @@ def _run_b2(
 
     record["court2_opened"] = True
     excluded = set(record["court1_initial_judges"]) | set(record["court1_reset_judges"]) | set(record["dao_voters"])
+    record["court2_assignment_attempted"] = True
     first_court2 = _attempt(
         random,
         base,
@@ -382,7 +434,9 @@ def _run_b2(
         excluded=excluded,
     )
     _apply_attempt(record, first_court2, reset=False)
+    record["court2_assignment_succeeded"] = first_court2.assigned
     if first_court2.result is None:
+        record["court2_exhaustion_reason"] = _court2_exhaustion_category(first_court2.failure_reason)
         return _finalize(record, None, first_court2.failure_reason)
     if first_court2.result.valid:
         record["court2_final_judges"] = list(first_court2.judge_ids)
@@ -398,9 +452,12 @@ def _run_b2(
         excluded=excluded | set(first_court2.judge_ids),
     )
     _apply_attempt(record, replacement_court2, reset=True)
+    record["court2_assignment_succeeded"] = record["court2_assignment_succeeded"] or replacement_court2.assigned
     if replacement_court2.result is None:
+        record["court2_exhaustion_reason"] = _court2_exhaustion_category(replacement_court2.failure_reason)
         return _finalize(record, None, replacement_court2.failure_reason)
     if not replacement_court2.result.valid:
+        record["court2_exhaustion_reason"] = _court2_exhaustion_category(replacement_court2.failure_reason)
         return _finalize(record, None, replacement_court2.failure_reason)
     record["court2_final_judges"] = list(replacement_court2.judge_ids)
     record["court2_final_valid"] = True
@@ -447,6 +504,8 @@ def _write_figures(output: Path, scenario_rows: list[dict[str, Any]]) -> list[st
             continue
         if row["nonreveal_configured"] != 0.0 or row["rho_configured"] != 0.30 or row["judge_pool_level"] != "large":
             continue
+        if row["overlap_ratio_realized"] != 0.0:
+            continue
         grouped.setdefault(row["treatment_id"], {})[row["model"]] = row["substantive_resolution_rate"]
     labels = ["informative", "misleading"]
     x = list(range(len(labels)))
@@ -459,7 +518,8 @@ def _write_figures(output: Path, scenario_rows: list[dict[str, Any]]) -> list[st
     axis.set_ylim(0, 1)
     axis.set_ylabel("Substantive resolution rate")
     axis.set_title("SIM-01 paired exploratory resolution")
-    axis.legend()
+    if grouped:
+        axis.legend()
     axis.grid(axis="y", alpha=0.25)
     fig.tight_layout()
     fig.savefig(figure_dir / "comparative_resolution.png", dpi=160)
@@ -474,6 +534,7 @@ def _write_figures(output: Path, scenario_rows: list[dict[str, Any]]) -> list[st
             and row["nonreveal_configured"] == 0.0
             and row["rho_configured"] == 0.30
             and row["judge_pool_level"] == "large"
+            and row["overlap_ratio_realized"] == 0.0
         ]
         if row_values:
             row = row_values[0]
@@ -484,51 +545,145 @@ def _write_figures(output: Path, scenario_rows: list[dict[str, Any]]) -> list[st
     axis.set_xlim(-0.02, 1.02)
     axis.set_ylim(-0.02, 1.02)
     axis.grid(alpha=0.25)
-    axis.legend()
+    if axis.get_legend_handles_labels()[0]:
+        axis.legend()
     fig.tight_layout()
     fig.savefig(figure_dir / "dao_reversal_diagnostics.png", dpi=160)
     plt.close(fig)
-    return ["figures/comparative_resolution.png", "figures/dao_reversal_diagnostics.png"]
+
+    overlap_rows = [
+        row for row in scenario_rows
+        if row["model"] == "B2"
+        and row["treatment_id"] == "informative"
+        and row["nonreveal_configured"] == 0.0
+        and row["rho_configured"] == 0.0
+        and row["judge_pool_level"] == "large"
+    ]
+    overlap_rows.sort(key=lambda row: row["overlap_ratio_realized"])
+    fig, axis = plt.subplots(figsize=(8, 5))
+    if overlap_rows:
+        axis.plot(
+            [row["overlap_ratio_realized"] for row in overlap_rows],
+            [row["court2_eligible_judges_after_dao_mean"] for row in overlap_rows],
+            marker="o",
+            label="eligible after DAO",
+        )
+        axis.plot(
+            [row["overlap_ratio_realized"] for row in overlap_rows],
+            [row["court2_assignment_succeeded_rate"] for row in overlap_rows],
+            marker="x",
+            label="assignment success rate",
+        )
+    axis.set_xlabel("Realized Judge–Backer overlap ratio")
+    axis.set_ylabel("Mean eligibility / assignment success")
+    axis.set_title("SIM-01 Court 2 availability by overlap")
+    axis.grid(alpha=0.25)
+    if overlap_rows:
+        axis.legend()
+    fig.tight_layout()
+    fig.savefig(figure_dir / "court2_eligibility_overlap.png", dpi=160)
+    plt.close(fig)
+    return [
+        "figures/comparative_resolution.png",
+        "figures/dao_reversal_diagnostics.png",
+        "figures/court2_eligibility_overlap.png",
+    ]
 
 
 def _analytical_sanity_checks(config: PilotConfig, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    for nonreveal in config["nonreveal_probabilities"]:
-        cell = [
+    overlap_ratios = tuple(float(value) for value in config.values.get("judge_backer_overlap_ratios", (1.0,)))
+    for overlap_ratio in overlap_ratios:
+        for nonreveal in config["nonreveal_probabilities"]:
+            cell = [
+                record for record in records
+                if record["judge_pool_level"] == "large"
+                and record["rho_configured"] == 0.0
+                and record["nonreveal_configured"] == float(nonreveal)
+                and record["treatment_id"] == "informative"
+                and record["overlap_ratio_requested"] == overlap_ratio
+            ]
+            by_model = {
+                model: [record for record in cell if record["model"] == model]
+                for model in ("B0", "B1")
+            }
+            p = float(nonreveal)
+            q = (1.0 - p) ** 3
+            expected = {
+                "B0": q,
+                "B1": 1.0 - (1.0 - q) ** 2,
+            }
+            for model in ("B0", "B1"):
+                observed_rows = by_model[model]
+                observed = sum(int(record["substantively_resolved"]) for record in observed_rows) / len(observed_rows)
+                error = abs(observed - expected[model])
+                rows.append(
+                    {
+                        "check": "closed_form_nonreveal_resolution",
+                        "model": model,
+                        "overlap_ratio_requested": overlap_ratio,
+                        "nonreveal_probability": p,
+                        "formula": "q=(1-p)^3" if model == "B0" else "1-(1-q)^2",
+                        "expected": expected[model],
+                        "observed": observed,
+                        "absolute_error": error,
+                        "observations": len(observed_rows),
+                        "applicable": True,
+                        "validation_status": "PASS" if error <= float(config["analytical_sanity_tolerance"]) else "FAIL",
+                    }
+                )
+
+        eligibility_cell = [
             record for record in records
-            if record["judge_pool_level"] == "large"
+            if record["model"] == "B2"
+            and record["judge_pool_level"] == "large"
             and record["rho_configured"] == 0.0
-            and record["nonreveal_configured"] == float(nonreveal)
+            and record["nonreveal_configured"] == 0.0
             and record["treatment_id"] == "informative"
+            and record["overlap_ratio_requested"] == overlap_ratio
+            and record["court2_eligible_judges_after_dao"] is not None
         ]
-        by_model = {
-            model: [record for record in cell if record["model"] == model]
-            for model in ("B0", "B1")
-        }
-        p = float(nonreveal)
-        q = (1.0 - p) ** 3
-        expected = {
-            "B0": q,
-            "B1": 1.0 - (1.0 - q) ** 2,
-        }
-        for model in ("B0", "B1"):
-            observed_rows = by_model[model]
-            observed = sum(int(record["substantively_resolved"]) for record in observed_rows) / len(observed_rows)
-            error = abs(observed - expected[model])
+        if eligibility_cell:
+            distribution = Counter(
+                int(record["court2_eligible_judges_after_dao"])
+                for record in eligibility_cell
+            )
             rows.append(
                 {
-                    "check": "closed_form_nonreveal_resolution",
-                    "model": model,
-                    "nonreveal_probability": p,
-                    "formula": "q=(1-p)^3" if model == "B0" else "1-(1-q)^2",
-                    "expected": expected[model],
-                    "observed": observed,
-                    "absolute_error": error,
-                    "observations": len(observed_rows),
-                    "applicable": True,
-                    "validation_status": "PASS" if error <= float(config["analytical_sanity_tolerance"]) else "FAIL",
+                    "check": "court2_eligibility_distribution",
+                    "overlap_ratio_requested": overlap_ratio,
+                    "overlap_ratio_realized": eligibility_cell[0]["overlap_ratio_realized"],
+                    "judge_pool_size": eligibility_cell[0]["judge_pool_size"],
+                    "observations": len(eligibility_cell),
+                    "eligible_after_dao_distribution": {str(key): value for key, value in sorted(distribution.items())},
+                    "court1_reset_history_accounted": True,
+                    "validation_status": "RECORDED",
                 }
             )
+            if overlap_ratio == 1.0:
+                expected_probability = sum(
+                    comb(6, abstentions) * (0.20**abstentions) * (0.80 ** (6 - abstentions))
+                    for abstentions in range(3, 7)
+                )
+                observed_probability = sum(
+                    int(record["court2_eligible_judges_after_dao"] >= 3)
+                    for record in eligibility_cell
+                ) / len(eligibility_cell)
+                rows.append(
+                    {
+                        "check": "full_overlap_binomial_abstention_sanity",
+                        "overlap_ratio_requested": overlap_ratio,
+                        "assumptions": "nine Judges, three Court 1 seats, six remaining Judge-Backers, independent 80% turnout, no other exclusions",
+                        "formula": "P(X>=3), X~Binomial(6,0.20)",
+                        "expected": expected_probability,
+                        "observed": observed_probability,
+                        "absolute_error": abs(observed_probability - expected_probability),
+                        "observations": len(eligibility_cell),
+                        "court1_reset_history_accounted": True,
+                        "applicable": True,
+                        "validation_status": "PASS" if abs(observed_probability - expected_probability) <= float(config["analytical_sanity_tolerance"]) else "FAIL",
+                    }
+                )
     return rows
 
 
@@ -541,6 +696,7 @@ def run_comparative(config: PilotConfig, output: str | Path) -> dict[str, Any]:
     records: list[dict[str, Any]] = []
     pool_levels = tuple(config["judge_pool_levels"])
     replication_sequence = 0
+    overlap_ratios = tuple(float(value) for value in config.values.get("judge_backer_overlap_ratios", (1.0,)))
     for pool in pool_levels:
         pool_id = str(pool["pool_id"])
         pool_size = int(pool["judge_count"])
@@ -553,25 +709,27 @@ def run_comparative(config: PilotConfig, output: str | Path) -> dict[str, Any]:
                         f"{config['experiment_id']}/{pool_id}/rho-{float(rho):.2f}/"
                         f"nonreveal-{float(nonreveal):.2f}/rep-{global_replication_id}"
                     )
-                    base = generate_base_scenario(
-                        random,
-                        replication_id=global_replication_id,
-                        base_case_id=base_case_id,
-                        judge_pool_size=pool_size,
-                        backers_per_case=int(config["backers_per_case"]),
-                        judge_accuracy=float(config["judge_accuracy"]),
-                        rho=float(rho),
-                        nonreveal_probability=float(nonreveal),
-                        creator_id=str(config["creator_id"]),
-                        judge_pool_level=pool_id,
-                        judge_stake=int(config["judge_stake"]),
-                        attacker_capital=int(config["attacker_capital"]),
-                    )
-                    initial, replacement = _court1_attempts(random, base)
-                    for treatment in treatments:
-                        records.append(_run_b0(config, base, treatment, initial))
-                        records.append(_run_b1(config, base, treatment, initial, replacement))
-                        records.append(_run_b2(config, random, base, treatment, initial, replacement))
+                    for overlap_ratio in overlap_ratios:
+                        base = generate_base_scenario(
+                            random,
+                            replication_id=global_replication_id,
+                            base_case_id=base_case_id,
+                            judge_pool_size=pool_size,
+                            backers_per_case=int(config["backers_per_case"]),
+                            judge_accuracy=float(config["judge_accuracy"]),
+                            rho=float(rho),
+                            nonreveal_probability=float(nonreveal),
+                            creator_id=str(config["creator_id"]),
+                            judge_pool_level=pool_id,
+                            judge_stake=int(config["judge_stake"]),
+                            attacker_capital=int(config["attacker_capital"]),
+                            judge_backer_overlap_ratio=overlap_ratio,
+                        )
+                        initial, replacement = _court1_attempts(random, base)
+                        for treatment in treatments:
+                            records.append(_run_b0(config, base, treatment, initial))
+                            records.append(_run_b1(config, base, treatment, initial, replacement))
+                            records.append(_run_b2(config, random, base, treatment, initial, replacement))
 
     validate_comparative_records(records)
     raw_path.parent.mkdir(parents=True, exist_ok=True)
@@ -586,6 +744,8 @@ def run_comparative(config: PilotConfig, output: str | Path) -> dict[str, Any]:
     _write_csv(table_dir / "scenario_summary.csv", summary["scenario_summary"])
     _write_csv(table_dir / "paired_comparisons.csv", summary["paired_comparisons"])
     _write_csv(table_dir / "diagnostics.csv", summary["diagnostics"])
+    _write_csv(table_dir / "court2_eligibility.csv", summary["court2_eligibility"])
+    _write_csv(table_dir / "overlap_sensitivity.csv", summary["overlap_sensitivity"])
     figure_paths = _write_figures(output_path, summary["scenario_summary"])
     raw_sha256 = _sha256(raw_path)
     dependencies = {
@@ -604,7 +764,8 @@ def run_comparative(config: PilotConfig, output: str | Path) -> dict[str, Any]:
         "random_stream_version": config["random_stream_version"],
         "master_seed": config.master_seed,
         "replications_per_cell": config["replications_per_cell"],
-        "cell_count": len(pool_levels) * len(config["rho_levels"]) * len(config["nonreveal_probabilities"]),
+        "overlap_ratios_requested": list(overlap_ratios),
+        "cell_count": len(pool_levels) * len(config["rho_levels"]) * len(config["nonreveal_probabilities"]) * len(overlap_ratios),
         "signal_treatments": config["signal_scenarios"],
         "raw_record_count": len(records),
         "raw_sha256": raw_sha256,
@@ -624,6 +785,8 @@ def run_comparative(config: PilotConfig, output: str | Path) -> dict[str, Any]:
         "tables/scenario_summary.csv": _sha256(table_dir / "scenario_summary.csv"),
         "tables/paired_comparisons.csv": _sha256(table_dir / "paired_comparisons.csv"),
         "tables/diagnostics.csv": _sha256(table_dir / "diagnostics.csv"),
+        "tables/court2_eligibility.csv": _sha256(table_dir / "court2_eligibility.csv"),
+        "tables/overlap_sensitivity.csv": _sha256(table_dir / "overlap_sensitivity.csv"),
     }
     (output_path / "checksums.sha256").write_text(
         "".join(f"{digest}  {name}\n" for name, digest in sorted(checksums.items())),

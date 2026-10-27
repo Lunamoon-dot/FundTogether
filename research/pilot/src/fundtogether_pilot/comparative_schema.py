@@ -5,8 +5,10 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
-SCHEMA_VERSION = "sim-01-comparative-raw-v1"
-MODEL_VERSION = "fundtogether-sim-01-paired-v1"
+LEGACY_SCHEMA_VERSION = "sim-01-comparative-raw-v1"
+SCHEMA_VERSION = "sim-01-comparative-raw-v2"
+SUPPORTED_SCHEMA_VERSIONS = frozenset({LEGACY_SCHEMA_VERSION, SCHEMA_VERSION})
+MODEL_VERSION = "fundtogether-sim-01-paired-v2"
 MODELS = frozenset({"B0", "B1", "B2"})
 TREATMENTS = frozenset({"informative", "non_informative", "misleading"})
 VERDICTS = frozenset({"PASS", "FAIL"})
@@ -99,6 +101,36 @@ REQUIRED_FIELDS = frozenset(
         "court2_assignments",
         "valid_court_rewards",
         "payout_assumed",
+    }
+)
+
+REMEDIATION_FIELDS = frozenset(
+    {
+        "backer_total_contribution",
+        "overlap_ratio_requested",
+        "overlap_judge_count",
+        "overlap_ratio_realized",
+        "judge_backer_overlap_judges",
+        "creator_id",
+        "court1_assignee_count",
+        "dao_eligible_judge_count",
+        "dao_voting_judge_count",
+        "court2_eligible_judges_before_dao",
+        "court2_eligible_judges_after_dao",
+        "court2_excluded_by_court1_count",
+        "court2_excluded_by_dao_count",
+        "court2_excluded_by_creator_count",
+        "court2_assignment_attempted",
+        "court2_assignment_succeeded",
+        "court2_exhaustion_reason",
+    }
+)
+
+COURT2_EXHAUSTION_REASONS = frozenset(
+    {
+        "INSUFFICIENT_ELIGIBLE_JUDGE_SUPPLY",
+        "NONREVEAL_PROCEDURAL_FAILURE",
+        "OTHER_PROCEDURAL_FAILURE",
     }
 )
 
@@ -246,14 +278,136 @@ def _validate_backer_observations(record: dict[str, Any]) -> None:
         raise ComparativeSchemaError("backer observations must cover the population in order")
 
 
+def _validate_remediation_fields(record: dict[str, Any]) -> None:
+    backer_total = _require(record, "backer_total_contribution")
+    if not _is_int(backer_total) or backer_total < 0:
+        raise ComparativeSchemaError("backer_total_contribution must be a non-negative integer")
+    snapshot_total = sum(item["contribution"] for item in record["contribution_snapshot"])
+    if backer_total != snapshot_total:
+        raise ComparativeSchemaError("backer_total_contribution must equal the snapshot total")
+
+    requested = _nullable_number(record, "overlap_ratio_requested")
+    realized = _nullable_number(record, "overlap_ratio_realized")
+    overlap_count = _require(record, "overlap_judge_count")
+    if requested is None or not 0.0 <= requested <= 1.0:
+        raise ComparativeSchemaError("overlap_ratio_requested must be in [0, 1]")
+    if realized is None or not 0.0 <= realized <= 1.0:
+        raise ComparativeSchemaError("overlap_ratio_realized must be in [0, 1]")
+    if not _is_int(overlap_count) or overlap_count < 0:
+        raise ComparativeSchemaError("overlap_judge_count must be a non-negative integer")
+    creator_id = _string(record, "creator_id")
+    if creator_id not in record["judge_population"]:
+        raise ComparativeSchemaError("creator_id must be in judge_population")
+    judge_population = set(record["judge_population"]) - {creator_id}
+    if len(judge_population) != record["judge_pool_size"]:
+        raise ComparativeSchemaError("judge_pool_size must equal eligible Judge population size")
+    if overlap_count > record["judge_pool_size"]:
+        raise ComparativeSchemaError("overlap_judge_count cannot exceed judge_pool_size")
+    overlap_judges = _string_list(record, "judge_backer_overlap_judges")
+    if len(overlap_judges) != overlap_count or not set(overlap_judges).issubset(judge_population):
+        raise ComparativeSchemaError("judge_backer_overlap_judges does not match the overlap count")
+    if abs(realized - overlap_count / record["judge_pool_size"]) > 1e-12:
+        raise ComparativeSchemaError("overlap_ratio_realized does not match the overlap count")
+    backer_population = set(record["backer_population"])
+    if set(overlap_judges) != backer_population & judge_population:
+        raise ComparativeSchemaError("backer population does not match the recorded overlap identities")
+
+    for field in (
+        "court1_assignee_count",
+        "dao_eligible_judge_count",
+        "dao_voting_judge_count",
+        "court2_eligible_judges_before_dao",
+        "court2_eligible_judges_after_dao",
+        "court2_excluded_by_court1_count",
+        "court2_excluded_by_dao_count",
+        "court2_excluded_by_creator_count",
+    ):
+        value = _nullable_int(record, field)
+        if value is not None and value < 0:
+            raise ComparativeSchemaError(f"{field} must not be negative")
+    history = set(record["court1_initial_judges"]) | set(record["court1_reset_judges"])
+    if record["court1_assignee_count"] != len(history):
+        raise ComparativeSchemaError("court1_assignee_count must cover initial and reset history")
+
+    attempted = _require(record, "court2_assignment_attempted")
+    succeeded = _require(record, "court2_assignment_succeeded")
+    if not _is_bool(attempted) or not _is_bool(succeeded):
+        raise ComparativeSchemaError("Court 2 assignment accounting must be boolean")
+    exhaustion = _nullable_string(record, "court2_exhaustion_reason")
+    if exhaustion is not None and exhaustion not in COURT2_EXHAUSTION_REASONS:
+        raise ComparativeSchemaError("invalid court2_exhaustion_reason")
+
+    if record["model"] != "B2":
+        if any(record[field] is not None for field in (
+            "dao_eligible_judge_count",
+            "dao_voting_judge_count",
+            "court2_eligible_judges_before_dao",
+            "court2_eligible_judges_after_dao",
+            "court2_excluded_by_court1_count",
+            "court2_excluded_by_dao_count",
+            "court2_excluded_by_creator_count",
+        )):
+            raise ComparativeSchemaError("Court 2 eligibility diagnostics must be null outside B2")
+        if attempted or succeeded or exhaustion is not None:
+            raise ComparativeSchemaError("Court 2 assignment diagnostics must be inactive outside B2")
+        return
+
+    if record["dao_finalized"] is not True:
+        if any(record[field] is not None for field in (
+            "dao_eligible_judge_count",
+            "dao_voting_judge_count",
+            "court2_eligible_judges_before_dao",
+            "court2_eligible_judges_after_dao",
+            "court2_excluded_by_court1_count",
+            "court2_excluded_by_dao_count",
+            "court2_excluded_by_creator_count",
+        )):
+            raise ComparativeSchemaError("unfinalized DAO cannot have Court 2 eligibility diagnostics")
+        return
+
+    voters = set(record["dao_voters"] or [])
+    overlap_set = set(overlap_judges)
+    before = judge_population - history
+    after = before - voters
+    if record["dao_eligible_judge_count"] != len(overlap_set - history):
+        raise ComparativeSchemaError("dao_eligible_judge_count is inconsistent")
+    if record["dao_voting_judge_count"] != len(overlap_set & voters):
+        raise ComparativeSchemaError("dao_voting_judge_count is inconsistent")
+    if record["court2_eligible_judges_before_dao"] != len(before):
+        raise ComparativeSchemaError("court2_eligible_judges_before_dao is inconsistent")
+    if record["court2_eligible_judges_after_dao"] != len(after):
+        raise ComparativeSchemaError("court2_eligible_judges_after_dao is inconsistent")
+    if record["court2_excluded_by_court1_count"] != len(history & judge_population):
+        raise ComparativeSchemaError("court2_excluded_by_court1_count is inconsistent")
+    if record["court2_excluded_by_dao_count"] != len(voters & before):
+        raise ComparativeSchemaError("court2_excluded_by_dao_count is inconsistent")
+    if record["court2_excluded_by_creator_count"] != int(creator_id in record["judge_population"]):
+        raise ComparativeSchemaError("court2_excluded_by_creator_count is inconsistent")
+    if record["court2_opened"] is False and (attempted or succeeded or exhaustion is not None):
+        raise ComparativeSchemaError("Court 2 assignment diagnostics require an opened appeal")
+    if record["court2_opened"] and not attempted:
+        raise ComparativeSchemaError("opened Court 2 must record an assignment attempt")
+    if record["court2_final_valid"] and not succeeded:
+        raise ComparativeSchemaError("valid Court 2 requires a successful assignment")
+    if record["final_state"] == "PROTOCOL_FAIL" and record["court2_opened"] and exhaustion is None:
+        raise ComparativeSchemaError("Court 2 protocol failure requires an exhaustion reason")
+    if record["final_state"] != "PROTOCOL_FAIL" and exhaustion is not None:
+        raise ComparativeSchemaError("substantive Court 2 completion cannot have an exhaustion reason")
+
+
 def validate_comparative_record(record: object) -> dict[str, Any]:
     if not isinstance(record, dict):
         raise ComparativeSchemaError("record must be an object")
     missing = REQUIRED_FIELDS - record.keys()
     if missing:
         raise ComparativeSchemaError(f"missing fields: {sorted(missing)}")
-    if _string(record, "schema_version") != SCHEMA_VERSION:
+    schema_version = _string(record, "schema_version")
+    if schema_version not in SUPPORTED_SCHEMA_VERSIONS:
         raise ComparativeSchemaError("unsupported schema_version")
+    if schema_version == SCHEMA_VERSION:
+        missing_remediation = REMEDIATION_FIELDS - record.keys()
+        if missing_remediation:
+            raise ComparativeSchemaError(f"missing remediation fields: {sorted(missing_remediation)}")
     if _string(record, "experiment_id") != "SIM-01":
         raise ComparativeSchemaError("record has the wrong experiment_id")
     for field in ("model_version", "workflow_model_version", "base_case_id", "treatment_id", "random_stream_version"):
@@ -292,6 +446,8 @@ def validate_comparative_record(record: object) -> dict[str, Any]:
     _validate_judge_state(record)
     _validate_wallets(record)
     _validate_backer_observations(record)
+    if schema_version == SCHEMA_VERSION:
+        _validate_remediation_fields(record)
 
     for field in ("court1_initial_valid", "court1_reset_valid", "court1_final_valid", "court2_opened", "court2_valid", "court2_reset_valid", "court2_final_valid", "payout_assumed", "substantively_resolved", "terminally_complete"):
         value = _require(record, field)
@@ -388,7 +544,10 @@ def validate_comparative_records(records: Iterable[object]) -> int:
     keys: set[tuple[object, ...]] = set()
     for record in records:
         validated = validate_comparative_record(record)
-        key = tuple(validated[field] for field in ("experiment_id", "replication_id", "treatment_id", "model"))
+        identity_fields = ("experiment_id", "replication_id", "treatment_id", "model")
+        if validated["schema_version"] == SCHEMA_VERSION:
+            identity_fields += ("overlap_ratio_requested",)
+        key = tuple(validated[field] for field in identity_fields)
         if key in keys:
             raise ComparativeSchemaError(f"duplicate experimental record identity: {key}")
         keys.add(key)

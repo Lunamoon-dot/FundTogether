@@ -1,0 +1,47 @@
+{
+  "experiment_id": "SIM-01",
+  "schema_version": "sim-01-comparative-raw-v2",
+  "repository_commit": "d0c81c88b543fad859a119921a45b999719ff0d3",
+  "research_spec_commit": "58ad19b237758f776418ac64eed09a8c4031bffe",
+  "policy_spec_commit": "d1b3b5fcfda8caa3fd83f40a32418772cce8b83b",
+  "research_pr": "https://github.com/Lunamoon-dot/FundTogether/pull/25",
+  "model_version": "fundtogether-sim-01-paired-v2",
+  "workflow_model_version": "sim-01-b0-b1-b2-overlap-remediation-v1",
+  "policy_version": "fundtogether-vnext-v2-pr4-fixture-policy-v1",
+  "random_stream_version": "blake2b-256-numpy-pcg64dxsm-v1",
+  "master_seed": 20261027,
+  "replications_per_cell": 32,
+  "judge_accuracy": 0.70,
+  "rho_levels": [0.0, 0.30],
+  "nonreveal_probabilities": [0.0, 0.20],
+  "judge_backer_overlap_ratios": [0.0, 0.25, 0.50, 1.0],
+  "overlap_rounding": "nearest_integer_half_up",
+  "signal_scenarios": [
+    {"treatment_id": "informative", "sensitivity": 0.80, "false_alarm": 0.20},
+    {"treatment_id": "non_informative", "sensitivity": 0.50, "false_alarm": 0.50},
+    {"treatment_id": "misleading", "sensitivity": 0.20, "false_alarm": 0.80}
+  ],
+  "judge_pool_levels": [
+    {"pool_id": "large", "judge_count": 9},
+    {"pool_id": "constrained", "judge_count": 3}
+  ],
+  "backers_per_case": 20,
+  "backer_participation_probability": 0.80,
+  "creator_id": "creator",
+  "judge_stake": 50,
+  "attacker_capital": 0,
+  "analytical_sanity_tolerance": 0.20,
+  "candidate_policy_fixture": {
+    "dao_participation_threshold_bps": 2000,
+    "dao_contribution_cap": "340282366920938463463374607431768211455"
+  },
+  "uncertainty_treatment": {
+    "status": "exploratory_only",
+    "interval": "no confirmatory intervals; paired differences retain scenario-level observations for future preregistration",
+    "clustering": "base_case_id is the paired unit; overlap is a named treatment",
+    "zero_denominator": "null",
+    "overlap_definition": "number of Judge identities also represented as Backers divided by eligible Judge identities",
+    "overlap_rounding": "nearest integer, half up; realized ratio is overlap_judge_count / judge_pool_size",
+    "capital_note": "total backer contribution capital is fixed by slot index; partial overlap changes which wallet owns a slot and this is recorded in raw JSONL"
+  }
+}

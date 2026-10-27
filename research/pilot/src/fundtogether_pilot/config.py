@@ -69,6 +69,8 @@ def load_comparative_config(path: str | Path) -> PilotConfig:
         raise ValueError(f"missing comparative configuration fields: {', '.join(missing)}")
     if values["experiment_id"] != "SIM-01":
         raise ValueError("comparative configuration experiment_id must be SIM-01")
-    if values["schema_version"] != "sim-01-comparative-raw-v1":
+    if values["schema_version"] not in {"sim-01-comparative-raw-v1", "sim-01-comparative-raw-v2"}:
         raise ValueError("unsupported SIM-01 schema version")
+    if values["schema_version"] == "sim-01-comparative-raw-v2" and "judge_backer_overlap_ratios" not in values:
+        raise ValueError("remediation configuration requires judge_backer_overlap_ratios")
     return PilotConfig(values)
