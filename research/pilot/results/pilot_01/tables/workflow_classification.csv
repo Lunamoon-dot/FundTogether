@@ -1,0 +1,4 @@
+model,trials,substantive_resolution_rate,protocol_failure_rate,terminal_completion_rate,classification_validation_status
+B0,1000,0.527,0.473,1.0,PASS
+B1,1000,0.77,0.23,1.0,PASS
+B2,1000,0.666,0.334,1.0,PASS

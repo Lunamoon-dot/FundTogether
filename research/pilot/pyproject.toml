@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fundtogether-pilot"
+version = "0.1.0"
+description = "Reproducible validation pilot for the FundTogether VNext synthetic model"
+requires-python = ">=3.11"
+dependencies = [
+  "matplotlib==3.10.3",
+  "numpy==2.2.6",
+  "scipy==1.15.3",
+]
+
+[project.optional-dependencies]
+test = ["pytest==8.4.1"]
+
+[project.scripts]
+fundtogether-pilot = "fundtogether_pilot.cli:main"
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

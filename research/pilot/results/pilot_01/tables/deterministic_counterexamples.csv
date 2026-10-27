@@ -1,0 +1,4 @@
+scenario_id,initial_wallet_distribution,split_wallet_distribution,total_contribution_before,total_contribution_after,accept_weight,appeal_weight_before,appeal_weight_after,dao_decision_before,dao_decision_after,result,locked_stake_per_judge,gross_slash,penalties,compensation_recipient,finalizer_allowance,same_actor_controls_judges_and_finalizer,net_attacker_loss_before_gas,milestone_escrow_effect
+Q6,[9000000],"[1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000]",9000000,9000000,0,3000,9000,APPEAL,APPEAL,PASS,,,,,,,,
+Q10,"[16000000, 9000000]","[16000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000]",25000000,25000000,4000,3000,9000,ACCEPT,APPEAL,PASS,,,,,,,,
+R3,,,,,,,,,,PASS,23,3,"{""A"": 1, ""B"": 1, ""C"": 1}",FINALIZER,3,True,0,0
