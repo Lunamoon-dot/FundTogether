@@ -50,6 +50,13 @@ class SignalOracle:
             (scenario_id, backer_id),
         )
 
+    def generate_from_uniform(self, uniform_draw: float, *, court_incorrect: bool) -> bool:
+        """Apply this treatment's threshold to a shared counterfactual draw."""
+        if not 0.0 <= uniform_draw < 1.0:
+            raise ValueError("uniform_draw must be in [0, 1)")
+        probability = self.sensitivity if court_incorrect else self.false_alarm
+        return uniform_draw < probability
+
 
 class BackerBehavior:
     def __init__(self, random: KeyedRandom, participation_probability: float) -> None:
@@ -71,6 +78,32 @@ class BackerBehavior:
             "backer.participation",
             (scenario_id, backer_id),
         )
+        preference = APPEAL if private_signal else ACCEPT
+        return BackerObservation(
+            backer_id=backer_id,
+            private_signal=private_signal,
+            participated=participated,
+            ballot_preference=preference,
+            cast_ballot=preference if participated else None,
+        )
+
+    def observe_from_uniform(
+        self,
+        replication_id: int,
+        scenario_id: str,
+        backer_id: str,
+        private_signal: bool,
+        participation_draw: float,
+    ) -> BackerObservation:
+        """Use a caller-supplied paired participation draw.
+
+        The legacy ``observe`` method remains keyed by ``scenario_id`` for
+        PILOT-01 compatibility. Comparative experiments use this method so a
+        signal treatment cannot regenerate participation observations.
+        """
+        if not 0.0 <= participation_draw < 1.0:
+            raise ValueError("participation_draw must be in [0, 1)")
+        participated = participation_draw < self.participation_probability
         preference = APPEAL if private_signal else ACCEPT
         return BackerObservation(
             backer_id=backer_id,

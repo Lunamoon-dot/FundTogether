@@ -40,3 +40,20 @@ bounded generated tables and figures are committed.
 
 See `SOURCE_AUDIT.md` for the exact repository sources and
 `docs/research/VNEXT_PILOT_01_VALIDATION_REPORT.md` for executed results.
+
+## Reproduce SIM-01
+
+SIM-01 is a separate paired exploratory runner. It does not replace the
+PILOT-01 validation path:
+
+```powershell
+.\.venv\Scripts\fundtogether-pilot.exe run-sim01 `
+  --config configs/sim_01_exploratory.json `
+  --output results/sim_01
+.\.venv\Scripts\fundtogether-pilot.exe verify-sim01-schema `
+  results/sim_01/raw/sim_01.jsonl
+```
+
+The raw JSONL is ignored by Git; `manifest.json`, `checksums.sha256`, tables,
+and figures are the bounded committed artifacts. The SIM-01 report is
+`docs/research/VNEXT_SIM_01_FOUNDATION_REPORT.md`.

@@ -1,0 +1,42 @@
+{
+  "experiment_id": "SIM-01",
+  "schema_version": "sim-01-comparative-raw-v1",
+  "repository_commit": "1b3fc71bf0e714afc2d7a9a36f243523b3ccd0ae",
+  "research_spec_commit": "58ad19b237758f776418ac64eed09a8c4031bffe",
+  "policy_spec_commit": "d1b3b5fcfda8caa3fd83f40a32418772cce8b83b",
+  "research_pr": "https://github.com/Lunamoon-dot/FundTogether/pull/24",
+  "model_version": "fundtogether-sim-01-paired-v1",
+  "workflow_model_version": "sim-01-b0-b1-b2-integrated-dao-v1",
+  "policy_version": "fundtogether-vnext-v2-pr4-fixture-policy-v1",
+  "random_stream_version": "blake2b-256-numpy-pcg64dxsm-v1",
+  "master_seed": 20261027,
+  "replications_per_cell": 32,
+  "judge_accuracy": 0.70,
+  "rho_levels": [0.0, 0.30],
+  "nonreveal_probabilities": [0.0, 0.20],
+  "signal_scenarios": [
+    {"treatment_id": "informative", "sensitivity": 0.80, "false_alarm": 0.20},
+    {"treatment_id": "non_informative", "sensitivity": 0.50, "false_alarm": 0.50},
+    {"treatment_id": "misleading", "sensitivity": 0.20, "false_alarm": 0.80}
+  ],
+  "judge_pool_levels": [
+    {"pool_id": "large", "judge_count": 9},
+    {"pool_id": "constrained", "judge_count": 3}
+  ],
+  "backers_per_case": 20,
+  "backer_participation_probability": 0.80,
+  "creator_id": "creator",
+  "judge_stake": 50,
+  "attacker_capital": 0,
+  "analytical_sanity_tolerance": 0.20,
+  "candidate_policy_fixture": {
+    "dao_participation_threshold_bps": 2000,
+    "dao_contribution_cap": "340282366920938463463374607431768211455"
+  },
+  "uncertainty_treatment": {
+    "status": "exploratory_only",
+    "interval": "no confirmatory intervals; paired differences retain scenario-level observations for future preregistration",
+    "clustering": "base_case_id is the paired unit",
+    "zero_denominator": "null"
+  }
+}
