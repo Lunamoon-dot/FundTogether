@@ -1,0 +1,88 @@
+{
+  "calibration_tolerances": {
+    "accuracy_absolute_floor": 0.02,
+    "confidence_level": 0.95,
+    "correlation_absolute_floor": 0.06,
+    "rate_absolute_floor": 0.025,
+    "standard_error_multiplier": 4.0
+  },
+  "dependency_versions": {
+    "matplotlib": "3.10.3",
+    "numpy": "2.2.6",
+    "pytest": "8.4.1",
+    "scipy": "1.15.3"
+  },
+  "master_seed": 20261027,
+  "model_version": "fundtogether-pilot-01-beta-bernoulli-v1",
+  "policy_version": "fundtogether-vnext-v2-pr0-remediation-20261025/pr0_candidate_pending",
+  "python_version": "3.12.10",
+  "random_stream_version": "blake2b-256-numpy-pcg64dxsm-v1",
+  "raw_record_count": 64000,
+  "raw_sha256": "2da6d35ce0425742b31564d642338ad70552aecce67387ceb4a8a2023bd73357",
+  "replication_counts": {
+    "judge": 6000,
+    "nonreveal": 4000,
+    "signal": 3000,
+    "workflow": 1000
+  },
+  "repository_commit": "4ef5bd71645e83609cb98226b94e69b98c3c166e",
+  "research_pr": "https://github.com/Lunamoon-dot/FundTogether/pull/23",
+  "research_spec_commit": "58ad19b237758f776418ac64eed09a8c4031bffe",
+  "scenario_grid": {
+    "judge": [
+      {
+        "accuracy": 0.7,
+        "rho": 0.0,
+        "scenario_id": "J1"
+      },
+      {
+        "accuracy": 0.7,
+        "rho": 0.1,
+        "scenario_id": "J2"
+      },
+      {
+        "accuracy": 0.7,
+        "rho": 0.3,
+        "scenario_id": "J3"
+      },
+      {
+        "accuracy": 0.7,
+        "rho": 0.6,
+        "scenario_id": "J4"
+      },
+      {
+        "accuracy": 0.55,
+        "rho": 0.3,
+        "scenario_id": "J5"
+      },
+      {
+        "accuracy": 0.85,
+        "rho": 0.3,
+        "scenario_id": "J6"
+      }
+    ],
+    "nonreveal": [
+      0.0,
+      0.05,
+      0.2
+    ],
+    "signal": [
+      {
+        "false_alarm": 0.2,
+        "scenario_id": "informative",
+        "sensitivity": 0.8
+      },
+      {
+        "false_alarm": 0.5,
+        "scenario_id": "non_informative",
+        "sensitivity": 0.5
+      },
+      {
+        "false_alarm": 0.8,
+        "scenario_id": "misleading",
+        "sensitivity": 0.2
+      }
+    ]
+  },
+  "workflow_model_version": "pilot-01-b0-b1-b2-smoke-v1"
+}

@@ -1,0 +1,5 @@
+check,observed,validation_status,tolerance,expected
+bit_for_bit_replay,True,PASS,,
+unrelated_draw_order_independence,True,PASS,,
+unrelated_domain_correlation,0.008175489482494944,PASS,0.05,
+replication_identity_distinctness,100,PASS,,100
