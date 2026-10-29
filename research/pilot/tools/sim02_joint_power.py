@@ -24,6 +24,16 @@ class ScenarioSpec:
     b2: tuple[float, float, float]
     coupling: str
     is_null_scenario: bool
+    null_regions: tuple[str, ...] = ()
+    r2_b1: tuple[float, float, float] | None = None
+    r2_b2: tuple[float, float, float] | None = None
+
+    def region_distributions(self, region: str) -> tuple[tuple[float, ...], tuple[float, ...]]:
+        if region == "R1":
+            return self.b1, self.b2
+        if region == "R2":
+            return self.r2_b1 or self.b1, self.r2_b2 or self.b2
+        raise ValueError(f"unknown region: {region}")
 
 
 @dataclass(frozen=True)
@@ -32,7 +42,7 @@ class PlanningConfig:
     bootstrap_reps: int = 250
     sample_sizes: tuple[int, ...] = (1_500, 2_000, 3_000)
     master_seed: int = 20261028
-    analysis_version: str = "sim-02-joint-power-v1"
+    analysis_version: str = "sim-02-joint-power-v2"
     alpha: float = 0.05
     correctness_margin: float = 0.05
     resolution_margin: float = 0.05
@@ -246,10 +256,14 @@ def centered_bootstrap_pvalue(
     return (1 + exceedances) / (bootstrap_reps + 1)
 
 
-def _seed(master_seed: int, *labels: object) -> int:
+def planning_seed(master_seed: int, *labels: object) -> int:
     payload = json.dumps([master_seed, *labels], sort_keys=True, separators=(",", ":")).encode()
-    digest = hashlib.blake2b(payload, digest_size=16, person=b"FT-SIM02-PLAN").digest()
-    return int.from_bytes(digest, "big") % (2**63 - 1)
+    digest = hashlib.blake2b(payload, digest_size=32, person=b"FT-SIM02-PLAN").digest()
+    return int.from_bytes(digest, "big") % (2**128)
+
+
+def keyed_rng(master_seed: int, *labels: object) -> np.random.Generator:
+    return np.random.Generator(np.random.PCG64DXSM(planning_seed(master_seed, *labels)))
 
 
 def _sample_differences(
@@ -273,14 +287,42 @@ def _proportion_interval(successes: int, trials: int) -> tuple[float, float]:
     return max(0.0, center - spread), min(1.0, center + spread)
 
 
-def _scenario_specs() -> tuple[ScenarioSpec, ...]:
+def _scenario_specs(
+    correctness_margin: float = 0.05,
+    resolution_margin: float = 0.05,
+) -> tuple[ScenarioSpec, ...]:
+    if not 0.0 < correctness_margin < 1.0 or not 0.0 < resolution_margin < 1.0:
+        raise ValueError("candidate margins must be in (0, 1)")
     b1 = (0.56, 0.24, 0.20)  # correct=.56, resolution=.80
+    b1_correct = b1[0]
+    b1_resolution = b1[0] + b1[1]
+
+    def state_distribution(correct: float, resolution: float) -> tuple[float, float, float]:
+        if not 0.0 <= correct <= resolution <= 1.0:
+            raise ValueError("scenario state probabilities violate correctness <= resolution")
+        return (correct, resolution - correct, 1.0 - resolution)
+
+    favorable = state_distribution(
+        b1_correct + 2.0 * correctness_margin,
+        b1_resolution + resolution_margin,
+    )
+    correctness_boundary = state_distribution(b1_correct + correctness_margin, b1_resolution)
+    resolution_boundary = state_distribution(b1_correct, b1_resolution - resolution_margin)
+    loss_correct = min(b1_correct + 2.0 * correctness_margin, b1_resolution - resolution_margin / 2.0)
+    correctness_gain_resolution_loss = state_distribution(
+        loss_correct,
+        max(loss_correct, b1_resolution - 2.0 * resolution_margin),
+    )
+    joint_null_boundary = state_distribution(
+        b1_correct + correctness_margin,
+        b1_resolution - resolution_margin,
+    )
     return (
         ScenarioSpec(
             "favorable",
             "Meaningful correctness improvement with safe resolution.",
             b1,
-            (0.66, 0.19, 0.15),
+            favorable,
             "positive",
             False,
         ),
@@ -288,23 +330,25 @@ def _scenario_specs() -> tuple[ScenarioSpec, ...]:
             "correctness_boundary",
             "Correctness is exactly at the candidate minimum-effect boundary.",
             b1,
-            (0.61, 0.19, 0.20),
+            correctness_boundary,
             "positive",
             True,
+            ("R1", "R2"),
         ),
         ScenarioSpec(
             "resolution_boundary",
             "Resolution is exactly at the candidate non-inferiority boundary.",
             b1,
-            (0.56, 0.19, 0.25),
+            resolution_boundary,
             "positive",
             True,
+            ("R1", "R2"),
         ),
         ScenarioSpec(
             "correctness_gain_resolution_loss",
             "Correctness improves while resolution loss exceeds the candidate margin.",
             b1,
-            (0.66, 0.04, 0.30),
+            correctness_gain_resolution_loss,
             "positive",
             False,
         ),
@@ -315,12 +359,13 @@ def _scenario_specs() -> tuple[ScenarioSpec, ...]:
             b1,
             "independent",
             True,
+            ("R1", "R2"),
         ),
         ScenarioSpec(
             "strong_positive_dependence",
             "Favorable margins with strong feasible positive paired dependence.",
             b1,
-            (0.66, 0.19, 0.15),
+            favorable,
             "positive",
             False,
         ),
@@ -328,7 +373,7 @@ def _scenario_specs() -> tuple[ScenarioSpec, ...]:
             "weak_unfavorable_dependence",
             "Favorable margins with a feasible reverse quantile coupling.",
             b1,
-            (0.66, 0.19, 0.15),
+            favorable,
             "unfavorable",
             False,
         ),
@@ -344,19 +389,34 @@ def _scenario_specs() -> tuple[ScenarioSpec, ...]:
             "joint_null_boundary",
             "Both component nulls are set at their candidate decision boundaries.",
             b1,
-            (0.61, 0.14, 0.25),
+            joint_null_boundary,
             "independent",
             True,
+            ("R1", "R2"),
+        ),
+        ScenarioSpec(
+            "mixed_null_boundary",
+            "R1 is favorable while R2 is at both candidate null boundaries.",
+            b1,
+            favorable,
+            "positive",
+            True,
+            ("R2",),
+            r2_b1=b1,
+            r2_b2=joint_null_boundary,
         ),
     )
 
 
-def scenario_specs() -> tuple[ScenarioSpec, ...]:
-    return _scenario_specs()
+def scenario_specs(
+    correctness_margin: float = 0.05,
+    resolution_margin: float = 0.05,
+) -> tuple[ScenarioSpec, ...]:
+    return _scenario_specs(correctness_margin, resolution_margin)
 
 
 def _simulate_decision(
-    table: Sequence[Sequence[float]],
+    tables: dict[str, Sequence[Sequence[float]]],
     sample_size: int,
     bootstrap_reps: int,
     alpha: float,
@@ -369,13 +429,13 @@ def _simulate_decision(
     p_values: list[float] = []
     component_results: dict[str, bool] = {}
     for region in ("R1", "R2"):
-        sample_rng = np.random.default_rng(_seed(master_seed, scenario_name, sample_size, replication, region, "sample"))
-        d_resolution, d_correct = _sample_differences(table, sample_size, sample_rng)
-        resolution_rng = np.random.default_rng(
-            _seed(master_seed, scenario_name, sample_size, replication, region, "bootstrap", "resolution")
+        sample_rng = keyed_rng(master_seed, scenario_name, sample_size, replication, region, "sample")
+        d_resolution, d_correct = _sample_differences(tables[region], sample_size, sample_rng)
+        resolution_rng = keyed_rng(
+            master_seed, scenario_name, sample_size, replication, region, "bootstrap", "resolution"
         )
-        correct_rng = np.random.default_rng(
-            _seed(master_seed, scenario_name, sample_size, replication, region, "bootstrap", "correctness")
+        correct_rng = keyed_rng(
+            master_seed, scenario_name, sample_size, replication, region, "bootstrap", "correctness"
         )
         p_resolution = centered_bootstrap_pvalue(
             d_resolution, -resolution_margin, bootstrap_reps, resolution_rng
@@ -401,7 +461,12 @@ def run_planning(config: PlanningConfig = PlanningConfig()) -> dict[str, object]
         raise ValueError("sample_sizes must contain positive values")
     if not 0.0 < config.alpha < 1.0:
         raise ValueError("alpha must be in (0, 1)")
-    specs = {spec.name: spec for spec in scenario_specs()}
+    if not 0.0 < config.correctness_margin < 1.0 or not 0.0 < config.resolution_margin < 1.0:
+        raise ValueError("candidate margins must be in (0, 1)")
+    specs = {
+        spec.name: spec
+        for spec in scenario_specs(config.correctness_margin, config.resolution_margin)
+    }
     selected_names = config.scenario_names or tuple(specs)
     unknown = set(selected_names) - set(specs)
     if unknown:
@@ -411,18 +476,28 @@ def run_planning(config: PlanningConfig = PlanningConfig()) -> dict[str, object]
     result_rows: list[dict[str, object]] = []
     for name in selected_names:
         spec = specs[name]
-        table = categorical_joint_table(spec.b1, spec.b2, coupling=spec.coupling)
-        contrasts = paired_contrasts(table)
+        region_data: dict[str, dict[str, object]] = {}
+        tables: dict[str, tuple[tuple[float, ...], ...]] = {}
+        for region in ("R1", "R2"):
+            region_b1, region_b2 = spec.region_distributions(region)
+            table = categorical_joint_table(region_b1, region_b2, coupling=spec.coupling)
+            tables[region] = table
+            region_data[region] = {
+                "b1_state_probabilities": list(region_b1),
+                "b2_state_probabilities": list(region_b2),
+                "joint_table": [list(row) for row in table],
+                "contrasts": paired_contrasts(table),
+            }
+        r1_contrasts = region_data["R1"]["contrasts"]
+        r2_contrasts = region_data["R2"]["contrasts"]
         scenario_rows.append(
             {
                 "name": spec.name,
                 "description": spec.description,
-                "b1_state_probabilities": list(spec.b1),
-                "b2_state_probabilities": list(spec.b2),
                 "coupling": spec.coupling,
                 "is_null_scenario": spec.is_null_scenario,
-                "joint_table": [list(row) for row in table],
-                "contrasts": contrasts,
+                "null_regions": list(spec.null_regions),
+                "regions": region_data,
             }
         )
         for sample_size in config.sample_sizes:
@@ -435,11 +510,12 @@ def run_planning(config: PlanningConfig = PlanningConfig()) -> dict[str, object]
                 "R2_joint",
                 "global",
                 "any_regional",
+                "false_regional",
             )
             counts = {key: 0 for key in keys}
             for replication in range(config.planning_reps):
                 decision = _simulate_decision(
-                    table,
+                    tables,
                     sample_size,
                     config.bootstrap_reps,
                     config.alpha,
@@ -450,9 +526,12 @@ def run_planning(config: PlanningConfig = PlanningConfig()) -> dict[str, object]
                     replication,
                 )
                 for key in keys:
-                    counts[key] += int(decision[key])
+                    if key == "false_regional":
+                        counts[key] += int(any(decision[f"{region}_joint"] for region in spec.null_regions))
+                    else:
+                        counts[key] += int(decision[key])
             rates = {key: counts[key] / config.planning_reps for key in keys}
-            interval_keys = ("R1_joint", "R2_joint", "global", "any_regional")
+            interval_keys = keys
             intervals = {
                 key: list(_proportion_interval(counts[key], config.planning_reps)) for key in interval_keys
             }
@@ -472,13 +551,21 @@ def run_planning(config: PlanningConfig = PlanningConfig()) -> dict[str, object]
                     "regional_joint_power": (rates["R1_joint"] + rates["R2_joint"]) / 2.0,
                     "global_joint_power": rates["global"],
                     "any_regional_claim_rate": rates["any_regional"],
-                    "false_regional_claim_rate": rates["any_regional"] if spec.is_null_scenario else None,
+                    "false_regional_claim_rate": rates["false_regional"] if spec.is_null_scenario else None,
                     "mc_interval_95": intervals,
-                    "contrast_correlation": contrasts["correlation_contrasts"],
-                    "delta_resolution": contrasts["delta_resolution"],
-                    "delta_correct": contrasts["delta_correct"],
+                    "contrast_correlation": r1_contrasts["correlation_contrasts"],
+                    "contrast_correlation_r1": r1_contrasts["correlation_contrasts"],
+                    "contrast_correlation_r2": r2_contrasts["correlation_contrasts"],
+                    "delta_resolution": r1_contrasts["delta_resolution"],
+                    "delta_correct": r1_contrasts["delta_correct"],
+                    "delta_resolution_r1": r1_contrasts["delta_resolution"],
+                    "delta_resolution_r2": r2_contrasts["delta_resolution"],
+                    "delta_correct_r1": r1_contrasts["delta_correct"],
+                    "delta_correct_r2": r2_contrasts["delta_correct"],
                     "protocol_failure_b1": spec.b1[2],
                     "protocol_failure_b2": spec.b2[2],
+                    "protocol_failure_b1_r2": spec.region_distributions("R2")[0][2],
+                    "protocol_failure_b2_r2": spec.region_distributions("R2")[1][2],
                 }
             )
     reference_scenarios = {
@@ -524,6 +611,9 @@ def run_planning(config: PlanningConfig = PlanningConfig()) -> dict[str, object]
 
 
 def render_markdown(result: dict[str, object]) -> str:
+    def interval_text(interval: Sequence[float]) -> str:
+        return f"[{interval[0]:.3f}, {interval[1]:.3f}]"
+
     lines = [
         "# SIM-02 joint-power planning evidence",
         "",
@@ -534,17 +624,21 @@ def render_markdown(result: dict[str, object]) -> str:
         "",
         "All rows are design-stage planning diagnostics, not substantive FundTogether evidence.",
         "",
-        "| Scenario | N pairs | Delta correct | Delta resolution | Contrast rho | Marginal resolution | Marginal correctness | Regional joint | Global both-region | Any regional claim | False claim under null |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Scenario | N pairs | Delta correct R1/R2 | Delta resolution R1/R2 | Contrast rho R1/R2 | Marginal resolution | Marginal correctness | Regional joint | Global both-region | Global MC 95% | Any regional claim | False claim under null | False-claim MC 95% |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | --- |",
     ]
     for row in result["results"]:
-        false_claim = "—" if row["false_regional_claim_rate"] is None else f"{row['false_regional_claim_rate']:.3f}"
-        correlation = "—" if row["contrast_correlation"] is None else f"{row['contrast_correlation']:.3f}"
+        false_claim = "NA" if row["false_regional_claim_rate"] is None else f"{row['false_regional_claim_rate']:.3f}"
+        correlation_r1 = "—" if row["contrast_correlation_r1"] is None else f"{row['contrast_correlation_r1']:.3f}"
+        correlation_r2 = "—" if row["contrast_correlation_r2"] is None else f"{row['contrast_correlation_r2']:.3f}"
         lines.append(
-            f"| {row['scenario']} | {row['sample_size']} | {row['delta_correct']:.3f} | "
-            f"{row['delta_resolution']:.3f} | {correlation} | {row['marginal_resolution_power']:.3f} | "
+            f"| {row['scenario']} | {row['sample_size']} | {row['delta_correct_r1']:.3f}/{row['delta_correct_r2']:.3f} | "
+            f"{row['delta_resolution_r1']:.3f}/{row['delta_resolution_r2']:.3f} | {correlation_r1}/{correlation_r2} | "
+            f"{row['marginal_resolution_power']:.3f} | "
             f"{row['marginal_correctness_power']:.3f} | {row['regional_joint_power']:.3f} | "
-            f"{row['global_joint_power']:.3f} | {row['any_regional_claim_rate']:.3f} | {false_claim} |"
+            f"{row['global_joint_power']:.3f} | {interval_text(row['mc_interval_95']['global'])} | "
+            f"{row['any_regional_claim_rate']:.3f} | {false_claim} | "
+            f"{interval_text(row['mc_interval_95']['false_regional'])} |"
         )
     lines.extend(
         [

@@ -38,6 +38,9 @@ Judge accuracy, shared case difficulty, Backer signal probabilities,
 participation, Court selection, or any other DGP variable. A future behavioral
 evidence model would require an explicit mathematical mapping, validation
 tests, shared-revision policy across B0/B1/B2, and a new design revision.
+The older shared experimental protocol's optional evidence-class mapping is
+not active for SIM-02 v2; this metadata-only rule is the study-specific
+override until a separately versioned behavioral model is approved.
 
 The semantic outcome classes are:
 
@@ -331,7 +334,10 @@ holds by construction. It validates a 3x3 B1-by-B2 joint table, preserves
 declared state marginals, and computes the correlation between the paired
 resolution and correctness contrasts from that table. Positive, independent,
 and reverse-quantile couplings are feasible sensitivity models; none is
-presented as an empirical estimate.
+presented as an empirical estimate. R1 and R2 have explicit region-specific
+tables in the planner, including a mixed-null case in which R1 is favorable
+and R2 remains null, so false regional claims are not replaced by the
+global-both-region probability.
 
 The actual planning decision is simulated for both fixed regions using the
 centered bootstrap p-values, `p_joint=max(p_resolution,p_correct)`, and one
@@ -346,8 +352,9 @@ analysis remains 10,000 bootstrap draws.
 Required scenarios are `favorable`, `correctness_boundary`,
 `resolution_boundary`, `correctness_gain_resolution_loss`,
 `no_meaningful_correctness_benefit`, `strong_positive_dependence`,
-`weak_unfavorable_dependence`, `scarcity_additional_protocol_failures`, and
-`joint_null_boundary`. Candidate sample sizes are 1,500, 2,000, and 3,000
+`weak_unfavorable_dependence`, `scarcity_additional_protocol_failures`,
+`joint_null_boundary`, and `mixed_null_boundary`. Candidate sample sizes are
+1,500, 2,000, and 3,000
 pairs per target region. The machine-readable and rendered outputs are
 [VNEXT_SIM_02_JOINT_POWER_PLANNING.json](VNEXT_SIM_02_JOINT_POWER_PLANNING.json)
 and [VNEXT_SIM_02_JOINT_POWER_PLANNING.md](VNEXT_SIM_02_JOINT_POWER_PLANNING.md).
@@ -360,6 +367,12 @@ recommendation, pending owner approval. The recommendation is not a
 superiority result and does not override scarcity, misleading, null, or R3
 negative cells. If future approved margins or validated DGPs change, rerun the
 planner and issue a new design revision.
+
+The planner's planning-domain seed is BLAKE2b-256 reduced modulo `2^128` and
+initialized with NumPy `PCG64DXSM`; confirmatory bootstrap streams use the
+separate `FT-SIM02-BOOT` domain specified above. The JSON includes Wilson 95%
+Monte Carlo intervals for every marginal, regional, global, and false-claim
+rate; the Markdown table displays the global and false-claim intervals.
 
 R3 remains descriptive/falsification-only regardless of its replication count.
 

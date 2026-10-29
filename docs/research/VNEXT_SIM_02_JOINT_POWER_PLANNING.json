@@ -1,7 +1,7 @@
 {
   "alpha": 0.05,
   "analysis_label": "DESIGN_STAGE_POWER_ANALYSIS",
-  "analysis_version": "sim-02-joint-power-v1",
+  "analysis_version": "sim-02-joint-power-v2",
   "bootstrap_reps": 250,
   "correctness_margin": 0.05,
   "global_success_rule": "both R1 and R2 joint claims rejected after Holm",
@@ -10,150 +10,260 @@
   "resolution_margin": 0.05,
   "results": [
     {
-      "any_regional_claim_rate": 0.984,
+      "any_regional_claim_rate": 0.974,
       "contrast_correlation": 0.9371505989742097,
+      "contrast_correlation_r1": 0.9371505989742097,
+      "contrast_correlation_r2": 0.9371505989742097,
       "delta_correct": 0.09999999999999998,
-      "delta_resolution": 0.04999999999999993,
+      "delta_correct_r1": 0.09999999999999998,
+      "delta_correct_r2": 0.09999999999999998,
+      "delta_resolution": 0.050000000000000044,
+      "delta_resolution_r1": 0.050000000000000044,
+      "delta_resolution_r2": 0.050000000000000044,
       "false_regional_claim_rate": null,
-      "global_joint_power": 0.84,
+      "global_joint_power": 0.832,
       "marginal_correctness_power": 0.917,
-      "marginal_correctness_power_r1": 0.936,
-      "marginal_correctness_power_r2": 0.898,
+      "marginal_correctness_power_r1": 0.922,
+      "marginal_correctness_power_r2": 0.912,
       "marginal_resolution_power": 1.0,
       "marginal_resolution_power_r1": 1.0,
       "marginal_resolution_power_r2": 1.0,
       "mc_interval_95": {
+        "R1_correctness": [
+          0.8951464501266115,
+          0.9424186065238385
+        ],
         "R1_joint": [
-          0.9019315959830375,
-          0.9475419685818739
+          0.8772354441374409,
+          0.9285735914077787
+        ],
+        "R1_resolution": [
+          0.9923756595384479,
+          1.0
+        ],
+        "R2_correctness": [
+          0.8839235279346099,
+          0.9337940155250711
         ],
         "R2_joint": [
-          0.8661557291243417,
-          0.919805793230109
+          0.8705780903680599,
+          0.9233224372626984
+        ],
+        "R2_resolution": [
+          0.9923756595384479,
+          1.0
         ],
         "any_regional": [
-          0.9687488914666058,
-          0.9918707469666117
+          0.9560285091657758,
+          0.9847436160766728
+        ],
+        "false_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
         ],
         "global": [
-          0.8052918208363085,
-          0.8695236276498359
+          0.7967256709103735,
+          0.8622117670231558
         ]
       },
       "null_diagnostic": false,
       "protocol_failure_b1": 0.2,
-      "protocol_failure_b2": 0.15,
-      "regional_joint_power": 0.912,
-      "regional_joint_power_r1": 0.928,
-      "regional_joint_power_r2": 0.896,
+      "protocol_failure_b1_r2": 0.2,
+      "protocol_failure_b2": 0.1499999999999999,
+      "protocol_failure_b2_r2": 0.1499999999999999,
+      "regional_joint_power": 0.903,
+      "regional_joint_power_r1": 0.906,
+      "regional_joint_power_r2": 0.9,
       "sample_size": 1500,
       "scenario": "favorable"
     },
     {
-      "any_regional_claim_rate": 0.996,
+      "any_regional_claim_rate": 0.992,
       "contrast_correlation": 0.9371505989742097,
+      "contrast_correlation_r1": 0.9371505989742097,
+      "contrast_correlation_r2": 0.9371505989742097,
       "delta_correct": 0.09999999999999998,
-      "delta_resolution": 0.04999999999999993,
+      "delta_correct_r1": 0.09999999999999998,
+      "delta_correct_r2": 0.09999999999999998,
+      "delta_resolution": 0.050000000000000044,
+      "delta_resolution_r1": 0.050000000000000044,
+      "delta_resolution_r2": 0.050000000000000044,
       "false_regional_claim_rate": null,
-      "global_joint_power": 0.936,
-      "marginal_correctness_power": 0.968,
+      "global_joint_power": 0.922,
+      "marginal_correctness_power": 0.961,
       "marginal_correctness_power_r1": 0.974,
-      "marginal_correctness_power_r2": 0.962,
+      "marginal_correctness_power_r2": 0.948,
       "marginal_resolution_power": 1.0,
       "marginal_resolution_power_r1": 1.0,
       "marginal_resolution_power_r2": 1.0,
       "mc_interval_95": {
+        "R1_correctness": [
+          0.9560285091657758,
+          0.9847436160766728
+        ],
         "R1_joint": [
-          0.9535535973250511,
-          0.9832490252792436
+          0.9510963331640543,
+          0.9817367868020865
+        ],
+        "R1_resolution": [
+          0.9923756595384479,
+          1.0
+        ],
+        "R2_correctness": [
+          0.9248988560621544,
+          0.9642697348842947
         ],
         "R2_joint": [
-          0.9390264041651492,
-          0.9739592026102227
+          0.920255206353293,
+          0.9609743793168485
+        ],
+        "R2_resolution": [
+          0.9923756595384479,
+          1.0
         ],
         "any_regional": [
-          0.9855342847848231,
-          0.9989023694773173
+          0.9796129641658948,
+          0.9968846848199377
+        ],
+        "false_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
         ],
         "global": [
-          0.911047591162316,
-          0.9543039839552107
+          0.8951464501266115,
+          0.9424186065238385
         ]
       },
       "null_diagnostic": false,
       "protocol_failure_b1": 0.2,
-      "protocol_failure_b2": 0.15,
-      "regional_joint_power": 0.966,
-      "regional_joint_power_r1": 0.972,
-      "regional_joint_power_r2": 0.96,
+      "protocol_failure_b1_r2": 0.2,
+      "protocol_failure_b2": 0.1499999999999999,
+      "protocol_failure_b2_r2": 0.1499999999999999,
+      "regional_joint_power": 0.957,
+      "regional_joint_power_r1": 0.97,
+      "regional_joint_power_r2": 0.944,
       "sample_size": 2000,
       "scenario": "favorable"
     },
     {
       "any_regional_claim_rate": 1.0,
       "contrast_correlation": 0.9371505989742097,
+      "contrast_correlation_r1": 0.9371505989742097,
+      "contrast_correlation_r2": 0.9371505989742097,
       "delta_correct": 0.09999999999999998,
-      "delta_resolution": 0.04999999999999993,
+      "delta_correct_r1": 0.09999999999999998,
+      "delta_correct_r2": 0.09999999999999998,
+      "delta_resolution": 0.050000000000000044,
+      "delta_resolution_r1": 0.050000000000000044,
+      "delta_resolution_r2": 0.050000000000000044,
       "false_regional_claim_rate": null,
-      "global_joint_power": 0.99,
-      "marginal_correctness_power": 0.995,
-      "marginal_correctness_power_r1": 0.992,
+      "global_joint_power": 0.986,
+      "marginal_correctness_power": 0.993,
+      "marginal_correctness_power_r1": 0.988,
       "marginal_correctness_power_r2": 0.998,
       "marginal_resolution_power": 1.0,
       "marginal_resolution_power_r1": 1.0,
       "marginal_resolution_power_r2": 1.0,
       "mc_interval_95": {
+        "R1_correctness": [
+          0.9740696388835527,
+          0.9944890048259724
+        ],
         "R1_joint": [
-          0.9796129641658948,
-          0.9968846848199377
+          0.9740696388835527,
+          0.9944890048259724
+        ],
+        "R1_resolution": [
+          0.9923756595384479,
+          1.0
+        ],
+        "R2_correctness": [
+          0.9887592932948532,
+          0.9996468636054407
         ],
         "R2_joint": [
           0.9887592932948532,
           0.9996468636054407
         ],
+        "R2_resolution": [
+          0.9923756595384479,
+          1.0
+        ],
         "any_regional": [
           0.9923756595384479,
           1.0
         ],
+        "false_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
         "global": [
-          0.9768069002442693,
-          0.9957212461034096
+          0.9713869308622147,
+          0.9932022102091564
         ]
       },
       "null_diagnostic": false,
       "protocol_failure_b1": 0.2,
-      "protocol_failure_b2": 0.15,
-      "regional_joint_power": 0.995,
-      "regional_joint_power_r1": 0.992,
+      "protocol_failure_b1_r2": 0.2,
+      "protocol_failure_b2": 0.1499999999999999,
+      "protocol_failure_b2_r2": 0.1499999999999999,
+      "regional_joint_power": 0.993,
+      "regional_joint_power_r1": 0.988,
       "regional_joint_power_r2": 0.998,
       "sample_size": 3000,
       "scenario": "favorable"
     },
     {
-      "any_regional_claim_rate": 0.052,
+      "any_regional_claim_rate": 0.04,
       "contrast_correlation": 0.9454389184941309,
+      "contrast_correlation_r1": 0.9454389184941309,
+      "contrast_correlation_r2": 0.9454389184941309,
       "delta_correct": 0.050000000000000044,
+      "delta_correct_r1": 0.050000000000000044,
+      "delta_correct_r2": 0.050000000000000044,
       "delta_resolution": 0.0,
-      "false_regional_claim_rate": 0.052,
+      "delta_resolution_r1": 0.0,
+      "delta_resolution_r2": 0.0,
+      "false_regional_claim_rate": 0.04,
       "global_joint_power": 0.0,
-      "marginal_correctness_power": 0.051000000000000004,
-      "marginal_correctness_power_r1": 0.044,
-      "marginal_correctness_power_r2": 0.058,
-      "marginal_resolution_power": 0.9,
-      "marginal_resolution_power_r1": 0.9,
-      "marginal_resolution_power_r2": 0.9,
+      "marginal_correctness_power": 0.036000000000000004,
+      "marginal_correctness_power_r1": 0.024,
+      "marginal_correctness_power_r2": 0.048,
+      "marginal_resolution_power": 0.884,
+      "marginal_resolution_power_r1": 0.866,
+      "marginal_resolution_power_r2": 0.902,
       "mc_interval_95": {
-        "R1_joint": [
+        "R1_correctness": [
           0.013781314655496986,
           0.041477057463900756
         ],
+        "R1_joint": [
+          0.00311531518006224,
+          0.020387035834105168
+        ],
+        "R1_resolution": [
+          0.8333339846536646,
+          0.8930849981284793
+        ],
+        "R2_correctness": [
+          0.03246520694135317,
+          0.07042719683589006
+        ],
         "R2_joint": [
-          0.01675097472075645,
-          0.04644640267494888
+          0.019791513626571118,
+          0.051344869045441784
+        ],
+        "R2_resolution": [
+          0.8727939491335183,
+          0.9250760811353939
         ],
         "any_regional": [
-          0.035730265115705276,
-          0.07510114393784553
+          0.026040797389777257,
+          0.060973595834850805
+        ],
+        "false_regional": [
+          0.026040797389777257,
+          0.060973595834850805
         ],
         "global": [
           4.336808689942018e-19,
@@ -162,108 +272,184 @@
       },
       "null_diagnostic": true,
       "protocol_failure_b1": 0.2,
-      "protocol_failure_b2": 0.2,
-      "regional_joint_power": 0.026000000000000002,
-      "regional_joint_power_r1": 0.024,
-      "regional_joint_power_r2": 0.028,
+      "protocol_failure_b1_r2": 0.2,
+      "protocol_failure_b2": 0.19999999999999996,
+      "protocol_failure_b2_r2": 0.19999999999999996,
+      "regional_joint_power": 0.02,
+      "regional_joint_power_r1": 0.008,
+      "regional_joint_power_r2": 0.032,
       "sample_size": 1500,
       "scenario": "correctness_boundary"
     },
     {
-      "any_regional_claim_rate": 0.044,
+      "any_regional_claim_rate": 0.03,
       "contrast_correlation": 0.9454389184941309,
+      "contrast_correlation_r1": 0.9454389184941309,
+      "contrast_correlation_r2": 0.9454389184941309,
       "delta_correct": 0.050000000000000044,
+      "delta_correct_r1": 0.050000000000000044,
+      "delta_correct_r2": 0.050000000000000044,
       "delta_resolution": 0.0,
-      "false_regional_claim_rate": 0.044,
-      "global_joint_power": 0.0,
-      "marginal_correctness_power": 0.043,
-      "marginal_correctness_power_r1": 0.056,
-      "marginal_correctness_power_r2": 0.03,
-      "marginal_resolution_power": 0.961,
-      "marginal_resolution_power_r1": 0.962,
-      "marginal_resolution_power_r2": 0.96,
+      "delta_resolution_r1": 0.0,
+      "delta_resolution_r2": 0.0,
+      "false_regional_claim_rate": 0.03,
+      "global_joint_power": 0.006,
+      "marginal_correctness_power": 0.042,
+      "marginal_correctness_power_r1": 0.042,
+      "marginal_correctness_power_r2": 0.042,
+      "marginal_resolution_power": 0.957,
+      "marginal_resolution_power_r1": 0.952,
+      "marginal_resolution_power_r2": 0.962,
       "mc_interval_95": {
+        "R1_correctness": [
+          0.027632310108451703,
+          0.06335158575433016
+        ],
+        "R1_joint": [
+          0.008129253033388314,
+          0.03125110853339426
+        ],
+        "R1_resolution": [
+          0.92957280316411,
+          0.9675347930586469
+        ],
+        "R2_correctness": [
+          0.027632310108451703,
+          0.06335158575433016
+        ],
+        "R2_joint": [
+          0.010899183596210813,
+          0.036420183246879345
+        ],
+        "R2_resolution": [
+          0.9414152274693561,
+          0.9755398819441696
+        ],
+        "any_regional": [
+          0.018263213197913384,
+          0.04890366683594573
+        ],
+        "false_regional": [
+          0.018263213197913384,
+          0.04890366683594573
+        ],
+        "global": [
+          0.002042596271960238,
+          0.017490252104053375
+        ]
+      },
+      "null_diagnostic": true,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b1_r2": 0.2,
+      "protocol_failure_b2": 0.19999999999999996,
+      "protocol_failure_b2_r2": 0.19999999999999996,
+      "regional_joint_power": 0.018000000000000002,
+      "regional_joint_power_r1": 0.016,
+      "regional_joint_power_r2": 0.02,
+      "sample_size": 2000,
+      "scenario": "correctness_boundary"
+    },
+    {
+      "any_regional_claim_rate": 0.074,
+      "contrast_correlation": 0.9454389184941309,
+      "contrast_correlation_r1": 0.9454389184941309,
+      "contrast_correlation_r2": 0.9454389184941309,
+      "delta_correct": 0.050000000000000044,
+      "delta_correct_r1": 0.050000000000000044,
+      "delta_correct_r2": 0.050000000000000044,
+      "delta_resolution": 0.0,
+      "delta_resolution_r1": 0.0,
+      "delta_resolution_r2": 0.0,
+      "false_regional_claim_rate": 0.074,
+      "global_joint_power": 0.004,
+      "marginal_correctness_power": 0.049,
+      "marginal_correctness_power_r1": 0.046,
+      "marginal_correctness_power_r2": 0.052,
+      "marginal_resolution_power": 0.998,
+      "marginal_resolution_power_r1": 0.998,
+      "marginal_resolution_power_r2": 0.998,
+      "mc_interval_95": {
+        "R1_correctness": [
+          0.030845108370816204,
+          0.06807779276827323
+        ],
         "R1_joint": [
           0.019791513626571118,
           0.051344869045441784
         ],
-        "R2_joint": [
-          0.005510995174027701,
-          0.025930361116447295
+        "R1_resolution": [
+          0.9887592932948532,
+          0.9996468636054407
         ],
-        "any_regional": [
-          0.02923395562860718,
-          0.06571944287232845
-        ],
-        "global": [
-          4.336808689942018e-19,
-          0.007624340461552241
-        ]
-      },
-      "null_diagnostic": true,
-      "protocol_failure_b1": 0.2,
-      "protocol_failure_b2": 0.2,
-      "regional_joint_power": 0.022,
-      "regional_joint_power_r1": 0.032,
-      "regional_joint_power_r2": 0.012,
-      "sample_size": 2000,
-      "scenario": "correctness_boundary"
-    },
-    {
-      "any_regional_claim_rate": 0.046,
-      "contrast_correlation": 0.9454389184941309,
-      "delta_correct": 0.050000000000000044,
-      "delta_resolution": 0.0,
-      "false_regional_claim_rate": 0.046,
-      "global_joint_power": 0.0,
-      "marginal_correctness_power": 0.045,
-      "marginal_correctness_power_r1": 0.034,
-      "marginal_correctness_power_r2": 0.056,
-      "marginal_resolution_power": 0.994,
-      "marginal_resolution_power_r1": 0.996,
-      "marginal_resolution_power_r2": 0.992,
-      "mc_interval_95": {
-        "R1_joint": [
-          0.010899183596210813,
-          0.036420183246879345
+        "R2_correctness": [
+          0.035730265115705276,
+          0.07510114393784553
         ],
         "R2_joint": [
-          0.01525638392332725,
-          0.043971490834224275
-        ],
-        "any_regional": [
           0.030845108370816204,
           0.06807779276827323
         ],
+        "R2_resolution": [
+          0.9887592932948532,
+          0.9996468636054407
+        ],
+        "any_regional": [
+          0.054161184751011976,
+          0.10033475332223055
+        ],
+        "false_regional": [
+          0.054161184751011976,
+          0.10033475332223055
+        ],
         "global": [
-          4.336808689942018e-19,
-          0.007624340461552241
+          0.0010976305226827925,
+          0.014465715215177033
         ]
       },
       "null_diagnostic": true,
       "protocol_failure_b1": 0.2,
-      "protocol_failure_b2": 0.2,
-      "regional_joint_power": 0.023,
-      "regional_joint_power_r1": 0.02,
-      "regional_joint_power_r2": 0.026,
+      "protocol_failure_b1_r2": 0.2,
+      "protocol_failure_b2": 0.19999999999999996,
+      "protocol_failure_b2_r2": 0.19999999999999996,
+      "regional_joint_power": 0.039,
+      "regional_joint_power_r1": 0.032,
+      "regional_joint_power_r2": 0.046,
       "sample_size": 3000,
       "scenario": "correctness_boundary"
     },
     {
       "any_regional_claim_rate": 0.0,
       "contrast_correlation": 0.951329560647042,
+      "contrast_correlation_r1": 0.951329560647042,
+      "contrast_correlation_r2": 0.951329560647042,
       "delta_correct": 0.0,
+      "delta_correct_r1": 0.0,
+      "delta_correct_r2": 0.0,
       "delta_resolution": -0.050000000000000044,
+      "delta_resolution_r1": -0.050000000000000044,
+      "delta_resolution_r2": -0.050000000000000044,
       "false_regional_claim_rate": 0.0,
       "global_joint_power": 0.0,
       "marginal_correctness_power": 0.0,
       "marginal_correctness_power_r1": 0.0,
       "marginal_correctness_power_r2": 0.0,
-      "marginal_resolution_power": 0.045,
-      "marginal_resolution_power_r1": 0.05,
-      "marginal_resolution_power_r2": 0.04,
+      "marginal_resolution_power": 0.046,
+      "marginal_resolution_power_r1": 0.048,
+      "marginal_resolution_power_r2": 0.044,
       "mc_interval_95": {
+        "R1_correctness": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
         "R1_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R1_resolution": [
+          0.03246520694135317,
+          0.07042719683589006
+        ],
+        "R2_correctness": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
@@ -271,7 +457,15 @@
           4.336808689942018e-19,
           0.007624340461552241
         ],
+        "R2_resolution": [
+          0.02923395562860718,
+          0.06571944287232845
+        ],
         "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "false_regional": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
@@ -282,7 +476,9 @@
       },
       "null_diagnostic": true,
       "protocol_failure_b1": 0.2,
+      "protocol_failure_b1_r2": 0.2,
       "protocol_failure_b2": 0.25,
+      "protocol_failure_b2_r2": 0.25,
       "regional_joint_power": 0.0,
       "regional_joint_power_r1": 0.0,
       "regional_joint_power_r2": 0.0,
@@ -292,18 +488,36 @@
     {
       "any_regional_claim_rate": 0.0,
       "contrast_correlation": 0.951329560647042,
+      "contrast_correlation_r1": 0.951329560647042,
+      "contrast_correlation_r2": 0.951329560647042,
       "delta_correct": 0.0,
+      "delta_correct_r1": 0.0,
+      "delta_correct_r2": 0.0,
       "delta_resolution": -0.050000000000000044,
+      "delta_resolution_r1": -0.050000000000000044,
+      "delta_resolution_r2": -0.050000000000000044,
       "false_regional_claim_rate": 0.0,
       "global_joint_power": 0.0,
       "marginal_correctness_power": 0.0,
       "marginal_correctness_power_r1": 0.0,
       "marginal_correctness_power_r2": 0.0,
-      "marginal_resolution_power": 0.033,
-      "marginal_resolution_power_r1": 0.032,
-      "marginal_resolution_power_r2": 0.034,
+      "marginal_resolution_power": 0.047,
+      "marginal_resolution_power_r1": 0.05,
+      "marginal_resolution_power_r2": 0.044,
       "mc_interval_95": {
+        "R1_correctness": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
         "R1_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R1_resolution": [
+          0.034093745243849435,
+          0.0727681611715476
+        ],
+        "R2_correctness": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
@@ -311,7 +525,15 @@
           4.336808689942018e-19,
           0.007624340461552241
         ],
+        "R2_resolution": [
+          0.02923395562860718,
+          0.06571944287232845
+        ],
         "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "false_regional": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
@@ -322,7 +544,9 @@
       },
       "null_diagnostic": true,
       "protocol_failure_b1": 0.2,
+      "protocol_failure_b1_r2": 0.2,
       "protocol_failure_b2": 0.25,
+      "protocol_failure_b2_r2": 0.25,
       "regional_joint_power": 0.0,
       "regional_joint_power_r1": 0.0,
       "regional_joint_power_r2": 0.0,
@@ -332,18 +556,36 @@
     {
       "any_regional_claim_rate": 0.0,
       "contrast_correlation": 0.951329560647042,
+      "contrast_correlation_r1": 0.951329560647042,
+      "contrast_correlation_r2": 0.951329560647042,
       "delta_correct": 0.0,
+      "delta_correct_r1": 0.0,
+      "delta_correct_r2": 0.0,
       "delta_resolution": -0.050000000000000044,
+      "delta_resolution_r1": -0.050000000000000044,
+      "delta_resolution_r2": -0.050000000000000044,
       "false_regional_claim_rate": 0.0,
       "global_joint_power": 0.0,
       "marginal_correctness_power": 0.0,
       "marginal_correctness_power_r1": 0.0,
       "marginal_correctness_power_r2": 0.0,
-      "marginal_resolution_power": 0.048,
-      "marginal_resolution_power_r1": 0.04,
-      "marginal_resolution_power_r2": 0.056,
+      "marginal_resolution_power": 0.046,
+      "marginal_resolution_power_r1": 0.05,
+      "marginal_resolution_power_r2": 0.042,
       "mc_interval_95": {
+        "R1_correctness": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
         "R1_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R1_resolution": [
+          0.034093745243849435,
+          0.0727681611715476
+        ],
+        "R2_correctness": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
@@ -351,7 +593,15 @@
           4.336808689942018e-19,
           0.007624340461552241
         ],
+        "R2_resolution": [
+          0.027632310108451703,
+          0.06335158575433016
+        ],
         "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "false_regional": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
@@ -362,7 +612,9 @@
       },
       "null_diagnostic": true,
       "protocol_failure_b1": 0.2,
+      "protocol_failure_b1_r2": 0.2,
       "protocol_failure_b2": 0.25,
+      "protocol_failure_b2_r2": 0.25,
       "regional_joint_power": 0.0,
       "regional_joint_power_r1": 0.0,
       "regional_joint_power_r2": 0.0,
@@ -371,27 +623,53 @@
     },
     {
       "any_regional_claim_rate": 0.0,
-      "contrast_correlation": 0.87709692962489,
-      "delta_correct": 0.09999999999999987,
-      "delta_resolution": -0.10000000000000009,
+      "contrast_correlation": 0.8770969296248898,
+      "contrast_correlation_r1": 0.8770969296248898,
+      "contrast_correlation_r2": 0.8770969296248898,
+      "delta_correct": 0.09999999999999998,
+      "delta_correct_r1": 0.09999999999999998,
+      "delta_correct_r2": 0.09999999999999998,
+      "delta_resolution": -0.09999999999999998,
+      "delta_resolution_r1": -0.09999999999999998,
+      "delta_resolution_r2": -0.09999999999999998,
       "false_regional_claim_rate": null,
       "global_joint_power": 0.0,
-      "marginal_correctness_power": 0.726,
-      "marginal_correctness_power_r1": 0.728,
-      "marginal_correctness_power_r2": 0.724,
+      "marginal_correctness_power": 0.738,
+      "marginal_correctness_power_r1": 0.736,
+      "marginal_correctness_power_r2": 0.74,
       "marginal_resolution_power": 0.0,
       "marginal_resolution_power_r1": 0.0,
       "marginal_resolution_power_r2": 0.0,
       "mc_interval_95": {
+        "R1_correctness": [
+          0.6956691427151993,
+          0.7727321685869482
+        ],
         "R1_joint": [
           4.336808689942018e-19,
           0.007624340461552241
+        ],
+        "R1_resolution": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R2_correctness": [
+          0.6998260397638378,
+          0.7765142768146172
         ],
         "R2_joint": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
+        "R2_resolution": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
         "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "false_regional": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
@@ -402,7 +680,9 @@
       },
       "null_diagnostic": false,
       "protocol_failure_b1": 0.2,
-      "protocol_failure_b2": 0.3,
+      "protocol_failure_b1_r2": 0.2,
+      "protocol_failure_b2": 0.29999999999999993,
+      "protocol_failure_b2_r2": 0.29999999999999993,
       "regional_joint_power": 0.0,
       "regional_joint_power_r1": 0.0,
       "regional_joint_power_r2": 0.0,
@@ -411,27 +691,53 @@
     },
     {
       "any_regional_claim_rate": 0.0,
-      "contrast_correlation": 0.87709692962489,
-      "delta_correct": 0.09999999999999987,
-      "delta_resolution": -0.10000000000000009,
+      "contrast_correlation": 0.8770969296248898,
+      "contrast_correlation_r1": 0.8770969296248898,
+      "contrast_correlation_r2": 0.8770969296248898,
+      "delta_correct": 0.09999999999999998,
+      "delta_correct_r1": 0.09999999999999998,
+      "delta_correct_r2": 0.09999999999999998,
+      "delta_resolution": -0.09999999999999998,
+      "delta_resolution_r1": -0.09999999999999998,
+      "delta_resolution_r2": -0.09999999999999998,
       "false_regional_claim_rate": null,
       "global_joint_power": 0.0,
-      "marginal_correctness_power": 0.844,
-      "marginal_correctness_power_r1": 0.842,
-      "marginal_correctness_power_r2": 0.846,
+      "marginal_correctness_power": 0.842,
+      "marginal_correctness_power_r1": 0.852,
+      "marginal_correctness_power_r2": 0.832,
       "marginal_resolution_power": 0.0,
       "marginal_resolution_power_r1": 0.0,
       "marginal_resolution_power_r2": 0.0,
       "mc_interval_95": {
+        "R1_correctness": [
+          0.8181938697042727,
+          0.8804385946107945
+        ],
         "R1_joint": [
           4.336808689942018e-19,
           0.007624340461552241
+        ],
+        "R1_resolution": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R2_correctness": [
+          0.7967256709103735,
+          0.8622117670231558
         ],
         "R2_joint": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
+        "R2_resolution": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
         "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "false_regional": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
@@ -442,7 +748,9 @@
       },
       "null_diagnostic": false,
       "protocol_failure_b1": 0.2,
-      "protocol_failure_b2": 0.3,
+      "protocol_failure_b1_r2": 0.2,
+      "protocol_failure_b2": 0.29999999999999993,
+      "protocol_failure_b2_r2": 0.29999999999999993,
       "regional_joint_power": 0.0,
       "regional_joint_power_r1": 0.0,
       "regional_joint_power_r2": 0.0,
@@ -451,27 +759,53 @@
     },
     {
       "any_regional_claim_rate": 0.0,
-      "contrast_correlation": 0.87709692962489,
-      "delta_correct": 0.09999999999999987,
-      "delta_resolution": -0.10000000000000009,
+      "contrast_correlation": 0.8770969296248898,
+      "contrast_correlation_r1": 0.8770969296248898,
+      "contrast_correlation_r2": 0.8770969296248898,
+      "delta_correct": 0.09999999999999998,
+      "delta_correct_r1": 0.09999999999999998,
+      "delta_correct_r2": 0.09999999999999998,
+      "delta_resolution": -0.09999999999999998,
+      "delta_resolution_r1": -0.09999999999999998,
+      "delta_resolution_r2": -0.09999999999999998,
       "false_regional_claim_rate": null,
       "global_joint_power": 0.0,
-      "marginal_correctness_power": 0.91,
-      "marginal_correctness_power_r1": 0.914,
-      "marginal_correctness_power_r2": 0.906,
+      "marginal_correctness_power": 0.9390000000000001,
+      "marginal_correctness_power_r1": 0.932,
+      "marginal_correctness_power_r2": 0.946,
       "marginal_resolution_power": 0.0,
       "marginal_resolution_power_r1": 0.0,
       "marginal_resolution_power_r2": 0.0,
       "mc_interval_95": {
+        "R1_correctness": [
+          0.9064790772661258,
+          0.9509334925750932
+        ],
         "R1_joint": [
           4.336808689942018e-19,
           0.007624340461552241
+        ],
+        "R1_resolution": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R2_correctness": [
+          0.9225734384893529,
+          0.9626256498189425
         ],
         "R2_joint": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
+        "R2_resolution": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
         "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "false_regional": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
@@ -482,7 +816,9 @@
       },
       "null_diagnostic": false,
       "protocol_failure_b1": 0.2,
-      "protocol_failure_b2": 0.3,
+      "protocol_failure_b1_r2": 0.2,
+      "protocol_failure_b2": 0.29999999999999993,
+      "protocol_failure_b2_r2": 0.29999999999999993,
       "regional_joint_power": 0.0,
       "regional_joint_power_r1": 0.0,
       "regional_joint_power_r2": 0.0,
@@ -492,8 +828,14 @@
     {
       "any_regional_claim_rate": 0.0,
       "contrast_correlation": 0.5640760748177661,
+      "contrast_correlation_r1": 0.5640760748177661,
+      "contrast_correlation_r2": 0.5640760748177661,
       "delta_correct": 0.0,
+      "delta_correct_r1": 0.0,
+      "delta_correct_r2": 0.0,
       "delta_resolution": 0.0,
+      "delta_resolution_r1": 0.0,
+      "delta_resolution_r2": 0.0,
       "false_regional_claim_rate": 0.0,
       "global_joint_power": 0.0,
       "marginal_correctness_power": 0.0,
@@ -503,7 +845,19 @@
       "marginal_resolution_power_r1": 0.948,
       "marginal_resolution_power_r2": 0.946,
       "mc_interval_95": {
+        "R1_correctness": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
         "R1_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R1_resolution": [
+          0.9248988560621544,
+          0.9642697348842947
+        ],
+        "R2_correctness": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
@@ -511,7 +865,15 @@
           4.336808689942018e-19,
           0.007624340461552241
         ],
+        "R2_resolution": [
+          0.9225734384893529,
+          0.9626256498189425
+        ],
         "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "false_regional": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
@@ -522,7 +884,9 @@
       },
       "null_diagnostic": true,
       "protocol_failure_b1": 0.2,
+      "protocol_failure_b1_r2": 0.2,
       "protocol_failure_b2": 0.2,
+      "protocol_failure_b2_r2": 0.2,
       "regional_joint_power": 0.0,
       "regional_joint_power_r1": 0.0,
       "regional_joint_power_r2": 0.0,
@@ -532,18 +896,36 @@
     {
       "any_regional_claim_rate": 0.0,
       "contrast_correlation": 0.5640760748177661,
+      "contrast_correlation_r1": 0.5640760748177661,
+      "contrast_correlation_r2": 0.5640760748177661,
       "delta_correct": 0.0,
+      "delta_correct_r1": 0.0,
+      "delta_correct_r2": 0.0,
       "delta_resolution": 0.0,
+      "delta_resolution_r1": 0.0,
+      "delta_resolution_r2": 0.0,
       "false_regional_claim_rate": 0.0,
       "global_joint_power": 0.0,
       "marginal_correctness_power": 0.0,
       "marginal_correctness_power_r1": 0.0,
       "marginal_correctness_power_r2": 0.0,
-      "marginal_resolution_power": 0.985,
-      "marginal_resolution_power_r1": 0.988,
-      "marginal_resolution_power_r2": 0.982,
+      "marginal_resolution_power": 0.987,
+      "marginal_resolution_power_r1": 0.984,
+      "marginal_resolution_power_r2": 0.99,
       "mc_interval_95": {
+        "R1_correctness": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
         "R1_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R1_resolution": [
+          0.9687488914666058,
+          0.9918707469666117
+        ],
+        "R2_correctness": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
@@ -551,7 +933,15 @@
           4.336808689942018e-19,
           0.007624340461552241
         ],
+        "R2_resolution": [
+          0.9768069002442693,
+          0.9957212461034096
+        ],
         "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "false_regional": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
@@ -562,7 +952,9 @@
       },
       "null_diagnostic": true,
       "protocol_failure_b1": 0.2,
+      "protocol_failure_b1_r2": 0.2,
       "protocol_failure_b2": 0.2,
+      "protocol_failure_b2_r2": 0.2,
       "regional_joint_power": 0.0,
       "regional_joint_power_r1": 0.0,
       "regional_joint_power_r2": 0.0,
@@ -572,18 +964,36 @@
     {
       "any_regional_claim_rate": 0.0,
       "contrast_correlation": 0.5640760748177661,
+      "contrast_correlation_r1": 0.5640760748177661,
+      "contrast_correlation_r2": 0.5640760748177661,
       "delta_correct": 0.0,
+      "delta_correct_r1": 0.0,
+      "delta_correct_r2": 0.0,
       "delta_resolution": 0.0,
+      "delta_resolution_r1": 0.0,
+      "delta_resolution_r2": 0.0,
       "false_regional_claim_rate": 0.0,
       "global_joint_power": 0.0,
       "marginal_correctness_power": 0.0,
       "marginal_correctness_power_r1": 0.0,
       "marginal_correctness_power_r2": 0.0,
-      "marginal_resolution_power": 1.0,
+      "marginal_resolution_power": 0.999,
       "marginal_resolution_power_r1": 1.0,
-      "marginal_resolution_power_r2": 1.0,
+      "marginal_resolution_power_r2": 0.998,
       "mc_interval_95": {
+        "R1_correctness": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
         "R1_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R1_resolution": [
+          0.9923756595384479,
+          1.0
+        ],
+        "R2_correctness": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
@@ -591,7 +1001,15 @@
           4.336808689942018e-19,
           0.007624340461552241
         ],
+        "R2_resolution": [
+          0.9887592932948532,
+          0.9996468636054407
+        ],
         "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "false_regional": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
@@ -602,7 +1020,9 @@
       },
       "null_diagnostic": true,
       "protocol_failure_b1": 0.2,
+      "protocol_failure_b1_r2": 0.2,
       "protocol_failure_b2": 0.2,
+      "protocol_failure_b2_r2": 0.2,
       "regional_joint_power": 0.0,
       "regional_joint_power_r1": 0.0,
       "regional_joint_power_r2": 0.0,
@@ -610,81 +1030,137 @@
       "scenario": "no_meaningful_correctness_benefit"
     },
     {
-      "any_regional_claim_rate": 0.978,
+      "any_regional_claim_rate": 0.986,
       "contrast_correlation": 0.9371505989742097,
+      "contrast_correlation_r1": 0.9371505989742097,
+      "contrast_correlation_r2": 0.9371505989742097,
       "delta_correct": 0.09999999999999998,
-      "delta_resolution": 0.04999999999999993,
+      "delta_correct_r1": 0.09999999999999998,
+      "delta_correct_r2": 0.09999999999999998,
+      "delta_resolution": 0.050000000000000044,
+      "delta_resolution_r1": 0.050000000000000044,
+      "delta_resolution_r2": 0.050000000000000044,
       "false_regional_claim_rate": null,
-      "global_joint_power": 0.822,
-      "marginal_correctness_power": 0.908,
+      "global_joint_power": 0.84,
+      "marginal_correctness_power": 0.919,
       "marginal_correctness_power_r1": 0.916,
-      "marginal_correctness_power_r2": 0.9,
+      "marginal_correctness_power_r2": 0.922,
       "marginal_resolution_power": 1.0,
       "marginal_resolution_power_r1": 1.0,
       "marginal_resolution_power_r2": 1.0,
       "mc_interval_95": {
+        "R1_correctness": [
+          0.888400685539819,
+          0.9372558631961696
+        ],
         "R1_joint": [
-          0.8772354441374409,
-          0.9285735914077787
+          0.8816905887106666,
+          0.9320574521108606
+        ],
+        "R1_resolution": [
+          0.9923756595384479,
+          1.0
+        ],
+        "R2_correctness": [
+          0.8951464501266115,
+          0.9424186065238385
         ],
         "R2_joint": [
-          0.8639490699892671,
-          0.9180429497270297
+          0.888400685539819,
+          0.9372558631961696
+        ],
+        "R2_resolution": [
+          0.9923756595384479,
+          1.0
         ],
         "any_regional": [
-          0.9610391387886836,
-          0.9876719917300725
+          0.9713869308622147,
+          0.9932022102091564
+        ],
+        "false_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
         ],
         "global": [
-          0.7860548114500956,
-          0.8530351132926648
+          0.8052918208363085,
+          0.8695236276498359
         ]
       },
       "null_diagnostic": false,
       "protocol_failure_b1": 0.2,
-      "protocol_failure_b2": 0.15,
-      "regional_joint_power": 0.9,
-      "regional_joint_power_r1": 0.906,
-      "regional_joint_power_r2": 0.894,
+      "protocol_failure_b1_r2": 0.2,
+      "protocol_failure_b2": 0.1499999999999999,
+      "protocol_failure_b2_r2": 0.1499999999999999,
+      "regional_joint_power": 0.913,
+      "regional_joint_power_r1": 0.91,
+      "regional_joint_power_r2": 0.916,
       "sample_size": 1500,
       "scenario": "strong_positive_dependence"
     },
     {
       "any_regional_claim_rate": 0.994,
       "contrast_correlation": 0.9371505989742097,
+      "contrast_correlation_r1": 0.9371505989742097,
+      "contrast_correlation_r2": 0.9371505989742097,
       "delta_correct": 0.09999999999999998,
-      "delta_resolution": 0.04999999999999993,
+      "delta_correct_r1": 0.09999999999999998,
+      "delta_correct_r2": 0.09999999999999998,
+      "delta_resolution": 0.050000000000000044,
+      "delta_resolution_r1": 0.050000000000000044,
+      "delta_resolution_r2": 0.050000000000000044,
       "false_regional_claim_rate": null,
-      "global_joint_power": 0.938,
-      "marginal_correctness_power": 0.972,
-      "marginal_correctness_power_r1": 0.974,
-      "marginal_correctness_power_r2": 0.97,
+      "global_joint_power": 0.942,
+      "marginal_correctness_power": 0.969,
+      "marginal_correctness_power_r1": 0.972,
+      "marginal_correctness_power_r2": 0.966,
       "marginal_resolution_power": 1.0,
       "marginal_resolution_power_r1": 1.0,
       "marginal_resolution_power_r2": 1.0,
       "mc_interval_95": {
+        "R1_correctness": [
+          0.9535535973250511,
+          0.9832490252792436
+        ],
         "R1_joint": [
-          0.9486551309545582,
-          0.9802084863734289
+          0.9535535973250511,
+          0.9832490252792436
+        ],
+        "R1_resolution": [
+          0.9923756595384479,
+          1.0
+        ],
+        "R2_correctness": [
+          0.9462286344983655,
+          0.9786654801914678
         ],
         "R2_joint": [
           0.9438156730319722,
           0.9771089390197072
         ],
+        "R2_resolution": [
+          0.9923756595384479,
+          1.0
+        ],
         "any_regional": [
           0.9825097478959467,
           0.9979574037280398
         ],
+        "false_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
         "global": [
-          0.9133402868983618,
-          0.9559807908573184
+          0.917943812143745,
+          0.9593162708882429
         ]
       },
       "null_diagnostic": false,
       "protocol_failure_b1": 0.2,
-      "protocol_failure_b2": 0.15,
-      "regional_joint_power": 0.966,
-      "regional_joint_power_r1": 0.968,
+      "protocol_failure_b1_r2": 0.2,
+      "protocol_failure_b2": 0.1499999999999999,
+      "protocol_failure_b2_r2": 0.1499999999999999,
+      "regional_joint_power": 0.968,
+      "regional_joint_power_r1": 0.972,
       "regional_joint_power_r2": 0.964,
       "sample_size": 2000,
       "scenario": "strong_positive_dependence"
@@ -692,48 +1168,82 @@
     {
       "any_regional_claim_rate": 1.0,
       "contrast_correlation": 0.9371505989742097,
+      "contrast_correlation_r1": 0.9371505989742097,
+      "contrast_correlation_r2": 0.9371505989742097,
       "delta_correct": 0.09999999999999998,
-      "delta_resolution": 0.04999999999999993,
+      "delta_correct_r1": 0.09999999999999998,
+      "delta_correct_r2": 0.09999999999999998,
+      "delta_resolution": 0.050000000000000044,
+      "delta_resolution_r1": 0.050000000000000044,
+      "delta_resolution_r2": 0.050000000000000044,
       "false_regional_claim_rate": null,
-      "global_joint_power": 0.992,
-      "marginal_correctness_power": 0.996,
+      "global_joint_power": 0.996,
+      "marginal_correctness_power": 0.998,
       "marginal_correctness_power_r1": 0.998,
-      "marginal_correctness_power_r2": 0.994,
+      "marginal_correctness_power_r2": 0.998,
       "marginal_resolution_power": 1.0,
       "marginal_resolution_power_r1": 1.0,
       "marginal_resolution_power_r2": 1.0,
       "mc_interval_95": {
+        "R1_correctness": [
+          0.9887592932948532,
+          0.9996468636054407
+        ],
         "R1_joint": [
           0.9887592932948532,
           0.9996468636054407
         ],
+        "R1_resolution": [
+          0.9923756595384479,
+          1.0
+        ],
+        "R2_correctness": [
+          0.9887592932948532,
+          0.9996468636054407
+        ],
         "R2_joint": [
-          0.9825097478959467,
-          0.9979574037280398
+          0.9887592932948532,
+          0.9996468636054407
+        ],
+        "R2_resolution": [
+          0.9923756595384479,
+          1.0
         ],
         "any_regional": [
           0.9923756595384479,
           1.0
         ],
+        "false_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
         "global": [
-          0.9796129641658948,
-          0.9968846848199377
+          0.9855342847848231,
+          0.9989023694773173
         ]
       },
       "null_diagnostic": false,
       "protocol_failure_b1": 0.2,
-      "protocol_failure_b2": 0.15,
-      "regional_joint_power": 0.996,
+      "protocol_failure_b1_r2": 0.2,
+      "protocol_failure_b2": 0.1499999999999999,
+      "protocol_failure_b2_r2": 0.1499999999999999,
+      "regional_joint_power": 0.998,
       "regional_joint_power_r1": 0.998,
-      "regional_joint_power_r2": 0.994,
+      "regional_joint_power_r2": 0.998,
       "sample_size": 3000,
       "scenario": "strong_positive_dependence"
     },
     {
       "any_regional_claim_rate": 1.0,
       "contrast_correlation": -0.07647191129018749,
+      "contrast_correlation_r1": -0.07647191129018749,
+      "contrast_correlation_r2": -0.07647191129018749,
       "delta_correct": 0.10000000000000009,
+      "delta_correct_r1": 0.10000000000000009,
+      "delta_correct_r2": 0.10000000000000009,
       "delta_resolution": 0.050000000000000155,
+      "delta_resolution_r1": 0.050000000000000155,
+      "delta_resolution_r2": 0.050000000000000155,
       "false_regional_claim_rate": null,
       "global_joint_power": 1.0,
       "marginal_correctness_power": 1.0,
@@ -743,7 +1253,19 @@
       "marginal_resolution_power_r1": 1.0,
       "marginal_resolution_power_r2": 1.0,
       "mc_interval_95": {
+        "R1_correctness": [
+          0.9923756595384479,
+          1.0
+        ],
         "R1_joint": [
+          0.9923756595384479,
+          1.0
+        ],
+        "R1_resolution": [
+          0.9923756595384479,
+          1.0
+        ],
+        "R2_correctness": [
           0.9923756595384479,
           1.0
         ],
@@ -751,9 +1273,17 @@
           0.9923756595384479,
           1.0
         ],
+        "R2_resolution": [
+          0.9923756595384479,
+          1.0
+        ],
         "any_regional": [
           0.9923756595384479,
           1.0
+        ],
+        "false_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
         ],
         "global": [
           0.9923756595384479,
@@ -762,7 +1292,9 @@
       },
       "null_diagnostic": false,
       "protocol_failure_b1": 0.2,
-      "protocol_failure_b2": 0.15,
+      "protocol_failure_b1_r2": 0.2,
+      "protocol_failure_b2": 0.1499999999999999,
+      "protocol_failure_b2_r2": 0.1499999999999999,
       "regional_joint_power": 1.0,
       "regional_joint_power_r1": 1.0,
       "regional_joint_power_r2": 1.0,
@@ -772,8 +1304,14 @@
     {
       "any_regional_claim_rate": 1.0,
       "contrast_correlation": -0.07647191129018749,
+      "contrast_correlation_r1": -0.07647191129018749,
+      "contrast_correlation_r2": -0.07647191129018749,
       "delta_correct": 0.10000000000000009,
+      "delta_correct_r1": 0.10000000000000009,
+      "delta_correct_r2": 0.10000000000000009,
       "delta_resolution": 0.050000000000000155,
+      "delta_resolution_r1": 0.050000000000000155,
+      "delta_resolution_r2": 0.050000000000000155,
       "false_regional_claim_rate": null,
       "global_joint_power": 1.0,
       "marginal_correctness_power": 1.0,
@@ -783,7 +1321,19 @@
       "marginal_resolution_power_r1": 1.0,
       "marginal_resolution_power_r2": 1.0,
       "mc_interval_95": {
+        "R1_correctness": [
+          0.9923756595384479,
+          1.0
+        ],
         "R1_joint": [
+          0.9923756595384479,
+          1.0
+        ],
+        "R1_resolution": [
+          0.9923756595384479,
+          1.0
+        ],
+        "R2_correctness": [
           0.9923756595384479,
           1.0
         ],
@@ -791,9 +1341,17 @@
           0.9923756595384479,
           1.0
         ],
+        "R2_resolution": [
+          0.9923756595384479,
+          1.0
+        ],
         "any_regional": [
           0.9923756595384479,
           1.0
+        ],
+        "false_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
         ],
         "global": [
           0.9923756595384479,
@@ -802,7 +1360,9 @@
       },
       "null_diagnostic": false,
       "protocol_failure_b1": 0.2,
-      "protocol_failure_b2": 0.15,
+      "protocol_failure_b1_r2": 0.2,
+      "protocol_failure_b2": 0.1499999999999999,
+      "protocol_failure_b2_r2": 0.1499999999999999,
       "regional_joint_power": 1.0,
       "regional_joint_power_r1": 1.0,
       "regional_joint_power_r2": 1.0,
@@ -812,8 +1372,14 @@
     {
       "any_regional_claim_rate": 1.0,
       "contrast_correlation": -0.07647191129018749,
+      "contrast_correlation_r1": -0.07647191129018749,
+      "contrast_correlation_r2": -0.07647191129018749,
       "delta_correct": 0.10000000000000009,
+      "delta_correct_r1": 0.10000000000000009,
+      "delta_correct_r2": 0.10000000000000009,
       "delta_resolution": 0.050000000000000155,
+      "delta_resolution_r1": 0.050000000000000155,
+      "delta_resolution_r2": 0.050000000000000155,
       "false_regional_claim_rate": null,
       "global_joint_power": 1.0,
       "marginal_correctness_power": 1.0,
@@ -823,7 +1389,19 @@
       "marginal_resolution_power_r1": 1.0,
       "marginal_resolution_power_r2": 1.0,
       "mc_interval_95": {
+        "R1_correctness": [
+          0.9923756595384479,
+          1.0
+        ],
         "R1_joint": [
+          0.9923756595384479,
+          1.0
+        ],
+        "R1_resolution": [
+          0.9923756595384479,
+          1.0
+        ],
+        "R2_correctness": [
           0.9923756595384479,
           1.0
         ],
@@ -831,9 +1409,17 @@
           0.9923756595384479,
           1.0
         ],
+        "R2_resolution": [
+          0.9923756595384479,
+          1.0
+        ],
         "any_regional": [
           0.9923756595384479,
           1.0
+        ],
+        "false_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
         ],
         "global": [
           0.9923756595384479,
@@ -842,7 +1428,9 @@
       },
       "null_diagnostic": false,
       "protocol_failure_b1": 0.2,
-      "protocol_failure_b2": 0.15,
+      "protocol_failure_b1_r2": 0.2,
+      "protocol_failure_b2": 0.1499999999999999,
+      "protocol_failure_b2_r2": 0.1499999999999999,
       "regional_joint_power": 1.0,
       "regional_joint_power_r1": 1.0,
       "regional_joint_power_r2": 1.0,
@@ -852,8 +1440,14 @@
     {
       "any_regional_claim_rate": 0.0,
       "contrast_correlation": 0.9337292153995469,
+      "contrast_correlation_r1": 0.9337292153995469,
+      "contrast_correlation_r2": 0.9337292153995469,
       "delta_correct": -0.06000000000000005,
+      "delta_correct_r1": -0.06000000000000005,
+      "delta_correct_r2": -0.06000000000000005,
       "delta_resolution": -0.15000000000000002,
+      "delta_resolution_r1": -0.15000000000000002,
+      "delta_resolution_r2": -0.15000000000000002,
       "false_regional_claim_rate": null,
       "global_joint_power": 0.0,
       "marginal_correctness_power": 0.0,
@@ -863,7 +1457,19 @@
       "marginal_resolution_power_r1": 0.0,
       "marginal_resolution_power_r2": 0.0,
       "mc_interval_95": {
+        "R1_correctness": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
         "R1_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R1_resolution": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R2_correctness": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
@@ -871,7 +1477,15 @@
           4.336808689942018e-19,
           0.007624340461552241
         ],
+        "R2_resolution": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
         "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "false_regional": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
@@ -882,7 +1496,9 @@
       },
       "null_diagnostic": false,
       "protocol_failure_b1": 0.2,
+      "protocol_failure_b1_r2": 0.2,
       "protocol_failure_b2": 0.35,
+      "protocol_failure_b2_r2": 0.35,
       "regional_joint_power": 0.0,
       "regional_joint_power_r1": 0.0,
       "regional_joint_power_r2": 0.0,
@@ -892,8 +1508,14 @@
     {
       "any_regional_claim_rate": 0.0,
       "contrast_correlation": 0.9337292153995469,
+      "contrast_correlation_r1": 0.9337292153995469,
+      "contrast_correlation_r2": 0.9337292153995469,
       "delta_correct": -0.06000000000000005,
+      "delta_correct_r1": -0.06000000000000005,
+      "delta_correct_r2": -0.06000000000000005,
       "delta_resolution": -0.15000000000000002,
+      "delta_resolution_r1": -0.15000000000000002,
+      "delta_resolution_r2": -0.15000000000000002,
       "false_regional_claim_rate": null,
       "global_joint_power": 0.0,
       "marginal_correctness_power": 0.0,
@@ -903,7 +1525,19 @@
       "marginal_resolution_power_r1": 0.0,
       "marginal_resolution_power_r2": 0.0,
       "mc_interval_95": {
+        "R1_correctness": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
         "R1_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R1_resolution": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R2_correctness": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
@@ -911,7 +1545,15 @@
           4.336808689942018e-19,
           0.007624340461552241
         ],
+        "R2_resolution": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
         "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "false_regional": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
@@ -922,7 +1564,9 @@
       },
       "null_diagnostic": false,
       "protocol_failure_b1": 0.2,
+      "protocol_failure_b1_r2": 0.2,
       "protocol_failure_b2": 0.35,
+      "protocol_failure_b2_r2": 0.35,
       "regional_joint_power": 0.0,
       "regional_joint_power_r1": 0.0,
       "regional_joint_power_r2": 0.0,
@@ -932,8 +1576,14 @@
     {
       "any_regional_claim_rate": 0.0,
       "contrast_correlation": 0.9337292153995469,
+      "contrast_correlation_r1": 0.9337292153995469,
+      "contrast_correlation_r2": 0.9337292153995469,
       "delta_correct": -0.06000000000000005,
+      "delta_correct_r1": -0.06000000000000005,
+      "delta_correct_r2": -0.06000000000000005,
       "delta_resolution": -0.15000000000000002,
+      "delta_resolution_r1": -0.15000000000000002,
+      "delta_resolution_r2": -0.15000000000000002,
       "false_regional_claim_rate": null,
       "global_joint_power": 0.0,
       "marginal_correctness_power": 0.0,
@@ -943,7 +1593,19 @@
       "marginal_resolution_power_r1": 0.0,
       "marginal_resolution_power_r2": 0.0,
       "mc_interval_95": {
+        "R1_correctness": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
         "R1_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R1_resolution": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R2_correctness": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
@@ -951,7 +1613,15 @@
           4.336808689942018e-19,
           0.007624340461552241
         ],
+        "R2_resolution": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
         "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "false_regional": [
           4.336808689942018e-19,
           0.007624340461552241
         ],
@@ -962,7 +1632,9 @@
       },
       "null_diagnostic": false,
       "protocol_failure_b1": 0.2,
+      "protocol_failure_b1_r2": 0.2,
       "protocol_failure_b2": 0.35,
+      "protocol_failure_b2_r2": 0.35,
       "regional_joint_power": 0.0,
       "regional_joint_power_r1": 0.0,
       "regional_joint_power_r2": 0.0,
@@ -970,124 +1642,412 @@
       "scenario": "scarcity_additional_protocol_failures"
     },
     {
-      "any_regional_claim_rate": 0.018,
+      "any_regional_claim_rate": 0.01,
       "contrast_correlation": 0.644749534691844,
-      "delta_correct": 0.04999999999999993,
+      "contrast_correlation_r1": 0.644749534691844,
+      "contrast_correlation_r2": 0.644749534691844,
+      "delta_correct": 0.050000000000000044,
+      "delta_correct_r1": 0.050000000000000044,
+      "delta_correct_r2": 0.050000000000000044,
       "delta_resolution": -0.050000000000000044,
-      "false_regional_claim_rate": 0.018,
+      "delta_resolution_r1": -0.050000000000000044,
+      "delta_resolution_r2": -0.050000000000000044,
+      "false_regional_claim_rate": 0.01,
       "global_joint_power": 0.0,
       "marginal_correctness_power": 0.05,
-      "marginal_correctness_power_r1": 0.042,
-      "marginal_correctness_power_r2": 0.058,
-      "marginal_resolution_power": 0.041999999999999996,
-      "marginal_resolution_power_r1": 0.032,
-      "marginal_resolution_power_r2": 0.052,
+      "marginal_correctness_power_r1": 0.05,
+      "marginal_correctness_power_r2": 0.05,
+      "marginal_resolution_power": 0.05,
+      "marginal_resolution_power_r1": 0.058,
+      "marginal_resolution_power_r2": 0.042,
       "mc_interval_95": {
+        "R1_correctness": [
+          0.034093745243849435,
+          0.0727681611715476
+        ],
+        "R1_joint": [
+          0.00311531518006224,
+          0.020387035834105168
+        ],
+        "R1_resolution": [
+          0.0406837291117572,
+          0.08205618785625499
+        ],
+        "R2_correctness": [
+          0.034093745243849435,
+          0.0727681611715476
+        ],
+        "R2_joint": [
+          0.00035313639455927543,
+          0.011240706705146757
+        ],
+        "R2_resolution": [
+          0.027632310108451703,
+          0.06335158575433016
+        ],
+        "any_regional": [
+          0.004278753896590496,
+          0.023193099755730702
+        ],
+        "false_regional": [
+          0.004278753896590496,
+          0.023193099755730702
+        ],
+        "global": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ]
+      },
+      "null_diagnostic": true,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b1_r2": 0.2,
+      "protocol_failure_b2": 0.25,
+      "protocol_failure_b2_r2": 0.25,
+      "regional_joint_power": 0.005,
+      "regional_joint_power_r1": 0.008,
+      "regional_joint_power_r2": 0.002,
+      "sample_size": 1500,
+      "scenario": "joint_null_boundary"
+    },
+    {
+      "any_regional_claim_rate": 0.01,
+      "contrast_correlation": 0.644749534691844,
+      "contrast_correlation_r1": 0.644749534691844,
+      "contrast_correlation_r2": 0.644749534691844,
+      "delta_correct": 0.050000000000000044,
+      "delta_correct_r1": 0.050000000000000044,
+      "delta_correct_r2": 0.050000000000000044,
+      "delta_resolution": -0.050000000000000044,
+      "delta_resolution_r1": -0.050000000000000044,
+      "delta_resolution_r2": -0.050000000000000044,
+      "false_regional_claim_rate": 0.01,
+      "global_joint_power": 0.0,
+      "marginal_correctness_power": 0.045,
+      "marginal_correctness_power_r1": 0.04,
+      "marginal_correctness_power_r2": 0.05,
+      "marginal_resolution_power": 0.041999999999999996,
+      "marginal_resolution_power_r1": 0.048,
+      "marginal_resolution_power_r2": 0.036,
+      "mc_interval_95": {
+        "R1_correctness": [
+          0.026040797389777257,
+          0.060973595834850805
+        ],
         "R1_joint": [
           0.0010976305226827925,
           0.014465715215177033
         ],
+        "R1_resolution": [
+          0.03246520694135317,
+          0.07042719683589006
+        ],
+        "R2_correctness": [
+          0.034093745243849435,
+          0.0727681611715476
+        ],
         "R2_joint": [
-          0.00679778979084349,
-          0.02861306913778529
+          0.002042596271960238,
+          0.017490252104053375
+        ],
+        "R2_resolution": [
+          0.02289106098029272,
+          0.056184326968027755
         ],
         "any_regional": [
+          0.004278753896590496,
+          0.023193099755730702
+        ],
+        "false_regional": [
+          0.004278753896590496,
+          0.023193099755730702
+        ],
+        "global": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ]
+      },
+      "null_diagnostic": true,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b1_r2": 0.2,
+      "protocol_failure_b2": 0.25,
+      "protocol_failure_b2_r2": 0.25,
+      "regional_joint_power": 0.005,
+      "regional_joint_power_r1": 0.004,
+      "regional_joint_power_r2": 0.006,
+      "sample_size": 2000,
+      "scenario": "joint_null_boundary"
+    },
+    {
+      "any_regional_claim_rate": 0.012,
+      "contrast_correlation": 0.644749534691844,
+      "contrast_correlation_r1": 0.644749534691844,
+      "contrast_correlation_r2": 0.644749534691844,
+      "delta_correct": 0.050000000000000044,
+      "delta_correct_r1": 0.050000000000000044,
+      "delta_correct_r2": 0.050000000000000044,
+      "delta_resolution": -0.050000000000000044,
+      "delta_resolution_r1": -0.050000000000000044,
+      "delta_resolution_r2": -0.050000000000000044,
+      "false_regional_claim_rate": 0.012,
+      "global_joint_power": 0.0,
+      "marginal_correctness_power": 0.05,
+      "marginal_correctness_power_r1": 0.058,
+      "marginal_correctness_power_r2": 0.042,
+      "marginal_resolution_power": 0.045,
+      "marginal_resolution_power_r1": 0.038,
+      "marginal_resolution_power_r2": 0.052,
+      "mc_interval_95": {
+        "R1_correctness": [
+          0.0406837291117572,
+          0.08205618785625499
+        ],
+        "R1_joint": [
+          0.00311531518006224,
+          0.020387035834105168
+        ],
+        "R1_resolution": [
+          0.024460118055830385,
+          0.05858477253064388
+        ],
+        "R2_correctness": [
+          0.027632310108451703,
+          0.06335158575433016
+        ],
+        "R2_joint": [
+          0.0010976305226827925,
+          0.014465715215177033
+        ],
+        "R2_resolution": [
+          0.035730265115705276,
+          0.07510114393784553
+        ],
+        "any_regional": [
+          0.005510995174027701,
+          0.025930361116447295
+        ],
+        "false_regional": [
+          0.005510995174027701,
+          0.025930361116447295
+        ],
+        "global": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ]
+      },
+      "null_diagnostic": true,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b1_r2": 0.2,
+      "protocol_failure_b2": 0.25,
+      "protocol_failure_b2_r2": 0.25,
+      "regional_joint_power": 0.006,
+      "regional_joint_power_r1": 0.008,
+      "regional_joint_power_r2": 0.004,
+      "sample_size": 3000,
+      "scenario": "joint_null_boundary"
+    },
+    {
+      "any_regional_claim_rate": 0.86,
+      "contrast_correlation": 0.9371505989742097,
+      "contrast_correlation_r1": 0.9371505989742097,
+      "contrast_correlation_r2": 0.9141763924809453,
+      "delta_correct": 0.09999999999999998,
+      "delta_correct_r1": 0.09999999999999998,
+      "delta_correct_r2": 0.050000000000000044,
+      "delta_resolution": 0.050000000000000044,
+      "delta_resolution_r1": 0.050000000000000044,
+      "delta_resolution_r2": -0.050000000000000044,
+      "false_regional_claim_rate": 0.028,
+      "global_joint_power": 0.026,
+      "marginal_correctness_power": 0.48100000000000004,
+      "marginal_correctness_power_r1": 0.914,
+      "marginal_correctness_power_r2": 0.048,
+      "marginal_resolution_power": 0.524,
+      "marginal_resolution_power_r1": 1.0,
+      "marginal_resolution_power_r2": 0.048,
+      "mc_interval_95": {
+        "R1_correctness": [
+          0.8861601885014425,
+          0.9355268575963924
+        ],
+        "R1_joint": [
+          0.8246703326752246,
+          0.885870639554304
+        ],
+        "R1_resolution": [
+          0.9923756595384479,
+          1.0
+        ],
+        "R2_correctness": [
+          0.03246520694135317,
+          0.07042719683589006
+        ],
+        "R2_joint": [
+          0.01675097472075645,
+          0.04644640267494888
+        ],
+        "R2_resolution": [
+          0.03246520694135317,
+          0.07042719683589006
+        ],
+        "any_regional": [
+          0.826833135055546,
+          0.8876773398121365
+        ],
+        "false_regional": [
+          0.01675097472075645,
+          0.04644640267494888
+        ],
+        "global": [
+          0.01525638392332725,
+          0.043971490834224275
+        ]
+      },
+      "null_diagnostic": true,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b1_r2": 0.2,
+      "protocol_failure_b2": 0.1499999999999999,
+      "protocol_failure_b2_r2": 0.25,
+      "regional_joint_power": 0.443,
+      "regional_joint_power_r1": 0.858,
+      "regional_joint_power_r2": 0.028,
+      "sample_size": 1500,
+      "scenario": "mixed_null_boundary"
+    },
+    {
+      "any_regional_claim_rate": 0.926,
+      "contrast_correlation": 0.9371505989742097,
+      "contrast_correlation_r1": 0.9371505989742097,
+      "contrast_correlation_r2": 0.9141763924809453,
+      "delta_correct": 0.09999999999999998,
+      "delta_correct_r1": 0.09999999999999998,
+      "delta_correct_r2": 0.050000000000000044,
+      "delta_resolution": 0.050000000000000044,
+      "delta_resolution_r1": 0.050000000000000044,
+      "delta_resolution_r2": -0.050000000000000044,
+      "false_regional_claim_rate": 0.02,
+      "global_joint_power": 0.02,
+      "marginal_correctness_power": 0.501,
+      "marginal_correctness_power_r1": 0.96,
+      "marginal_correctness_power_r2": 0.042,
+      "marginal_resolution_power": 0.521,
+      "marginal_resolution_power_r1": 1.0,
+      "marginal_resolution_power_r2": 0.042,
+      "mc_interval_95": {
+        "R1_correctness": [
+          0.9390264041651492,
+          0.9739592026102227
+        ],
+        "R1_joint": [
+          0.8996652466777695,
+          0.945838815248988
+        ],
+        "R1_resolution": [
+          0.9923756595384479,
+          1.0
+        ],
+        "R2_correctness": [
+          0.027632310108451703,
+          0.06335158575433016
+        ],
+        "R2_joint": [
+          0.010899183596210813,
+          0.036420183246879345
+        ],
+        "R2_resolution": [
+          0.027632310108451703,
+          0.06335158575433016
+        ],
+        "any_regional": [
+          0.8996652466777695,
+          0.945838815248988
+        ],
+        "false_regional": [
+          0.010899183596210813,
+          0.036420183246879345
+        ],
+        "global": [
+          0.010899183596210813,
+          0.036420183246879345
+        ]
+      },
+      "null_diagnostic": true,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b1_r2": 0.2,
+      "protocol_failure_b2": 0.1499999999999999,
+      "protocol_failure_b2_r2": 0.25,
+      "regional_joint_power": 0.47300000000000003,
+      "regional_joint_power_r1": 0.926,
+      "regional_joint_power_r2": 0.02,
+      "sample_size": 2000,
+      "scenario": "mixed_null_boundary"
+    },
+    {
+      "any_regional_claim_rate": 0.992,
+      "contrast_correlation": 0.9371505989742097,
+      "contrast_correlation_r1": 0.9371505989742097,
+      "contrast_correlation_r2": 0.9141763924809453,
+      "delta_correct": 0.09999999999999998,
+      "delta_correct_r1": 0.09999999999999998,
+      "delta_correct_r2": 0.050000000000000044,
+      "delta_resolution": 0.050000000000000044,
+      "delta_resolution_r1": 0.050000000000000044,
+      "delta_resolution_r2": -0.050000000000000044,
+      "false_regional_claim_rate": 0.018,
+      "global_joint_power": 0.018,
+      "marginal_correctness_power": 0.516,
+      "marginal_correctness_power_r1": 0.994,
+      "marginal_correctness_power_r2": 0.038,
+      "marginal_resolution_power": 0.515,
+      "marginal_resolution_power_r1": 1.0,
+      "marginal_resolution_power_r2": 0.03,
+      "mc_interval_95": {
+        "R1_correctness": [
+          0.9825097478959467,
+          0.9979574037280398
+        ],
+        "R1_joint": [
+          0.9796129641658948,
+          0.9968846848199377
+        ],
+        "R1_resolution": [
+          0.9923756595384479,
+          1.0
+        ],
+        "R2_correctness": [
+          0.024460118055830385,
+          0.05858477253064388
+        ],
+        "R2_joint": [
+          0.00949819329619708,
+          0.03385167090873928
+        ],
+        "R2_resolution": [
+          0.018263213197913384,
+          0.04890366683594573
+        ],
+        "any_regional": [
+          0.9796129641658948,
+          0.9968846848199377
+        ],
+        "false_regional": [
           0.00949819329619708,
           0.03385167090873928
         ],
         "global": [
-          4.336808689942018e-19,
-          0.007624340461552241
+          0.00949819329619708,
+          0.03385167090873928
         ]
       },
       "null_diagnostic": true,
       "protocol_failure_b1": 0.2,
-      "protocol_failure_b2": 0.25,
-      "regional_joint_power": 0.009000000000000001,
-      "regional_joint_power_r1": 0.004,
-      "regional_joint_power_r2": 0.014,
-      "sample_size": 1500,
-      "scenario": "joint_null_boundary"
-    },
-    {
-      "any_regional_claim_rate": 0.008,
-      "contrast_correlation": 0.644749534691844,
-      "delta_correct": 0.04999999999999993,
-      "delta_resolution": -0.050000000000000044,
-      "false_regional_claim_rate": 0.008,
-      "global_joint_power": 0.0,
-      "marginal_correctness_power": 0.044,
-      "marginal_correctness_power_r1": 0.042,
-      "marginal_correctness_power_r2": 0.046,
-      "marginal_resolution_power": 0.023,
-      "marginal_resolution_power_r1": 0.02,
-      "marginal_resolution_power_r2": 0.026,
-      "mc_interval_95": {
-        "R1_joint": [
-          0.002042596271960238,
-          0.017490252104053375
-        ],
-        "R2_joint": [
-          0.00035313639455927543,
-          0.011240706705146757
-        ],
-        "any_regional": [
-          0.00311531518006224,
-          0.020387035834105168
-        ],
-        "global": [
-          4.336808689942018e-19,
-          0.007624340461552241
-        ]
-      },
-      "null_diagnostic": true,
-      "protocol_failure_b1": 0.2,
-      "protocol_failure_b2": 0.25,
-      "regional_joint_power": 0.004,
-      "regional_joint_power_r1": 0.006,
-      "regional_joint_power_r2": 0.002,
-      "sample_size": 2000,
-      "scenario": "joint_null_boundary"
-    },
-    {
-      "any_regional_claim_rate": 0.006,
-      "contrast_correlation": 0.644749534691844,
-      "delta_correct": 0.04999999999999993,
-      "delta_resolution": -0.050000000000000044,
-      "false_regional_claim_rate": 0.006,
-      "global_joint_power": 0.0,
-      "marginal_correctness_power": 0.035,
-      "marginal_correctness_power_r1": 0.034,
-      "marginal_correctness_power_r2": 0.036,
-      "marginal_resolution_power": 0.036000000000000004,
-      "marginal_resolution_power_r1": 0.032,
-      "marginal_resolution_power_r2": 0.04,
-      "mc_interval_95": {
-        "R1_joint": [
-          0.0010976305226827925,
-          0.014465715215177033
-        ],
-        "R2_joint": [
-          0.00035313639455927543,
-          0.011240706705146757
-        ],
-        "any_regional": [
-          0.002042596271960238,
-          0.017490252104053375
-        ],
-        "global": [
-          4.336808689942018e-19,
-          0.007624340461552241
-        ]
-      },
-      "null_diagnostic": true,
-      "protocol_failure_b1": 0.2,
-      "protocol_failure_b2": 0.25,
-      "regional_joint_power": 0.003,
-      "regional_joint_power_r1": 0.004,
-      "regional_joint_power_r2": 0.002,
+      "protocol_failure_b1_r2": 0.2,
+      "protocol_failure_b2": 0.1499999999999999,
+      "protocol_failure_b2_r2": 0.25,
+      "regional_joint_power": 0.505,
+      "regional_joint_power_r1": 0.992,
+      "regional_joint_power_r2": 0.018,
       "sample_size": 3000,
-      "scenario": "joint_null_boundary"
+      "scenario": "mixed_null_boundary"
     }
   ],
   "sample_size_recommendation": {
@@ -1107,382 +2067,868 @@
   ],
   "scenarios": [
     {
-      "b1_state_probabilities": [
-        0.56,
-        0.24,
-        0.2
-      ],
-      "b2_state_probabilities": [
-        0.66,
-        0.19,
-        0.15
-      ],
-      "contrasts": {
-        "correlation_contrasts": 0.9371505989742097,
-        "covariance_contrasts": 0.34500000000000003,
-        "delta_correct": 0.09999999999999998,
-        "delta_resolution": 0.04999999999999993,
-        "min_cell_probability": 0.0,
-        "variance_correct": 0.39000000000000007,
-        "variance_resolution": 0.34750000000000003
-      },
       "coupling": "positive",
       "description": "Meaningful correctness improvement with safe resolution.",
       "is_null_scenario": false,
-      "joint_table": [
-        [
-          0.41,
-          0.0,
-          0.15000000000000002
-        ],
-        [
-          0.050000000000000044,
-          0.18999999999999995,
-          0.0
-        ],
-        [
-          0.2,
-          0.0,
-          0.0
-        ]
-      ],
-      "name": "favorable"
+      "name": "favorable",
+      "null_regions": [],
+      "regions": {
+        "R1": {
+          "b1_state_probabilities": [
+            0.56,
+            0.24,
+            0.2
+          ],
+          "b2_state_probabilities": [
+            0.66,
+            0.19000000000000006,
+            0.1499999999999999
+          ],
+          "contrasts": {
+            "correlation_contrasts": 0.9371505989742097,
+            "covariance_contrasts": 0.3449999999999999,
+            "delta_correct": 0.09999999999999998,
+            "delta_resolution": 0.050000000000000044,
+            "min_cell_probability": 0.0,
+            "variance_correct": 0.38999999999999985,
+            "variance_resolution": 0.3474999999999999
+          },
+          "joint_table": [
+            [
+              0.4100000000000001,
+              0.0,
+              0.1499999999999999
+            ],
+            [
+              0.04999999999999993,
+              0.19000000000000006,
+              0.0
+            ],
+            [
+              0.2,
+              0.0,
+              0.0
+            ]
+          ]
+        },
+        "R2": {
+          "b1_state_probabilities": [
+            0.56,
+            0.24,
+            0.2
+          ],
+          "b2_state_probabilities": [
+            0.66,
+            0.19000000000000006,
+            0.1499999999999999
+          ],
+          "contrasts": {
+            "correlation_contrasts": 0.9371505989742097,
+            "covariance_contrasts": 0.3449999999999999,
+            "delta_correct": 0.09999999999999998,
+            "delta_resolution": 0.050000000000000044,
+            "min_cell_probability": 0.0,
+            "variance_correct": 0.38999999999999985,
+            "variance_resolution": 0.3474999999999999
+          },
+          "joint_table": [
+            [
+              0.4100000000000001,
+              0.0,
+              0.1499999999999999
+            ],
+            [
+              0.04999999999999993,
+              0.19000000000000006,
+              0.0
+            ],
+            [
+              0.2,
+              0.0,
+              0.0
+            ]
+          ]
+        }
+      }
     },
     {
-      "b1_state_probabilities": [
-        0.56,
-        0.24,
-        0.2
-      ],
-      "b2_state_probabilities": [
-        0.61,
-        0.19,
-        0.2
-      ],
-      "contrasts": {
-        "correlation_contrasts": 0.9454389184941309,
-        "covariance_contrasts": 0.39999999999999997,
-        "delta_correct": 0.050000000000000044,
-        "delta_resolution": 0.0,
-        "min_cell_probability": 0.0,
-        "variance_correct": 0.4475,
-        "variance_resolution": 0.39999999999999997
-      },
       "coupling": "positive",
       "description": "Correctness is exactly at the candidate minimum-effect boundary.",
       "is_null_scenario": true,
-      "joint_table": [
-        [
-          0.36000000000000004,
-          0.0,
-          0.19999999999999996
-        ],
-        [
-          0.050000000000000044,
-          0.18999999999999995,
-          0.0
-        ],
-        [
-          0.2,
-          0.0,
-          0.0
-        ]
+      "name": "correctness_boundary",
+      "null_regions": [
+        "R1",
+        "R2"
       ],
-      "name": "correctness_boundary"
+      "regions": {
+        "R1": {
+          "b1_state_probabilities": [
+            0.56,
+            0.24,
+            0.2
+          ],
+          "b2_state_probabilities": [
+            0.6100000000000001,
+            0.18999999999999995,
+            0.19999999999999996
+          ],
+          "contrasts": {
+            "correlation_contrasts": 0.9454389184941309,
+            "covariance_contrasts": 0.39999999999999997,
+            "delta_correct": 0.050000000000000044,
+            "delta_resolution": 0.0,
+            "min_cell_probability": 0.0,
+            "variance_correct": 0.4475,
+            "variance_resolution": 0.39999999999999997
+          },
+          "joint_table": [
+            [
+              0.36000000000000004,
+              0.0,
+              0.19999999999999996
+            ],
+            [
+              0.050000000000000044,
+              0.18999999999999995,
+              0.0
+            ],
+            [
+              0.2,
+              0.0,
+              0.0
+            ]
+          ]
+        },
+        "R2": {
+          "b1_state_probabilities": [
+            0.56,
+            0.24,
+            0.2
+          ],
+          "b2_state_probabilities": [
+            0.6100000000000001,
+            0.18999999999999995,
+            0.19999999999999996
+          ],
+          "contrasts": {
+            "correlation_contrasts": 0.9454389184941309,
+            "covariance_contrasts": 0.39999999999999997,
+            "delta_correct": 0.050000000000000044,
+            "delta_resolution": 0.0,
+            "min_cell_probability": 0.0,
+            "variance_correct": 0.4475,
+            "variance_resolution": 0.39999999999999997
+          },
+          "joint_table": [
+            [
+              0.36000000000000004,
+              0.0,
+              0.19999999999999996
+            ],
+            [
+              0.050000000000000044,
+              0.18999999999999995,
+              0.0
+            ],
+            [
+              0.2,
+              0.0,
+              0.0
+            ]
+          ]
+        }
+      }
     },
     {
-      "b1_state_probabilities": [
-        0.56,
-        0.24,
-        0.2
-      ],
-      "b2_state_probabilities": [
-        0.56,
-        0.19,
-        0.25
-      ],
-      "contrasts": {
-        "correlation_contrasts": 0.951329560647042,
-        "covariance_contrasts": 0.45,
-        "delta_correct": 0.0,
-        "delta_resolution": -0.050000000000000044,
-        "min_cell_probability": 0.0,
-        "variance_correct": 0.5,
-        "variance_resolution": 0.4475
-      },
       "coupling": "positive",
       "description": "Resolution is exactly at the candidate non-inferiority boundary.",
       "is_null_scenario": true,
-      "joint_table": [
-        [
-          0.31,
-          0.0,
-          0.25
-        ],
-        [
-          0.050000000000000044,
-          0.18999999999999995,
-          0.0
-        ],
-        [
-          0.2,
-          0.0,
-          0.0
-        ]
+      "name": "resolution_boundary",
+      "null_regions": [
+        "R1",
+        "R2"
       ],
-      "name": "resolution_boundary"
+      "regions": {
+        "R1": {
+          "b1_state_probabilities": [
+            0.56,
+            0.24,
+            0.2
+          ],
+          "b2_state_probabilities": [
+            0.56,
+            0.18999999999999995,
+            0.25
+          ],
+          "contrasts": {
+            "correlation_contrasts": 0.951329560647042,
+            "covariance_contrasts": 0.45,
+            "delta_correct": 0.0,
+            "delta_resolution": -0.050000000000000044,
+            "min_cell_probability": 0.0,
+            "variance_correct": 0.5,
+            "variance_resolution": 0.4475
+          },
+          "joint_table": [
+            [
+              0.31,
+              0.0,
+              0.25
+            ],
+            [
+              0.050000000000000044,
+              0.18999999999999995,
+              0.0
+            ],
+            [
+              0.2,
+              0.0,
+              0.0
+            ]
+          ]
+        },
+        "R2": {
+          "b1_state_probabilities": [
+            0.56,
+            0.24,
+            0.2
+          ],
+          "b2_state_probabilities": [
+            0.56,
+            0.18999999999999995,
+            0.25
+          ],
+          "contrasts": {
+            "correlation_contrasts": 0.951329560647042,
+            "covariance_contrasts": 0.45,
+            "delta_correct": 0.0,
+            "delta_resolution": -0.050000000000000044,
+            "min_cell_probability": 0.0,
+            "variance_correct": 0.5,
+            "variance_resolution": 0.4475
+          },
+          "joint_table": [
+            [
+              0.31,
+              0.0,
+              0.25
+            ],
+            [
+              0.050000000000000044,
+              0.18999999999999995,
+              0.0
+            ],
+            [
+              0.2,
+              0.0,
+              0.0
+            ]
+          ]
+        }
+      }
     },
     {
-      "b1_state_probabilities": [
-        0.56,
-        0.24,
-        0.2
-      ],
-      "b2_state_probabilities": [
-        0.66,
-        0.04,
-        0.3
-      ],
-      "contrasts": {
-        "correlation_contrasts": 0.87709692962489,
-        "covariance_contrasts": 0.51,
-        "delta_correct": 0.09999999999999987,
-        "delta_resolution": -0.10000000000000009,
-        "min_cell_probability": 0.0,
-        "variance_correct": 0.69,
-        "variance_resolution": 0.49
-      },
       "coupling": "positive",
       "description": "Correctness improves while resolution loss exceeds the candidate margin.",
       "is_null_scenario": false,
-      "joint_table": [
-        [
-          0.25999999999999995,
-          0.0,
-          0.30000000000000004
-        ],
-        [
-          0.19999999999999996,
-          0.040000000000000036,
-          0.0
-        ],
-        [
-          0.2,
-          0.0,
-          0.0
-        ]
-      ],
-      "name": "correctness_gain_resolution_loss"
+      "name": "correctness_gain_resolution_loss",
+      "null_regions": [],
+      "regions": {
+        "R1": {
+          "b1_state_probabilities": [
+            0.56,
+            0.24,
+            0.2
+          ],
+          "b2_state_probabilities": [
+            0.66,
+            0.040000000000000036,
+            0.29999999999999993
+          ],
+          "contrasts": {
+            "correlation_contrasts": 0.8770969296248898,
+            "covariance_contrasts": 0.5099999999999999,
+            "delta_correct": 0.09999999999999998,
+            "delta_resolution": -0.09999999999999998,
+            "min_cell_probability": 0.0,
+            "variance_correct": 0.69,
+            "variance_resolution": 0.48999999999999994
+          },
+          "joint_table": [
+            [
+              0.26000000000000006,
+              0.0,
+              0.29999999999999993
+            ],
+            [
+              0.19999999999999996,
+              0.040000000000000036,
+              0.0
+            ],
+            [
+              0.2,
+              0.0,
+              0.0
+            ]
+          ]
+        },
+        "R2": {
+          "b1_state_probabilities": [
+            0.56,
+            0.24,
+            0.2
+          ],
+          "b2_state_probabilities": [
+            0.66,
+            0.040000000000000036,
+            0.29999999999999993
+          ],
+          "contrasts": {
+            "correlation_contrasts": 0.8770969296248898,
+            "covariance_contrasts": 0.5099999999999999,
+            "delta_correct": 0.09999999999999998,
+            "delta_resolution": -0.09999999999999998,
+            "min_cell_probability": 0.0,
+            "variance_correct": 0.69,
+            "variance_resolution": 0.48999999999999994
+          },
+          "joint_table": [
+            [
+              0.26000000000000006,
+              0.0,
+              0.29999999999999993
+            ],
+            [
+              0.19999999999999996,
+              0.040000000000000036,
+              0.0
+            ],
+            [
+              0.2,
+              0.0,
+              0.0
+            ]
+          ]
+        }
+      }
     },
     {
-      "b1_state_probabilities": [
-        0.56,
-        0.24,
-        0.2
-      ],
-      "b2_state_probabilities": [
-        0.56,
-        0.24,
-        0.2
-      ],
-      "contrasts": {
-        "correlation_contrasts": 0.5640760748177661,
-        "covariance_contrasts": 0.22400000000000003,
-        "delta_correct": 0.0,
-        "delta_resolution": 0.0,
-        "min_cell_probability": 0.04000000000000001,
-        "variance_correct": 0.49280000000000007,
-        "variance_resolution": 0.32000000000000006
-      },
       "coupling": "independent",
       "description": "No correctness or resolution improvement.",
       "is_null_scenario": true,
-      "joint_table": [
-        [
-          0.31360000000000005,
-          0.13440000000000002,
-          0.11200000000000002
-        ],
-        [
-          0.13440000000000002,
-          0.0576,
-          0.048
-        ],
-        [
-          0.11200000000000002,
-          0.048,
-          0.04000000000000001
-        ]
+      "name": "no_meaningful_correctness_benefit",
+      "null_regions": [
+        "R1",
+        "R2"
       ],
-      "name": "no_meaningful_correctness_benefit"
+      "regions": {
+        "R1": {
+          "b1_state_probabilities": [
+            0.56,
+            0.24,
+            0.2
+          ],
+          "b2_state_probabilities": [
+            0.56,
+            0.24,
+            0.2
+          ],
+          "contrasts": {
+            "correlation_contrasts": 0.5640760748177661,
+            "covariance_contrasts": 0.22400000000000003,
+            "delta_correct": 0.0,
+            "delta_resolution": 0.0,
+            "min_cell_probability": 0.04000000000000001,
+            "variance_correct": 0.49280000000000007,
+            "variance_resolution": 0.32000000000000006
+          },
+          "joint_table": [
+            [
+              0.31360000000000005,
+              0.13440000000000002,
+              0.11200000000000002
+            ],
+            [
+              0.13440000000000002,
+              0.0576,
+              0.048
+            ],
+            [
+              0.11200000000000002,
+              0.048,
+              0.04000000000000001
+            ]
+          ]
+        },
+        "R2": {
+          "b1_state_probabilities": [
+            0.56,
+            0.24,
+            0.2
+          ],
+          "b2_state_probabilities": [
+            0.56,
+            0.24,
+            0.2
+          ],
+          "contrasts": {
+            "correlation_contrasts": 0.5640760748177661,
+            "covariance_contrasts": 0.22400000000000003,
+            "delta_correct": 0.0,
+            "delta_resolution": 0.0,
+            "min_cell_probability": 0.04000000000000001,
+            "variance_correct": 0.49280000000000007,
+            "variance_resolution": 0.32000000000000006
+          },
+          "joint_table": [
+            [
+              0.31360000000000005,
+              0.13440000000000002,
+              0.11200000000000002
+            ],
+            [
+              0.13440000000000002,
+              0.0576,
+              0.048
+            ],
+            [
+              0.11200000000000002,
+              0.048,
+              0.04000000000000001
+            ]
+          ]
+        }
+      }
     },
     {
-      "b1_state_probabilities": [
-        0.56,
-        0.24,
-        0.2
-      ],
-      "b2_state_probabilities": [
-        0.66,
-        0.19,
-        0.15
-      ],
-      "contrasts": {
-        "correlation_contrasts": 0.9371505989742097,
-        "covariance_contrasts": 0.34500000000000003,
-        "delta_correct": 0.09999999999999998,
-        "delta_resolution": 0.04999999999999993,
-        "min_cell_probability": 0.0,
-        "variance_correct": 0.39000000000000007,
-        "variance_resolution": 0.34750000000000003
-      },
       "coupling": "positive",
       "description": "Favorable margins with strong feasible positive paired dependence.",
       "is_null_scenario": false,
-      "joint_table": [
-        [
-          0.41,
-          0.0,
-          0.15000000000000002
-        ],
-        [
-          0.050000000000000044,
-          0.18999999999999995,
-          0.0
-        ],
-        [
-          0.2,
-          0.0,
-          0.0
-        ]
-      ],
-      "name": "strong_positive_dependence"
+      "name": "strong_positive_dependence",
+      "null_regions": [],
+      "regions": {
+        "R1": {
+          "b1_state_probabilities": [
+            0.56,
+            0.24,
+            0.2
+          ],
+          "b2_state_probabilities": [
+            0.66,
+            0.19000000000000006,
+            0.1499999999999999
+          ],
+          "contrasts": {
+            "correlation_contrasts": 0.9371505989742097,
+            "covariance_contrasts": 0.3449999999999999,
+            "delta_correct": 0.09999999999999998,
+            "delta_resolution": 0.050000000000000044,
+            "min_cell_probability": 0.0,
+            "variance_correct": 0.38999999999999985,
+            "variance_resolution": 0.3474999999999999
+          },
+          "joint_table": [
+            [
+              0.4100000000000001,
+              0.0,
+              0.1499999999999999
+            ],
+            [
+              0.04999999999999993,
+              0.19000000000000006,
+              0.0
+            ],
+            [
+              0.2,
+              0.0,
+              0.0
+            ]
+          ]
+        },
+        "R2": {
+          "b1_state_probabilities": [
+            0.56,
+            0.24,
+            0.2
+          ],
+          "b2_state_probabilities": [
+            0.66,
+            0.19000000000000006,
+            0.1499999999999999
+          ],
+          "contrasts": {
+            "correlation_contrasts": 0.9371505989742097,
+            "covariance_contrasts": 0.3449999999999999,
+            "delta_correct": 0.09999999999999998,
+            "delta_resolution": 0.050000000000000044,
+            "min_cell_probability": 0.0,
+            "variance_correct": 0.38999999999999985,
+            "variance_resolution": 0.3474999999999999
+          },
+          "joint_table": [
+            [
+              0.4100000000000001,
+              0.0,
+              0.1499999999999999
+            ],
+            [
+              0.04999999999999993,
+              0.19000000000000006,
+              0.0
+            ],
+            [
+              0.2,
+              0.0,
+              0.0
+            ]
+          ]
+        }
+      }
     },
     {
-      "b1_state_probabilities": [
-        0.56,
-        0.24,
-        0.2
-      ],
-      "b2_state_probabilities": [
-        0.66,
-        0.19,
-        0.15
-      ],
-      "contrasts": {
-        "correlation_contrasts": -0.07647191129018749,
-        "covariance_contrasts": -0.00500000000000002,
-        "delta_correct": 0.10000000000000009,
-        "delta_resolution": 0.050000000000000155,
-        "min_cell_probability": 0.0,
-        "variance_correct": 0.09000000000000001,
-        "variance_resolution": 0.047500000000000084
-      },
       "coupling": "unfavorable",
       "description": "Favorable margins with a feasible reverse quantile coupling.",
       "is_null_scenario": false,
-      "joint_table": [
-        [
-          0.56,
-          0.0,
-          0.0
-        ],
-        [
-          0.10000000000000003,
-          0.13999999999999996,
-          0.0
-        ],
-        [
-          0.0,
-          0.0500000000000001,
-          0.1499999999999999
-        ]
-      ],
-      "name": "weak_unfavorable_dependence"
+      "name": "weak_unfavorable_dependence",
+      "null_regions": [],
+      "regions": {
+        "R1": {
+          "b1_state_probabilities": [
+            0.56,
+            0.24,
+            0.2
+          ],
+          "b2_state_probabilities": [
+            0.66,
+            0.19000000000000006,
+            0.1499999999999999
+          ],
+          "contrasts": {
+            "correlation_contrasts": -0.07647191129018749,
+            "covariance_contrasts": -0.00500000000000002,
+            "delta_correct": 0.10000000000000009,
+            "delta_resolution": 0.050000000000000155,
+            "min_cell_probability": 0.0,
+            "variance_correct": 0.09000000000000001,
+            "variance_resolution": 0.047500000000000084
+          },
+          "joint_table": [
+            [
+              0.56,
+              0.0,
+              0.0
+            ],
+            [
+              0.10000000000000003,
+              0.13999999999999996,
+              0.0
+            ],
+            [
+              0.0,
+              0.0500000000000001,
+              0.1499999999999999
+            ]
+          ]
+        },
+        "R2": {
+          "b1_state_probabilities": [
+            0.56,
+            0.24,
+            0.2
+          ],
+          "b2_state_probabilities": [
+            0.66,
+            0.19000000000000006,
+            0.1499999999999999
+          ],
+          "contrasts": {
+            "correlation_contrasts": -0.07647191129018749,
+            "covariance_contrasts": -0.00500000000000002,
+            "delta_correct": 0.10000000000000009,
+            "delta_resolution": 0.050000000000000155,
+            "min_cell_probability": 0.0,
+            "variance_correct": 0.09000000000000001,
+            "variance_resolution": 0.047500000000000084
+          },
+          "joint_table": [
+            [
+              0.56,
+              0.0,
+              0.0
+            ],
+            [
+              0.10000000000000003,
+              0.13999999999999996,
+              0.0
+            ],
+            [
+              0.0,
+              0.0500000000000001,
+              0.1499999999999999
+            ]
+          ]
+        }
+      }
     },
     {
-      "b1_state_probabilities": [
-        0.56,
-        0.24,
-        0.2
-      ],
-      "b2_state_probabilities": [
-        0.5,
-        0.15,
-        0.35
-      ],
-      "contrasts": {
-        "correlation_contrasts": 0.9337292153995469,
-        "covariance_contrasts": 0.541,
-        "delta_correct": -0.06000000000000005,
-        "delta_resolution": -0.15000000000000002,
-        "min_cell_probability": 0.0,
-        "variance_correct": 0.6363999999999999,
-        "variance_resolution": 0.5275000000000001
-      },
       "coupling": "positive",
       "description": "B2 adds protocol failures under a scarce Judge supply treatment.",
       "is_null_scenario": false,
-      "joint_table": [
-        [
-          0.21000000000000002,
-          0.0,
-          0.35
-        ],
-        [
-          0.08999999999999997,
-          0.15000000000000002,
-          0.0
-        ],
-        [
-          0.2,
-          0.0,
-          0.0
-        ]
-      ],
-      "name": "scarcity_additional_protocol_failures"
+      "name": "scarcity_additional_protocol_failures",
+      "null_regions": [],
+      "regions": {
+        "R1": {
+          "b1_state_probabilities": [
+            0.56,
+            0.24,
+            0.2
+          ],
+          "b2_state_probabilities": [
+            0.5,
+            0.15,
+            0.35
+          ],
+          "contrasts": {
+            "correlation_contrasts": 0.9337292153995469,
+            "covariance_contrasts": 0.541,
+            "delta_correct": -0.06000000000000005,
+            "delta_resolution": -0.15000000000000002,
+            "min_cell_probability": 0.0,
+            "variance_correct": 0.6363999999999999,
+            "variance_resolution": 0.5275000000000001
+          },
+          "joint_table": [
+            [
+              0.21000000000000002,
+              0.0,
+              0.35
+            ],
+            [
+              0.08999999999999997,
+              0.15000000000000002,
+              0.0
+            ],
+            [
+              0.2,
+              0.0,
+              0.0
+            ]
+          ]
+        },
+        "R2": {
+          "b1_state_probabilities": [
+            0.56,
+            0.24,
+            0.2
+          ],
+          "b2_state_probabilities": [
+            0.5,
+            0.15,
+            0.35
+          ],
+          "contrasts": {
+            "correlation_contrasts": 0.9337292153995469,
+            "covariance_contrasts": 0.541,
+            "delta_correct": -0.06000000000000005,
+            "delta_resolution": -0.15000000000000002,
+            "min_cell_probability": 0.0,
+            "variance_correct": 0.6363999999999999,
+            "variance_resolution": 0.5275000000000001
+          },
+          "joint_table": [
+            [
+              0.21000000000000002,
+              0.0,
+              0.35
+            ],
+            [
+              0.08999999999999997,
+              0.15000000000000002,
+              0.0
+            ],
+            [
+              0.2,
+              0.0,
+              0.0
+            ]
+          ]
+        }
+      }
     },
     {
-      "b1_state_probabilities": [
-        0.56,
-        0.24,
-        0.2
-      ],
-      "b2_state_probabilities": [
-        0.61,
-        0.14,
-        0.25
-      ],
-      "contrasts": {
-        "correlation_contrasts": 0.644749534691844,
-        "covariance_contrasts": 0.2645,
-        "delta_correct": 0.04999999999999993,
-        "delta_resolution": -0.050000000000000044,
-        "min_cell_probability": 0.028000000000000004,
-        "variance_correct": 0.4843,
-        "variance_resolution": 0.34750000000000003
-      },
       "coupling": "independent",
       "description": "Both component nulls are set at their candidate decision boundaries.",
       "is_null_scenario": true,
-      "joint_table": [
-        [
-          0.3416,
-          0.07840000000000001,
-          0.14
-        ],
-        [
-          0.1464,
-          0.033600000000000005,
-          0.06
-        ],
-        [
-          0.122,
-          0.028000000000000004,
-          0.05
-        ]
+      "name": "joint_null_boundary",
+      "null_regions": [
+        "R1",
+        "R2"
       ],
-      "name": "joint_null_boundary"
+      "regions": {
+        "R1": {
+          "b1_state_probabilities": [
+            0.56,
+            0.24,
+            0.2
+          ],
+          "b2_state_probabilities": [
+            0.6100000000000001,
+            0.1399999999999999,
+            0.25
+          ],
+          "contrasts": {
+            "correlation_contrasts": 0.644749534691844,
+            "covariance_contrasts": 0.2645,
+            "delta_correct": 0.050000000000000044,
+            "delta_resolution": -0.050000000000000044,
+            "min_cell_probability": 0.027999999999999983,
+            "variance_correct": 0.4843,
+            "variance_resolution": 0.34750000000000003
+          },
+          "joint_table": [
+            [
+              0.34160000000000007,
+              0.07839999999999996,
+              0.14
+            ],
+            [
+              0.14640000000000003,
+              0.03359999999999998,
+              0.06
+            ],
+            [
+              0.12200000000000003,
+              0.027999999999999983,
+              0.05
+            ]
+          ]
+        },
+        "R2": {
+          "b1_state_probabilities": [
+            0.56,
+            0.24,
+            0.2
+          ],
+          "b2_state_probabilities": [
+            0.6100000000000001,
+            0.1399999999999999,
+            0.25
+          ],
+          "contrasts": {
+            "correlation_contrasts": 0.644749534691844,
+            "covariance_contrasts": 0.2645,
+            "delta_correct": 0.050000000000000044,
+            "delta_resolution": -0.050000000000000044,
+            "min_cell_probability": 0.027999999999999983,
+            "variance_correct": 0.4843,
+            "variance_resolution": 0.34750000000000003
+          },
+          "joint_table": [
+            [
+              0.34160000000000007,
+              0.07839999999999996,
+              0.14
+            ],
+            [
+              0.14640000000000003,
+              0.03359999999999998,
+              0.06
+            ],
+            [
+              0.12200000000000003,
+              0.027999999999999983,
+              0.05
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "coupling": "positive",
+      "description": "R1 is favorable while R2 is at both candidate null boundaries.",
+      "is_null_scenario": true,
+      "name": "mixed_null_boundary",
+      "null_regions": [
+        "R2"
+      ],
+      "regions": {
+        "R1": {
+          "b1_state_probabilities": [
+            0.56,
+            0.24,
+            0.2
+          ],
+          "b2_state_probabilities": [
+            0.66,
+            0.19000000000000006,
+            0.1499999999999999
+          ],
+          "contrasts": {
+            "correlation_contrasts": 0.9371505989742097,
+            "covariance_contrasts": 0.3449999999999999,
+            "delta_correct": 0.09999999999999998,
+            "delta_resolution": 0.050000000000000044,
+            "min_cell_probability": 0.0,
+            "variance_correct": 0.38999999999999985,
+            "variance_resolution": 0.3474999999999999
+          },
+          "joint_table": [
+            [
+              0.4100000000000001,
+              0.0,
+              0.1499999999999999
+            ],
+            [
+              0.04999999999999993,
+              0.19000000000000006,
+              0.0
+            ],
+            [
+              0.2,
+              0.0,
+              0.0
+            ]
+          ]
+        },
+        "R2": {
+          "b1_state_probabilities": [
+            0.56,
+            0.24,
+            0.2
+          ],
+          "b2_state_probabilities": [
+            0.6100000000000001,
+            0.1399999999999999,
+            0.25
+          ],
+          "contrasts": {
+            "correlation_contrasts": 0.9141763924809453,
+            "covariance_contrasts": 0.4525,
+            "delta_correct": 0.050000000000000044,
+            "delta_resolution": -0.050000000000000044,
+            "min_cell_probability": 0.0,
+            "variance_correct": 0.5475,
+            "variance_resolution": 0.4475
+          },
+          "joint_table": [
+            [
+              0.31,
+              0.0,
+              0.25
+            ],
+            [
+              0.10000000000000009,
+              0.1399999999999999,
+              0.0
+            ],
+            [
+              0.2,
+              0.0,
+              0.0
+            ]
+          ]
+        }
+      }
     }
   ]
 }

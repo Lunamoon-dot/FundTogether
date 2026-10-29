@@ -128,9 +128,9 @@ Deterministic vector `R3-A-V1`:
 ```text
 pool                 = [J0,J1,J2,J3,J4,J5,J6,J7,J8]
 controlled           = [J0,J1,J2]
-attempt 0 assignment = [J0,J3,J4]
+attempt 0 assignment = [J0,J1,J4]
 attempt 0 trigger    = 1; honest non-reveal = 0
-attempt 1 assignment = [J1,J5,J6]
+attempt 1 assignment = [J2,J5,J6]
 attempt 1 trigger    = 1; honest non-reveal = 0
 expected             = two invalid settlements, then PROTOCOL_FAIL
 ```
@@ -207,6 +207,8 @@ controlled_judge_count = 3 of 9                 PENDING_OWNER_APPROVAL
 controlled_vote_target = PASS or FAIL           PENDING_OWNER_APPROVAL
 controlled_reveal = VALID_REVEAL                PENDING_OWNER_APPROVAL
 selection = uniform among eligible, non-conflicted identities
+court_levels = Court 1 and any Court 2 assignment use the same controlled set
+control_persistence_across_levels = true        PENDING_OWNER_APPROVAL
 DAO participation by a controlled identity = allowed only if snapshot rules allow it
 ```
 
@@ -226,8 +228,9 @@ verdict = two_of_three(vote) if all_reveals_valid else INVALID
 Deterministic vector `R3-C-V1`: assignment `[J0,J1,J4]`, controlled
 `[J0,J1,J2]`, target `PASS`, honest `J4=FAIL`, all reveals valid. The expected
 Court result is `PASS`. With oracle truth `FAIL`, the observable is a false
-PASS; the mirror vector with target `FAIL` is retained separately and is not
-selected after seeing truth.
+PASS. A second attempt `[J2,J5,J6]` retains the same controlled set and again
+uses the fixed target. The mirror vector with target `FAIL` is retained
+separately and is not selected after seeing truth.
 
 Required tests: controlled membership is fixed before assignment, selection
 is uniform over the eligible set, target is not outcome-selected, colluding

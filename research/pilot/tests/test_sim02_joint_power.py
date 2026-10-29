@@ -115,3 +115,28 @@ def test_output_is_json_serializable_and_null_diagnostic_is_marked() -> None:
     json.dumps(result, sort_keys=True)
     assert result["scenarios"][0]["is_null_scenario"] is True
     assert result["results"][0]["null_diagnostic"] is True
+    assert "R1_resolution" in result["results"][0]["mc_interval_95"]
+
+
+def test_planner_uses_region_specific_mixed_nulls_and_margin_derived_boundaries() -> None:
+    result = sim02_joint_power.run_planning(
+        sim02_joint_power.PlanningConfig(
+            planning_reps=3,
+            bootstrap_reps=8,
+            sample_sizes=(10,),
+            correctness_margin=0.10,
+            resolution_margin=0.10,
+            scenario_names=("mixed_null_boundary",),
+        )
+    )
+    scenario = result["scenarios"][0]
+    assert set(scenario["regions"]) == {"R1", "R2"}
+    assert scenario["regions"]["R2"]["contrasts"]["delta_correct"] == pytest.approx(0.10)
+    assert scenario["regions"]["R2"]["contrasts"]["delta_resolution"] == pytest.approx(-0.10)
+    assert result["results"][0]["false_regional_claim_rate"] is not None
+
+
+def test_planning_rng_uses_declared_blake2_and_pcg64dxsm_family() -> None:
+    rng = sim02_joint_power.keyed_rng(20261028, "R1", "case-1")
+    assert isinstance(rng.bit_generator, sim02_joint_power.np.random.PCG64DXSM)
+    assert sim02_joint_power.planning_seed(20261028, "R1", "case-1") < 2**128

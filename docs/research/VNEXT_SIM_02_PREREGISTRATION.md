@@ -224,6 +224,11 @@ They must not be read as calibrated evidence-quality categories. Behavioral
 evidence modeling is a future dependency requiring its own mapping, validation,
 and design revision.
 
+The older shared experimental protocol describes evidence classes as a possible
+future mapping. SIM-02 v2 explicitly does not import that mapping: this
+metadata-only contract is the active rule for the SIM-02 study, and any
+behavioral evidence treatment requires a new preregistration revision.
+
 ## 5. Judge–Backer overlap and ownership identification
 
 ### O1 — slot-keyed controlled overlap (primary)
@@ -400,7 +405,7 @@ Joint-power planning uses one valid categorical state per mechanism
 (`CORRECT`, `INCORRECT`, or `PROTOCOL_FAIL`) and therefore cannot generate
 `Y=1` with `R=0`. It reports marginal component power, regional IUT/Holm power,
 the probability both R1 and R2 pass, and false regional claims under declared
-null scenarios. Candidate `2,000` pairs per target region is a planning
+null and mixed-null scenarios using region-specific tables. Candidate `2,000` pairs per target region is a planning
 recommendation under the fixed 500 outer / 250 inner design-stage budget: it
 clears the predeclared lower-Monte-Carlo-bound rule in the favorable and
 dependence sensitivity cells, while 1,500 is borderline in the strong-positive
