@@ -1,7 +1,7 @@
 # SIM-02 Statistical Analysis Plan
 
 **Status:** preregistered design; no confirmatory execution  
-**Design revision:** sim-02-prereg-v1  
+**Design revision:** sim-02-prereg-v2  
 **Primary implementation unit:** one paired base case  
 **Primary comparison:** C2 = B2 - B1
 
@@ -30,6 +30,14 @@ failure_reason, contribution_slots, overlap_requested, overlap_realized,
 ownership_assignment, attacker_budget, courts_attempted,
 assigned_judge_seats, ballots_cast, valid_court_rewards
 ~~~
+
+`evidence_class` is primary-study metadata only. The allowed labels are
+`clear_metadata`, `borderline_metadata`, and `misleading_metadata`; they are
+scenario labels, not calibrated evidence-quality parameters. They do not alter
+Judge accuracy, shared case difficulty, Backer signal probabilities,
+participation, Court selection, or any other DGP variable. A future behavioral
+evidence model would require an explicit mathematical mapping, validation
+tests, shared-revision policy across B0/B1/B2, and a new design revision.
 
 The semantic outcome classes are:
 
@@ -106,8 +114,9 @@ never placed in either reversal numerator.
 
 ## 3. Primary testing hierarchy
 
-R1 and R2 are candidate target regions pending approval. R3 is a mandatory adversarial
-falsification region and is descriptive/sensitivity-only for positive claims.
+R1 and R2 are the fixed candidate target regions pending owner approval. R3 is
+a mandatory adversarial falsification region and is descriptive/sensitivity-only
+for positive claims.
 
 Candidate margins are not owner-approved and are used only for planning:
 
@@ -116,26 +125,45 @@ m_correct    = 0.05   candidate minimum correctness improvement
 m_resolution = 0.05   candidate maximum resolution loss
 ~~~
 
-The owner must approve these values before confirmatory execution. If another
-value is selected, rerun the power helper and update the design revision before
-data generation.
+For each target region `r`, define:
 
-For each target region:
+~~~text
+H0_resolution,r: Delta_resolution,r <= -m_resolution
+H1_resolution,r: Delta_resolution,r >  -m_resolution
+H0_correct,r:   Delta_correct,r <=  m_correct
+H1_correct,r:   Delta_correct,r >   m_correct
+H0_joint,r = H0_resolution,r UNION H0_correct,r
+H1_joint,r = H1_resolution,r INTERSECTION H1_correct,r
+p_joint,r = max(p_resolution,r, p_correct,r)
+~~~
 
-1. Test resolution non-inferiority, H0: Delta_resolution <= -m_resolution,
-   against H1: Delta_resolution > -m_resolution.
-2. Apply Holm correction at family alpha 0.05 across the two target-region
-   resolution hypotheses.
-3. A region whose liveness gate fails cannot receive a positive B2 correctness
-   claim, even if its correctness estimate is favorable.
-4. For regions whose liveness gate passes, test correctness superiority,
-   H0: Delta_correct <= m_correct, against H1: Delta_correct > m_correct.
-5. Apply Holm correction at alpha 0.05 across the gated target-region
-   correctness hypotheses.
+The intersection–union p-value is valid because a joint null is true whenever
+at least one component null is true. Under that joint null, the p-value for
+the true component is super-uniform; the maximum of the two component
+p-values is at least that true component p-value, so `p_joint` is also
+super-uniform. This argument does not require independence between the
+resolution and correctness contrasts.
 
-C1, B0-versus-B1 correctness, and all R3 analyses are separate secondary or
-falsification families. They are not silently promoted to primary evidence.
-The decision rule never trades a failed resolution gate for a correctness win.
+The exact regional claim family is `(p_joint,R1, p_joint,R2)`. Apply one Holm
+step-down correction at family alpha `0.05` across those two values under
+arbitrary dependence. Holm's step-down procedure controls FWER for any valid
+p-values and any dependence because, for every true-null subset, the first
+rejected true hypothesis must pass its Bonferroni threshold for the remaining
+true hypotheses; the union bound gives probability at most alpha. The procedure
+is therefore not two separate endpoint families followed by an informal AND.
+
+A region receives a positive B2 claim only if its joint p-value is rejected by
+the R1/R2 Holm procedure. The global claim "B2 works in all target regions"
+requires both R1 and R2 regional claims to pass. A single-region pass is
+conditional evidence. R3 is not added to this positive family: its negative,
+null, and failure outputs can reject, restrict, or make the recommendation
+`INCONCLUSIVE`, but they are not another positive hypothesis test.
+
+C1, B0-versus-B1 correctness, O1/O2 ownership variants, secondary outcomes,
+and all R3 analyses remain separately labeled secondary or falsification
+outputs. Candidate margins remain pending; changing either value requires a
+new design revision and a rerun of the planning analysis before data
+generation.
 
 ## 4. Confidence intervals and resampling
 
@@ -175,8 +203,21 @@ it is not an additional unadjusted gate. This makes the interval and
 multiplicity procedure reproducible and does not turn an unapproved candidate
 margin into an approved gate.
 
+Bootstrap calibration is a required diagnostic, not an assumption supplied by
+the number of replicates. Before confirmatory execution, the implementation
+must evaluate the centered-null procedure at the exact decision boundary, at a
+strict null below/above the boundary as appropriate, under a genuine
+alternative, with strongly correlated paired outcomes, zero empirical
+variance, rare outcomes, and small samples. When R1/R2 share case-level
+randomness, the complete shared base-case cluster must remain the resampling
+unit. Finite diagnostic estimates report their Monte Carlo uncertainty and do
+not establish a mathematical guarantee. If the centered bootstrap is
+anti-conservative or unstable for a required cell, the confirmatory gate is
+`NO-GO` until a justified studentized, exact/conservative paired procedure is
+versioned and revalidated; increasing `B` alone is not a correction.
+
 The bootstrap seed is exact: canonical JSON with sorted keys and no spaces for
-master_seed=20261028, analysis_version=sim-02-prereg-v1, region_id, cell_id,
+master_seed=20261028, analysis_version=sim-02-prereg-v2, region_id, cell_id,
 comparison=B2_minus_B1, and metric is hashed with BLAKE2b-256 using the
 personalization string FT-SIM02-BOOT. Convert the digest to a big-endian
 integer modulo 2^128 and initialize NumPy PCG64DXSM. Region/cell/metric labels
@@ -200,11 +241,17 @@ are flagged when effective event counts are too small for a stable interval.
 
 ## 5. Multiplicity and scenario dependence
 
-The resolution family and gated correctness family each have a declared
-two-region family and Holm correction. Primary endpoint order and the gate are
-fixed before execution. Secondary outcomes, ownership variants, O2, R3, and
-attacker treatments are exploratory/falsification outputs reported with their
-nominal intervals and full cell list; they are not silently promoted.
+There is one primary positive-claim family: the two regional IUT p-values for
+R1 and R2. Holm is applied once across that family. The component p-values are
+not separately Holm-adjusted and then informally intersected. Primary endpoint
+order and the R1/R2 target list are fixed before execution.
+
+Secondary outcomes, ownership variants, O2, R3, and attacker treatments are
+exploratory/falsification outputs reported with their nominal intervals and
+full cell list; they are not silently promoted to positive claims. R3 remains
+mandatory even when its output is unfavorable. A global success claim requires
+both regional joint hypotheses to reject; no global claim is made from an
+average over regions.
 
 When scenarios share one base case, scenarios are not pooled as independent
 observations. A scenario effect is reported separately. A later aggregate must
@@ -265,11 +312,56 @@ alpha 0.025 (the conservative two-region Holm planning value), target power
 | resolution | resolution_high | 0.95 | 0.95 | -0.05 | 0.00 | 0.05 | 0.25 | 0.071250 | 224 |
 | resolution | resolution_high | 0.95 | 0.95 | -0.05 | 0.00 | 0.05 | 0.50 | 0.047500 | 150 |
 
-The worst planning row requires 1,492 paired base cases. Candidate fixed counts
-are 2,000 paired cases for R1, 2,000 for R2, and 1,000 descriptive paired
-cases for R3. The 2,000 count is a rounded allowance for invalid-output
-attrition and variance misspecification; it does not power a smaller effect
-than the approved margin. R3 is not a positive claim regardless of count.
+The worst **historical marginal** planning row requires 1,492 paired base
+cases. This table is retained for comparison and is not joint power: `marginal
+power != joint power`.
+
+### Joint design-stage power planning
+
+The standalone planning-only simulator
+[`sim02_joint_power.py`](../../research/pilot/tools/sim02_joint_power.py)
+uses one categorical outcome per mechanism:
+
+~~~text
+CORRECT, INCORRECT, or PROTOCOL_FAIL
+~~~
+
+`R=1` for the first two states and `Y=1` only for `CORRECT`, so `Y_m <= R_m`
+holds by construction. It validates a 3x3 B1-by-B2 joint table, preserves
+declared state marginals, and computes the correlation between the paired
+resolution and correctness contrasts from that table. Positive, independent,
+and reverse-quantile couplings are feasible sensitivity models; none is
+presented as an empirical estimate.
+
+The actual planning decision is simulated for both fixed regions using the
+centered bootstrap p-values, `p_joint=max(p_resolution,p_correct)`, and one
+Holm step-down across R1/R2. It reports individual component-gate power,
+regional joint power, the probability both regional claims pass, and the
+probability of at least one regional claim under declared null scenarios.
+The fixed design-stage budget is **500 outer planning replications and 250
+inner bootstrap draws per p-value**, selected before inspecting the output;
+each reported proportion has a Wilson 95% Monte Carlo interval. Confirmatory
+analysis remains 10,000 bootstrap draws.
+
+Required scenarios are `favorable`, `correctness_boundary`,
+`resolution_boundary`, `correctness_gain_resolution_loss`,
+`no_meaningful_correctness_benefit`, `strong_positive_dependence`,
+`weak_unfavorable_dependence`, `scarcity_additional_protocol_failures`, and
+`joint_null_boundary`. Candidate sample sizes are 1,500, 2,000, and 3,000
+pairs per target region. The machine-readable and rendered outputs are
+[VNEXT_SIM_02_JOINT_POWER_PLANNING.json](VNEXT_SIM_02_JOINT_POWER_PLANNING.json)
+and [VNEXT_SIM_02_JOINT_POWER_PLANNING.md](VNEXT_SIM_02_JOINT_POWER_PLANNING.md).
+
+Under the declared interpretation rule, 1,500 is borderline in the strong
+positive dependence cell because its lower Monte Carlo bound is below 0.80;
+2,000 clears the lower-bound rule in the favorable and dependence sensitivity
+cells. Therefore 2,000 pairs per R1/R2 region is the current planning
+recommendation, pending owner approval. The recommendation is not a
+superiority result and does not override scarcity, misleading, null, or R3
+negative cells. If future approved margins or validated DGPs change, rerun the
+planner and issue a new design revision.
+
+R3 remains descriptive/falsification-only regardless of its replication count.
 
 The maximum candidate budget is 5,000 paired base cases and 15,000 mechanism
 evaluations across B0/B1/B2. Six sensitivity cells may use 500 paired cases

@@ -2,7 +2,7 @@
 
 **Status:** recommendations and pending owner decisions; nothing in this
 register approves runtime policy.  
-**Design revision:** sim-02-prereg-v1  
+**Design revision:** sim-02-prereg-v2  
 **Source baseline:** origin/main@7d773668a201f8ba9c137fb6751d69122222b606
 
 Approval states used here:
@@ -34,6 +34,10 @@ Approval states used here:
 | Randomness | deterministic keyed streams for study; no production claim | PENDING_OWNER_APPROVAL | freeze stream/version; separately approve production source | changes assignment dependence |
 | Evidence | frozen revision/hash and explicit availability check | PENDING_OWNER_APPROVAL | canonical bytes, disclosure, timeout/revision | changes information quality and external validity |
 | Rewards/refunds | fixture accounting only; no production economic inference | PROPOSED_PENDING_APPROVAL | rate/reserve/dust/failed-transfer policy | changes cost and capital-lock gates |
+| Regional positive claims | IUT per region: `p_joint = max(p_resolution, p_correct)`; one Holm family across R1/R2 | PENDING_OWNER_APPROVAL | approve margins, alpha, target-region list, and global both-region rule | changes false-claim control and claim interpretation |
+| Global success | both R1 and R2 joint claims must pass; one-region pass is conditional | PENDING_OWNER_APPROVAL | approve exact global aggregation rule | changes whether a local gain can support the study conclusion |
+| R3 multiplicity role | mandatory descriptive/falsification family; excluded from positive-claim Holm family | PENDING_OWNER_APPROVAL | approve rejection/restriction/inconclusive recommendation rule | prevents R3 becoming a hidden third positive test |
+| Evidence class | metadata-only labels; no behavioral DGP effect in primary study | PENDING_OWNER_APPROVAL | approve labels and future-model dependency | prevents uncalibrated evidence quality from changing outcomes invisibly |
 
 The candidate values in this table are not owner-approved merely because they
 are present in a fixture or manifest.
@@ -116,3 +120,22 @@ After execution begins, a change requires a new design revision, timestamp,
 reason, affected cells, new seed or version where applicable, and separate
 analysis. It cannot overwrite raw output or convert exploratory findings into
 confirmatory evidence.
+
+## 7. Statistical-remediation and R3 register
+
+| Item | Candidate/default | Status | Validation required before confirmatory execution | Consequence if unresolved |
+| --- | --- | --- | --- | --- |
+| Joint outcome model | one B1/B2 categorical state: `CORRECT`, `INCORRECT`, or `PROTOCOL_FAIL`; `Y <= R` by construction | PENDING_OWNER_APPROVAL | validate marginals, feasible 3x3 tables, contrast covariance, and no impossible state | joint-power result is unvalidated |
+| Joint-power planning budget | 500 outer replications, 250 inner bootstrap draws, fixed seed `20261028` | PENDING_OWNER_APPROVAL | deterministic replay and finite Monte Carlo intervals | no sample-size recommendation |
+| Candidate sample size | 2,000 pairs per R1/R2 region; 1,000 descriptive R3 pairs | PENDING_OWNER_APPROVAL | re-run after approved margins/model and verify joint power, not marginal power only | confirmatory execution remains blocked |
+| Historical marginal power table | retain 1,492-pair worst row as non-joint reference | LOCKED AS HISTORICAL REFERENCE | preserve original helper regression output | cannot be used as joint-power evidence |
+| Bootstrap calibration | boundary, strict-null, alternative, correlated, zero-variance, rare, small-N, and shared-cluster diagnostics | PENDING_OWNER_APPROVAL | report uncertainty; replace centered bootstrap only with justified validated method | confirmatory implementation `NO-GO` |
+| R3 DGP version | `sim-02-r3-dgp-v1`, R3-A through R3-E | PENDING_OWNER_APPROVAL | deterministic vectors, exact action traces, input/output schema, no truth access | adversarial conclusions `UNVALIDATED` |
+| R3 accounting | CCPS-1 fixture arithmetic only; separate gross slash, compensation, net loss, escrow, gas/opportunity cost | PROPOSED_PENDING_APPROVAL | reproduce PR3 vectors and approve economic scope | no deterrence claim |
+
+The complete adversarial treatment contract is
+[VNEXT_SIM_02_R3_TREATMENTS.md](VNEXT_SIM_02_R3_TREATMENTS.md). The planner
+evidence is
+[VNEXT_SIM_02_JOINT_POWER_PLANNING.md](VNEXT_SIM_02_JOINT_POWER_PLANNING.md)
+with machine-readable JSON beside it. These artifacts are design-stage
+diagnostics, not confirmatory evidence.

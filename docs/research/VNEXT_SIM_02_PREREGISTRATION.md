@@ -1,8 +1,8 @@
 # FundTogether VNext SIM-02 preregistration
 
 **Status:** research design only; no confirmatory simulation has been run.  
-**Design revision:** sim-02-prereg-v1  
-**Design date:** 2026-10-28 (Asia/Ho_Chi_Minh)  
+**Design revision:** sim-02-prereg-v2  
+**Design date:** 2026-10-29 (Asia/Ho_Chi_Minh)  
 **Branch:** codex/vnext-sim-02-preregistration
 
 This preregistration makes a later implementation executable without selecting
@@ -31,6 +31,9 @@ PR #26 was independently checked as **MERGED** on 2026-10-28:
 | V2CourtResetFixture.sol | 6bf371646da84044006d34d76319da221ab6d59f | Foundry-only PR3 fixture | Reset and stake-ledger semantics |
 | V2BackerDaoCourt2Fixture.sol | d00c92dca186164ff2bb842e420b9ac2f80c9f76 | Foundry-only PR4 fixture | DAO/Court 2 test semantics |
 | SIM-01 raw result SHA | 3808dd7109196d102ac93034e6f686996f80415e493f46068805d2e5b1a87e49 | Preserved exploratory artifact | Reproducibility reference only |
+| SIM-02 joint-power planner | `research/pilot/tools/sim02_joint_power.py` added after `97da20e` | Standalone design-stage planner | Feasible categorical joint outcomes, IUT/Holm decision diagnostics |
+| SIM-02 joint-power evidence | [VNEXT_SIM_02_JOINT_POWER_PLANNING.json](VNEXT_SIM_02_JOINT_POWER_PLANNING.json) and [Markdown table](VNEXT_SIM_02_JOINT_POWER_PLANNING.md) | `DESIGN_STAGE_POWER_ANALYSIS` only | Fixed-seed marginal/joint power and null diagnostics |
+| SIM-02 R3 treatment contract | [VNEXT_SIM_02_R3_TREATMENTS.md](VNEXT_SIM_02_R3_TREATMENTS.md) | Versioned synthetic adversarial DGP | Reproducible R3-A through R3-E treatments |
 
 The current runtime is not treated as V2-compatible. V2 contracts and tests
 are isolated fixtures, not deployed production behavior. D=10, F=3,
@@ -42,6 +45,11 @@ The external source memo is
 [VNEXT_SIM_02_EXTERNAL_SOURCES.md](VNEXT_SIM_02_EXTERNAL_SOURCES.md). It
 records official source claims and transfer limits; it is not evidence that
 FundTogether implements Kleros, UMA, or Reality.eth.
+
+This remediation was independently checked against PR #27 at source commit
+`97da20e8dd7bead1e616e2f11a295a6d183169bd` before edits. The remediation
+source commit is the commit containing this revision; all research-spec and
+fixture SHAs above remain the input revisions and are not silently advanced.
 
 ## 2. Research question and hypotheses
 
@@ -183,6 +191,39 @@ with stage denominator. Report courts attempted, assigned seats, ballots, and
 valid rewards as resource proxies. Procedural failures are never substantive
 reversals. Every summary includes numerator and denominator.
 
+### Joint regional claim and evidence-class contract
+
+For each fixed target region `r`:
+
+```text
+H0_resolution,r: Delta_resolution,r <= -m_resolution
+H1_resolution,r: Delta_resolution,r >  -m_resolution
+H0_correct,r:   Delta_correct,r <=  m_correct
+H1_correct,r:   Delta_correct,r >   m_correct
+H0_joint,r = H0_resolution,r UNION H0_correct,r
+p_joint,r = max(p_resolution,r, p_correct,r)
+```
+
+The R1/R2 positive-claim family is the two joint p-values. Holm step-down at
+family alpha `0.05` is applied once across `(p_joint,R1, p_joint,R2)`.
+Region `r` receives a positive claim only when its joint p-value is rejected by
+that step-down procedure. The global success rule is strict: both R1 and R2
+must pass their joint claims. A single-region pass is conditional evidence,
+not a global B2 success claim.
+
+R3 is a mandatory falsification/sensitivity region. Its estimates and
+uncertainty are reported separately and are not added to the positive-claim
+Holm family. R3 can reject, restrict, or make the overall recommendation
+`INCONCLUSIVE`; it cannot silently become a third positive test.
+
+The primary `evidence_class` field is metadata-only. `clear_metadata`,
+`borderline_metadata`, and `misleading_metadata` describe a declared scenario
+label and do not change Judge accuracy, case difficulty, Backer signal
+probabilities, participation, Court selection, or any other DGP variable.
+They must not be read as calibrated evidence-quality categories. Behavioral
+evidence modeling is a future dependency requiring its own mapping, validation,
+and design revision.
+
 ## 5. Judge–Backer overlap and ownership identification
 
 ### O1 — slot-keyed controlled overlap (primary)
@@ -290,9 +331,9 @@ mandatory adversarial falsification region and cannot be omitted.
 
 | Cell | Pool | rho | Non-reveal | Overlap | Signal (s,f) | Participation | Attacker/ownership | Evidence |
 | --- | ---: | ---: | ---: | ---: | --- | ---: | --- | --- |
-| R1 nominal | 9 | 0.30 | 0.05 independent | 0.25 (2/9) | informative (0.80,0.20) | 0.80 | none; O1 uniform slots | borderline |
-| R2 scarcity/uncertainty | 9 | 0.60 | 0.20 independent | 1.00 (9/9) | non-informative (0.50,0.50) | 0.50 | none; O1 high-value slots | borderline |
-| R3 adversarial/misleading | 9 | 0.30 | 0.20 coordinated | 1.00 (9/9) | misleading (0.20,0.80) | 0.80 strategic | four fixed-capital wallets; one-third colluding Judges; recapture diagnostic | misleading |
+| R1 nominal | 9 | 0.30 | 0.05 independent | 0.25 (2/9) | informative (0.80,0.20) | 0.80 | none; O1 uniform slots | borderline_metadata |
+| R2 scarcity/uncertainty | 9 | 0.60 | 0.20 independent | 1.00 (9/9) | non-informative (0.50,0.50) | 0.50 | none; O1 high-value slots | borderline_metadata |
+| R3 adversarial/misleading | 9 | 0.30 | 0.20 coordinated | 1.00 (9/9) | misleading (0.20,0.80) | 0.80 strategic | four fixed-capital wallets; one-third colluding Judges; recapture diagnostic | misleading_metadata |
 
 All use a=0.70, 20 slots, balanced truth, seed 20261028, and common initial
 assignment. R3 is not in the positive superiority family.
@@ -335,3 +376,39 @@ SIM-02 design is **GO for documentation**. Confirmatory implementation is
 **CONDITIONAL GO** only after the pending decisions and validation gates.
 Confirmatory Monte Carlo, production integration, and a superiority claim are
 **NO-GO**.
+
+## 11. Statistical-design remediation lock
+
+The executable statistical remediation is documented in the
+[SIM-02 Statistical Analysis Plan](VNEXT_SIM_02_STATISTICAL_ANALYSIS_PLAN.md)
+and tested by the standalone
+[`sim02_joint_power.py`](../../research/pilot/tools/sim02_joint_power.py)
+planner. Its machine-readable and rendered planning outputs are
+[VNEXT_SIM_02_JOINT_POWER_PLANNING.json](VNEXT_SIM_02_JOINT_POWER_PLANNING.json)
+and [VNEXT_SIM_02_JOINT_POWER_PLANNING.md](VNEXT_SIM_02_JOINT_POWER_PLANNING.md).
+
+The primary inferential procedure is now one intersection–union test per
+approved region followed by one Holm correction across the fixed R1/R2 joint
+claim family. The component bootstrap p-values remain centered at the
+predeclared null boundaries, but the planner's finite diagnostics are not a
+calibration guarantee. Before confirmatory execution, the implementation must
+test boundary, strict-null, alternative, correlated, zero-variance, rare,
+small-sample, and shared-case-cluster behavior and retain any failed or
+inconclusive diagnostic.
+
+Joint-power planning uses one valid categorical state per mechanism
+(`CORRECT`, `INCORRECT`, or `PROTOCOL_FAIL`) and therefore cannot generate
+`Y=1` with `R=0`. It reports marginal component power, regional IUT/Holm power,
+the probability both R1 and R2 pass, and false regional claims under declared
+null scenarios. Candidate `2,000` pairs per target region is a planning
+recommendation under the fixed 500 outer / 250 inner design-stage budget: it
+clears the predeclared lower-Monte-Carlo-bound rule in the favorable and
+dependence sensitivity cells, while 1,500 is borderline in the strong-positive
+cell. This remains `PENDING_OWNER_APPROVAL` and is not a confirmatory sample
+size or a B2 success claim.
+
+The complete adversarial DGP contract is
+[VNEXT_SIM_02_R3_TREATMENTS.md](VNEXT_SIM_02_R3_TREATMENTS.md). All R3
+parameters not explicitly locked by source policy remain
+`PENDING_OWNER_APPROVAL`; deterministic fixture vectors are counterexamples,
+not calibrated attack probabilities.
