@@ -1,0 +1,1488 @@
+{
+  "alpha": 0.05,
+  "analysis_label": "DESIGN_STAGE_POWER_ANALYSIS",
+  "analysis_version": "sim-02-joint-power-v1",
+  "bootstrap_reps": 250,
+  "correctness_margin": 0.05,
+  "global_success_rule": "both R1 and R2 joint claims rejected after Holm",
+  "master_seed": 20261028,
+  "planning_reps": 500,
+  "resolution_margin": 0.05,
+  "results": [
+    {
+      "any_regional_claim_rate": 0.984,
+      "contrast_correlation": 0.9371505989742097,
+      "delta_correct": 0.09999999999999998,
+      "delta_resolution": 0.04999999999999993,
+      "false_regional_claim_rate": null,
+      "global_joint_power": 0.84,
+      "marginal_correctness_power": 0.917,
+      "marginal_correctness_power_r1": 0.936,
+      "marginal_correctness_power_r2": 0.898,
+      "marginal_resolution_power": 1.0,
+      "marginal_resolution_power_r1": 1.0,
+      "marginal_resolution_power_r2": 1.0,
+      "mc_interval_95": {
+        "R1_joint": [
+          0.9019315959830375,
+          0.9475419685818739
+        ],
+        "R2_joint": [
+          0.8661557291243417,
+          0.919805793230109
+        ],
+        "any_regional": [
+          0.9687488914666058,
+          0.9918707469666117
+        ],
+        "global": [
+          0.8052918208363085,
+          0.8695236276498359
+        ]
+      },
+      "null_diagnostic": false,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.15,
+      "regional_joint_power": 0.912,
+      "regional_joint_power_r1": 0.928,
+      "regional_joint_power_r2": 0.896,
+      "sample_size": 1500,
+      "scenario": "favorable"
+    },
+    {
+      "any_regional_claim_rate": 0.996,
+      "contrast_correlation": 0.9371505989742097,
+      "delta_correct": 0.09999999999999998,
+      "delta_resolution": 0.04999999999999993,
+      "false_regional_claim_rate": null,
+      "global_joint_power": 0.936,
+      "marginal_correctness_power": 0.968,
+      "marginal_correctness_power_r1": 0.974,
+      "marginal_correctness_power_r2": 0.962,
+      "marginal_resolution_power": 1.0,
+      "marginal_resolution_power_r1": 1.0,
+      "marginal_resolution_power_r2": 1.0,
+      "mc_interval_95": {
+        "R1_joint": [
+          0.9535535973250511,
+          0.9832490252792436
+        ],
+        "R2_joint": [
+          0.9390264041651492,
+          0.9739592026102227
+        ],
+        "any_regional": [
+          0.9855342847848231,
+          0.9989023694773173
+        ],
+        "global": [
+          0.911047591162316,
+          0.9543039839552107
+        ]
+      },
+      "null_diagnostic": false,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.15,
+      "regional_joint_power": 0.966,
+      "regional_joint_power_r1": 0.972,
+      "regional_joint_power_r2": 0.96,
+      "sample_size": 2000,
+      "scenario": "favorable"
+    },
+    {
+      "any_regional_claim_rate": 1.0,
+      "contrast_correlation": 0.9371505989742097,
+      "delta_correct": 0.09999999999999998,
+      "delta_resolution": 0.04999999999999993,
+      "false_regional_claim_rate": null,
+      "global_joint_power": 0.99,
+      "marginal_correctness_power": 0.995,
+      "marginal_correctness_power_r1": 0.992,
+      "marginal_correctness_power_r2": 0.998,
+      "marginal_resolution_power": 1.0,
+      "marginal_resolution_power_r1": 1.0,
+      "marginal_resolution_power_r2": 1.0,
+      "mc_interval_95": {
+        "R1_joint": [
+          0.9796129641658948,
+          0.9968846848199377
+        ],
+        "R2_joint": [
+          0.9887592932948532,
+          0.9996468636054407
+        ],
+        "any_regional": [
+          0.9923756595384479,
+          1.0
+        ],
+        "global": [
+          0.9768069002442693,
+          0.9957212461034096
+        ]
+      },
+      "null_diagnostic": false,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.15,
+      "regional_joint_power": 0.995,
+      "regional_joint_power_r1": 0.992,
+      "regional_joint_power_r2": 0.998,
+      "sample_size": 3000,
+      "scenario": "favorable"
+    },
+    {
+      "any_regional_claim_rate": 0.052,
+      "contrast_correlation": 0.9454389184941309,
+      "delta_correct": 0.050000000000000044,
+      "delta_resolution": 0.0,
+      "false_regional_claim_rate": 0.052,
+      "global_joint_power": 0.0,
+      "marginal_correctness_power": 0.051000000000000004,
+      "marginal_correctness_power_r1": 0.044,
+      "marginal_correctness_power_r2": 0.058,
+      "marginal_resolution_power": 0.9,
+      "marginal_resolution_power_r1": 0.9,
+      "marginal_resolution_power_r2": 0.9,
+      "mc_interval_95": {
+        "R1_joint": [
+          0.013781314655496986,
+          0.041477057463900756
+        ],
+        "R2_joint": [
+          0.01675097472075645,
+          0.04644640267494888
+        ],
+        "any_regional": [
+          0.035730265115705276,
+          0.07510114393784553
+        ],
+        "global": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ]
+      },
+      "null_diagnostic": true,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.2,
+      "regional_joint_power": 0.026000000000000002,
+      "regional_joint_power_r1": 0.024,
+      "regional_joint_power_r2": 0.028,
+      "sample_size": 1500,
+      "scenario": "correctness_boundary"
+    },
+    {
+      "any_regional_claim_rate": 0.044,
+      "contrast_correlation": 0.9454389184941309,
+      "delta_correct": 0.050000000000000044,
+      "delta_resolution": 0.0,
+      "false_regional_claim_rate": 0.044,
+      "global_joint_power": 0.0,
+      "marginal_correctness_power": 0.043,
+      "marginal_correctness_power_r1": 0.056,
+      "marginal_correctness_power_r2": 0.03,
+      "marginal_resolution_power": 0.961,
+      "marginal_resolution_power_r1": 0.962,
+      "marginal_resolution_power_r2": 0.96,
+      "mc_interval_95": {
+        "R1_joint": [
+          0.019791513626571118,
+          0.051344869045441784
+        ],
+        "R2_joint": [
+          0.005510995174027701,
+          0.025930361116447295
+        ],
+        "any_regional": [
+          0.02923395562860718,
+          0.06571944287232845
+        ],
+        "global": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ]
+      },
+      "null_diagnostic": true,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.2,
+      "regional_joint_power": 0.022,
+      "regional_joint_power_r1": 0.032,
+      "regional_joint_power_r2": 0.012,
+      "sample_size": 2000,
+      "scenario": "correctness_boundary"
+    },
+    {
+      "any_regional_claim_rate": 0.046,
+      "contrast_correlation": 0.9454389184941309,
+      "delta_correct": 0.050000000000000044,
+      "delta_resolution": 0.0,
+      "false_regional_claim_rate": 0.046,
+      "global_joint_power": 0.0,
+      "marginal_correctness_power": 0.045,
+      "marginal_correctness_power_r1": 0.034,
+      "marginal_correctness_power_r2": 0.056,
+      "marginal_resolution_power": 0.994,
+      "marginal_resolution_power_r1": 0.996,
+      "marginal_resolution_power_r2": 0.992,
+      "mc_interval_95": {
+        "R1_joint": [
+          0.010899183596210813,
+          0.036420183246879345
+        ],
+        "R2_joint": [
+          0.01525638392332725,
+          0.043971490834224275
+        ],
+        "any_regional": [
+          0.030845108370816204,
+          0.06807779276827323
+        ],
+        "global": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ]
+      },
+      "null_diagnostic": true,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.2,
+      "regional_joint_power": 0.023,
+      "regional_joint_power_r1": 0.02,
+      "regional_joint_power_r2": 0.026,
+      "sample_size": 3000,
+      "scenario": "correctness_boundary"
+    },
+    {
+      "any_regional_claim_rate": 0.0,
+      "contrast_correlation": 0.951329560647042,
+      "delta_correct": 0.0,
+      "delta_resolution": -0.050000000000000044,
+      "false_regional_claim_rate": 0.0,
+      "global_joint_power": 0.0,
+      "marginal_correctness_power": 0.0,
+      "marginal_correctness_power_r1": 0.0,
+      "marginal_correctness_power_r2": 0.0,
+      "marginal_resolution_power": 0.045,
+      "marginal_resolution_power_r1": 0.05,
+      "marginal_resolution_power_r2": 0.04,
+      "mc_interval_95": {
+        "R1_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R2_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "global": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ]
+      },
+      "null_diagnostic": true,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.25,
+      "regional_joint_power": 0.0,
+      "regional_joint_power_r1": 0.0,
+      "regional_joint_power_r2": 0.0,
+      "sample_size": 1500,
+      "scenario": "resolution_boundary"
+    },
+    {
+      "any_regional_claim_rate": 0.0,
+      "contrast_correlation": 0.951329560647042,
+      "delta_correct": 0.0,
+      "delta_resolution": -0.050000000000000044,
+      "false_regional_claim_rate": 0.0,
+      "global_joint_power": 0.0,
+      "marginal_correctness_power": 0.0,
+      "marginal_correctness_power_r1": 0.0,
+      "marginal_correctness_power_r2": 0.0,
+      "marginal_resolution_power": 0.033,
+      "marginal_resolution_power_r1": 0.032,
+      "marginal_resolution_power_r2": 0.034,
+      "mc_interval_95": {
+        "R1_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R2_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "global": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ]
+      },
+      "null_diagnostic": true,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.25,
+      "regional_joint_power": 0.0,
+      "regional_joint_power_r1": 0.0,
+      "regional_joint_power_r2": 0.0,
+      "sample_size": 2000,
+      "scenario": "resolution_boundary"
+    },
+    {
+      "any_regional_claim_rate": 0.0,
+      "contrast_correlation": 0.951329560647042,
+      "delta_correct": 0.0,
+      "delta_resolution": -0.050000000000000044,
+      "false_regional_claim_rate": 0.0,
+      "global_joint_power": 0.0,
+      "marginal_correctness_power": 0.0,
+      "marginal_correctness_power_r1": 0.0,
+      "marginal_correctness_power_r2": 0.0,
+      "marginal_resolution_power": 0.048,
+      "marginal_resolution_power_r1": 0.04,
+      "marginal_resolution_power_r2": 0.056,
+      "mc_interval_95": {
+        "R1_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R2_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "global": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ]
+      },
+      "null_diagnostic": true,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.25,
+      "regional_joint_power": 0.0,
+      "regional_joint_power_r1": 0.0,
+      "regional_joint_power_r2": 0.0,
+      "sample_size": 3000,
+      "scenario": "resolution_boundary"
+    },
+    {
+      "any_regional_claim_rate": 0.0,
+      "contrast_correlation": 0.87709692962489,
+      "delta_correct": 0.09999999999999987,
+      "delta_resolution": -0.10000000000000009,
+      "false_regional_claim_rate": null,
+      "global_joint_power": 0.0,
+      "marginal_correctness_power": 0.726,
+      "marginal_correctness_power_r1": 0.728,
+      "marginal_correctness_power_r2": 0.724,
+      "marginal_resolution_power": 0.0,
+      "marginal_resolution_power_r1": 0.0,
+      "marginal_resolution_power_r2": 0.0,
+      "mc_interval_95": {
+        "R1_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R2_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "global": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ]
+      },
+      "null_diagnostic": false,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.3,
+      "regional_joint_power": 0.0,
+      "regional_joint_power_r1": 0.0,
+      "regional_joint_power_r2": 0.0,
+      "sample_size": 1500,
+      "scenario": "correctness_gain_resolution_loss"
+    },
+    {
+      "any_regional_claim_rate": 0.0,
+      "contrast_correlation": 0.87709692962489,
+      "delta_correct": 0.09999999999999987,
+      "delta_resolution": -0.10000000000000009,
+      "false_regional_claim_rate": null,
+      "global_joint_power": 0.0,
+      "marginal_correctness_power": 0.844,
+      "marginal_correctness_power_r1": 0.842,
+      "marginal_correctness_power_r2": 0.846,
+      "marginal_resolution_power": 0.0,
+      "marginal_resolution_power_r1": 0.0,
+      "marginal_resolution_power_r2": 0.0,
+      "mc_interval_95": {
+        "R1_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R2_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "global": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ]
+      },
+      "null_diagnostic": false,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.3,
+      "regional_joint_power": 0.0,
+      "regional_joint_power_r1": 0.0,
+      "regional_joint_power_r2": 0.0,
+      "sample_size": 2000,
+      "scenario": "correctness_gain_resolution_loss"
+    },
+    {
+      "any_regional_claim_rate": 0.0,
+      "contrast_correlation": 0.87709692962489,
+      "delta_correct": 0.09999999999999987,
+      "delta_resolution": -0.10000000000000009,
+      "false_regional_claim_rate": null,
+      "global_joint_power": 0.0,
+      "marginal_correctness_power": 0.91,
+      "marginal_correctness_power_r1": 0.914,
+      "marginal_correctness_power_r2": 0.906,
+      "marginal_resolution_power": 0.0,
+      "marginal_resolution_power_r1": 0.0,
+      "marginal_resolution_power_r2": 0.0,
+      "mc_interval_95": {
+        "R1_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R2_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "global": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ]
+      },
+      "null_diagnostic": false,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.3,
+      "regional_joint_power": 0.0,
+      "regional_joint_power_r1": 0.0,
+      "regional_joint_power_r2": 0.0,
+      "sample_size": 3000,
+      "scenario": "correctness_gain_resolution_loss"
+    },
+    {
+      "any_regional_claim_rate": 0.0,
+      "contrast_correlation": 0.5640760748177661,
+      "delta_correct": 0.0,
+      "delta_resolution": 0.0,
+      "false_regional_claim_rate": 0.0,
+      "global_joint_power": 0.0,
+      "marginal_correctness_power": 0.0,
+      "marginal_correctness_power_r1": 0.0,
+      "marginal_correctness_power_r2": 0.0,
+      "marginal_resolution_power": 0.947,
+      "marginal_resolution_power_r1": 0.948,
+      "marginal_resolution_power_r2": 0.946,
+      "mc_interval_95": {
+        "R1_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R2_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "global": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ]
+      },
+      "null_diagnostic": true,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.2,
+      "regional_joint_power": 0.0,
+      "regional_joint_power_r1": 0.0,
+      "regional_joint_power_r2": 0.0,
+      "sample_size": 1500,
+      "scenario": "no_meaningful_correctness_benefit"
+    },
+    {
+      "any_regional_claim_rate": 0.0,
+      "contrast_correlation": 0.5640760748177661,
+      "delta_correct": 0.0,
+      "delta_resolution": 0.0,
+      "false_regional_claim_rate": 0.0,
+      "global_joint_power": 0.0,
+      "marginal_correctness_power": 0.0,
+      "marginal_correctness_power_r1": 0.0,
+      "marginal_correctness_power_r2": 0.0,
+      "marginal_resolution_power": 0.985,
+      "marginal_resolution_power_r1": 0.988,
+      "marginal_resolution_power_r2": 0.982,
+      "mc_interval_95": {
+        "R1_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R2_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "global": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ]
+      },
+      "null_diagnostic": true,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.2,
+      "regional_joint_power": 0.0,
+      "regional_joint_power_r1": 0.0,
+      "regional_joint_power_r2": 0.0,
+      "sample_size": 2000,
+      "scenario": "no_meaningful_correctness_benefit"
+    },
+    {
+      "any_regional_claim_rate": 0.0,
+      "contrast_correlation": 0.5640760748177661,
+      "delta_correct": 0.0,
+      "delta_resolution": 0.0,
+      "false_regional_claim_rate": 0.0,
+      "global_joint_power": 0.0,
+      "marginal_correctness_power": 0.0,
+      "marginal_correctness_power_r1": 0.0,
+      "marginal_correctness_power_r2": 0.0,
+      "marginal_resolution_power": 1.0,
+      "marginal_resolution_power_r1": 1.0,
+      "marginal_resolution_power_r2": 1.0,
+      "mc_interval_95": {
+        "R1_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R2_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "global": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ]
+      },
+      "null_diagnostic": true,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.2,
+      "regional_joint_power": 0.0,
+      "regional_joint_power_r1": 0.0,
+      "regional_joint_power_r2": 0.0,
+      "sample_size": 3000,
+      "scenario": "no_meaningful_correctness_benefit"
+    },
+    {
+      "any_regional_claim_rate": 0.978,
+      "contrast_correlation": 0.9371505989742097,
+      "delta_correct": 0.09999999999999998,
+      "delta_resolution": 0.04999999999999993,
+      "false_regional_claim_rate": null,
+      "global_joint_power": 0.822,
+      "marginal_correctness_power": 0.908,
+      "marginal_correctness_power_r1": 0.916,
+      "marginal_correctness_power_r2": 0.9,
+      "marginal_resolution_power": 1.0,
+      "marginal_resolution_power_r1": 1.0,
+      "marginal_resolution_power_r2": 1.0,
+      "mc_interval_95": {
+        "R1_joint": [
+          0.8772354441374409,
+          0.9285735914077787
+        ],
+        "R2_joint": [
+          0.8639490699892671,
+          0.9180429497270297
+        ],
+        "any_regional": [
+          0.9610391387886836,
+          0.9876719917300725
+        ],
+        "global": [
+          0.7860548114500956,
+          0.8530351132926648
+        ]
+      },
+      "null_diagnostic": false,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.15,
+      "regional_joint_power": 0.9,
+      "regional_joint_power_r1": 0.906,
+      "regional_joint_power_r2": 0.894,
+      "sample_size": 1500,
+      "scenario": "strong_positive_dependence"
+    },
+    {
+      "any_regional_claim_rate": 0.994,
+      "contrast_correlation": 0.9371505989742097,
+      "delta_correct": 0.09999999999999998,
+      "delta_resolution": 0.04999999999999993,
+      "false_regional_claim_rate": null,
+      "global_joint_power": 0.938,
+      "marginal_correctness_power": 0.972,
+      "marginal_correctness_power_r1": 0.974,
+      "marginal_correctness_power_r2": 0.97,
+      "marginal_resolution_power": 1.0,
+      "marginal_resolution_power_r1": 1.0,
+      "marginal_resolution_power_r2": 1.0,
+      "mc_interval_95": {
+        "R1_joint": [
+          0.9486551309545582,
+          0.9802084863734289
+        ],
+        "R2_joint": [
+          0.9438156730319722,
+          0.9771089390197072
+        ],
+        "any_regional": [
+          0.9825097478959467,
+          0.9979574037280398
+        ],
+        "global": [
+          0.9133402868983618,
+          0.9559807908573184
+        ]
+      },
+      "null_diagnostic": false,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.15,
+      "regional_joint_power": 0.966,
+      "regional_joint_power_r1": 0.968,
+      "regional_joint_power_r2": 0.964,
+      "sample_size": 2000,
+      "scenario": "strong_positive_dependence"
+    },
+    {
+      "any_regional_claim_rate": 1.0,
+      "contrast_correlation": 0.9371505989742097,
+      "delta_correct": 0.09999999999999998,
+      "delta_resolution": 0.04999999999999993,
+      "false_regional_claim_rate": null,
+      "global_joint_power": 0.992,
+      "marginal_correctness_power": 0.996,
+      "marginal_correctness_power_r1": 0.998,
+      "marginal_correctness_power_r2": 0.994,
+      "marginal_resolution_power": 1.0,
+      "marginal_resolution_power_r1": 1.0,
+      "marginal_resolution_power_r2": 1.0,
+      "mc_interval_95": {
+        "R1_joint": [
+          0.9887592932948532,
+          0.9996468636054407
+        ],
+        "R2_joint": [
+          0.9825097478959467,
+          0.9979574037280398
+        ],
+        "any_regional": [
+          0.9923756595384479,
+          1.0
+        ],
+        "global": [
+          0.9796129641658948,
+          0.9968846848199377
+        ]
+      },
+      "null_diagnostic": false,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.15,
+      "regional_joint_power": 0.996,
+      "regional_joint_power_r1": 0.998,
+      "regional_joint_power_r2": 0.994,
+      "sample_size": 3000,
+      "scenario": "strong_positive_dependence"
+    },
+    {
+      "any_regional_claim_rate": 1.0,
+      "contrast_correlation": -0.07647191129018749,
+      "delta_correct": 0.10000000000000009,
+      "delta_resolution": 0.050000000000000155,
+      "false_regional_claim_rate": null,
+      "global_joint_power": 1.0,
+      "marginal_correctness_power": 1.0,
+      "marginal_correctness_power_r1": 1.0,
+      "marginal_correctness_power_r2": 1.0,
+      "marginal_resolution_power": 1.0,
+      "marginal_resolution_power_r1": 1.0,
+      "marginal_resolution_power_r2": 1.0,
+      "mc_interval_95": {
+        "R1_joint": [
+          0.9923756595384479,
+          1.0
+        ],
+        "R2_joint": [
+          0.9923756595384479,
+          1.0
+        ],
+        "any_regional": [
+          0.9923756595384479,
+          1.0
+        ],
+        "global": [
+          0.9923756595384479,
+          1.0
+        ]
+      },
+      "null_diagnostic": false,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.15,
+      "regional_joint_power": 1.0,
+      "regional_joint_power_r1": 1.0,
+      "regional_joint_power_r2": 1.0,
+      "sample_size": 1500,
+      "scenario": "weak_unfavorable_dependence"
+    },
+    {
+      "any_regional_claim_rate": 1.0,
+      "contrast_correlation": -0.07647191129018749,
+      "delta_correct": 0.10000000000000009,
+      "delta_resolution": 0.050000000000000155,
+      "false_regional_claim_rate": null,
+      "global_joint_power": 1.0,
+      "marginal_correctness_power": 1.0,
+      "marginal_correctness_power_r1": 1.0,
+      "marginal_correctness_power_r2": 1.0,
+      "marginal_resolution_power": 1.0,
+      "marginal_resolution_power_r1": 1.0,
+      "marginal_resolution_power_r2": 1.0,
+      "mc_interval_95": {
+        "R1_joint": [
+          0.9923756595384479,
+          1.0
+        ],
+        "R2_joint": [
+          0.9923756595384479,
+          1.0
+        ],
+        "any_regional": [
+          0.9923756595384479,
+          1.0
+        ],
+        "global": [
+          0.9923756595384479,
+          1.0
+        ]
+      },
+      "null_diagnostic": false,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.15,
+      "regional_joint_power": 1.0,
+      "regional_joint_power_r1": 1.0,
+      "regional_joint_power_r2": 1.0,
+      "sample_size": 2000,
+      "scenario": "weak_unfavorable_dependence"
+    },
+    {
+      "any_regional_claim_rate": 1.0,
+      "contrast_correlation": -0.07647191129018749,
+      "delta_correct": 0.10000000000000009,
+      "delta_resolution": 0.050000000000000155,
+      "false_regional_claim_rate": null,
+      "global_joint_power": 1.0,
+      "marginal_correctness_power": 1.0,
+      "marginal_correctness_power_r1": 1.0,
+      "marginal_correctness_power_r2": 1.0,
+      "marginal_resolution_power": 1.0,
+      "marginal_resolution_power_r1": 1.0,
+      "marginal_resolution_power_r2": 1.0,
+      "mc_interval_95": {
+        "R1_joint": [
+          0.9923756595384479,
+          1.0
+        ],
+        "R2_joint": [
+          0.9923756595384479,
+          1.0
+        ],
+        "any_regional": [
+          0.9923756595384479,
+          1.0
+        ],
+        "global": [
+          0.9923756595384479,
+          1.0
+        ]
+      },
+      "null_diagnostic": false,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.15,
+      "regional_joint_power": 1.0,
+      "regional_joint_power_r1": 1.0,
+      "regional_joint_power_r2": 1.0,
+      "sample_size": 3000,
+      "scenario": "weak_unfavorable_dependence"
+    },
+    {
+      "any_regional_claim_rate": 0.0,
+      "contrast_correlation": 0.9337292153995469,
+      "delta_correct": -0.06000000000000005,
+      "delta_resolution": -0.15000000000000002,
+      "false_regional_claim_rate": null,
+      "global_joint_power": 0.0,
+      "marginal_correctness_power": 0.0,
+      "marginal_correctness_power_r1": 0.0,
+      "marginal_correctness_power_r2": 0.0,
+      "marginal_resolution_power": 0.0,
+      "marginal_resolution_power_r1": 0.0,
+      "marginal_resolution_power_r2": 0.0,
+      "mc_interval_95": {
+        "R1_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R2_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "global": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ]
+      },
+      "null_diagnostic": false,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.35,
+      "regional_joint_power": 0.0,
+      "regional_joint_power_r1": 0.0,
+      "regional_joint_power_r2": 0.0,
+      "sample_size": 1500,
+      "scenario": "scarcity_additional_protocol_failures"
+    },
+    {
+      "any_regional_claim_rate": 0.0,
+      "contrast_correlation": 0.9337292153995469,
+      "delta_correct": -0.06000000000000005,
+      "delta_resolution": -0.15000000000000002,
+      "false_regional_claim_rate": null,
+      "global_joint_power": 0.0,
+      "marginal_correctness_power": 0.0,
+      "marginal_correctness_power_r1": 0.0,
+      "marginal_correctness_power_r2": 0.0,
+      "marginal_resolution_power": 0.0,
+      "marginal_resolution_power_r1": 0.0,
+      "marginal_resolution_power_r2": 0.0,
+      "mc_interval_95": {
+        "R1_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R2_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "global": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ]
+      },
+      "null_diagnostic": false,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.35,
+      "regional_joint_power": 0.0,
+      "regional_joint_power_r1": 0.0,
+      "regional_joint_power_r2": 0.0,
+      "sample_size": 2000,
+      "scenario": "scarcity_additional_protocol_failures"
+    },
+    {
+      "any_regional_claim_rate": 0.0,
+      "contrast_correlation": 0.9337292153995469,
+      "delta_correct": -0.06000000000000005,
+      "delta_resolution": -0.15000000000000002,
+      "false_regional_claim_rate": null,
+      "global_joint_power": 0.0,
+      "marginal_correctness_power": 0.0,
+      "marginal_correctness_power_r1": 0.0,
+      "marginal_correctness_power_r2": 0.0,
+      "marginal_resolution_power": 0.0,
+      "marginal_resolution_power_r1": 0.0,
+      "marginal_resolution_power_r2": 0.0,
+      "mc_interval_95": {
+        "R1_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "R2_joint": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "any_regional": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ],
+        "global": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ]
+      },
+      "null_diagnostic": false,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.35,
+      "regional_joint_power": 0.0,
+      "regional_joint_power_r1": 0.0,
+      "regional_joint_power_r2": 0.0,
+      "sample_size": 3000,
+      "scenario": "scarcity_additional_protocol_failures"
+    },
+    {
+      "any_regional_claim_rate": 0.018,
+      "contrast_correlation": 0.644749534691844,
+      "delta_correct": 0.04999999999999993,
+      "delta_resolution": -0.050000000000000044,
+      "false_regional_claim_rate": 0.018,
+      "global_joint_power": 0.0,
+      "marginal_correctness_power": 0.05,
+      "marginal_correctness_power_r1": 0.042,
+      "marginal_correctness_power_r2": 0.058,
+      "marginal_resolution_power": 0.041999999999999996,
+      "marginal_resolution_power_r1": 0.032,
+      "marginal_resolution_power_r2": 0.052,
+      "mc_interval_95": {
+        "R1_joint": [
+          0.0010976305226827925,
+          0.014465715215177033
+        ],
+        "R2_joint": [
+          0.00679778979084349,
+          0.02861306913778529
+        ],
+        "any_regional": [
+          0.00949819329619708,
+          0.03385167090873928
+        ],
+        "global": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ]
+      },
+      "null_diagnostic": true,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.25,
+      "regional_joint_power": 0.009000000000000001,
+      "regional_joint_power_r1": 0.004,
+      "regional_joint_power_r2": 0.014,
+      "sample_size": 1500,
+      "scenario": "joint_null_boundary"
+    },
+    {
+      "any_regional_claim_rate": 0.008,
+      "contrast_correlation": 0.644749534691844,
+      "delta_correct": 0.04999999999999993,
+      "delta_resolution": -0.050000000000000044,
+      "false_regional_claim_rate": 0.008,
+      "global_joint_power": 0.0,
+      "marginal_correctness_power": 0.044,
+      "marginal_correctness_power_r1": 0.042,
+      "marginal_correctness_power_r2": 0.046,
+      "marginal_resolution_power": 0.023,
+      "marginal_resolution_power_r1": 0.02,
+      "marginal_resolution_power_r2": 0.026,
+      "mc_interval_95": {
+        "R1_joint": [
+          0.002042596271960238,
+          0.017490252104053375
+        ],
+        "R2_joint": [
+          0.00035313639455927543,
+          0.011240706705146757
+        ],
+        "any_regional": [
+          0.00311531518006224,
+          0.020387035834105168
+        ],
+        "global": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ]
+      },
+      "null_diagnostic": true,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.25,
+      "regional_joint_power": 0.004,
+      "regional_joint_power_r1": 0.006,
+      "regional_joint_power_r2": 0.002,
+      "sample_size": 2000,
+      "scenario": "joint_null_boundary"
+    },
+    {
+      "any_regional_claim_rate": 0.006,
+      "contrast_correlation": 0.644749534691844,
+      "delta_correct": 0.04999999999999993,
+      "delta_resolution": -0.050000000000000044,
+      "false_regional_claim_rate": 0.006,
+      "global_joint_power": 0.0,
+      "marginal_correctness_power": 0.035,
+      "marginal_correctness_power_r1": 0.034,
+      "marginal_correctness_power_r2": 0.036,
+      "marginal_resolution_power": 0.036000000000000004,
+      "marginal_resolution_power_r1": 0.032,
+      "marginal_resolution_power_r2": 0.04,
+      "mc_interval_95": {
+        "R1_joint": [
+          0.0010976305226827925,
+          0.014465715215177033
+        ],
+        "R2_joint": [
+          0.00035313639455927543,
+          0.011240706705146757
+        ],
+        "any_regional": [
+          0.002042596271960238,
+          0.017490252104053375
+        ],
+        "global": [
+          4.336808689942018e-19,
+          0.007624340461552241
+        ]
+      },
+      "null_diagnostic": true,
+      "protocol_failure_b1": 0.2,
+      "protocol_failure_b2": 0.25,
+      "regional_joint_power": 0.003,
+      "regional_joint_power_r1": 0.004,
+      "regional_joint_power_r2": 0.002,
+      "sample_size": 3000,
+      "scenario": "joint_null_boundary"
+    }
+  ],
+  "sample_size_recommendation": {
+    "candidate_sample_size": 2000,
+    "owner_approval": "PENDING_OWNER_APPROVAL",
+    "reference_scenarios": [
+      "favorable",
+      "strong_positive_dependence",
+      "weak_unfavorable_dependence"
+    ],
+    "rule": "smallest candidate whose lower 95% MC bound for global_joint_power is at least 0.80 in favorable, strong-positive, and weak/unfavorable dependence cells"
+  },
+  "sample_sizes": [
+    1500,
+    2000,
+    3000
+  ],
+  "scenarios": [
+    {
+      "b1_state_probabilities": [
+        0.56,
+        0.24,
+        0.2
+      ],
+      "b2_state_probabilities": [
+        0.66,
+        0.19,
+        0.15
+      ],
+      "contrasts": {
+        "correlation_contrasts": 0.9371505989742097,
+        "covariance_contrasts": 0.34500000000000003,
+        "delta_correct": 0.09999999999999998,
+        "delta_resolution": 0.04999999999999993,
+        "min_cell_probability": 0.0,
+        "variance_correct": 0.39000000000000007,
+        "variance_resolution": 0.34750000000000003
+      },
+      "coupling": "positive",
+      "description": "Meaningful correctness improvement with safe resolution.",
+      "is_null_scenario": false,
+      "joint_table": [
+        [
+          0.41,
+          0.0,
+          0.15000000000000002
+        ],
+        [
+          0.050000000000000044,
+          0.18999999999999995,
+          0.0
+        ],
+        [
+          0.2,
+          0.0,
+          0.0
+        ]
+      ],
+      "name": "favorable"
+    },
+    {
+      "b1_state_probabilities": [
+        0.56,
+        0.24,
+        0.2
+      ],
+      "b2_state_probabilities": [
+        0.61,
+        0.19,
+        0.2
+      ],
+      "contrasts": {
+        "correlation_contrasts": 0.9454389184941309,
+        "covariance_contrasts": 0.39999999999999997,
+        "delta_correct": 0.050000000000000044,
+        "delta_resolution": 0.0,
+        "min_cell_probability": 0.0,
+        "variance_correct": 0.4475,
+        "variance_resolution": 0.39999999999999997
+      },
+      "coupling": "positive",
+      "description": "Correctness is exactly at the candidate minimum-effect boundary.",
+      "is_null_scenario": true,
+      "joint_table": [
+        [
+          0.36000000000000004,
+          0.0,
+          0.19999999999999996
+        ],
+        [
+          0.050000000000000044,
+          0.18999999999999995,
+          0.0
+        ],
+        [
+          0.2,
+          0.0,
+          0.0
+        ]
+      ],
+      "name": "correctness_boundary"
+    },
+    {
+      "b1_state_probabilities": [
+        0.56,
+        0.24,
+        0.2
+      ],
+      "b2_state_probabilities": [
+        0.56,
+        0.19,
+        0.25
+      ],
+      "contrasts": {
+        "correlation_contrasts": 0.951329560647042,
+        "covariance_contrasts": 0.45,
+        "delta_correct": 0.0,
+        "delta_resolution": -0.050000000000000044,
+        "min_cell_probability": 0.0,
+        "variance_correct": 0.5,
+        "variance_resolution": 0.4475
+      },
+      "coupling": "positive",
+      "description": "Resolution is exactly at the candidate non-inferiority boundary.",
+      "is_null_scenario": true,
+      "joint_table": [
+        [
+          0.31,
+          0.0,
+          0.25
+        ],
+        [
+          0.050000000000000044,
+          0.18999999999999995,
+          0.0
+        ],
+        [
+          0.2,
+          0.0,
+          0.0
+        ]
+      ],
+      "name": "resolution_boundary"
+    },
+    {
+      "b1_state_probabilities": [
+        0.56,
+        0.24,
+        0.2
+      ],
+      "b2_state_probabilities": [
+        0.66,
+        0.04,
+        0.3
+      ],
+      "contrasts": {
+        "correlation_contrasts": 0.87709692962489,
+        "covariance_contrasts": 0.51,
+        "delta_correct": 0.09999999999999987,
+        "delta_resolution": -0.10000000000000009,
+        "min_cell_probability": 0.0,
+        "variance_correct": 0.69,
+        "variance_resolution": 0.49
+      },
+      "coupling": "positive",
+      "description": "Correctness improves while resolution loss exceeds the candidate margin.",
+      "is_null_scenario": false,
+      "joint_table": [
+        [
+          0.25999999999999995,
+          0.0,
+          0.30000000000000004
+        ],
+        [
+          0.19999999999999996,
+          0.040000000000000036,
+          0.0
+        ],
+        [
+          0.2,
+          0.0,
+          0.0
+        ]
+      ],
+      "name": "correctness_gain_resolution_loss"
+    },
+    {
+      "b1_state_probabilities": [
+        0.56,
+        0.24,
+        0.2
+      ],
+      "b2_state_probabilities": [
+        0.56,
+        0.24,
+        0.2
+      ],
+      "contrasts": {
+        "correlation_contrasts": 0.5640760748177661,
+        "covariance_contrasts": 0.22400000000000003,
+        "delta_correct": 0.0,
+        "delta_resolution": 0.0,
+        "min_cell_probability": 0.04000000000000001,
+        "variance_correct": 0.49280000000000007,
+        "variance_resolution": 0.32000000000000006
+      },
+      "coupling": "independent",
+      "description": "No correctness or resolution improvement.",
+      "is_null_scenario": true,
+      "joint_table": [
+        [
+          0.31360000000000005,
+          0.13440000000000002,
+          0.11200000000000002
+        ],
+        [
+          0.13440000000000002,
+          0.0576,
+          0.048
+        ],
+        [
+          0.11200000000000002,
+          0.048,
+          0.04000000000000001
+        ]
+      ],
+      "name": "no_meaningful_correctness_benefit"
+    },
+    {
+      "b1_state_probabilities": [
+        0.56,
+        0.24,
+        0.2
+      ],
+      "b2_state_probabilities": [
+        0.66,
+        0.19,
+        0.15
+      ],
+      "contrasts": {
+        "correlation_contrasts": 0.9371505989742097,
+        "covariance_contrasts": 0.34500000000000003,
+        "delta_correct": 0.09999999999999998,
+        "delta_resolution": 0.04999999999999993,
+        "min_cell_probability": 0.0,
+        "variance_correct": 0.39000000000000007,
+        "variance_resolution": 0.34750000000000003
+      },
+      "coupling": "positive",
+      "description": "Favorable margins with strong feasible positive paired dependence.",
+      "is_null_scenario": false,
+      "joint_table": [
+        [
+          0.41,
+          0.0,
+          0.15000000000000002
+        ],
+        [
+          0.050000000000000044,
+          0.18999999999999995,
+          0.0
+        ],
+        [
+          0.2,
+          0.0,
+          0.0
+        ]
+      ],
+      "name": "strong_positive_dependence"
+    },
+    {
+      "b1_state_probabilities": [
+        0.56,
+        0.24,
+        0.2
+      ],
+      "b2_state_probabilities": [
+        0.66,
+        0.19,
+        0.15
+      ],
+      "contrasts": {
+        "correlation_contrasts": -0.07647191129018749,
+        "covariance_contrasts": -0.00500000000000002,
+        "delta_correct": 0.10000000000000009,
+        "delta_resolution": 0.050000000000000155,
+        "min_cell_probability": 0.0,
+        "variance_correct": 0.09000000000000001,
+        "variance_resolution": 0.047500000000000084
+      },
+      "coupling": "unfavorable",
+      "description": "Favorable margins with a feasible reverse quantile coupling.",
+      "is_null_scenario": false,
+      "joint_table": [
+        [
+          0.56,
+          0.0,
+          0.0
+        ],
+        [
+          0.10000000000000003,
+          0.13999999999999996,
+          0.0
+        ],
+        [
+          0.0,
+          0.0500000000000001,
+          0.1499999999999999
+        ]
+      ],
+      "name": "weak_unfavorable_dependence"
+    },
+    {
+      "b1_state_probabilities": [
+        0.56,
+        0.24,
+        0.2
+      ],
+      "b2_state_probabilities": [
+        0.5,
+        0.15,
+        0.35
+      ],
+      "contrasts": {
+        "correlation_contrasts": 0.9337292153995469,
+        "covariance_contrasts": 0.541,
+        "delta_correct": -0.06000000000000005,
+        "delta_resolution": -0.15000000000000002,
+        "min_cell_probability": 0.0,
+        "variance_correct": 0.6363999999999999,
+        "variance_resolution": 0.5275000000000001
+      },
+      "coupling": "positive",
+      "description": "B2 adds protocol failures under a scarce Judge supply treatment.",
+      "is_null_scenario": false,
+      "joint_table": [
+        [
+          0.21000000000000002,
+          0.0,
+          0.35
+        ],
+        [
+          0.08999999999999997,
+          0.15000000000000002,
+          0.0
+        ],
+        [
+          0.2,
+          0.0,
+          0.0
+        ]
+      ],
+      "name": "scarcity_additional_protocol_failures"
+    },
+    {
+      "b1_state_probabilities": [
+        0.56,
+        0.24,
+        0.2
+      ],
+      "b2_state_probabilities": [
+        0.61,
+        0.14,
+        0.25
+      ],
+      "contrasts": {
+        "correlation_contrasts": 0.644749534691844,
+        "covariance_contrasts": 0.2645,
+        "delta_correct": 0.04999999999999993,
+        "delta_resolution": -0.050000000000000044,
+        "min_cell_probability": 0.028000000000000004,
+        "variance_correct": 0.4843,
+        "variance_resolution": 0.34750000000000003
+      },
+      "coupling": "independent",
+      "description": "Both component nulls are set at their candidate decision boundaries.",
+      "is_null_scenario": true,
+      "joint_table": [
+        [
+          0.3416,
+          0.07840000000000001,
+          0.14
+        ],
+        [
+          0.1464,
+          0.033600000000000005,
+          0.06
+        ],
+        [
+          0.122,
+          0.028000000000000004,
+          0.05
+        ]
+      ],
+      "name": "joint_null_boundary"
+    }
+  ]
+}
