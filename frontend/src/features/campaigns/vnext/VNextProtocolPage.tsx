@@ -1,15 +1,18 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { campaignApi } from '../api/campaigns';
 import { getErrorMessage } from '../../../lib/api/error';
 import { useAccountSession } from '../../auth/AccountSessionProvider';
 import { VNextActionPanel } from './VNextActionPanel';
 import { VNextCreateCampaignPanel } from './VNextCreateCampaignPanel';
+import { VNextCourtDashboard } from './VNextCourtDashboard';
 
 const campaignStates = ['CREATED', 'FUNDING', 'FUNDED', 'MILESTONES_RUNNING', 'COMPLETED', 'REFUNDING'];
 const milestoneStates = ['PENDING', 'SUBMITTED', 'REVIEW_ENROLLMENT', 'BASE_REVIEW', 'RETRY_PENDING', 'PROVISIONAL_RULING', 'APPEAL_WINDOW', 'FINAL_RULING', 'PAYABLE', 'CHALLENGE_WINDOW', 'PAID', 'CORRECTION', 'RESUBMIT', 'TERMINAL'];
 
 export function VNextProtocolPage({ campaignId }: { campaignId?: string }) {
   const { session } = useAccountSession();
+  const [selectedMilestoneId, setSelectedMilestoneId] = useState<number | null>(null);
   const deployment = useQuery({ queryKey: ['vnext-deployment'], queryFn: campaignApi.vnextDeployment, retry: false });
   const indexer = useQuery({ queryKey: ['vnext-indexer'], queryFn: ({ signal }) => campaignApi.vnextIndexer(signal), retry: false });
   const campaign = useQuery({
@@ -24,6 +27,24 @@ export function VNextProtocolPage({ campaignId }: { campaignId?: string }) {
     enabled: Boolean(campaignId),
     retry: false,
   });
+  const reviews = useQuery({
+    queryKey: ['vnext-reviews', deployment.data?.juryReview],
+    queryFn: ({ signal }) => campaignApi.vnextReviews(signal),
+    enabled: Boolean(campaignId && deployment.data?.configured),
+    retry: false,
+  });
+  const selectedMilestone = milestones.data?.find(milestone => milestone.milestoneId === selectedMilestoneId);
+  const selectedReview = selectedMilestone?.reviewCaseId
+    ? reviews.data?.find(review => review.reviewCaseId.toLowerCase() === selectedMilestone.reviewCaseId?.toLowerCase())
+    : undefined;
+  const refreshCampaign = () => {
+    void Promise.all([
+      indexer.refetch(),
+      campaign.refetch(),
+      milestones.refetch(),
+      reviews.refetch(),
+    ]);
+  };
 
   return (
     <div className="campaign-container space-y-4">
@@ -46,6 +67,7 @@ export function VNextProtocolPage({ campaignId }: { campaignId?: string }) {
       </section>
 
       {campaignId && campaign.error && <p role="alert" className="monograph-alert monograph-alert--error">{getErrorMessage(campaign.error)}</p>}
+      {campaignId && reviews.error && <p role="alert" className="monograph-alert monograph-alert--error">Không tải được Court projection: {getErrorMessage(reviews.error)}</p>}
       {!campaignId && deployment.data?.configured && <VNextCreateCampaignPanel deployment={deployment.data} />}
       {campaign.data && <>
         <section className="monograph-card space-y-3">
@@ -56,14 +78,39 @@ export function VNextProtocolPage({ campaignId }: { campaignId?: string }) {
         </section>
         <section className="monograph-card space-y-3">
           <span className="monograph-card__kicker">MILESTONE REVIEW</span>
-          {milestones.data?.length ? milestones.data.map(milestone => (
+          {milestones.isPending ? <p className="muted" role="status">Đang tải milestone projection…</p> : milestones.data?.length ? milestones.data.map(milestone => (
             <article key={milestone.milestoneId} className="border-t border-[var(--border-hairline)] pt-3">
               <strong>Milestone {milestone.milestoneId} · {milestoneStates[milestone.state] ?? `STATE_${milestone.state}`}</strong>
               <p className="text-sm text-[var(--ink-subtle)] m-0">Revision {milestone.evidenceRevision} · {milestone.paid ? 'đã payout' : 'chưa payout'}</p>
               {milestone.reviewCaseId && <code className="text-xs break-all">Review case {milestone.reviewCaseId}</code>}
+              {milestone.reviewCaseId ? (
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    className="button button--secondary"
+                    aria-expanded={selectedMilestoneId === milestone.milestoneId}
+                    onClick={() => setSelectedMilestoneId(current => current === milestone.milestoneId ? null : milestone.milestoneId)}
+                  >
+                    {selectedMilestoneId === milestone.milestoneId ? 'Đóng Court Dashboard' : 'Mở Court Dashboard'}
+                  </button>
+                </div>
+              ) : null}
             </article>
           )) : <p className="muted">Chưa có milestone projection.</p>}
         </section>
+        {selectedMilestone ? (
+          reviews.isPending ? (
+            <p role="status" className="muted">Đang tải Court Dashboard…</p>
+          ) : (
+            <VNextCourtDashboard
+              campaignId={campaignId!}
+              milestone={selectedMilestone}
+              review={selectedReview}
+              indexer={indexer.data}
+              onRefresh={refreshCampaign}
+            />
+          )
+        ) : null}
         {deployment.data?.configured && campaignId && campaign.data && (
           <VNextActionPanel
             campaignId={campaignId!}
@@ -71,10 +118,7 @@ export function VNextProtocolPage({ campaignId }: { campaignId?: string }) {
             campaign={campaign.data}
             milestones={milestones.data ?? []}
             deployment={deployment.data}
-            onRefresh={() => {
-              void campaign.refetch();
-              void milestones.refetch();
-            }}
+            onRefresh={refreshCampaign}
           />
         )}
       </>}

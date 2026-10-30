@@ -5,6 +5,7 @@ import {
   vnextCampaignProjections,
   vnextChainEvents,
   vnextChallengeProjections,
+  vnextCourtProjections,
   vnextJudgeAssignments,
   vnextJudgeLedgerProjections,
   vnextMilestoneProjections,
@@ -47,6 +48,7 @@ function createFakeDb() {
     campaigns: [],
     backers: [],
     challenges: [],
+    courts: [],
     judgeLedger: [],
     milestones: [],
     reviews: [],
@@ -60,6 +62,7 @@ function createFakeDb() {
     campaigns: state.campaigns,
     backers: state.backers,
     challenges: state.challenges,
+    courts: state.courts,
     judgeLedger: state.judgeLedger,
     milestones: state.milestones,
     reviews: state.reviews,
@@ -76,6 +79,7 @@ function createFakeDb() {
     if (table === vnextCampaignProjections) return state.campaigns;
     if (table === vnextBackerProjections) return state.backers;
     if (table === vnextChallengeProjections) return state.challenges;
+    if (table === vnextCourtProjections) return state.courts;
     if (table === vnextJudgeLedgerProjections) return state.judgeLedger;
     if (table === vnextMilestoneProjections) return state.milestones;
     if (table === vnextReviewProjections) return state.reviews;
@@ -88,6 +92,7 @@ function createFakeDb() {
     if (table === vnextCampaignProjections) return `${value.streamId}:${value.onchainCampaignId}`;
     if (table === vnextBackerProjections) return `${value.streamId}:${value.onchainCampaignId}:${value.backerAddress}`;
     if (table === vnextChallengeProjections) return `${value.streamId}:${value.challengeCaseId}`;
+    if (table === vnextCourtProjections) return `${value.streamId}:${value.reviewCaseId}:${value.courtId}`;
     if (table === vnextJudgeLedgerProjections) return `${value.streamId}:${value.reviewCaseId}:${value.judgeAddress}`;
     if (table === vnextMilestoneProjections) return `${value.streamId}:${value.onchainCampaignId}:${value.milestoneId}`;
     if (table === vnextReviewProjections) return `${value.streamId}:${value.reviewCaseId}`;
@@ -328,6 +333,75 @@ describe("VNextIndexerService", () => {
     expect(fake.state.reviews[0].passCourts).toBe("2");
     expect(fake.state.reviews[0].failCourts).toBe("1");
     expect(fake.state.events).toHaveLength(3);
+  });
+
+  it("test_EighteenEligibleJudgesProjectOnlyFiveCourts", async () => {
+    const fake = createFakeDb();
+    const service = serviceWith(fake);
+    const caseId = hash("e");
+    await persist(service, "stream-1", log(0), "ReviewCaseCreated", reviewCreated(caseId));
+    await persist(service, "stream-1", log(1), "JurySnapshotFinalized", {
+      reviewCaseId: caseId,
+      snapshotBlock: 12n,
+      eligibleCount: 18n,
+      randomnessRequestId: hash("f"),
+    });
+
+    expect(fake.state.reviews[0].courtCount).toBe("5");
+  });
+
+  it("test_CourtAssignmentAndVerdictRemainCanonical", async () => {
+    const fake = createFakeDb();
+    const service = serviceWith(fake);
+    const caseId = hash("e");
+    await persist(service, "stream-1", log(0), "ReviewCaseCreated", reviewCreated(caseId));
+    await persist(service, "stream-1", log(1), "JurySnapshotFinalized", {
+      reviewCaseId: caseId,
+      snapshotBlock: 12n,
+      eligibleCount: 3n,
+      randomnessRequestId: hash("f"),
+    });
+    await persist(service, "stream-1", log(2), "CourtAssigned", {
+      reviewCaseId: caseId,
+      roundId: 0n,
+      courtId: 0n,
+      judgeOne: "0x0000000000000000000000000000000000000003",
+      judgeTwo: "0x0000000000000000000000000000000000000004",
+      judgeThree: "0x0000000000000000000000000000000000000005",
+    });
+    await persist(service, "stream-1", log(3), "CourtFinalized", {
+      reviewCaseId: caseId,
+      roundId: 0n,
+      courtId: 0n,
+      outcome: 1,
+    });
+
+    expect(fake.state.assignments).toHaveLength(3);
+    expect(fake.state.courts).toMatchObject([{ courtId: "0", finalized: true, outcome: 1 }]);
+  });
+
+  it("test_AssignmentBeyondProjectedCourtCountIsRejected", async () => {
+    const fake = createFakeDb();
+    const service = serviceWith(fake);
+    const caseId = hash("e");
+    await persist(service, "stream-1", log(0), "ReviewCaseCreated", reviewCreated(caseId));
+    await persist(service, "stream-1", log(1), "JurySnapshotFinalized", {
+      reviewCaseId: caseId,
+      snapshotBlock: 12n,
+      eligibleCount: 18n,
+      randomnessRequestId: hash("f"),
+    });
+
+    await expect(persist(service, "stream-1", log(2), "CourtAssigned", {
+      reviewCaseId: caseId,
+      roundId: 0n,
+      courtId: 5n,
+      judgeOne: "0x0000000000000000000000000000000000000003",
+      judgeTwo: "0x0000000000000000000000000000000000000004",
+      judgeThree: "0x0000000000000000000000000000000000000005",
+    })).rejects.toThrow("exceeds canonical court count");
+    expect(fake.state.assignments).toHaveLength(0);
+    expect(fake.state.events).toHaveLength(2);
   });
 
   it("test_MissingOrMalformedEventDoesNotAdvanceCheckpoint", async () => {

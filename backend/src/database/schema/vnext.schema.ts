@@ -102,6 +102,9 @@ export const vnextReviewProjections = pgTable("vnext_review_projections", {
   finalizedCourtCount: numeric("finalized_court_count", { precision: 78, scale: 0 }).notNull().default("0"),
   passCourts: numeric("pass_courts", { precision: 78, scale: 0 }).notNull().default("0"),
   failCourts: numeric("fail_courts", { precision: 78, scale: 0 }).notNull().default("0"),
+  invalidCourts: numeric("invalid_courts", { precision: 78, scale: 0 }).notNull().default("0"),
+  roundOutcome: integer("round_outcome"),
+  finalOutcome: integer("final_outcome"),
   outcome: integer("outcome"),
   finalized: boolean("finalized").notNull().default(false),
   lastBlockNumber: numeric("last_block_number", { precision: 78, scale: 0 }).notNull(),
@@ -163,6 +166,8 @@ export const vnextJudgeAssignments = pgTable("vnext_judge_assignments", {
   courtId: numeric("court_id", { precision: 78, scale: 0 }).notNull(),
   slot: integer("slot").notNull(),
   judgeAddress: varchar("judge_address", { length: 42 }).notNull(),
+  committed: boolean("committed").notNull().default(false),
+  revealed: boolean("revealed").notNull().default(false),
   lastBlockNumber: numeric("last_block_number", { precision: 78, scale: 0 }).notNull(),
 }, table => [
   primaryKey({ columns: [table.streamId, table.reviewCaseId, table.courtId, table.slot] }),
@@ -171,6 +176,19 @@ export const vnextJudgeAssignments = pgTable("vnext_judge_assignments", {
     table.reviewCaseId,
     table.judgeAddress,
   ),
+]);
+
+export const vnextCourtProjections = pgTable("vnext_court_projections", {
+  streamId: text("stream_id").notNull(),
+  reviewCaseId: varchar("review_case_id", { length: 66 }).notNull(),
+  roundId: numeric("round_id", { precision: 78, scale: 0 }).notNull(),
+  courtId: numeric("court_id", { precision: 78, scale: 0 }).notNull(),
+  outcome: integer("outcome"),
+  finalized: boolean("finalized").notNull().default(false),
+  lastBlockNumber: numeric("last_block_number", { precision: 78, scale: 0 }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  primaryKey({ columns: [table.streamId, table.reviewCaseId, table.courtId] }),
 ]);
 
 export const vnextCaseEvidence = pgTable("vnext_case_evidence", {

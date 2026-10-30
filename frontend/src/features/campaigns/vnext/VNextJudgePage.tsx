@@ -197,7 +197,8 @@ function JudgeReviewCard({
       <h2 className="monograph-card__title">Case {review.reviewCaseId}</h2>
       <p className="text-sm m-0">Campaign {review.campaignId} · milestone {review.milestoneId} · round {review.roundId} · enrolled {review.enrolledCount}</p>
       <p className="text-xs font-mono break-all m-0">Assignment: {currentAssignment ? `court ${currentAssignment.courtId}, slot ${currentAssignment.slot}` : 'chưa được chọn vào court'}</p>
-      <p className="text-sm text-[var(--ink-subtle)] m-0">{review.outcome == null ? 'Court chưa final canonical outcome; chưa hiển thị PASS/FAIL cuối cùng.' : `Canonical review outcome: ${review.outcome}`}</p>
+      <p className="text-sm text-[var(--ink-subtle)] m-0">{review.roundOutcome == null ? 'Round chưa có provisional verdict.' : `Provisional round verdict: ${review.roundOutcome}`}</p>
+      <p className="text-sm text-[var(--ink-subtle)] m-0">{review.finalOutcome == null ? 'Final protocol outcome chưa được thiết lập sau appeal window.' : `Final protocol outcome: ${review.finalOutcome}`}</p>
       {creatorConflict && <p className="text-sm text-[var(--danger)] m-0">Creator conflict: wallet tạo case không được enroll.</p>}
       {contributorConflict && !creatorConflict && <p className="text-sm text-[var(--danger)] m-0">Contributor conflict: wallet đã góp vốn cho campaign không được enroll.</p>}
       {meta.data && <p className="text-sm text-[var(--ink-subtle)] m-0">Case stake tối thiểu: {meta.data.requiredCaseStake.toString()} token units.</p>}
@@ -227,7 +228,7 @@ function JudgeReviewCard({
           </div>
         </div>
       )}
-      {currentAssignment && review.finalized && meta.data?.revealed && (
+      {currentAssignment && review.finalOutcome != null && meta.data?.revealed && (
         <button type="button" className="button button--secondary" disabled={transaction.busy} onClick={() => void transaction.send('registry', 'claimReward', [caseId])}>Claim Judge reward</button>
       )}
       {currentAssignment && <VNextEvidencePanel reviewCaseId={review.reviewCaseId} />}

@@ -127,4 +127,41 @@ describe("VNext event projector", () => {
       challengeDeadline: "1234",
     });
   });
+
+  it("caps replayed snapshots at five courts and separates provisional from final outcomes", () => {
+    const state = createVNextProjectionState();
+    const caseId = "0x1111111111111111111111111111111111111111111111111111111111111111";
+    applyVNextEvent(state, event("ReviewCaseCreated", {
+      reviewCaseId: caseId,
+      campaignId: 7n,
+      milestoneId: 1n,
+      evidenceRevision: 2n,
+      creator: "0x0000000000000000000000000000000000000001",
+    }));
+    applyVNextEvent(state, event("JurySnapshotFinalized", {
+      reviewCaseId: caseId,
+      snapshotBlock: 12n,
+      eligibleCount: 18n,
+      randomnessRequestId: "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    }, 1));
+    applyVNextEvent(state, event("ReviewRoundFinalized", {
+      reviewCaseId: caseId,
+      roundId: 0n,
+      outcome: 1,
+      passCourts: 3n,
+      failCourts: 2n,
+    }, 2));
+
+    expect(state.reviews.get(caseId)).toMatchObject({
+      courtCount: "5",
+      roundOutcome: 1,
+    });
+    expect(state.reviews.get(caseId)?.finalOutcome).toBeUndefined();
+
+    applyVNextEvent(state, event("FinalRulingEstablished", {
+      reviewCaseId: caseId,
+      outcome: 1,
+    }, 3));
+    expect(state.reviews.get(caseId)).toMatchObject({ roundOutcome: 1, finalOutcome: 1 });
+  });
 });

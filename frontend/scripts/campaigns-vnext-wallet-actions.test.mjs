@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { after, test } from 'node:test'
 import fs from 'node:fs'
 import path from 'node:path'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { createServer } from 'vite'
 
 const server = await createServer({ mode: 'fundtogether', server: { middlewareMode: true, ws: false }, logLevel: 'error' })
@@ -9,6 +11,7 @@ after(async () => { await server.close() })
 
 const actions = await server.ssrLoadModule('/src/features/campaigns/vnext/vnext-actions.ts')
 const descriptor = await server.ssrLoadModule('/src/features/campaigns/vnext/vnext-contract-descriptor.ts')
+const courtDashboard = await server.ssrLoadModule('/src/features/campaigns/vnext/VNextCourtDashboard.tsx')
 const root = path.resolve(import.meta.dirname, '..')
 
 test('VNext action policy keeps Creator and Backer actions explicit', () => {
@@ -50,6 +53,8 @@ test('VNext campaign projection exposes permissionless Creator and Backer action
   assert.match(page, /VNextCreateCampaignPanel/)
   assert.match(page, /vnextIndexer/)
   assert.match(page, /indexer-status/)
+  assert.match(page, /VNextCourtDashboard/)
+  assert.match(page, /Mở Court Dashboard/)
   assert.match(panel, /contribute/)
   assert.match(panel, /finalizeFunding/)
   assert.match(panel, /submitMilestoneEvidence/)
@@ -110,7 +115,8 @@ test('VNext Judge workspace exposes stake and assigned commit-reveal actions', (
   assert.match(page, /roundStatus/)
   assert.match(page, /contributionOf/)
   assert.match(page, /Creator conflict/)
-  assert.match(page, /Court chưa final canonical outcome/)
+  assert.match(page, /Provisional round verdict/)
+  assert.match(page, /Final protocol outcome/)
   assert.match(page, /claimReward/)
   assert.match(page, /VNextEvidencePanel/)
   assert.match(page, /vnextJudgeLedger/)
@@ -132,6 +138,83 @@ test('VNext Judge workspace exposes stake and assigned commit-reveal actions', (
   assert.doesNotMatch(page, /functionName: 'snapshotFinalized'/)
   assert.match(page, /snapshotFinalized: Number\(roundStatus\) >= ROUND_ASSIGNMENT_PENDING/)
   assert.doesNotMatch(page, /approveCampaign/)
+})
+
+test('VNext Milestone Court Dashboard keeps provisional, final and payout states separate', () => {
+  const dashboard = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextCourtDashboard.tsx'), 'utf8')
+  assert.match(dashboard, /MAX_COURTS_PER_REVIEW_CASE = 5/)
+  assert.match(dashboard, /\.slice\(0, MAX_COURTS_PER_REVIEW_CASE\)/)
+  assert.match(dashboard, /Court assignments/)
+  assert.match(dashboard, /committedCount/)
+  assert.match(dashboard, /revealedCount/)
+  assert.match(dashboard, /PASS Courts/)
+  assert.match(dashboard, /INVALID Courts/)
+  assert.match(dashboard, /Provisional round verdict/)
+  assert.match(dashboard, /Final protocol outcome/)
+  assert.match(dashboard, /appeal window\/finalization chưa kết thúc/)
+  assert.match(dashboard, /milestone\.paid/)
+  assert.match(dashboard, /canonical MilestonePaid event/)
+  assert.match(dashboard, /PASS không đồng nghĩa tiền đã được giải ngân/)
+  assert.match(dashboard, /vnext-court-indexer-lag/)
+  assert.doesNotMatch(dashboard, /judge\.vote|court\.votes/)
+})
+
+test('VNext Milestone Court Dashboard renders canonical assignments without promoting provisional PASS', () => {
+  const html = renderToStaticMarkup(createElement(courtDashboard.VNextCourtDashboard, {
+    campaignId: '7',
+    milestone: {
+      milestoneId: 1,
+      evidenceRevision: '2',
+      evidenceHash: null,
+      reviewCaseId: '0xcase',
+      finalOutcome: null,
+      state: 5,
+      paid: false,
+      lastBlockNumber: '99',
+    },
+    review: {
+      streamId: 'stream-1',
+      reviewCaseId: '0xcase',
+      rootCaseId: '0xcase',
+      campaignId: '7',
+      milestoneId: '1',
+      evidenceRevision: '2',
+      roundId: '0',
+      creator: '0xcreator',
+      enrolledCount: '3',
+      courtCount: '1',
+      finalizedCourtCount: '1',
+      passCourts: '1',
+      failCourts: '0',
+      invalidCourts: '0',
+      roundOutcome: 1,
+      finalOutcome: null,
+      outcome: 1,
+      finalized: true,
+      lastBlockNumber: '99',
+      assignments: [],
+      courts: [{
+        courtId: '0',
+        roundId: '0',
+        judges: ['0xjudge1', '0xjudge2', '0xjudge3'],
+        assignmentStatus: 'ASSIGNED',
+        phase: 'FINALIZED',
+        committedCount: 3,
+        revealedCount: 3,
+        finalized: true,
+        verdict: 1,
+      }],
+    },
+    indexer: { configured: true, status: 'syncing', lastBlock: '99', headBlock: '100', lagBlocks: '1' },
+    onRefresh: () => undefined,
+  }))
+
+  assert.match(html, /0xjudge1/)
+  assert.match(html, /Provisional round verdict:<\/strong> PASS/)
+  assert.match(html, /Final protocol outcome:<\/strong> PENDING/)
+  assert.match(html, /Đây chưa phải kết quả cuối cùng/)
+  assert.match(html, /NOT PAID/)
+  assert.match(html, /Indexer chưa đồng bộ hoàn toàn/)
 })
 
 test('VNext Judge review blocks voting until canonical evidence is available', () => {
