@@ -19,6 +19,7 @@ export type { VNextContractKind } from './vnext-contract-descriptor';
 
 export interface VNextTransactionState {
   stage: VNextTransactionStage;
+  action?: string;
   txHash?: `0x${string}`;
   eventCount?: number;
   error?: string;
@@ -26,7 +27,10 @@ export interface VNextTransactionState {
 
 const sleep = (milliseconds: number) => new Promise(resolve => setTimeout(resolve, milliseconds));
 
-export function useVNextTransaction(onIndexed: () => void = () => {}) {
+export function useVNextTransaction(
+  onIndexed: () => void = () => {},
+  onReceiptConfirmed: () => void = () => {},
+) {
   const account = useAccount();
   const client = usePublicClient({ chainId: 31339 });
   const { data: wallet } = useWalletClient({ account: account.address, connector: account.connector });
@@ -39,7 +43,7 @@ export function useVNextTransaction(onIndexed: () => void = () => {}) {
     args: readonly unknown[],
   ) {
     setBusy(true);
-    setState({ stage: 'wallet_requested' });
+    setState({ stage: 'wallet_requested', action: functionName });
     try {
       if (!account.address) throw new Error('Ví chưa được kết nối.');
       if (!wallet || !client) throw new Error('Không đọc được wallet hoặc RPC VNext.');
@@ -94,16 +98,17 @@ export function useVNextTransaction(onIndexed: () => void = () => {}) {
         account: account.address,
       });
       const txHash = await wallet.writeContract(request);
-      setState({ stage: 'submitted', txHash });
+      setState({ stage: 'submitted', action: functionName, txHash });
       const receipt = await client.waitForTransactionReceipt({ hash: txHash });
       if (receipt.status !== 'success') throw new Error(`Transaction đã revert: ${txHash}`);
-      setState({ stage: 'receipt_confirmed', txHash });
+      setState({ stage: 'receipt_confirmed', action: functionName, txHash });
+      onReceiptConfirmed();
       if (kind === 'token') return txHash;
 
       for (let attempt = 0; attempt < 20; attempt += 1) {
         const status = await campaignApi.vnextTransaction(txHash);
         if (status.state === 'ON_CHAIN_CONFIRMED') {
-          setState({ stage: 'indexed', txHash, eventCount: status.eventCount });
+          setState({ stage: 'indexed', action: functionName, txHash, eventCount: status.eventCount });
           onIndexed();
           return txHash;
         }

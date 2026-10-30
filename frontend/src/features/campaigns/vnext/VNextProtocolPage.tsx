@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { campaignApi } from '../api/campaigns';
 import { getErrorMessage } from '../../../lib/api/error';
 import { useAccountSession } from '../../auth/AccountSessionProvider';
-import { VNextActionPanel } from './VNextActionPanel';
+import { VNextActionPanel, VNextMilestoneActions } from './VNextActionPanel';
 import { VNextCreateCampaignPanel } from './VNextCreateCampaignPanel';
 import { VNextCourtDashboard } from './VNextCourtDashboard';
 
@@ -83,22 +83,20 @@ export function VNextProtocolPage({ campaignId }: { campaignId?: string }) {
               <strong>Milestone {milestone.milestoneId} · {milestoneStates[milestone.state] ?? `STATE_${milestone.state}`}</strong>
               <p className="text-sm text-[var(--ink-subtle)] m-0">Revision {milestone.evidenceRevision} · {milestone.paid ? 'đã payout' : 'chưa payout'}</p>
               {milestone.reviewCaseId && <code className="text-xs break-all">Review case {milestone.reviewCaseId}</code>}
-              {milestone.reviewCaseId ? (
-                <div className="mt-2">
-                  <button
-                    type="button"
-                    className="button button--secondary"
-                    aria-expanded={selectedMilestoneId === milestone.milestoneId}
-                    onClick={() => setSelectedMilestoneId(current => current === milestone.milestoneId ? null : milestone.milestoneId)}
-                  >
-                    {selectedMilestoneId === milestone.milestoneId ? 'Đóng Court Dashboard' : 'Mở Court Dashboard'}
-                  </button>
-                </div>
-              ) : null}
+              <div className="mt-2">
+                <button
+                  type="button"
+                  className="button button--secondary"
+                  aria-expanded={selectedMilestoneId === milestone.milestoneId}
+                  onClick={() => setSelectedMilestoneId(current => current === milestone.milestoneId ? null : milestone.milestoneId)}
+                >
+                  {selectedMilestoneId === milestone.milestoneId ? 'Đóng Milestone Dashboard' : 'Mở Milestone Dashboard'}
+                </button>
+              </div>
             </article>
           )) : <p className="muted">Chưa có milestone projection.</p>}
         </section>
-        {selectedMilestone ? (
+        {selectedMilestone && deployment.data?.configured ? (
           reviews.isPending ? (
             <p role="status" className="muted">Đang tải Court Dashboard…</p>
           ) : (
@@ -107,8 +105,19 @@ export function VNextProtocolPage({ campaignId }: { campaignId?: string }) {
               milestone={selectedMilestone}
               review={selectedReview}
               indexer={indexer.data}
+              payoutWallet={campaign.data.payoutWallet}
               onRefresh={refreshCampaign}
-            />
+            >
+              <VNextMilestoneActions
+                campaignId={campaignId!}
+                campaign={campaign.data}
+                milestone={selectedMilestone}
+                review={selectedReview}
+                deployment={deployment.data}
+                userId={session?.userId}
+                onRefresh={refreshCampaign}
+              />
+            </VNextCourtDashboard>
           )
         ) : null}
         {deployment.data?.configured && campaignId && campaign.data && (
@@ -116,7 +125,6 @@ export function VNextProtocolPage({ campaignId }: { campaignId?: string }) {
             campaignId={campaignId!}
             userId={session?.userId}
             campaign={campaign.data}
-            milestones={milestones.data ?? []}
             deployment={deployment.data}
             onRefresh={refreshCampaign}
           />

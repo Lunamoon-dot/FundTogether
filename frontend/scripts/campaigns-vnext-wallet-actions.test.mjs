@@ -12,6 +12,7 @@ after(async () => { await server.close() })
 const actions = await server.ssrLoadModule('/src/features/campaigns/vnext/vnext-actions.ts')
 const descriptor = await server.ssrLoadModule('/src/features/campaigns/vnext/vnext-contract-descriptor.ts')
 const courtDashboard = await server.ssrLoadModule('/src/features/campaigns/vnext/VNextCourtDashboard.tsx')
+const milestoneFlow = await server.ssrLoadModule('/src/features/campaigns/vnext/vnext-milestone-flow.ts')
 const root = path.resolve(import.meta.dirname, '..')
 
 test('VNext action policy keeps Creator and Backer actions explicit', () => {
@@ -54,7 +55,7 @@ test('VNext campaign projection exposes permissionless Creator and Backer action
   assert.match(page, /vnextIndexer/)
   assert.match(page, /indexer-status/)
   assert.match(page, /VNextCourtDashboard/)
-  assert.match(page, /Mở Court Dashboard/)
+  assert.match(page, /Mở Milestone Dashboard/)
   assert.match(panel, /contribute/)
   assert.match(panel, /finalizeFunding/)
   assert.match(panel, /submitMilestoneEvidence/)
@@ -65,7 +66,7 @@ test('VNext campaign projection exposes permissionless Creator and Backer action
   assert.match(evidence, /availability không thay thế kiểm tra hash/)
   assert.match(panel, /vnextBackerPosition/)
   assert.match(panel, /indexed-backer-position/)
-  assert.match(panel, /milestones\.map/)
+  assert.match(page, /milestones\.data\?\.length \? milestones\.data\.map/)
   assert.match(panel, /VNextMilestoneActions/)
   assert.match(panel, /retryPublication/)
   assert.match(panel, /Open publication appeal/)
@@ -85,7 +86,12 @@ test('VNext campaign projection exposes permissionless Creator and Backer action
   assert.match(panel, /finalizeNoAppeal/)
   assert.match(panel, /finalizeProtocolFailure/)
   assert.match(panel, /MILESTONE_CHALLENGE_WINDOW = 9/)
-  assert.match(panel, /milestone\.state === MILESTONE_CHALLENGE_WINDOW/)
+  assert.match(panel, /MILESTONE_CORRECTION = 11/)
+  assert.match(panel, /MILESTONE_RESUBMIT = 12/)
+  assert.match(panel, /simulateContract/)
+  assert.match(panel, /data-vnext-blocked-reason/)
+  assert.match(panel, /payoutPreflightReady/)
+  assert.match(panel, /transaction\.action === 'payMilestone'/)
   assert.doesNotMatch(panel, /approveCampaign/)
 })
 
@@ -155,6 +161,9 @@ test('VNext Milestone Court Dashboard keeps provisional, final and payout states
   assert.match(dashboard, /milestone\.paid/)
   assert.match(dashboard, /canonical MilestonePaid event/)
   assert.match(dashboard, /PASS không đồng nghĩa tiền đã được giải ngân/)
+  assert.match(dashboard, /Preflight on-chain/)
+  assert.match(dashboard, /payoutWallet/)
+  assert.match(dashboard, /challengeDeadline/)
   assert.match(dashboard, /vnext-court-indexer-lag/)
   assert.doesNotMatch(dashboard, /judge\.vote|court\.votes/)
 })
@@ -164,6 +173,7 @@ test('VNext Milestone Court Dashboard renders canonical assignments without prom
     campaignId: '7',
     milestone: {
       milestoneId: 1,
+      budget: '25000000',
       evidenceRevision: '2',
       evidenceHash: null,
       reviewCaseId: '0xcase',
@@ -206,6 +216,7 @@ test('VNext Milestone Court Dashboard renders canonical assignments without prom
       }],
     },
     indexer: { configured: true, status: 'syncing', lastBlock: '99', headBlock: '100', lagBlocks: '1' },
+    payoutWallet: '0x9999999999999999999999999999999999999999',
     onRefresh: () => undefined,
   }))
 
@@ -215,6 +226,70 @@ test('VNext Milestone Court Dashboard renders canonical assignments without prom
   assert.match(html, /Đây chưa phải kết quả cuối cùng/)
   assert.match(html, /NOT PAID/)
   assert.match(html, /Indexer chưa đồng bộ hoàn toàn/)
+  assert.match(html, /25 MockUSDC/)
+  assert.match(html, /0x9999999999999999999999999999999999999999/)
+})
+
+test('VNext CourtResult mapping keeps 3 as TIED and 4 as INVALID', () => {
+  assert.equal(milestoneFlow.courtVerdictLabel(3), 'TIED')
+  assert.equal(milestoneFlow.courtVerdictLabel(4), 'INVALID')
+  assert.equal(milestoneFlow.roundVerdictLabel(3), 'TIED')
+  assert.equal(milestoneFlow.roundVerdictLabel(4), 'INVALID')
+})
+
+test('VNext payout requires the challenge deadline and successful on-chain preflight', () => {
+  const base = {
+    paid: false,
+    finalOutcome: 1,
+    settlementComplete: true,
+    synchronized: true,
+    transactionStage: 'idle',
+  }
+  assert.equal(milestoneFlow.vnextPaymentStatus({
+    ...base,
+    chainTimestamp: 99n,
+    challengeDeadline: 100n,
+    payoutPreflightReady: false,
+  }), 'CHALLENGE_WINDOW_OPEN')
+  assert.equal(milestoneFlow.vnextPaymentStatus({
+    ...base,
+    chainTimestamp: 100n,
+    challengeDeadline: 100n,
+    payoutPreflightReady: true,
+  }), 'PAYOUT_ELIGIBLE')
+})
+
+test('VNext payment status never promotes pending transactions to PAID', () => {
+  const base = {
+    finalOutcome: 1,
+    settlementComplete: true,
+    synchronized: true,
+    chainTimestamp: 100n,
+    challengeDeadline: 100n,
+    payoutPreflightReady: true,
+  }
+  assert.equal(milestoneFlow.vnextPaymentStatus({ ...base, paid: false, transactionStage: 'submitted' }), 'TRANSACTION_PENDING')
+  assert.equal(milestoneFlow.vnextPaymentStatus({ ...base, paid: false, transactionStage: 'receipt_confirmed' }), 'TRANSACTION_PENDING')
+  assert.equal(milestoneFlow.vnextPaymentStatus({ ...base, paid: true, transactionStage: 'indexed' }), 'PAID_INDEXED')
+})
+
+test('VNext failed outcomes route to correction or recovery without payout', () => {
+  const base = {
+    paid: false,
+    settlementComplete: true,
+    synchronized: true,
+    payoutPreflightReady: false,
+    transactionStage: 'idle',
+  }
+  assert.equal(milestoneFlow.vnextPaymentStatus({ ...base, finalOutcome: 2 }), 'CORRECTION')
+  assert.equal(milestoneFlow.vnextPaymentStatus({ ...base, finalOutcome: 3 }), 'RECOVERY_REFUND')
+})
+
+test('VNext tied and invalid rounds use the bounded retry budget', () => {
+  assert.equal(milestoneFlow.vnextRetryStatus(3, 0n, 2n), 'RETRY_ELIGIBLE')
+  assert.equal(milestoneFlow.vnextRetryStatus(4, 1n, 2n), 'RETRY_ELIGIBLE')
+  assert.equal(milestoneFlow.vnextRetryStatus(3, 2n, 2n), 'RETRY_EXHAUSTED')
+  assert.equal(milestoneFlow.vnextRetryStatus(4, 2n, 2n), 'RETRY_EXHAUSTED')
 })
 
 test('VNext Judge review blocks voting until canonical evidence is available', () => {

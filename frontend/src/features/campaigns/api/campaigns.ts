@@ -185,6 +185,8 @@ export interface VNextCampaignProjection {
 }
 export interface VNextMilestoneProjection {
   milestoneId: number;
+  budget?: string | null;
+  acceptanceCriteriaHash?: string | null;
   evidenceRevision: string;
   evidenceHash: string | null;
   reviewCaseId: string | null;

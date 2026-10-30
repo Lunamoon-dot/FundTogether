@@ -10,12 +10,20 @@ import type {
   VNextDeployment,
   VNextBackerProjection,
   VNextMilestoneProjection,
+  VNextReviewWithAssignments,
 } from '../api/campaigns';
 import { campaignApi } from '../api/campaigns';
 import { useVNextTransaction } from './vnext-transaction';
 import { vnextStageLabel } from './vnext-actions';
 import { VNextEvidencePanel } from './VNextEvidencePanel';
 import { vnextAppealBondApprovalRequired } from './vnext-appeal-bond';
+import {
+  finalOutcomeLabel,
+  roundVerdictLabel,
+  vnextBlockedReason,
+  vnextPaymentStatus,
+  vnextRetryStatus,
+} from './vnext-milestone-flow';
 
 const CAMPAIGN_FUNDING = 1;
 const CAMPAIGN_MILESTONES_RUNNING = 3;
@@ -27,8 +35,9 @@ const MILESTONE_BASE_REVIEW = 3;
 const MILESTONE_RETRY_PENDING = 4;
 const MILESTONE_PROVISIONAL_RULING = 5;
 const MILESTONE_APPEAL_WINDOW = 6;
-const MILESTONE_CORRECTION = 12;
-const MILESTONE_RESUBMIT = 13;
+const MILESTONE_CORRECTION = 11;
+const MILESTONE_RESUBMIT = 12;
+const MILESTONE_TERMINAL = 13;
 const MILESTONE_CHALLENGE_WINDOW = 9;
 const campaignAbi = campaignArtifact.abi as Abi;
 const reviewAbi = reviewArtifact.abi as Abi;
@@ -38,6 +47,58 @@ function tokenAmount(value: string): bigint | null {
   if (!/^[0-9]+$/.test(value) || value === '0') return null;
   try { return BigInt(value); } catch { return null; }
 }
+
+interface ActionAvailability {
+  ready: boolean;
+  reason?: string;
+}
+
+function GuardedAction({
+  label,
+  availability,
+  busy,
+  primary = false,
+  onClick,
+}: {
+  label: string;
+  availability: ActionAvailability;
+  busy: boolean;
+  primary?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <div className="space-y-1">
+      <button
+        type="button"
+        className={`button ${primary ? 'button--primary' : 'button--quiet'}`}
+        disabled={busy || !availability.ready}
+        onClick={onClick}
+      >
+        {label}
+      </button>
+      {!availability.ready && availability.reason ? (
+        <p className="text-xs text-[var(--ink-subtle)] m-0" data-vnext-blocked-reason>{availability.reason}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function timestampLabel(value?: bigint) {
+  if (!value || value === 0n) return 'Chưa thiết lập';
+  return new Date(Number(value * 1_000n)).toLocaleString('vi-VN');
+}
+
+const paymentStatusLabels = {
+  NOT_ELIGIBLE: 'Chưa đủ điều kiện payout',
+  SETTLEMENT_PENDING: 'Judge settlement đang chờ hoàn tất',
+  SYNC_PENDING: 'Final ruling chưa được đồng bộ vào milestone',
+  CHALLENGE_WINDOW_OPEN: 'Challenge window đang mở',
+  PAYOUT_ELIGIBLE: 'Đủ điều kiện payout on-chain',
+  TRANSACTION_PENDING: 'Payout đã gửi/confirm; đang chờ MilestonePaid được index',
+  PAID_INDEXED: 'PAID — canonical MilestonePaid đã được index',
+  CORRECTION: 'VERDICT_FAIL — chuyển sang correction/resubmission',
+  RECOVERY_REFUND: 'PROTOCOL_FAIL — recovery/refund theo state canonical',
+} as const;
 
 function VNextAppealBondActions({
   deployment,
@@ -52,7 +113,6 @@ function VNextAppealBondActions({
 }) {
   const account = useAccount();
   const client = usePublicClient({ chainId: 31339 });
-  const transaction = useVNextTransaction(onRefresh);
   const bond = useQuery({
     queryKey: ['vnext-appeal-bond', deployment.juryReview],
     enabled: Boolean(client && deployment.juryReview),
@@ -82,6 +142,35 @@ function VNextAppealBondActions({
     ? vnextAppealBondApprovalRequired(allowanceAmount, bondAmount)
     : true;
   const appealReady = bondAmount !== undefined && allowanceAmount !== undefined && !approvalRequired;
+  const appealPreflight = useQuery<ActionAvailability>({
+    queryKey: ['vnext-appeal-preflight', deployment.campaignEscrow, account.address, ...actionArgs.map(String)],
+    enabled: Boolean(client && account.address && deployment.campaignEscrow && appealReady),
+    queryFn: async () => {
+      if (!client || !account.address || !deployment.campaignEscrow) throw new Error('Appeal preflight is unavailable');
+      try {
+        await client.simulateContract({
+          address: deployment.campaignEscrow,
+          abi: campaignAbi,
+          functionName: 'openAppeal',
+          args: actionArgs,
+          account: account.address,
+        });
+        return { ready: true };
+      } catch (cause) {
+        return { ready: false, reason: vnextBlockedReason(cause) };
+      }
+    },
+    retry: false,
+    refetchInterval: 5_000,
+  });
+  const refreshAppeal = () => {
+    onRefresh();
+    void appealPreflight.refetch();
+  };
+  const transaction = useVNextTransaction(refreshAppeal, refreshAppeal);
+  const appealAvailability = !appealReady
+    ? { ready: false, reason: 'Approve đủ appeal bond trước khi mở appeal.' }
+    : appealPreflight.data ?? { ready: false, reason: 'Đang kiểm tra appeal preconditions on-chain…' };
 
   if (!account.address || !deployment.tokenAddress || !deployment.juryReview) return null;
 
@@ -95,44 +184,52 @@ function VNextAppealBondActions({
     <div className="flex flex-wrap gap-2" data-vnext-action="appeal-bond">
       <span className="text-sm text-[var(--ink-subtle)]">Appeal bond: {bondAmount?.toString() ?? 'đang đọc…'} token units</span>
       {approvalRequired && <button type="button" className="button button--secondary" disabled={transaction.busy || bondAmount === undefined} onClick={() => void approveAppealBond()}>Approve appeal bond</button>}
-      <button type="button" className="button button--quiet" disabled={transaction.busy || !appealReady} onClick={() => void transaction.send('campaign', 'openAppeal', actionArgs)}>{label}</button>
+      <GuardedAction label={label} availability={appealAvailability} busy={transaction.busy} onClick={() => void transaction.send('campaign', 'openAppeal', actionArgs)} />
       {transaction.stage !== 'idle' && <span className="text-xs text-[var(--ink-subtle)]" role="status">{vnextStageLabel(transaction.stage)}</span>}
     </div>
   );
 }
 
-function VNextMilestoneActions({
+export function VNextMilestoneActions({
   campaignId,
   campaign,
   milestone,
+  review,
   deployment,
-  creator,
   userId,
   onRefresh,
 }: {
   campaignId: string;
   campaign: VNextCampaignProjection;
   milestone: VNextMilestoneProjection;
+  review?: VNextReviewWithAssignments;
   deployment: VNextDeployment;
-  creator: boolean;
   userId?: string;
   onRefresh: () => void;
 }) {
-  const transaction = useVNextTransaction(onRefresh);
+  const account = useAccount();
   const client = usePublicClient({ chainId: 31339 });
   const [evidenceHash, setEvidenceHash] = useState('');
   const campaignNumber = /^[0-9]+$/.test(campaignId) ? BigInt(campaignId) : null;
   const milestoneNumber = BigInt(milestone.milestoneId);
+  const reviewCaseId = milestone.reviewCaseId as `0x${string}` | null;
+  const rootCaseId = (review?.rootCaseId ?? milestone.reviewCaseId) as `0x${string}` | null;
+  const creator = Boolean(account.address && account.address.toLowerCase() === campaign.creator.toLowerCase());
   const timing = useQuery({
     queryKey: ['vnext-milestone-timing', campaignId, milestone.milestoneId, deployment.campaignEscrow],
     enabled: Boolean(client && deployment.campaignEscrow && campaignNumber !== null),
     queryFn: async () => {
       if (!client || !deployment.campaignEscrow || campaignNumber === null) throw new Error('Milestone read client is unavailable');
-      const [submissionDeadline, correctionDeadline] = await Promise.all([
+      const [submissionDeadline, correctionDeadline, state] = await Promise.all([
         client.readContract({ address: deployment.campaignEscrow, abi: campaignAbi, functionName: 'milestoneSubmissionDeadline', args: [campaignNumber, milestoneNumber] }),
         client.readContract({ address: deployment.campaignEscrow, abi: campaignAbi, functionName: 'milestoneCorrectionDeadline', args: [campaignNumber, milestoneNumber] }),
+        client.readContract({ address: deployment.campaignEscrow, abi: campaignAbi, functionName: 'milestoneState', args: [campaignNumber, milestoneNumber] }),
       ]);
-      return { submissionDeadline: BigInt(submissionDeadline as bigint), correctionDeadline: BigInt(correctionDeadline as bigint) };
+      return {
+        submissionDeadline: BigInt(submissionDeadline as bigint),
+        correctionDeadline: BigInt(correctionDeadline as bigint),
+        state: Number(state),
+      };
     },
     retry: false,
   });
@@ -150,31 +247,173 @@ function VNextMilestoneActions({
   const submissionExpired = Boolean(milestoneChainTimestamp !== undefined && timing.data?.submissionDeadline && milestoneChainTimestamp >= timing.data.submissionDeadline);
   const correctionExpired = Boolean(milestoneChainTimestamp !== undefined && timing.data?.correctionDeadline && milestoneChainTimestamp >= timing.data.correctionDeadline);
   const settlement = useQuery({
-    queryKey: ['vnext-review-settlement', milestone.reviewCaseId, deployment.juryReview],
-    enabled: Boolean(client && deployment.juryReview && milestone.reviewCaseId),
+    queryKey: ['vnext-review-settlement', reviewCaseId, rootCaseId, deployment.juryReview],
+    enabled: Boolean(client && deployment.juryReview && reviewCaseId && rootCaseId),
     queryFn: async () => {
-      if (!client || !deployment.juryReview || !milestone.reviewCaseId) throw new Error('Review settlement client is unavailable');
-      const [outcome, phase, settled, complete] = await Promise.all([
-        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'finalOutcome', args: [milestone.reviewCaseId as `0x${string}`] }),
-        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'settlementPhase', args: [milestone.reviewCaseId as `0x${string}`] }),
-        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'reviewCaseSettled', args: [milestone.reviewCaseId as `0x${string}`] }),
-        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'settlementComplete', args: [milestone.reviewCaseId as `0x${string}`] }),
+      if (!client || !deployment.juryReview || !reviewCaseId || !rootCaseId) throw new Error('Review settlement client is unavailable');
+      const [outcome, phase, settled, complete, result, retries, maximumRetries, revealDeadline, appealWindowDuration, roundStatus] = await Promise.all([
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'finalOutcome', args: [reviewCaseId] }),
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'settlementPhase', args: [reviewCaseId] }),
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'reviewCaseSettled', args: [reviewCaseId] }),
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'settlementComplete', args: [reviewCaseId] }),
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'reviewResult', args: [reviewCaseId] }),
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'retryCount', args: [rootCaseId] }),
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'MAXIMUM_RETRIES_PER_REVIEW_LEVEL' }),
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'revealDeadline', args: [reviewCaseId] }),
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'appealWindowDuration' }),
+        client.readContract({ address: deployment.juryReview, abi: reviewAbi, functionName: 'roundStatus', args: [reviewCaseId] }),
       ]);
-      return { outcome: Number(outcome), phase: Number(phase), settled: Boolean(settled), complete: Boolean(complete) };
+      return {
+        outcome: Number(outcome),
+        phase: Number(phase),
+        settled: Boolean(settled),
+        complete: Boolean(complete),
+        result: Number(result),
+        retries: BigInt(retries as bigint),
+        maximumRetries: BigInt(maximumRetries as bigint),
+        appealDeadline: BigInt(revealDeadline as bigint) + BigInt(appealWindowDuration as bigint),
+        roundStatus: Number(roundStatus),
+      };
     },
     retry: false,
+    refetchInterval: 5_000,
   });
   const settlementState = settlement.data;
+  const actionPreflight = useQuery<Record<string, ActionAvailability>>({
+    queryKey: [
+      'vnext-milestone-action-preflight',
+      campaignId,
+      milestone.milestoneId,
+      reviewCaseId,
+      account.address,
+      timing.data?.state,
+      settlementState?.outcome,
+      settlementState?.phase,
+      settlementState?.complete,
+      milestoneChainTimestamp?.toString(),
+    ],
+    enabled: Boolean(
+      client && account.address && deployment.campaignEscrow && deployment.juryReview
+      && campaignNumber !== null && reviewCaseId,
+    ),
+    queryFn: async () => {
+      if (!client || !account.address || !deployment.campaignEscrow || !deployment.juryReview || campaignNumber === null || !reviewCaseId) {
+        throw new Error('Milestone action preflight is unavailable');
+      }
+      const checks: Array<[string, 'campaign' | 'review', string, readonly unknown[]]> = [
+        ['sync', 'campaign', 'syncFinalRuling', [campaignNumber, milestoneNumber]],
+        ['finalizeNoAppeal', 'review', 'finalizeNoAppeal', [reviewCaseId]],
+        ['prepareRetry', 'review', 'prepareRetrySettlement', [reviewCaseId]],
+        ['settleRetry', 'review', 'settleCaseBatch', [reviewCaseId, 32n]],
+        ['retry', 'campaign', 'retryMilestoneReview', [campaignNumber, milestoneNumber]],
+        ['finalizeProtocolFailure', 'review', 'finalizeProtocolFailure', [reviewCaseId]],
+        ['settleFinal', 'review', 'settleFinalRuling', [reviewCaseId, 32n]],
+        ['pay', 'campaign', 'payMilestone', [campaignNumber, milestoneNumber]],
+      ];
+      const results = await Promise.all(checks.map(async ([key, kind, functionName, args]) => {
+        try {
+          await client.simulateContract({
+            address: kind === 'campaign' ? deployment.campaignEscrow! : deployment.juryReview!,
+            abi: kind === 'campaign' ? campaignAbi : reviewAbi,
+            functionName,
+            args,
+            account: account.address,
+          });
+          return [key, { ready: true }] as const;
+        } catch (cause) {
+          return [key, { ready: false, reason: vnextBlockedReason(cause) }] as const;
+        }
+      }));
+      return Object.fromEntries(results);
+    },
+    retry: false,
+    refetchInterval: 5_000,
+  });
+  const refreshLocalState = () => {
+    onRefresh();
+    void Promise.all([
+      timing.refetch(),
+      milestoneClock.refetch(),
+      settlement.refetch(),
+      actionPreflight.refetch(),
+    ]);
+  };
+  const transaction = useVNextTransaction(refreshLocalState, refreshLocalState);
+  const availability = (action: string): ActionAvailability => {
+    if (!account.address) return { ready: false, reason: 'Kết nối ví chain 31339 để thực hiện thao tác permissionless.' };
+    if (actionPreflight.isPending) return { ready: false, reason: 'Đang kiểm tra preconditions trực tiếp từ contract…' };
+    if (actionPreflight.error) return { ready: false, reason: 'Không đọc được preconditions on-chain; refresh trước khi thử lại.' };
+    return actionPreflight.data?.[action] ?? { ready: false, reason: 'Thao tác chưa khả dụng ở trạng thái on-chain hiện tại.' };
+  };
+  const retryStatus = vnextRetryStatus(
+    settlementState?.result ?? review?.roundOutcome,
+    settlementState?.retries ?? 0n,
+    settlementState?.maximumRetries ?? 2n,
+  );
+  const synchronized = settlementState?.outcome === 1
+    ? timing.data?.state === MILESTONE_CHALLENGE_WINDOW || timing.data?.state === 10
+    : settlementState?.outcome === 2
+      ? [MILESTONE_CORRECTION, MILESTONE_RESUBMIT, MILESTONE_TERMINAL].includes(timing.data?.state ?? -1)
+      : settlementState?.outcome === 3 && timing.data?.state === MILESTONE_TERMINAL;
+  const challengeDeadline = milestone.challengeDeadline && /^[0-9]+$/.test(milestone.challengeDeadline)
+    ? BigInt(milestone.challengeDeadline)
+    : undefined;
+  const currentMilestoneState = timing.data?.state ?? milestone.state;
   const canEditEvidence = creator && campaign.state === CAMPAIGN_MILESTONES_RUNNING
-    && [MILESTONE_PENDING, MILESTONE_CORRECTION, MILESTONE_RESUBMIT].includes(milestone.state);
+    && [MILESTONE_PENDING, MILESTONE_CORRECTION, MILESTONE_RESUBMIT].includes(currentMilestoneState);
   const canSubmit = canEditEvidence && /^0x[0-9a-fA-F]{64}$/.test(evidenceHash);
+  const paymentStatus = vnextPaymentStatus({
+    paid: milestone.paid,
+    finalOutcome: settlementState?.outcome ?? milestone.finalOutcome ?? 0,
+    settlementComplete: settlementState?.complete ?? false,
+    synchronized,
+    chainTimestamp: milestoneChainTimestamp,
+    challengeDeadline,
+    payoutPreflightReady: availability('pay').ready,
+    transactionStage: transaction.action === 'payMilestone' ? transaction.stage : 'idle',
+  });
+  const nextSettlementAction = [
+    ['finalizeNoAppeal', 'Finalize final ruling'],
+    ['prepareRetry', 'Prepare retry settlement'],
+    ['settleRetry', 'Settle retry Judge batch'],
+    ['retry', 'Open bounded retry'],
+    ['finalizeProtocolFailure', 'Finalize protocol failure'],
+    ['settleFinal', 'Settle final ruling Judge batch'],
+    ['sync', 'Synchronize milestone outcome'],
+    ['pay', 'Pay milestone'],
+  ].find(([action]) => availability(action).ready)?.[1];
+  const nextAction = canEditEvidence
+    ? canSubmit ? 'Submit evidence revision' : 'Nhập evidence hash hợp lệ để submit'
+    : nextSettlementAction ?? 'Chưa có thao tác on-chain hợp lệ';
 
   return (
     <article className="monograph-card space-y-3" data-vnext-milestone={milestone.milestoneId}>
-      <div>
-        <span className="monograph-card__kicker">MILESTONE {milestone.milestoneId}</span>
-        <p className="text-sm text-[var(--ink-subtle)] m-0">State {milestone.state} · revision {milestone.evidenceRevision} · {milestone.paid ? 'đã payout' : 'chưa payout'}</p>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <span className="monograph-card__kicker">SETTLEMENT & DISBURSEMENT</span>
+          <h3 className="monograph-card__title">Current status: {paymentStatusLabels[paymentStatus]}</h3>
+          <p className="text-sm text-[var(--ink-subtle)] m-0">Revision {milestone.evidenceRevision} · on-chain milestone state {timing.data?.state ?? 'đang đọc'}</p>
+        </div>
+        <button type="button" className="button button--secondary" onClick={refreshLocalState}>Refresh on-chain state</button>
       </div>
+
+      <dl className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3" data-vnext-settlement-status>
+        <div><dt className="muted">Court result</dt><dd>{roundVerdictLabel(settlementState?.result ?? review?.roundOutcome)}</dd></div>
+        <div><dt className="muted">Final ruling</dt><dd>{finalOutcomeLabel(settlementState?.outcome ?? milestone.finalOutcome)}</dd></div>
+        <div><dt className="muted">Judge settlement</dt><dd>{settlementState?.outcome === 0 ? 'Chờ final ruling' : settlementState?.complete ? 'COMPLETED' : 'PENDING'}</dd></div>
+        <div><dt className="muted">Milestone outcome</dt><dd>{synchronized ? 'SYNCHRONIZED ON-CHAIN' : 'SYNC PENDING'}</dd></div>
+        <div><dt className="muted">Retry budget</dt><dd>{settlementState ? `${settlementState.retries}/${settlementState.maximumRetries} · ${retryStatus}` : 'Đang đọc'}</dd></div>
+        <div><dt className="muted">Next available action</dt><dd>{nextAction}</dd></div>
+        <div><dt className="muted">Appeal deadline</dt><dd>{timestampLabel(settlementState?.appealDeadline)}</dd></div>
+        <div><dt className="muted">Challenge deadline</dt><dd>{timestampLabel(challengeDeadline)}</dd></div>
+        <div><dt className="muted">Correction deadline</dt><dd>{timestampLabel(timing.data?.correctionDeadline)}</dd></div>
+      </dl>
+
+      {settlement.isPending || timing.isPending ? <p role="status" className="muted">Đang tải canonical on-chain state…</p> : null}
+      {settlement.error || timing.error ? <p role="alert" className="monograph-alert monograph-alert--error">Không đọc được settlement state từ contract. Refresh trước khi gửi transaction.</p> : null}
+      {retryStatus === 'RETRY_EXHAUSTED' ? <p className="monograph-alert">Retry budget đã hết; không mở thêm vòng retry. Chỉ protocol-failure terminalization hợp lệ mới được phép.</p> : null}
+      {(settlementState?.outcome ?? milestone.finalOutcome) === 2 ? <p className="monograph-alert">VERDICT_FAIL là substantive failure. Creator có thể correction/resubmit trong deadline hiện có; payout luôn bị khóa.</p> : null}
+      {(settlementState?.outcome ?? milestone.finalOutcome) === 3 ? <p className="monograph-alert">PROTOCOL_FAIL là lỗi vận hành phân xử, không quy kết Creator gian lận. Recovery/refund hiện tại: {campaign.state === CAMPAIGN_REFUNDING || campaign.state === CAMPAIGN_REFUNDING_REMAINDER ? 'canonical refund state đã được index' : 'đang chờ milestone sync/indexer'}.</p> : null}
 
       {canEditEvidence && (
         <div className="space-y-2" data-vnext-action="submitMilestoneEvidence">
@@ -187,27 +426,32 @@ function VNextMilestoneActions({
       {creator && milestone.reviewCaseId && <VNextEvidencePanel reviewCaseId={milestone.reviewCaseId} enabled={Boolean(userId)} />}
 
       {campaignNumber !== null && (
-        <div className="flex flex-wrap gap-2" data-vnext-action="milestone-timeouts">
-          {milestone.state === MILESTONE_PENDING && submissionExpired && <button type="button" className="button button--secondary" disabled={transaction.busy} onClick={() => void transaction.send('campaign', 'expireMilestoneSubmission', [campaignNumber, milestoneNumber])}>Expire submission deadline</button>}
-          {milestone.state === MILESTONE_CORRECTION && correctionExpired && <button type="button" className="button button--secondary" disabled={transaction.busy} onClick={() => void transaction.send('campaign', 'finalizeCorrectionFailure', [campaignNumber, milestoneNumber])}>Finalize correction failure</button>}
-          {[MILESTONE_REVIEW_ENROLLMENT, MILESTONE_BASE_REVIEW, MILESTONE_PROVISIONAL_RULING, MILESTONE_APPEAL_WINDOW].includes(milestone.state) && milestone.reviewCaseId && <>
-            <button type="button" className="button button--quiet" disabled={transaction.busy || Boolean(settlementState?.outcome && settlementState.outcome !== 0 && !settlementState.complete)} onClick={() => void transaction.send('campaign', 'syncFinalRuling', [campaignNumber, milestoneNumber])}>Sync final ruling</button>
-            {[MILESTONE_PROVISIONAL_RULING, MILESTONE_APPEAL_WINDOW].includes(milestone.state) && <>
+        <div className="grid gap-3 sm:grid-cols-2" data-vnext-action="milestone-timeouts">
+          {currentMilestoneState === MILESTONE_PENDING && submissionExpired && <button type="button" className="button button--secondary" disabled={transaction.busy} onClick={() => void transaction.send('campaign', 'expireMilestoneSubmission', [campaignNumber, milestoneNumber])}>Expire submission deadline</button>}
+          {currentMilestoneState === MILESTONE_CORRECTION && correctionExpired && <button type="button" className="button button--secondary" disabled={transaction.busy} onClick={() => void transaction.send('campaign', 'finalizeCorrectionFailure', [campaignNumber, milestoneNumber])}>Finalize correction failure</button>}
+          {reviewCaseId && settlementState?.outcome === 0 && (settlementState.result === 1 || settlementState.result === 2) ? (
+            <GuardedAction label="Finalize no appeal" availability={availability('finalizeNoAppeal')} busy={transaction.busy} onClick={() => void transaction.send('review', 'finalizeNoAppeal', [reviewCaseId])} />
+          ) : null}
+          {[MILESTONE_PROVISIONAL_RULING, MILESTONE_APPEAL_WINDOW].includes(timing.data?.state ?? milestone.state) && reviewCaseId && <>
               <VNextAppealBondActions deployment={deployment} actionArgs={[campaignNumber, milestoneNumber]} label="Open appeal" onRefresh={onRefresh} />
-              <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('review', 'finalizeNoAppeal', [milestone.reviewCaseId as `0x${string}`])}>Finalize no appeal</button>
-            </>}
           </>}
-          {milestone.state === MILESTONE_RETRY_PENDING && milestone.reviewCaseId && <>
-            {settlementState?.phase === 0 && <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('review', 'prepareRetrySettlement', [milestone.reviewCaseId as `0x${string}`])}>Prepare retry settlement</button>}
-            {settlementState && settlementState.phase > 0 && !settlementState.settled && <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('review', 'settleCaseBatch', [milestone.reviewCaseId as `0x${string}`, 32n])}>Settle retry batch</button>}
-            <button type="button" className="button button--quiet" disabled={transaction.busy || !settlementState?.settled} onClick={() => void transaction.send('campaign', 'retryMilestoneReview', [campaignNumber, milestoneNumber])}>Retry review</button>
-            <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('review', 'finalizeProtocolFailure', [milestone.reviewCaseId as `0x${string}`])}>Finalize protocol failure</button>
+          {reviewCaseId && (retryStatus === 'RETRY_ELIGIBLE' || availability('prepareRetry').ready || availability('retry').ready || Boolean(settlementState && settlementState.phase > 0 && !settlementState.settled)) && <>
+            {settlementState?.phase === 0 ? <GuardedAction label="Prepare retry settlement" availability={availability('prepareRetry')} busy={transaction.busy} onClick={() => void transaction.send('review', 'prepareRetrySettlement', [reviewCaseId])} /> : null}
+            {settlementState && settlementState.phase > 0 && !settlementState.settled ? <GuardedAction label="Settle retry Judge batch" availability={availability('settleRetry')} busy={transaction.busy} onClick={() => void transaction.send('review', 'settleCaseBatch', [reviewCaseId, 32n])} /> : null}
+            <GuardedAction label="Open bounded retry" availability={availability('retry')} busy={transaction.busy} onClick={() => void transaction.send('campaign', 'retryMilestoneReview', [campaignNumber, milestoneNumber])} />
           </>}
-          {settlementState && settlementState.outcome !== 0 && !settlementState.complete && <button type="button" className="button button--quiet" disabled={transaction.busy} onClick={() => void transaction.send('review', 'settleFinalRuling', [milestone.reviewCaseId as `0x${string}`, 32n])}>Settle final ruling batch</button>}
+          {reviewCaseId && settlementState?.outcome === 0 && (retryStatus === 'RETRY_EXHAUSTED' || availability('finalizeProtocolFailure').ready) ? <GuardedAction label="Finalize protocol failure" availability={availability('finalizeProtocolFailure')} busy={transaction.busy} onClick={() => void transaction.send('review', 'finalizeProtocolFailure', [reviewCaseId])} /> : null}
+          {reviewCaseId && settlementState && settlementState.outcome !== 0 && !settlementState.complete ? <GuardedAction label="Settle final ruling Judge batch" availability={availability('settleFinal')} busy={transaction.busy} onClick={() => void transaction.send('review', 'settleFinalRuling', [reviewCaseId, 32n])} /> : null}
+          {reviewCaseId && !synchronized && ([MILESTONE_REVIEW_ENROLLMENT, MILESTONE_BASE_REVIEW, MILESTONE_RETRY_PENDING, MILESTONE_PROVISIONAL_RULING, MILESTONE_APPEAL_WINDOW].includes(timing.data?.state ?? milestone.state)) ? <GuardedAction label={retryStatus === 'RETRY_ELIGIBLE' ? 'Sync retry eligibility' : 'Sync final ruling to milestone'} availability={availability('sync')} busy={transaction.busy} onClick={() => void transaction.send('campaign', 'syncFinalRuling', [campaignNumber, milestoneNumber])} /> : null}
         </div>
       )}
 
-      {milestone.state === MILESTONE_CHALLENGE_WINDOW && campaignNumber !== null && <button type="button" className="button button--primary" disabled={transaction.busy} onClick={() => void transaction.send('campaign', 'payMilestone', [campaignNumber, milestoneNumber])}>Payout milestone {milestone.milestoneId}</button>}
+      {(settlementState?.outcome === 1 || milestone.finalOutcome === 1 || timing.data?.state === MILESTONE_CHALLENGE_WINDOW) && campaignNumber !== null && !milestone.paid ? (
+        <div className="space-y-2" data-vnext-action="payMilestone">
+          <p className="text-sm m-0">Payout là permissionless. Nút chỉ bật khi `payMilestone` simulate thành công trên chain hiện tại; backend không chuyển tiền.</p>
+          <GuardedAction label={`Pay milestone ${milestone.milestoneId}`} availability={availability('pay')} busy={transaction.busy} primary onClick={() => void transaction.send('campaign', 'payMilestone', [campaignNumber, milestoneNumber])} />
+        </div>
+      ) : null}
       {transaction.stage !== 'idle' && <p className="text-sm m-0" role="status">{vnextStageLabel(transaction.stage)}{transaction.txHash ? ` · ${transaction.txHash}` : ''}</p>}
       {transaction.error && <p className="monograph-alert monograph-alert--error" role="alert">{transaction.error}</p>}
     </article>
@@ -218,14 +462,12 @@ export function VNextActionPanel({
   campaignId,
   userId,
   campaign,
-  milestones,
   deployment,
   onRefresh,
 }: {
   campaignId: string;
   userId?: string;
   campaign: VNextCampaignProjection;
-  milestones: VNextMilestoneProjection[];
   deployment: VNextDeployment;
   onRefresh: () => void;
 }) {
@@ -382,19 +624,6 @@ export function VNextActionPanel({
       )}
 
       {creator && campaign.publicationReviewCaseId && <VNextEvidencePanel reviewCaseId={campaign.publicationReviewCaseId} enabled={Boolean(userId)} />}
-      {campaign.state === CAMPAIGN_MILESTONES_RUNNING && milestones.map(milestone => (
-        <VNextMilestoneActions
-          key={milestone.milestoneId}
-          campaignId={campaignId}
-          campaign={campaign}
-          milestone={milestone}
-          deployment={deployment}
-          creator={creator}
-          userId={userId}
-          onRefresh={onRefresh}
-        />
-      ))}
-
       {(campaign.state === CAMPAIGN_REFUNDING || campaign.state === CAMPAIGN_REFUNDING_REMAINDER) && (
         <div className="flex flex-wrap gap-2" data-vnext-action="claimRefund">
           <button type="button" className="button button--secondary" disabled={transaction.busy || campaignNumber === null} onClick={() => void transaction.send('campaign', 'freezeRefundAllocations', [campaignNumber!, 50n])}>Chuẩn bị entitlement refund</button>
