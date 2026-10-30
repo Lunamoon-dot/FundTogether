@@ -251,6 +251,7 @@ export interface VNextBackerProjection {
   refundAllocationsFrozen: boolean;
   indexedContributed: string;
   indexedRefunded: string;
+  indexedRefundClaimed: boolean;
   lastBlockNumber: string;
 }
 export interface VNextChallengeProjection {

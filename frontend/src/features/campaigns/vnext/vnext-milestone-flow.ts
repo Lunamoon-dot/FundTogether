@@ -45,6 +45,7 @@ export function vnextPaymentStatus(input: VNextPaymentStatusInput): VNextPayment
   if (
     input.transactionStage === 'submitted'
     || input.transactionStage === 'receipt_confirmed'
+    || input.transactionStage === 'indexing'
     || input.transactionStage === 'indexed'
   ) {
     return 'TRANSACTION_PENDING';

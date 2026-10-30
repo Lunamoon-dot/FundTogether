@@ -154,6 +154,7 @@ export class VNextController {
         refundAllocationsFrozen: Boolean(allocationsFrozen),
         indexedContributed: row?.contributed ?? "0",
         indexedRefunded: row?.refunded ?? "0",
+        indexedRefundClaimed: row?.refundClaimed ?? false,
         lastBlockNumber: row?.lastBlockNumber ?? "0",
       };
     }));
