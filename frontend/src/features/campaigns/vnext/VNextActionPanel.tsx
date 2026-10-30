@@ -43,11 +43,6 @@ const campaignAbi = campaignArtifact.abi as Abi;
 const reviewAbi = reviewArtifact.abi as Abi;
 const tokenAbi = erc20Abi as Abi;
 
-function tokenAmount(value: string): bigint | null {
-  if (!/^[0-9]+$/.test(value) || value === '0') return null;
-  try { return BigInt(value); } catch { return null; }
-}
-
 interface ActionAvailability {
   ready: boolean;
   reason?: string;
@@ -474,9 +469,7 @@ export function VNextActionPanel({
 }) {
   const transaction = useVNextTransaction(onRefresh);
   const client = usePublicClient({ chainId: 31339 });
-  const [amount, setAmount] = useState('');
   const creator = Boolean(transaction.address && transaction.address.toLowerCase() === campaign.creator.toLowerCase());
-  const amountValue = tokenAmount(amount);
   const fundingClock = useQuery({
     queryKey: ['vnext-funding-chain-clock', client?.chain?.id],
     enabled: Boolean(client),
@@ -523,16 +516,6 @@ export function VNextActionPanel({
     retry: false,
   });
   const publicationFinalOutcome = publicationFinality.data ?? (campaign.publicationOutcome && campaign.publicationOutcome !== 0 ? campaign.publicationOutcome : 0);
-  const sendContribution = () => {
-    if (!amountValue || !deployment.campaignEscrow || campaignNumber === null) return;
-    void transaction.send('campaign', 'contribute', [campaignNumber, amountValue]);
-  };
-
-  const approveContribution = () => {
-    if (!amountValue || !deployment.campaignEscrow) return;
-    void transaction.send('token', 'approve', [deployment.campaignEscrow, amountValue]);
-  };
-
   return (
     <section className="monograph-card space-y-3" aria-labelledby="vnext-actions-title">
       <span className="monograph-card__kicker">PERMISSIONLESS ACTIONS</span>
@@ -567,18 +550,6 @@ export function VNextActionPanel({
         <div data-vnext-action="finalizePublication">
           <p className="text-sm text-[var(--ink-subtle)] m-0">Publication review đã có final outcome; bất kỳ caller nào cũng có thể materialize state tiếp theo từ contract.</p>
           <button type="button" className="button button--primary" disabled={transaction.busy || campaignNumber === null} onClick={() => void transaction.send('campaign', 'finalizePublication', [campaignNumber!])}>Finalize publication</button>
-        </div>
-      )}
-
-      {campaign.state === CAMPAIGN_FUNDING && (
-        <div className="space-y-2" data-vnext-action="contribute">
-          <label className="text-sm block" htmlFor="vnext-contribution-amount">Góp vốn (MockUSDC, 6 decimals)</label>
-          <input id="vnext-contribution-amount" inputMode="numeric" value={amount} onChange={event => setAmount(event.target.value)} placeholder="10000000 = 10 MockUSDC" />
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className="button button--secondary" disabled={!amountValue || transaction.busy} onClick={approveContribution}>Approve MockUSDC</button>
-            <button type="button" className="button button--primary" disabled={!amountValue || transaction.busy} onClick={sendContribution}>Góp vốn</button>
-          </div>
-          {!amountValue && amount && <p className="text-sm text-[var(--danger)] m-0">Chỉ nhập số nguyên token unit, lớn hơn 0.</p>}
         </div>
       )}
 

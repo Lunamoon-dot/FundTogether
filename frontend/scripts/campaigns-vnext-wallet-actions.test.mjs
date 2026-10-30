@@ -189,6 +189,7 @@ test('VNext contract descriptors use only the manifest addresses', () => {
 test('VNext campaign projection exposes permissionless Creator and Backer actions', () => {
   const page = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextProtocolPage.tsx'), 'utf8')
   const panel = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextActionPanel.tsx'), 'utf8')
+  const checkout = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextFundingCheckout.tsx'), 'utf8')
   const evidence = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextEvidencePanel.tsx'), 'utf8')
   assert.match(page, /VNextActionPanel/)
   assert.match(page, /VNextCreateCampaignPanel/)
@@ -196,7 +197,8 @@ test('VNext campaign projection exposes permissionless Creator and Backer action
   assert.match(page, /indexer-status/)
   assert.match(page, /VNextCourtDashboard/)
   assert.match(page, /Mở Milestone Dashboard/)
-  assert.match(panel, /contribute/)
+  assert.match(page, /VNextFundingCheckout/)
+  assert.match(checkout, /contribute/)
   assert.match(panel, /finalizeFunding/)
   assert.match(panel, /submitMilestoneEvidence/)
   assert.match(panel, /VNextEvidencePanel/)

@@ -8,10 +8,15 @@ describe("VNext transaction status", () => {
   it("accepts a canonical hash and reports indexed events", () => {
     const hash = `0x${"a".repeat(64)}`;
     expect(normalizeVNextTransactionHash(hash)).toBe(hash);
-    expect(buildVNextTransactionStatus(hash, [{ eventName: "ContributionReceived" }])).toEqual({
+    const event = {
+      eventName: "ContributionReceived",
+      args: { campaignId: "7", backer: "0x00000000000000000000000000000000000000a1", amount: "25500000" },
+    };
+    expect(buildVNextTransactionStatus(hash, [event])).toEqual({
       txHash: hash,
       state: "ON_CHAIN_CONFIRMED",
       eventCount: 1,
+      events: [event],
     });
   });
 
@@ -21,6 +26,7 @@ describe("VNext transaction status", () => {
       txHash: hash,
       state: "INDEXING",
       eventCount: 0,
+      events: [],
     });
   });
 

@@ -8,6 +8,10 @@ import reviewArtifact from '../../../../../backend/src/blockchain/generated/vnex
 import { getErrorMessage } from '../../../lib/api/error';
 import { campaignApi, listTransactionWallets } from '../api/campaigns';
 import type { VNextTransactionStage } from './vnext-actions';
+import {
+  vnextCanonicalEventIndexed,
+  type VNextCanonicalEventExpectation,
+} from './vnext-funding-flow';
 import { vnextContractAddress, type VNextContractKind } from './vnext-contract-descriptor';
 
 const campaignAbi = campaignArtifact.abi as Abi;
@@ -27,6 +31,7 @@ export interface VNextTransactionState {
 
 interface VNextTransactionOptions {
   waitForIndexer?: boolean;
+  canonicalEvent?: VNextCanonicalEventExpectation;
 }
 
 const sleep = (milliseconds: number) => new Promise(resolve => setTimeout(resolve, milliseconds));
@@ -42,6 +47,31 @@ export function useVNextTransaction(
   const [state, setState] = useState<VNextTransactionState>({ stage: 'idle' });
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
+  const canonicalEventRef = useRef<VNextTransactionOptions['canonicalEvent']>(undefined);
+
+  async function pollForCanonicalIndexing(
+    txHash: `0x${string}`,
+    action: string,
+    canonicalEvent?: VNextTransactionOptions['canonicalEvent'],
+  ) {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      try {
+        const status = await campaignApi.vnextTransaction(txHash);
+        const expectedEventIndexed = !canonicalEvent
+          || vnextCanonicalEventIndexed(status.events, canonicalEvent);
+        if (status.state === 'ON_CHAIN_CONFIRMED' && expectedEventIndexed) {
+          setState({ stage: 'indexed', action, txHash, eventCount: status.eventCount });
+          onIndexed();
+          return true;
+        }
+      } catch {
+        // A confirmed receipt remains successful while the indexer is unavailable.
+      }
+      setState({ stage: 'indexing', action, txHash });
+      await sleep(500);
+    }
+    return false;
+  }
 
   async function send(
     kind: VNextContractKind,
@@ -114,21 +144,8 @@ export function useVNextTransaction(
       setState({ stage: 'receipt_confirmed', action: functionName, txHash });
       onReceiptConfirmed();
       if (kind === 'token' || options.waitForIndexer === false) return txHash;
-
-      for (let attempt = 0; attempt < 20; attempt += 1) {
-        try {
-          const status = await campaignApi.vnextTransaction(txHash);
-          if (status.state === 'ON_CHAIN_CONFIRMED') {
-            setState({ stage: 'indexed', action: functionName, txHash, eventCount: status.eventCount });
-            onIndexed();
-            return txHash;
-          }
-        } catch {
-          // A confirmed receipt remains successful while the indexer is unavailable.
-        }
-        setState({ stage: 'indexing', action: functionName, txHash });
-        await sleep(500);
-      }
+      canonicalEventRef.current = options.canonicalEvent;
+      await pollForCanonicalIndexing(txHash, functionName, options.canonicalEvent);
       return txHash;
     } catch (cause) {
       const error = getErrorMessage(cause);
@@ -141,8 +158,21 @@ export function useVNextTransaction(
   }
 
   function reset() {
+    canonicalEventRef.current = undefined;
     setState({ stage: 'idle' });
   }
 
-  return { ...state, send, reset, busy, address: account.address };
+  async function reconcile() {
+    if (busyRef.current || !state.txHash || !state.action) return false;
+    busyRef.current = true;
+    setBusy(true);
+    try {
+      return await pollForCanonicalIndexing(state.txHash, state.action, canonicalEventRef.current);
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  }
+
+  return { ...state, send, reset, reconcile, busy, address: account.address };
 }

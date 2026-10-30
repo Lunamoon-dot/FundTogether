@@ -71,7 +71,10 @@ export class VNextController {
     } catch {
       throw new BadRequestException("Invalid VNext transaction hash");
     }
-    const events = await this.db.select({ eventName: vnextChainEvents.eventName }).from(vnextChainEvents).where(
+    const events = await this.db.select({
+      eventName: vnextChainEvents.eventName,
+      args: vnextChainEvents.args,
+    }).from(vnextChainEvents).where(
       and(
         eq(vnextChainEvents.streamId, this.streamId()),
         eq(vnextChainEvents.transactionHash, normalizedHash),
