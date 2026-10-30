@@ -13,6 +13,7 @@ import {
   vnextChainEvents,
   vnextBackerProjections,
   vnextChallengeProjections,
+  vnextCourtProjections,
   vnextJudgeAssignments,
   vnextJudgeLedgerProjections,
   vnextMilestoneProjections,
@@ -30,6 +31,7 @@ import {
 } from "../blockchain/vnext-deployment";
 
 export const VNEXT_CONNECTION = Symbol("VNEXT_CONNECTION");
+export const MAX_COURTS_PER_REVIEW_CASE = 5n;
 export interface VNextConnection {
   manifest: VNextDeploymentManifest;
   client: PublicClient;
@@ -61,6 +63,13 @@ function boolArg(args: Record<string, unknown>, key: string): boolean {
 
 function eventArgs(event: { args?: readonly unknown[] | Record<string, unknown> }) {
   return (event.args && !Array.isArray(event.args) ? event.args : {}) as Record<string, unknown>;
+}
+
+export function vnextCourtCount(eligibleCount: unknown): string {
+  const eligibleCourts = BigInt(String(eligibleCount)) / 3n;
+  return (eligibleCourts > MAX_COURTS_PER_REVIEW_CASE
+    ? MAX_COURTS_PER_REVIEW_CASE
+    : eligibleCourts).toString();
 }
 
 type VNextTransaction = Parameters<Parameters<NodePgDatabase<typeof schema>["transaction"]>[0]>[0];
@@ -490,40 +499,88 @@ export class VNextIndexerService implements OnModuleInit, OnModuleDestroy {
       await tx.update(vnextReviewProjections).set({ enrolledCount: sql`${vnextReviewProjections.enrolledCount} + 1`, lastBlockNumber: blockNumber.toString(), updatedAt: new Date() }).where(and(eq(vnextReviewProjections.streamId, streamId), eq(vnextReviewProjections.reviewCaseId, textArg(args, "reviewCaseId").toLowerCase())));
     } else if (eventName === "JurySnapshotFinalized") {
       await tx.update(vnextReviewProjections).set({
-        courtCount: (BigInt(textArg(args, "eligibleCount")) / 3n).toString(),
+        courtCount: vnextCourtCount(textArg(args, "eligibleCount")),
         lastBlockNumber: blockNumber.toString(),
         updatedAt: new Date(),
       }).where(and(eq(vnextReviewProjections.streamId, streamId), eq(vnextReviewProjections.reviewCaseId, textArg(args, "reviewCaseId").toLowerCase())));
     } else if (eventName === "CourtFinalized") {
+      const reviewCaseId = textArg(args, "reviewCaseId").toLowerCase();
+      const courtId = textArg(args, "courtId");
       const outcome = Number(textArg(args, "outcome"));
+      await tx.update(vnextCourtProjections).set({
+        outcome,
+        finalized: true,
+        lastBlockNumber: blockNumber.toString(),
+        updatedAt: new Date(),
+      }).where(and(
+        eq(vnextCourtProjections.streamId, streamId),
+        eq(vnextCourtProjections.reviewCaseId, reviewCaseId),
+        eq(vnextCourtProjections.courtId, courtId),
+      ));
       await tx.update(vnextReviewProjections).set({
         finalizedCourtCount: sql`${vnextReviewProjections.finalizedCourtCount} + 1`,
         passCourts: sql`${vnextReviewProjections.passCourts} + CASE WHEN ${outcome} = 1 THEN 1 ELSE 0 END`,
         failCourts: sql`${vnextReviewProjections.failCourts} + CASE WHEN ${outcome} = 2 THEN 1 ELSE 0 END`,
+        invalidCourts: sql`${vnextReviewProjections.invalidCourts} + CASE WHEN ${outcome} = 3 THEN 1 ELSE 0 END`,
         lastBlockNumber: blockNumber.toString(),
         updatedAt: new Date(),
-      }).where(and(eq(vnextReviewProjections.streamId, streamId), eq(vnextReviewProjections.reviewCaseId, textArg(args, "reviewCaseId").toLowerCase())));
+      }).where(and(eq(vnextReviewProjections.streamId, streamId), eq(vnextReviewProjections.reviewCaseId, reviewCaseId)));
     } else if (eventName === "ReviewRoundFinalized") {
       const passCourts = BigInt(textArg(args, "passCourts"));
       const failCourts = BigInt(textArg(args, "failCourts"));
+      const reviewCaseId = textArg(args, "reviewCaseId").toLowerCase();
+      const [review] = await tx.select({ courtCount: vnextReviewProjections.courtCount }).from(vnextReviewProjections).where(and(
+        eq(vnextReviewProjections.streamId, streamId),
+        eq(vnextReviewProjections.reviewCaseId, reviewCaseId),
+      ));
+      const courtCount = BigInt(review?.courtCount ?? passCourts + failCourts);
       await tx.update(vnextReviewProjections).set({
         outcome: Number(textArg(args, "outcome")),
+        roundOutcome: Number(textArg(args, "outcome")),
         finalized: true,
-        finalizedCourtCount: (passCourts + failCourts).toString(),
+        finalizedCourtCount: courtCount.toString(),
         passCourts: passCourts.toString(),
         failCourts: failCourts.toString(),
+        invalidCourts: (courtCount - passCourts - failCourts).toString(),
         lastBlockNumber: blockNumber.toString(),
         updatedAt: new Date(),
-      }).where(and(eq(vnextReviewProjections.streamId, streamId), eq(vnextReviewProjections.reviewCaseId, textArg(args, "reviewCaseId").toLowerCase())));
+      }).where(and(eq(vnextReviewProjections.streamId, streamId), eq(vnextReviewProjections.reviewCaseId, reviewCaseId)));
     } else if (eventName === "FinalRulingEstablished") {
-      await tx.update(vnextReviewProjections).set({ outcome: Number(textArg(args, "outcome")), finalized: true, lastBlockNumber: blockNumber.toString(), updatedAt: new Date() }).where(and(eq(vnextReviewProjections.streamId, streamId), eq(vnextReviewProjections.reviewCaseId, textArg(args, "reviewCaseId").toLowerCase())));
+      const rootCaseId = textArg(args, "reviewCaseId").toLowerCase();
+      await tx.update(vnextReviewProjections).set({
+        finalOutcome: Number(textArg(args, "outcome")),
+        finalized: true,
+        lastBlockNumber: blockNumber.toString(),
+        updatedAt: new Date(),
+      }).where(and(
+        eq(vnextReviewProjections.streamId, streamId),
+        or(
+          eq(vnextReviewProjections.reviewCaseId, rootCaseId),
+          eq(vnextReviewProjections.rootCaseId, rootCaseId),
+        ),
+      ));
     } else if (eventName === "CourtAssigned") {
       const reviewCaseId = textArg(args, "reviewCaseId").toLowerCase();
+      const courtId = textArg(args, "courtId");
+      const [review] = await tx.select({ courtCount: vnextReviewProjections.courtCount }).from(vnextReviewProjections).where(and(
+        eq(vnextReviewProjections.streamId, streamId),
+        eq(vnextReviewProjections.reviewCaseId, reviewCaseId),
+      ));
+      if (!review || BigInt(courtId) >= BigInt(review.courtCount)) {
+        throw new Error(`VNext court ${courtId} exceeds canonical court count for ${reviewCaseId}`);
+      }
+      await tx.insert(vnextCourtProjections).values({
+        streamId,
+        reviewCaseId,
+        roundId: textArg(args, "roundId"),
+        courtId,
+        lastBlockNumber: blockNumber.toString(),
+      }).onConflictDoNothing();
       const values = ["judgeOne", "judgeTwo", "judgeThree"].map((key, slot) => ({
         streamId,
         reviewCaseId,
         roundId: textArg(args, "roundId"),
-        courtId: textArg(args, "courtId"),
+        courtId,
         slot,
         judgeAddress: textArg(args, key).toLowerCase(),
         lastBlockNumber: blockNumber.toString(),
@@ -534,6 +591,19 @@ export class VNextIndexerService implements OnModuleInit, OnModuleDestroy {
           set: { judgeAddress: assignment.judgeAddress, lastBlockNumber: assignment.lastBlockNumber },
         });
       }
+    } else if (eventName === "VoteCommitted" || eventName === "VoteRevealed") {
+      const reviewCaseId = textArg(args, "reviewCaseId").toLowerCase();
+      const courtId = textArg(args, "courtId");
+      const judgeAddress = textArg(args, "judge").toLowerCase();
+      await tx.update(vnextJudgeAssignments).set({
+        ...(eventName === "VoteCommitted" ? { committed: true } : { committed: true, revealed: true }),
+        lastBlockNumber: blockNumber.toString(),
+      }).where(and(
+        eq(vnextJudgeAssignments.streamId, streamId),
+        eq(vnextJudgeAssignments.reviewCaseId, reviewCaseId),
+        eq(vnextJudgeAssignments.courtId, courtId),
+        eq(vnextJudgeAssignments.judgeAddress, judgeAddress),
+      ));
     } else if (eventName === "CaseStakeReserved") {
       await this.updateJudgeLedger(tx, streamId, blockNumber, textArg(args, "reviewCaseId"), textArg(args, "judge"), "reserved", textArg(args, "amount"));
     } else if (eventName === "UnenrolledCaseStakeReleased") {
@@ -557,10 +627,8 @@ export class VNextIndexerService implements OnModuleInit, OnModuleDestroy {
       await this.copyReviewToNewCase(tx, streamId, log, previousCaseId, nextCaseId, textArg(args, "appealRoundId"));
       await this.updateMilestoneReviewCase(tx, streamId, log, previousCaseId, nextCaseId, 6);
     } else if (eventName === "AppealRoundFinalized") {
-      await this.updateReviewFinality(tx, streamId, log, textArg(args, "reviewCaseId"), Number(textArg(args, "outcome")));
-    } else if (eventName === "ReviewCaseSettled") {
-      await this.updateReviewFinality(tx, streamId, log, textArg(args, "reviewCaseId"), Number(textArg(args, "outcome")));
-    } else if (eventName === "ReviewSettlementProgress" || eventName === "UnenrolledCaseStakeReleased" || eventName === "CaseStakeReserved" || eventName === "CaseStakeSettled" || eventName === "JudgeRewardAccrued" || eventName === "JurySnapshotFinalized" || eventName === "CourtFinalized" || eventName === "VoteCommitted" || eventName === "VoteRevealed" || eventName === "JudgeSlashed" || eventName === "JudgeRewardClaimed") {
+      await this.updateReviewFinalOutcome(tx, streamId, log, textArg(args, "reviewCaseId"), Number(textArg(args, "outcome")));
+    } else if (eventName === "ReviewSettlementProgress" || eventName === "ReviewCaseSettled" || eventName === "UnenrolledCaseStakeReleased" || eventName === "CaseStakeReserved" || eventName === "CaseStakeSettled" || eventName === "JudgeRewardAccrued" || eventName === "JurySnapshotFinalized" || eventName === "CourtFinalized" || eventName === "VoteCommitted" || eventName === "VoteRevealed" || eventName === "JudgeSlashed" || eventName === "JudgeRewardClaimed") {
       await tx.update(vnextReviewProjections).set({ lastBlockNumber: blockNumber.toString(), updatedAt: new Date() }).where(and(eq(vnextReviewProjections.streamId, streamId), eq(vnextReviewProjections.reviewCaseId, textArg(args, "reviewCaseId").toLowerCase())));
     }
 
@@ -643,16 +711,26 @@ export class VNextIndexerService implements OnModuleInit, OnModuleDestroy {
     }).onConflictDoNothing();
   }
 
-  private async updateReviewFinality(
+  private async updateReviewFinalOutcome(
     tx: VNextQueryClient,
     streamId: string,
     log: Log,
     reviewCaseId: string,
     outcome: number,
   ) {
+    const rootCaseId = reviewCaseId.toLowerCase();
     await tx.update(vnextReviewProjections).set({
-      outcome, finalized: true, lastBlockNumber: log.blockNumber!.toString(), updatedAt: new Date(),
-    }).where(and(eq(vnextReviewProjections.streamId, streamId), eq(vnextReviewProjections.reviewCaseId, reviewCaseId.toLowerCase())));
+      finalOutcome: outcome,
+      finalized: true,
+      lastBlockNumber: log.blockNumber!.toString(),
+      updatedAt: new Date(),
+    }).where(and(
+      eq(vnextReviewProjections.streamId, streamId),
+      or(
+        eq(vnextReviewProjections.reviewCaseId, rootCaseId),
+        eq(vnextReviewProjections.rootCaseId, rootCaseId),
+      ),
+    ));
   }
 
   private async updateMilestoneReviewCase(

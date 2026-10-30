@@ -193,6 +193,7 @@ export interface VNextMilestoneProjection {
   correctionDeadline?: string | null;
   state: number;
   paid: boolean;
+  lastBlockNumber: string;
 }
 export interface VNextJudgeAssignment {
   reviewCaseId: string;
@@ -200,6 +201,19 @@ export interface VNextJudgeAssignment {
   courtId: string;
   slot: number;
   judgeAddress: string;
+  committed: boolean;
+  revealed: boolean;
+}
+export interface VNextCourtProjection {
+  courtId: string;
+  roundId: string;
+  judges: string[];
+  assignmentStatus: 'ASSIGNED' | 'PENDING';
+  phase: 'ASSIGNMENT_PENDING' | 'COMMIT_PENDING' | 'COMMIT' | 'REVEAL' | 'FINALIZED';
+  committedCount: number;
+  revealedCount: number;
+  finalized: boolean;
+  verdict: number | null;
 }
 export interface VNextAssignedReview {
   streamId: string;
@@ -215,10 +229,14 @@ export interface VNextAssignedReview {
   finalizedCourtCount?: string;
   passCourts?: string;
   failCourts?: string;
+  invalidCourts?: string;
+  roundOutcome: number | null;
+  finalOutcome: number | null;
   outcome: number | null;
   finalized: boolean;
   lastBlockNumber: string;
   assignments: VNextJudgeAssignment[];
+  courts?: VNextCourtProjection[];
 }
 export type VNextReviewWithAssignments = VNextAssignedReview;
 export interface VNextBackerProjection {

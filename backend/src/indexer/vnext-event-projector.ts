@@ -54,6 +54,9 @@ export type VNextReviewProjection = {
   finalizedCourtCount: string;
   passCourts: string;
   failCourts: string;
+  invalidCourts: string;
+  roundOutcome?: number;
+  finalOutcome?: number;
   lastBlockNumber: string;
 };
 
@@ -94,6 +97,15 @@ function lower(value: string) {
 
 function touch(blockNumber: bigint) {
   return blockNumber.toString();
+}
+
+const MAX_COURTS_PER_REVIEW_CASE = 5n;
+
+function courtCountForEligibleJudges(eligibleCount: string) {
+  const eligibleCourts = BigInt(eligibleCount) / 3n;
+  return (eligibleCourts > MAX_COURTS_PER_REVIEW_CASE
+    ? MAX_COURTS_PER_REVIEW_CASE
+    : eligibleCourts).toString();
 }
 
 function milestoneForReview(state: VNextProjectionState, reviewCaseId: string) {
@@ -221,6 +233,7 @@ export function applyVNextEvent(state: VNextProjectionState, event: VNextEvent):
       finalizedCourtCount: "0",
       passCourts: "0",
       failCourts: "0",
+      invalidCourts: "0",
       lastBlockNumber: block,
     });
   } else if (event.eventName === "JudgeEnrolled") {
@@ -228,7 +241,7 @@ export function applyVNextEvent(state: VNextProjectionState, event: VNextEvent):
     if (review) review.enrolledCount = (BigInt(review.enrolledCount) + 1n).toString();
   } else if (event.eventName === "JurySnapshotFinalized") {
     const review = state.reviews.get(lower(stringValue(args, "reviewCaseId")));
-    if (review) review.courtCount = (BigInt(stringValue(args, "eligibleCount")) / 3n).toString();
+    if (review) review.courtCount = courtCountForEligibleJudges(stringValue(args, "eligibleCount"));
   } else if (event.eventName === "CourtAssigned") {
     const reviewCaseId = lower(stringValue(args, "reviewCaseId"));
     const roundId = stringValue(args, "roundId");
@@ -246,10 +259,16 @@ export function applyVNextEvent(state: VNextProjectionState, event: VNextEvent):
     const review = state.reviews.get(lower(stringValue(args, "reviewCaseId")));
     if (review) {
       review.outcome = numberValue(args, "outcome");
+      review.roundOutcome = numberValue(args, "outcome");
       review.finalized = true;
       review.finalizedCourtCount = review.courtCount;
       review.passCourts = stringValue(args, "passCourts");
       review.failCourts = stringValue(args, "failCourts");
+      review.invalidCourts = (
+        BigInt(review.courtCount)
+        - BigInt(review.passCourts)
+        - BigInt(review.failCourts)
+      ).toString();
     }
   } else if (event.eventName === "ReviewRetryOpened") {
     const reviewCaseId = lower(stringValue(args, "reviewCaseId"));
@@ -268,6 +287,9 @@ export function applyVNextEvent(state: VNextProjectionState, event: VNextEvent):
         finalizedCourtCount: "0",
         passCourts: "0",
         failCourts: "0",
+        invalidCourts: "0",
+        roundOutcome: undefined,
+        finalOutcome: undefined,
       });
     }
     const milestone = milestoneForReview(state, rootCaseId);
@@ -280,8 +302,13 @@ export function applyVNextEvent(state: VNextProjectionState, event: VNextEvent):
       milestone.lastBlockNumber = block;
     }
   } else if (event.eventName === "FinalRulingEstablished") {
-    const review = state.reviews.get(lower(stringValue(args, "reviewCaseId")));
-    if (review) review.outcome = numberValue(args, "outcome");
+    const rootCaseId = lower(stringValue(args, "reviewCaseId"));
+    for (const review of state.reviews.values()) {
+      if (review.reviewCaseId === rootCaseId || review.rootCaseId === rootCaseId) {
+        review.finalOutcome = numberValue(args, "outcome");
+        review.finalized = true;
+      }
+    }
   } else if (event.eventName === "AppealOpened") {
     const appealCaseId = lower(stringValue(args, "appealCaseId"));
     const rootCaseId = lower(stringValue(args, "reviewCaseId"));
@@ -299,6 +326,9 @@ export function applyVNextEvent(state: VNextProjectionState, event: VNextEvent):
         finalizedCourtCount: "0",
         passCourts: "0",
         failCourts: "0",
+        invalidCourts: "0",
+        roundOutcome: undefined,
+        finalOutcome: undefined,
       });
     }
     const milestone = milestoneForReview(state, rootCaseId);

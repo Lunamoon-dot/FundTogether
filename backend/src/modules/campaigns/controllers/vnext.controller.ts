@@ -9,6 +9,7 @@ import {
   vnextChainEvents,
   vnextBackerProjections,
   vnextChallengeProjections,
+  vnextCourtProjections,
   indexerStreams,
   vnextJudgeAssignments,
   vnextJudgeLedgerProjections,
@@ -23,6 +24,7 @@ import {
   normalizeVNextTransactionHash,
 } from "../../../indexer/vnext-transaction-status";
 import { buildVNextJudgeReviews } from "./vnext-judge-reviews";
+import { buildVNextCourtDashboard } from "./vnext-court-dashboard";
 
 @Controller("v1/fundtogether/vnext")
 export class VNextController {
@@ -182,14 +184,24 @@ export class VNextController {
   @Get("reviews")
   async reviews() {
     const streamId = this.streamId();
-    const [reviews, assignments] = await Promise.all([
+    const [reviews, assignments, courts] = await Promise.all([
       this.db.select().from(vnextReviewProjections).where(eq(vnextReviewProjections.streamId, streamId)),
       this.db.select().from(vnextJudgeAssignments).where(eq(vnextJudgeAssignments.streamId, streamId)),
+      this.db.select().from(vnextCourtProjections).where(eq(vnextCourtProjections.streamId, streamId)),
     ]);
-    return reviews.map(review => ({
-      ...review,
-      assignments: assignments.filter(assignment => assignment.reviewCaseId === review.reviewCaseId),
-    }));
+    return reviews.map(review => {
+      const dashboard = buildVNextCourtDashboard(review, assignments, courts);
+      const reviewAssignments = assignments.filter(assignment => (
+        assignment.reviewCaseId === review.reviewCaseId
+        && BigInt(assignment.courtId) < BigInt(dashboard.length)
+      ));
+      return {
+        ...review,
+        courtCount: dashboard.length.toString(),
+        assignments: reviewAssignments,
+        courts: dashboard,
+      };
+    });
   }
 
   @Get("reviews/assigned")
@@ -212,18 +224,47 @@ export class VNextController {
 
   @Get("reviews/:reviewCaseId/assignments")
   async assignments(@Param("reviewCaseId") reviewCaseId: string) {
-    return this.db.select().from(vnextJudgeAssignments).where(
-      and(eq(vnextJudgeAssignments.streamId, this.streamId()), eq(vnextJudgeAssignments.reviewCaseId, reviewCaseId.toLowerCase())),
-    );
+    const normalizedCaseId = reviewCaseId.toLowerCase();
+    const [review, assignments] = await Promise.all([
+      this.db.select().from(vnextReviewProjections).where(and(
+        eq(vnextReviewProjections.streamId, this.streamId()),
+        eq(vnextReviewProjections.reviewCaseId, normalizedCaseId),
+      )).then(rows => rows[0]),
+      this.db.select().from(vnextJudgeAssignments).where(and(
+        eq(vnextJudgeAssignments.streamId, this.streamId()),
+        eq(vnextJudgeAssignments.reviewCaseId, normalizedCaseId),
+      )),
+    ]);
+    if (!review) throw new NotFoundException("VNext review projection not found");
+    const courtCount = Math.min(Number(review.courtCount), 5);
+    return assignments.filter(assignment => Number(assignment.courtId) < courtCount);
   }
 
   @Get("reviews/:reviewCaseId")
   async review(@Param("reviewCaseId") reviewCaseId: string) {
+    const normalizedCaseId = reviewCaseId.toLowerCase();
     const [projection] = await this.db.select().from(vnextReviewProjections).where(
-      and(eq(vnextReviewProjections.streamId, this.streamId()), eq(vnextReviewProjections.reviewCaseId, reviewCaseId.toLowerCase())),
+      and(eq(vnextReviewProjections.streamId, this.streamId()), eq(vnextReviewProjections.reviewCaseId, normalizedCaseId)),
     );
     if (!projection) throw new NotFoundException("VNext review projection not found");
-    return projection;
+    const [assignments, courts] = await Promise.all([
+      this.db.select().from(vnextJudgeAssignments).where(and(
+        eq(vnextJudgeAssignments.streamId, this.streamId()),
+        eq(vnextJudgeAssignments.reviewCaseId, normalizedCaseId),
+      )),
+      this.db.select().from(vnextCourtProjections).where(and(
+        eq(vnextCourtProjections.streamId, this.streamId()),
+        eq(vnextCourtProjections.reviewCaseId, normalizedCaseId),
+      )),
+    ]);
+    const dashboard = buildVNextCourtDashboard(projection, assignments, courts);
+    const canonicalAssignments = assignments.filter(assignment => BigInt(assignment.courtId) < BigInt(dashboard.length));
+    return {
+      ...projection,
+      courtCount: dashboard.length.toString(),
+      assignments: canonicalAssignments,
+      courts: dashboard,
+    };
   }
 
   private streamId() {
