@@ -42,6 +42,7 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
     uint256 public immutable maximumAppealRounds;
     uint256 public immutable minoritySlashBps;
     uint256 public constant MAXIMUM_RETRIES_PER_REVIEW_LEVEL = 2;
+    uint256 public constant MAX_COURTS_PER_REVIEW_CASE = 5;
     uint256 public constant MAX_SETTLEMENT_BATCH_SIZE = 32;
 
     uint256 public reviewCaseCount;
@@ -289,7 +290,10 @@ contract JuryReview is ReentrancyGuard, IVNextEvents {
 
         reviewCase.seed = seed;
         reviewCase.randomnessRequestId = keccak256(abi.encode(reviewCaseId, seed));
-        reviewCase.totalCourts = reviewCase.enrolledCount / 3;
+        uint256 eligibleCourtCount = reviewCase.enrolledCount / 3;
+        reviewCase.totalCourts = eligibleCourtCount > MAX_COURTS_PER_REVIEW_CASE
+            ? MAX_COURTS_PER_REVIEW_CASE
+            : eligibleCourtCount;
         _freezePermutation(reviewCaseId, seed);
         reviewCase.snapshotFinalized = true;
         roundStatus[reviewCaseId] = JuryTypes.RoundStatus.ASSIGNMENT_PENDING;

@@ -164,6 +164,37 @@ contract VNextJuryReviewTest is Test {
         assertTrue(third != creator);
     }
 
+    function test_snapshotCapsAtFiveCourtsWithEighteenEligibleJudges() public {
+        // Three Judges are enrolled in setUp. Add fifteen so six Courts
+        // would otherwise be possible.
+        for (uint256 i = 0; i < 15; i++) {
+            address judge = vm.addr(10_000 + i);
+            _depositAndReserve(judge);
+            vm.prank(judge);
+            review.enroll(caseId);
+        }
+
+        vm.warp(review.enrollmentDeadline(caseId));
+        review.finalizeSnapshot(caseId);
+
+        assertEq(review.MAX_COURTS_PER_REVIEW_CASE(), 5);
+        assertEq(review.courtCount(caseId), 5);
+
+        for (uint256 courtId = 0; courtId < 5; courtId++) {
+            review.assignCourt(caseId, courtId);
+        }
+
+        vm.expectRevert(JuryReview.CourtAlreadyAssigned.selector);
+        review.assignCourt(caseId, 5);
+
+        // The frozen permutation still includes every eligible Judge,
+        // but only fifteen seats may be assigned to five Courts.
+        for (uint256 i = 0; i < 18; i++) {
+            address judge = review.frozenJudge(caseId, i);
+            assertEq(review.assignedJudge(caseId, judge), i < 15);
+        }
+    }
+
     function test_multiCourtUsesFloorOfThreeAndNeverOverlapsJudges() public {
         _depositAndReserve(judgeFour);
         _depositAndReserve(judgeFive);
