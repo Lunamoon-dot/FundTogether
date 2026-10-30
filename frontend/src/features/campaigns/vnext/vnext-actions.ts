@@ -5,6 +5,7 @@ export type VNextTransactionStage =
   | 'wallet_requested'
   | 'submitted'
   | 'receipt_confirmed'
+  | 'indexing'
   | 'indexed'
   | 'failed'
 
@@ -46,6 +47,7 @@ const stages: VNextTransactionStage[] = [
   'wallet_requested',
   'submitted',
   'receipt_confirmed',
+  'indexing',
   'indexed',
   'failed',
 ]
@@ -55,6 +57,7 @@ const stageLabels: Record<VNextTransactionStage, string> = {
   wallet_requested: 'Đang chờ ví xác nhận',
   submitted: 'Đã submit transaction',
   receipt_confirmed: 'Receipt on-chain đã thành công',
+  indexing: 'Đang chờ indexer xác nhận canonical',
   indexed: 'Indexer đã xác nhận canonical',
   failed: 'Giao dịch thất bại',
 }

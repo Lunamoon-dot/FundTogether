@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { erc20Abi, keccak256, toHex } from 'viem';
 import type { Abi } from 'viem';
@@ -25,6 +25,10 @@ export interface VNextTransactionState {
   error?: string;
 }
 
+interface VNextTransactionOptions {
+  waitForIndexer?: boolean;
+}
+
 const sleep = (milliseconds: number) => new Promise(resolve => setTimeout(resolve, milliseconds));
 
 export function useVNextTransaction(
@@ -37,12 +41,16 @@ export function useVNextTransaction(
   const { data: wallet } = useWalletClient({ account: account.address, connector: account.connector });
   const [state, setState] = useState<VNextTransactionState>({ stage: 'idle' });
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
 
   async function send(
     kind: VNextContractKind,
     functionName: string,
     args: readonly unknown[],
+    options: VNextTransactionOptions = {},
   ) {
+    if (busyRef.current) return undefined;
+    busyRef.current = true;
     setBusy(true);
     setState({ stage: 'wallet_requested', action: functionName });
     try {
@@ -105,15 +113,20 @@ export function useVNextTransaction(
       if (receipt.status !== 'success') throw new Error(`Transaction đã revert: ${txHash}`);
       setState({ stage: 'receipt_confirmed', action: functionName, txHash });
       onReceiptConfirmed();
-      if (kind === 'token') return txHash;
+      if (kind === 'token' || options.waitForIndexer === false) return txHash;
 
       for (let attempt = 0; attempt < 20; attempt += 1) {
-        const status = await campaignApi.vnextTransaction(txHash);
-        if (status.state === 'ON_CHAIN_CONFIRMED') {
-          setState({ stage: 'indexed', action: functionName, txHash, eventCount: status.eventCount });
-          onIndexed();
-          return txHash;
+        try {
+          const status = await campaignApi.vnextTransaction(txHash);
+          if (status.state === 'ON_CHAIN_CONFIRMED') {
+            setState({ stage: 'indexed', action: functionName, txHash, eventCount: status.eventCount });
+            onIndexed();
+            return txHash;
+          }
+        } catch {
+          // A confirmed receipt remains successful while the indexer is unavailable.
         }
+        setState({ stage: 'indexing', action: functionName, txHash });
         await sleep(500);
       }
       return txHash;
@@ -122,6 +135,7 @@ export function useVNextTransaction(
       setState(previous => ({ ...previous, stage: 'failed', error }));
       return undefined;
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   }
