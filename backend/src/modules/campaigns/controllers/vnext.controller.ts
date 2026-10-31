@@ -217,10 +217,9 @@ export class VNextController {
     if (walletAddresses.length === 0) return [];
     const streamId = this.streamId();
     const [reviews, assignments] = await Promise.all([
-      this.db.select().from(vnextReviewProjections).where(and(
+      this.db.select().from(vnextReviewProjections).where(
         eq(vnextReviewProjections.streamId, streamId),
-        eq(vnextReviewProjections.finalized, false),
-      )),
+      ),
       this.db.select().from(vnextJudgeAssignments).where(eq(vnextJudgeAssignments.streamId, streamId)),
     ]);
     return buildVNextJudgeReviews(reviews, assignments, walletAddresses);

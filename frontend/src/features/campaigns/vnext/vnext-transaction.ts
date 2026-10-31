@@ -86,6 +86,7 @@ export function useVNextTransaction(
     busyRef.current = true;
     setBusy(true);
     setState({ stage: 'wallet_requested', action: functionName });
+    let submittedHash: `0x${string}` | undefined;
     try {
       if (!account.address) throw new Error('Ví chưa được kết nối.');
       if (!wallet || !client) throw new Error('Không đọc được wallet hoặc RPC VNext.');
@@ -140,6 +141,8 @@ export function useVNextTransaction(
         account: account.address,
       });
       const txHash = await wallet.writeContract(request);
+      submittedHash = txHash;
+      canonicalEventRef.current = options.canonicalEvent;
       setState({ stage: 'submitted', action: functionName, txHash });
       onSubmitted(txHash);
       const receipt = await client.waitForTransactionReceipt({ hash: txHash });
@@ -151,12 +154,20 @@ export function useVNextTransaction(
       setState({ stage: 'receipt_confirmed', action: functionName, txHash, receiptStatus: 'success' });
       onReceiptConfirmed();
       if (kind === 'token' || options.waitForIndexer === false) return txHash;
-      canonicalEventRef.current = options.canonicalEvent;
       await pollForCanonicalIndexing(txHash, functionName, options.canonicalEvent, 'success');
       return txHash;
     } catch (cause) {
       const error = getErrorMessage(cause);
-      setState(previous => ({ ...previous, stage: 'failed', error }));
+      if (submittedHash) {
+        setState({
+          stage: 'submitted',
+          action: functionName,
+          txHash: submittedHash,
+          error: `Receipt chưa xác định; phải đối soát trước khi thử lại. ${error}`,
+        });
+      } else {
+        setState(previous => ({ ...previous, stage: 'failed', error }));
+      }
       return undefined;
     } finally {
       busyRef.current = false;
@@ -170,11 +181,42 @@ export function useVNextTransaction(
   }
 
   async function reconcile() {
-    if (busyRef.current || state.receiptStatus === 'reverted' || !state.txHash || !state.action) return false;
+    if (busyRef.current || state.receiptStatus === 'reverted' || !state.txHash || !state.action || !client) return false;
     busyRef.current = true;
     setBusy(true);
     try {
-      return await pollForCanonicalIndexing(state.txHash, state.action, canonicalEventRef.current, state.receiptStatus);
+      if (state.receiptStatus !== 'success') {
+        try {
+          const receipt = await client.getTransactionReceipt({ hash: state.txHash });
+          if (receipt.status !== 'success') {
+            setState({
+              stage: 'failed',
+              action: state.action,
+              txHash: state.txHash,
+              receiptStatus: 'reverted',
+              error: `Transaction đã revert: ${state.txHash}`,
+            });
+            onReceiptReverted();
+            return false;
+          }
+          setState({
+            stage: 'receipt_confirmed',
+            action: state.action,
+            txHash: state.txHash,
+            receiptStatus: 'success',
+          });
+          onReceiptConfirmed();
+        } catch (cause) {
+          setState({
+            stage: 'submitted',
+            action: state.action,
+            txHash: state.txHash,
+            error: `Receipt chưa xác định; transaction vẫn bị khóa để tránh gửi trùng. ${getErrorMessage(cause)}`,
+          });
+          return false;
+        }
+      }
+      return await pollForCanonicalIndexing(state.txHash, state.action, canonicalEventRef.current, 'success');
     } finally {
       busyRef.current = false;
       setBusy(false);
