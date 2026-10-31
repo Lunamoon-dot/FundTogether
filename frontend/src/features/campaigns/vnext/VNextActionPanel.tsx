@@ -16,6 +16,7 @@ import { campaignApi } from '../api/campaigns';
 import { useVNextTransaction } from './vnext-transaction';
 import { vnextStageLabel } from './vnext-actions';
 import { VNextEvidencePanel } from './VNextEvidencePanel';
+import { VNextEvidenceSubmissionWizard } from './VNextEvidenceSubmissionWizard';
 import { vnextAppealBondApprovalRequired } from './vnext-appeal-bond';
 import {
   finalOutcomeLabel,
@@ -209,7 +210,6 @@ export function VNextMilestoneActions({
 }) {
   const account = useAccount();
   const client = usePublicClient({ chainId: 31339 });
-  const [evidenceHash, setEvidenceHash] = useState('');
   const campaignNumber = /^[0-9]+$/.test(campaignId) ? BigInt(campaignId) : null;
   const milestoneNumber = BigInt(milestone.milestoneId);
   const reviewCaseId = milestone.reviewCaseId as `0x${string}` | null;
@@ -361,7 +361,6 @@ export function VNextMilestoneActions({
   const currentMilestoneState = timing.data?.state ?? milestone.state;
   const canEditEvidence = creator && campaign.state === CAMPAIGN_MILESTONES_RUNNING
     && [MILESTONE_PENDING, MILESTONE_CORRECTION, MILESTONE_RESUBMIT].includes(currentMilestoneState);
-  const canSubmit = canEditEvidence && /^0x[0-9a-fA-F]{64}$/.test(evidenceHash);
   const paymentStatus = vnextPaymentStatus({
     paid: milestone.paid,
     finalOutcome: settlementState?.outcome ?? milestone.finalOutcome ?? 0,
@@ -383,7 +382,7 @@ export function VNextMilestoneActions({
     ['pay', 'Pay milestone'],
   ].find(([action]) => availability(action).ready)?.[1];
   const nextAction = canEditEvidence
-    ? canSubmit ? 'Submit evidence revision' : 'Nhập evidence hash hợp lệ để submit'
+    ? 'Complete the Creator evidence wizard'
     : nextSettlementAction ?? 'Chưa có thao tác on-chain hợp lệ';
 
   return (
@@ -415,15 +414,18 @@ export function VNextMilestoneActions({
       {(settlementState?.outcome ?? milestone.finalOutcome) === 2 ? <p className="monograph-alert">VERDICT_FAIL là substantive failure. Creator có thể correction/resubmit trong deadline hiện có; payout luôn bị khóa.</p> : null}
       {(settlementState?.outcome ?? milestone.finalOutcome) === 3 ? <p className="monograph-alert">PROTOCOL_FAIL là lỗi vận hành phân xử, không quy kết Creator gian lận. Recovery/refund hiện tại: {campaign.state === CAMPAIGN_REFUNDING || campaign.state === CAMPAIGN_REFUNDING_REMAINDER ? 'canonical refund state đã được index' : 'đang chờ milestone sync/indexer'}.</p> : null}
 
-      {canEditEvidence && (
-        <div className="space-y-2" data-vnext-action="submitMilestoneEvidence">
-          <label className="text-sm block" htmlFor={`vnext-evidence-hash-${milestone.milestoneId}`}>Evidence hash cho milestone {milestone.milestoneId}</label>
-          <input id={`vnext-evidence-hash-${milestone.milestoneId}`} className="font-mono" value={evidenceHash} onChange={event => setEvidenceHash(event.target.value)} placeholder="0x + 64 hex chars" />
-          <button type="button" className="button button--primary" disabled={!canSubmit || transaction.busy || campaignNumber === null} onClick={() => void transaction.send('campaign', 'submitMilestoneEvidence', [campaignNumber!, milestoneNumber, evidenceHash as `0x${string}`])}>Submit evidence revision</button>
-        </div>
-      )}
+      <div data-vnext-action="submitMilestoneEvidence">
+        <VNextEvidenceSubmissionWizard
+          campaignId={campaignId}
+          campaign={campaign}
+          milestone={milestone}
+          deployment={deployment}
+          userId={userId}
+          onRefresh={refreshLocalState}
+        />
+      </div>
 
-      {creator && milestone.reviewCaseId && <VNextEvidencePanel reviewCaseId={milestone.reviewCaseId} enabled={Boolean(userId)} />}
+      {creator && milestone.reviewCaseId && <VNextEvidencePanel reviewCaseId={milestone.reviewCaseId} enabled={Boolean(userId)} allowUpload={false} />}
 
       {campaignNumber !== null && (
         <div className="grid gap-3 sm:grid-cols-2" data-vnext-action="milestone-timeouts">

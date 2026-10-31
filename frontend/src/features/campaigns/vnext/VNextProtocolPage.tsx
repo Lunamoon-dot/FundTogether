@@ -109,6 +109,7 @@ export function VNextProtocolPage({ campaignId }: { campaignId?: string }) {
               onRefresh={refreshCampaign}
             >
               <VNextMilestoneActions
+                key={selectedMilestone.milestoneId}
                 campaignId={campaignId!}
                 campaign={campaign.data}
                 milestone={selectedMilestone}

@@ -30,6 +30,7 @@ const sleep = (milliseconds: number) => new Promise(resolve => setTimeout(resolv
 export function useVNextTransaction(
   onIndexed: () => void = () => {},
   onReceiptConfirmed: () => void = () => {},
+  onSubmitted: (txHash: `0x${string}`) => void = () => {},
 ) {
   const account = useAccount();
   const client = usePublicClient({ chainId: 31339 });
@@ -99,6 +100,7 @@ export function useVNextTransaction(
       });
       const txHash = await wallet.writeContract(request);
       setState({ stage: 'submitted', action: functionName, txHash });
+      onSubmitted(txHash);
       const receipt = await client.waitForTransactionReceipt({ hash: txHash });
       if (receipt.status !== 'success') throw new Error(`Transaction đã revert: ${txHash}`);
       setState({ stage: 'receipt_confirmed', action: functionName, txHash });
