@@ -167,8 +167,8 @@ preserved and are not proof of an accepted release.
 
 ### 3.3. Historical and research material
 
-Resolver/Admin workflows and older milestone documents under docs/archive/
-are historical traceability, not V2 authority.
+Removed Resolver/Admin workflows and older milestone documents remain available
+in Git history for named regression investigations; they are not V2 authority.
 
 The research repository at
 C:\Users\dell\Desktop\fundtogether_data_analyzing contains CEAV-M1

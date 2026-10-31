@@ -38,4 +38,5 @@ refund, failure handling, events and invariants.
 - A protocol rule in this directory is not an implementation claim. Contract,
   indexer, backend, frontend and local-runtime evidence must be verified
   separately.
-- Historical Resolver/Admin documents remain available for traceability only.
+- Pre-reset Resolver/Admin documents are available only through Git history and
+  are not protocol authority.
