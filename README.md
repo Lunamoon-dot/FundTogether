@@ -1,98 +1,110 @@
 # FundTogether
 
-FundTogether là MVP Reward Crowdfunding dành cho truyện tranh số và
-artbook độc lập. Mỗi ấn phẩm có một gói `STANDARD`, một quyền tải
-`DIGITAL_DOWNLOAD` dạng PDF và sử dụng MockUSDC trên mạng Anvil local.
+FundTogether là prototype reward crowdfunding permissionless cho truyện tranh
+số và artbook độc lập. Target VNext dùng một tier `STANDARD`, một
+`DIGITAL_DOWNLOAD` PDF và MockUSDC trong escrow trên chain local `31339`.
 
-Đây là hệ thống nghiên cứu và nghiệm thu local, chưa được phép dùng tài sản thật
-hoặc triển khai công khai.
+Repository chỉ phục vụ nghiên cứu và demo local. Không dùng tài sản thật hoặc
+triển khai public chain.
 
-## Phạm vi hiện tại
+## Ranh giới hiện tại
 
-```text
-Creator khai báo hồ sơ/IP
-  -> tạo và khóa cam kết ấn phẩm
-  -> Resolver thẩm định, có thể mở Community Review
-  -> Resolver duyệt đúng snapshot
-  -> phát hành campaign on-chain
-  -> Backer pledge vào escrow
-  -> Creator nộp bằng chứng và PDF cuối
-  -> Resolver nghiệm thu
-  -> Backer tải PDF riêng tư
-  -> payout hoặc refund theo policy đã khóa
-```
+Repository đang chứa hai runtime có mục đích khác nhau:
 
-Không thuộc MVP: in ấn vật lý, vận chuyển, tồn kho, nhiều tier trả phí, NFT,
-charity workflow và organization crowdfunding.
-
-## Kiến trúc
+| Surface | Trạng thái |
+| --- | --- |
+| **VNext** | Target hiện hành: campaign permissionless, stake-backed Judge courts, commit–reveal, milestone evidence, payout và refund do contract quyết định. Source đã có Creator creation, Funding Checkout, Refund Dashboard, Evidence Wizard, Judge workspace, Court Dashboard và settlement/disbursement. |
+| **Historical Campaign/Resolver** | Runtime local cũ vẫn được đăng ký, có route và regression tests. Nó được giữ để tương thích và đối chiếu lịch sử, không phải authority của target VNext. |
 
 ```text
-React + Vite  <->  NestJS API  <->  PostgreSQL / MinIO
-      |                 |
-      +-----------------+----> Anvil / FundTogetherCampaign.sol
+React frontend <-> NestJS API <-> PostgreSQL / MinIO
+       |                  |
+       +------------------+--> Anvil / VNext contracts
 
-Contract event -> idempotent indexer -> PostgreSQL projection -> API -> UI
+Contract -> canonical event -> idempotent indexer -> PostgreSQL projection
 ```
 
-- Blockchain là nguồn sự thật cho pledge, escrow, dispute, payout và refund.
-- PostgreSQL giữ metadata ứng dụng và projection đã index.
-- MinIO giữ sample evidence và PDF cuối ở chế độ riêng tư.
-- Giao dịch phải phân biệt yêu cầu ví, submitted, receipt canonical và indexed.
+- Smart contracts sở hữu escrow, Judge assignment/vote, state transition,
+  payout và refund VNext.
+- Backend sở hữu SIWE, validation, private evidence và read APIs; backend không
+  được tạo verdict hay financial truth.
+- PostgreSQL là metadata/projection; MinIO giữ private evidence/PDF bytes.
+- Wallet submission chưa phải thành công: UI phân biệt wallet request,
+  submitted, receipt và indexed projection.
 
-## Chạy local
+Đọc [research direction](docs/research-direction.md),
+[project overview](docs/PROJECT_OVERVIEW.md) và
+[VNext protocol specification](docs/protocol/FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_V1.md)
+trước khi thay đổi protocol.
 
-Yêu cầu: Node.js/npm, Docker Desktop, WSL có Foundry và ví trình duyệt để test
-tay. Từ PowerShell tại root repository:
+## Yêu cầu local
+
+- Node.js và npm tương thích với lockfiles;
+- Docker Desktop cho PostgreSQL/MinIO;
+- WSL Ubuntu có Foundry, hoặc Foundry tương đương trên host;
+- ví trình duyệt cho manual/browser acceptance;
+- Anvil local tại `http://127.0.0.1:9548`, chain `31339` khi chạy runtime.
+
+Không commit `.env`, private key, seed phrase hoặc nội dung `.local/`.
+
+## Runtime và deployment identity
+
+Launcher hiện có:
 
 ```powershell
+# Historical Campaign/Resolver runtime only
 & .\backend\scripts\campaigns\start-services.ps1
 ```
 
-Các cổng local:
+**Chưa có VNext one-command launcher.** VNext hiện có các script deploy,
+runtime verification, backend và browser acceptance riêng trong
+`backend/scripts/campaigns/`; không được hiểu launcher historical là VNext.
 
-| Thành phần | Địa chỉ |
-| --- | --- |
-| Frontend | `http://localhost:5175` |
-| API | `http://localhost:3002` |
-| PostgreSQL | `localhost:5436` |
-| MinIO API / Console | `localhost:9202` / `localhost:9203` |
-| Anvil RPC | `http://127.0.0.1:9548`, chain `31339` |
-
-Runtime phải nhận diện đúng deployment Campaign trước khi tái sử dụng listener;
-không reset chain/DB/storage để bỏ qua lỗi nhận diện.
+Runtime thật yêu cầu manifest bị ignore tại `.local/fundtogether/generated/` và
+xác minh chain ID, genesis, deployed bytecode, ABI/policy identity trước khi ký.
+Frontend test dùng fixture deterministic được bật rõ ràng bởi test bootstrap;
+fixture đó không được dùng cho `dev` hoặc `build` runtime.
 
 ## Kiểm tra
 
+Các lệnh nhẹ, không yêu cầu live chain hoặc private secrets:
+
 ```powershell
 cd frontend
+npm.cmd ci
 npm.cmd test
 npm.cmd run lint
 npm.cmd run build
 
 cd ..\backend
+npm.cmd ci
+npm.cmd run lint
 npm.cmd run build
-npm.cmd run test:workflow
-npm.cmd run test:campaigns
+npm.cmd run test:vnext:unit
+npm.cmd run test:vnext-runtime
 
 cd ..\contracts
+git submodule update --init --recursive
 forge build
 forge test
 ```
 
-Kết quả tự động không thay thế nghiệm thu MetaMask, xác minh tác giả/IP hoặc
-đánh giá tính đúng đắn của bằng chứng ngoài đời.
+Full backend Jest và runtime E2E (`test:vnext-acceptance`,
+`test:vnext-browser`) chứa integration suites cần PostgreSQL, MinIO, Anvil và
+deployment manifest thật nên không thuộc lightweight CI. Không reset chain,
+database hoặc storage chỉ để làm test xanh.
 
 ## Bản đồ repository
 
 | Đường dẫn | Vai trò |
 | --- | --- |
-| `frontend/src/features/campaigns/` | UI hiện hành: public, Creator, Resolver, Backer và historical read-only surfaces |
-| `frontend/src/features/campaigns/api/campaigns.ts` | API client nội bộ của Campaign |
-| `backend/src/modules/campaigns/` | Backend nội bộ của Campaign |
-| `backend/src/modules/` | Các domain module đang hoạt động |
-| `contracts/src/campaigns/` | Contract và interface tài chính |
-| `docs/campaigns/` | Scope, workflow, policy và test guide hiện hành |
-| `docs/archive/` | Tài liệu lịch sử, không phải yêu cầu hiện hành |
+| `frontend/src/features/campaigns/vnext/` | VNext Creator, Backer, Judge, court và settlement UI |
+| `frontend/src/features/campaigns/` | VNext cùng các surface historical vẫn còn active |
+| `backend/src/modules/campaigns/` | VNext API/evidence và historical Campaign services |
+| `backend/src/indexer/` | VNext, Campaign và historical idempotent indexers |
+| `backend/src/blockchain/generated/` | ABI/artifact cần cho runtime identity và frontend |
+| `contracts/src/` | VNext và historical contracts; production Solidity không phải cleanup target |
+| `docs/protocol/` | VNext specification, threat model và implementation ledger |
+| `docs/archive/` | Tài liệu lịch sử, không phải yêu cầu target hiện hành |
 
-Đọc [docs/README.md](docs/README.md) để biết thứ tự tài liệu và nguồn chuẩn.
+Đọc [docs/README.md](docs/README.md) để biết thứ tự nguồn chuẩn.

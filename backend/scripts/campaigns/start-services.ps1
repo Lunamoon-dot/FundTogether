@@ -1,5 +1,7 @@
 param([switch]$SkipBuild)
 
+# Historical Campaign/Resolver launcher. VNext currently has separate deploy,
+# runtime-verification and backend commands; this script must not switch modes.
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 $environmentFile = Join-Path $projectRoot '.local\fundtogether\backend.env'

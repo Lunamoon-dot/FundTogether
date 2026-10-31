@@ -130,14 +130,11 @@ describe("Campaign Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => 
   let policyHash: `0x${string}`;
 
   // Test identities
-  let adminUserId: string;
   let adminSessionToken: string;
-  let resolverUserId: string;
   let resolverSessionToken: string;
   let creatorUserId: string;
   let creatorSessionToken: string;
   let creatorWalletLinkId: string;
-  let backerUserId: string;
   let backerSessionToken: string;
   let intruderUserId: string;
   let intruderSessionToken: string;
@@ -262,11 +259,9 @@ describe("Campaign Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => 
     };
 
     const admin = await createTestUser("ADMIN");
-    adminUserId = admin.userId;
     adminSessionToken = admin.sessionToken;
 
     const res = await createTestUser("RESOLVER", resolverWallet);
-    resolverUserId = res.userId;
     resolverSessionToken = res.sessionToken;
 
     const cr = await createTestUser(undefined, creatorWallet);
@@ -276,7 +271,6 @@ describe("Campaign Crowdfunding Full-Stack NestJS HTTP Acceptance Suite", () => 
       .where(and(eq(schema.walletLinks.userId, creatorUserId), eq(schema.walletLinks.address, creatorWallet.toLowerCase()))))[0].id;
 
     const bk = await createTestUser(undefined, backerWallet);
-    backerUserId = bk.userId;
     backerSessionToken = bk.sessionToken;
 
     const intr = await createTestUser(undefined, intruderWallet);

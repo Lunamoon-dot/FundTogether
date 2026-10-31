@@ -42,9 +42,9 @@ describe("HistoricalCampaignIndexerService Unit Tests", () => {
     ];
 
     mockDb = {
-      select: jest.fn().mockImplementation((projection?: any) => ({
-        from: jest.fn().mockImplementation((table: any) => ({
-          where: jest.fn().mockImplementation((condition: any) => {
+      select: jest.fn().mockImplementation((_projection?: any) => ({
+        from: jest.fn().mockImplementation((_table: any) => ({
+          where: jest.fn().mockImplementation((_condition: any) => {
             // Very simple mock query responses based on context
             return [];
           }),
@@ -63,7 +63,7 @@ describe("HistoricalCampaignIndexerService Unit Tests", () => {
           })),
         })),
       })),
-      insert: jest.fn().mockImplementation((table: any) => ({
+      insert: jest.fn().mockImplementation((_table: any) => ({
         values: jest.fn().mockImplementation((val: any) => ({
           returning: jest.fn().mockReturnValue([val]),
           onConflictDoNothing: jest.fn().mockReturnValue({
@@ -72,9 +72,9 @@ describe("HistoricalCampaignIndexerService Unit Tests", () => {
           onConflictDoUpdate: jest.fn().mockResolvedValue([val]),
         })),
       })),
-      update: jest.fn().mockImplementation((table: any) => ({
+      update: jest.fn().mockImplementation((_table: any) => ({
         set: jest.fn().mockImplementation((val: any) => ({
-          where: jest.fn().mockImplementation((condition: any) => {
+          where: jest.fn().mockImplementation((_condition: any) => {
             return [val];
           }),
         })),
@@ -160,7 +160,6 @@ describe("HistoricalCampaignIndexerService Unit Tests", () => {
       digitalAccessCode: null,
     });
 
-    let selectCall = 0;
     mockDb.select.mockImplementation(() => ({
       from: jest.fn().mockImplementation(() => ({
         where: jest.fn().mockImplementation(() => {

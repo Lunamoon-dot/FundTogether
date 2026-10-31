@@ -8,12 +8,14 @@ three-Judge courts, milestone evidence, escrowed payout and permissionless
 refund. The local runtime has not yet migrated.
 
 The executable migration currently contains a local VNext contract core for
-publication, funding, milestone review, appeal/retry, challenge, payout and
-refund, plus an idempotent projection slice and a read-only protocol page.
-Creator/Backer/Judge wallet journeys and fresh local-runtime acceptance are
-still incomplete. Any Resolver lifecycle behavior still in the checkout is
-transitional implementation residue, not target protocol authority. Read
-implementation progress before treating the pure target as deployed.
+publication, funding, milestone review, appeal/retry, payout and refund, plus
+an idempotent projection/API slice and Creator, Backer and guided Judge wallet
+surfaces. This includes campaign creation, funding, refund, evidence,
+commit–reveal, court visibility and settlement/disbursement flows. Challenge
+entrypoints remain disabled by the local policy, and there is no consolidated
+VNext one-command launcher. Any Resolver lifecycle behavior still in the
+checkout is historical runtime compatibility, not target protocol authority.
+Read implementation progress before treating the pure target as deployed.
 
 ## Reading order
 

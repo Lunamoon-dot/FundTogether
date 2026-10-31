@@ -97,13 +97,17 @@ See [VNext protocol specification V1](protocol/FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_
 The repository contains both the pre-reset Resolver implementation and a
 partially implemented VNext slice. VNext currently includes the contract core
 for publication/funding, stake-backed multi-court review, milestone evidence,
-appeal/retry, challenge, exact-budget payout and terminal refunds; it also has
-an idempotent projection/indexer slice, read-only API and read-only protocol
-page. Foundry and focused backend/frontend evidence exist, but no fresh local
-Anvil/PostgreSQL/MinIO vertical acceptance has been completed.
+appeal/retry, exact-budget payout and terminal refunds; it also has an
+idempotent projection/indexer slice, authenticated evidence APIs and Creator,
+Backer and guided Judge wallet surfaces. The UI covers campaign creation,
+funding, refunds, evidence submission, court visibility and
+settlement/disbursement. Challenge entrypoints remain disabled by the local
+policy. Focused Foundry/backend/frontend evidence exists, but the current
+repository has no consolidated VNext one-command launcher and this cleanup is
+not a fresh Anvil/PostgreSQL/MinIO acceptance run.
 
 Admin/profile verification is not a target funding gate. Any Resolver UI or
-role still present in the checkout is transitional implementation residue; it
-does not represent authority in the target protocol. Creator, Backer and Judge
-wallet journeys, production batch settlement and runtime E2E remain roadmap
-work.
+role still present in the checkout is a historical runtime boundary; it does
+not represent authority in the target protocol. Public-chain readiness,
+production settlement sizing, remaining appeal/retry edge journeys and fresh
+runtime E2E remain separate work.
