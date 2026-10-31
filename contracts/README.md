@@ -1,20 +1,26 @@
-# FundTogether HED contracts
+# FundTogether contracts
 
-The executable protocol is `FundTogetherDisbursement`: donors fund a campaign,
-the resolver reserves one evidence-backed vendor request at a time, the vendor
-accepts immutable terms, and delivery/outcome evidence controls payment and
-campaign wind-down. `MockUSDC` is only a local test token.
+The current target is the VNext permissionless crowdfunding protocol:
 
-The old milestone and Workflow B contracts are intentionally absent from this
-working product. Their deployments and applied data remain historical records;
-they are not migrated or reused by HED.
+- `CampaignEscrowVNext.sol` owns campaign terms, MockUSDC escrow, milestone
+  payout and refunds;
+- `JuryRegistry.sol` owns Judge stake, reservations, rewards and settlement;
+- `JuryReview.sol` owns assignment, commit–reveal, court aggregation,
+  appeal/retry and final rulings.
+
+Historical Campaign contracts remain in the repository for regression and
+compatibility tests. They are not authority for new VNext behavior.
 
 ## Verify locally
 
-```bash
-cd /mnt/c/Users/dell/Desktop/FundTogether/contracts
-forge test --match-path test/unit/Disbursement/FundingAndReservation.t.sol -vv
+```powershell
+git submodule update --init --recursive
+cd contracts
+forge build
+forge test --summary
 ```
 
-The HED test suite exercises reserve custody, vendor payment limits, evidence
-hash binding, challenges, takeover windows, wind-down and refunds.
+Production contracts must preserve escrow conservation, unique payout/refund,
+stake coverage, Judge uniqueness and canonical review authorization. The local
+MockUSDC deployment is research-only and not approved for public-chain or
+real-money use.

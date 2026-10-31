@@ -1,9 +1,9 @@
 # FundTogether — Pure Decentralized Protocol
 
 > **Status:** Current target architecture, decided 2026-10-20.
-> **Implementation status:** The VNext contract core and indexed read-only
-> surface are partially implemented. The full wallet journeys and fresh local
-> runtime have not yet migrated.
+> **Implementation status:** VNext contract, indexed/API and
+> Creator/Backer/Judge wallet slices are implemented. A consolidated VNext
+> launcher and fresh local-runtime acceptance remain pending.
 >
 > **Detailed reference:** [FundTogether VNext Protocol Specification V1](../protocol/FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_V1.md)
 
@@ -257,11 +257,10 @@ The backend never holds a private key capable of moving campaign funds.
 
 ## 9. Migration and implementation order
 
-The current repository contains a verified pre-reset Resolver implementation
-plus a partially implemented VNext contract, projection and read-only UI
-slice. Its existing tests and runtime evidence are evidence only for the named
-slices and do not prove that the full protocol has been deployed or accepted
-end to end.
+The current repository contains a pre-reset Resolver runtime alongside VNext
+contract, projection/API and Creator/Backer/Judge wallet slices. Existing tests
+and runtime records are evidence only for the named slices; they do not prove a
+fresh full-protocol deployment or end-to-end acceptance for this branch.
 
 The new implementation order is:
 
@@ -278,5 +277,5 @@ The new implementation order is:
 9. Disposable local-chain end-to-end acceptance and runtime identity check.
 
 No existing Resolver path should be silently treated as the new protocol. Old
-contracts, plans and manual tests are retained for historical comparison until
-the new contract and runtime are verified.
+contracts remain explicitly namespaced for regression compatibility; obsolete
+plans and manual guides are available only through Git history.

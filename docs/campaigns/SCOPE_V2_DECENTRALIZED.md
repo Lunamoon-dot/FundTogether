@@ -1,8 +1,8 @@
 # FundTogether — Pure Decentralized Campaign Scope
 
-> **Status:** Current target scope, decided 2026-10-20. The VNext contract core
-> and read-only projection surface are partially implemented; the full scope
-> is not yet accepted by the local runtime.
+> **Status:** Current target scope, decided 2026-10-20. VNext contract,
+> projection/API and Creator/Backer/Judge UI slices are implemented; the full
+> scope has no consolidated launcher or fresh local-runtime acceptance.
 >
 > **Protocol detail:** See [VNext Protocol Specification V1](../protocol/FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_V1.md).
 

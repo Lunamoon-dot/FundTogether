@@ -168,10 +168,9 @@ Interfaces:
 Files:
 - Modify docs/research-direction.md
 - Modify docs/PROJECT_OVERVIEW.md
-- Modify PRODUCT.md
-- Modify docs/PROJECT_PROGRESS.md
+- Modify docs/campaigns/WORKFLOWS_V2_DECENTRALIZED.md
+- Modify docs/protocol/IMPLEMENTATION_PROGRESS_VNEXT.md
 - Modify docs/README.md
-- Modify docs/campaigns/MANUAL_TEST_GUIDE.md
 
 - [ ] Search the listed docs for Studio, verification, Resolver, approveCampaign, and publication claims.
 - [ ] Document Creator → on-chain JudgeCase → three Judge votes → two-of-three resolution → campaign creation. Mark fixed Resolver authority as transitional and Studio profile as optional metadata.

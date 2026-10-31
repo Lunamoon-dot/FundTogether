@@ -10,8 +10,8 @@
 
 This policy replaces Resolver-controlled publication, production review,
 completion, challenge resolution and payout with permissionless stake-backed
-Judge cases. The old FINANCIAL_POLICY_V1.md remains available as a historical
-pre-reset policy and must not be used for new contract behavior.
+Judge cases. The removed V1 Resolver policy remains available in Git history
+only and must not be used for new contract behavior.
 
 ## Locked decisions
 
