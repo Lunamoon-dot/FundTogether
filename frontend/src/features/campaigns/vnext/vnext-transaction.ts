@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { erc20Abi, keccak256, toHex } from 'viem';
 import type { Abi } from 'viem';
@@ -8,6 +8,10 @@ import reviewArtifact from '../../../../../backend/src/blockchain/generated/vnex
 import { getErrorMessage } from '../../../lib/api/error';
 import { campaignApi, listTransactionWallets } from '../api/campaigns';
 import type { VNextTransactionStage } from './vnext-actions';
+import {
+  vnextCanonicalEventIndexed,
+  type VNextCanonicalEventExpectation,
+} from './vnext-funding-flow';
 import { vnextContractAddress, type VNextContractKind } from './vnext-contract-descriptor';
 
 const campaignAbi = campaignArtifact.abi as Abi;
@@ -21,8 +25,14 @@ export interface VNextTransactionState {
   stage: VNextTransactionStage;
   action?: string;
   txHash?: `0x${string}`;
+  receiptStatus?: 'success' | 'reverted';
   eventCount?: number;
   error?: string;
+}
+
+interface VNextTransactionOptions {
+  waitForIndexer?: boolean;
+  canonicalEvent?: VNextCanonicalEventExpectation;
 }
 
 const sleep = (milliseconds: number) => new Promise(resolve => setTimeout(resolve, milliseconds));
@@ -31,18 +41,49 @@ export function useVNextTransaction(
   onIndexed: () => void = () => {},
   onReceiptConfirmed: () => void = () => {},
   onSubmitted: (txHash: `0x${string}`) => void = () => {},
+  onReceiptReverted: () => void = () => {},
 ) {
   const account = useAccount();
   const client = usePublicClient({ chainId: 31339 });
   const { data: wallet } = useWalletClient({ account: account.address, connector: account.connector });
   const [state, setState] = useState<VNextTransactionState>({ stage: 'idle' });
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
+  const canonicalEventRef = useRef<VNextTransactionOptions['canonicalEvent']>(undefined);
+
+  async function pollForCanonicalIndexing(
+    txHash: `0x${string}`,
+    action: string,
+    canonicalEvent?: VNextTransactionOptions['canonicalEvent'],
+    receiptStatus?: 'success',
+  ) {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      try {
+        const status = await campaignApi.vnextTransaction(txHash);
+        const expectedEventIndexed = !canonicalEvent
+          || vnextCanonicalEventIndexed(status.events, canonicalEvent);
+        if (status.state === 'ON_CHAIN_CONFIRMED' && expectedEventIndexed) {
+          setState({ stage: 'indexed', action, txHash, receiptStatus: 'success', eventCount: status.eventCount });
+          onIndexed();
+          return true;
+        }
+      } catch {
+        // A confirmed receipt remains successful while the indexer is unavailable.
+      }
+      setState({ stage: 'indexing', action, txHash, receiptStatus });
+      await sleep(500);
+    }
+    return false;
+  }
 
   async function send(
     kind: VNextContractKind,
     functionName: string,
     args: readonly unknown[],
+    options: VNextTransactionOptions = {},
   ) {
+    if (busyRef.current) return undefined;
+    busyRef.current = true;
     setBusy(true);
     setState({ stage: 'wallet_requested', action: functionName });
     try {
@@ -102,33 +143,43 @@ export function useVNextTransaction(
       setState({ stage: 'submitted', action: functionName, txHash });
       onSubmitted(txHash);
       const receipt = await client.waitForTransactionReceipt({ hash: txHash });
-      if (receipt.status !== 'success') throw new Error(`Transaction đã revert: ${txHash}`);
-      setState({ stage: 'receipt_confirmed', action: functionName, txHash });
-      onReceiptConfirmed();
-      if (kind === 'token') return txHash;
-
-      for (let attempt = 0; attempt < 20; attempt += 1) {
-        const status = await campaignApi.vnextTransaction(txHash);
-        if (status.state === 'ON_CHAIN_CONFIRMED') {
-          setState({ stage: 'indexed', action: functionName, txHash, eventCount: status.eventCount });
-          onIndexed();
-          return txHash;
-        }
-        await sleep(500);
+      if (receipt.status !== 'success') {
+        setState({ stage: 'failed', action: functionName, txHash, receiptStatus: 'reverted', error: `Transaction đã revert: ${txHash}` });
+        onReceiptReverted();
+        return undefined;
       }
+      setState({ stage: 'receipt_confirmed', action: functionName, txHash, receiptStatus: 'success' });
+      onReceiptConfirmed();
+      if (kind === 'token' || options.waitForIndexer === false) return txHash;
+      canonicalEventRef.current = options.canonicalEvent;
+      await pollForCanonicalIndexing(txHash, functionName, options.canonicalEvent, 'success');
       return txHash;
     } catch (cause) {
       const error = getErrorMessage(cause);
       setState(previous => ({ ...previous, stage: 'failed', error }));
       return undefined;
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   }
 
   function reset() {
+    canonicalEventRef.current = undefined;
     setState({ stage: 'idle' });
   }
 
-  return { ...state, send, reset, busy, address: account.address };
+  async function reconcile() {
+    if (busyRef.current || state.receiptStatus === 'reverted' || !state.txHash || !state.action) return false;
+    busyRef.current = true;
+    setBusy(true);
+    try {
+      return await pollForCanonicalIndexing(state.txHash, state.action, canonicalEventRef.current, state.receiptStatus);
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  }
+
+  return { ...state, send, reset, reconcile, busy, address: account.address };
 }

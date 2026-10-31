@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAccount, usePublicClient } from 'wagmi';
 import { erc20Abi } from 'viem';
@@ -8,7 +7,6 @@ import reviewArtifact from '../../../../../backend/src/blockchain/generated/vnex
 import type {
   VNextCampaignProjection,
   VNextDeployment,
-  VNextBackerProjection,
   VNextMilestoneProjection,
   VNextReviewWithAssignments,
 } from '../api/campaigns';
@@ -43,11 +41,6 @@ const MILESTONE_CHALLENGE_WINDOW = 9;
 const campaignAbi = campaignArtifact.abi as Abi;
 const reviewAbi = reviewArtifact.abi as Abi;
 const tokenAbi = erc20Abi as Abi;
-
-function tokenAmount(value: string): bigint | null {
-  if (!/^[0-9]+$/.test(value) || value === '0') return null;
-  try { return BigInt(value); } catch { return null; }
-}
 
 interface ActionAvailability {
   ready: boolean;
@@ -474,11 +467,8 @@ export function VNextActionPanel({
   onRefresh: () => void;
 }) {
   const transaction = useVNextTransaction(onRefresh);
-  const account = useAccount();
   const client = usePublicClient({ chainId: 31339 });
-  const [amount, setAmount] = useState('');
   const creator = Boolean(transaction.address && transaction.address.toLowerCase() === campaign.creator.toLowerCase());
-  const amountValue = tokenAmount(amount);
   const fundingClock = useQuery({
     queryKey: ['vnext-funding-chain-clock', client?.chain?.id],
     enabled: Boolean(client),
@@ -525,39 +515,6 @@ export function VNextActionPanel({
     retry: false,
   });
   const publicationFinalOutcome = publicationFinality.data ?? (campaign.publicationOutcome && campaign.publicationOutcome !== 0 ? campaign.publicationOutcome : 0);
-  const backerPosition = useQuery({
-    queryKey: ['vnext-backer-position', campaignId, account.address, deployment.campaignEscrow],
-    enabled: Boolean(client && account.address && deployment.campaignEscrow && campaignNumber !== null),
-    queryFn: async () => {
-      if (!client || !account.address || !deployment.campaignEscrow) throw new Error('Backer read client is unavailable');
-      if (campaignNumber === null) throw new Error('Campaign ID không hợp lệ');
-      const [contribution, entitlement, claimed, allocationsFrozen] = await Promise.all([
-        client.readContract({ address: deployment.campaignEscrow, abi: campaignAbi, functionName: 'contributionOf', args: [campaignNumber, account.address] }),
-        client.readContract({ address: deployment.campaignEscrow, abi: campaignAbi, functionName: 'refundEntitlement', args: [campaignNumber, account.address] }),
-        client.readContract({ address: deployment.campaignEscrow, abi: campaignAbi, functionName: 'refundClaimed', args: [campaignNumber, account.address] }),
-        client.readContract({ address: deployment.campaignEscrow, abi: campaignAbi, functionName: 'refundAllocationsFrozen', args: [campaignNumber] }),
-      ]);
-      return { contribution: BigInt(contribution as bigint), entitlement: BigInt(entitlement as bigint), claimed: Boolean(claimed), allocationsFrozen: Boolean(allocationsFrozen) };
-    },
-    retry: false,
-  });
-  const indexedBackerPosition = useQuery<VNextBackerProjection[]>({
-    queryKey: ['vnext-indexed-backer-position', campaignId, account.address],
-    queryFn: ({ signal }) => campaignApi.vnextBackerPosition(campaignId, signal),
-    enabled: Boolean(userId && account.address),
-    retry: false,
-  });
-
-  const sendContribution = () => {
-    if (!amountValue || !deployment.campaignEscrow || campaignNumber === null) return;
-    void transaction.send('campaign', 'contribute', [campaignNumber, amountValue]);
-  };
-
-  const approveContribution = () => {
-    if (!amountValue || !deployment.campaignEscrow) return;
-    void transaction.send('token', 'approve', [deployment.campaignEscrow, amountValue]);
-  };
-
   return (
     <section className="monograph-card space-y-3" aria-labelledby="vnext-actions-title">
       <span className="monograph-card__kicker">PERMISSIONLESS ACTIONS</span>
@@ -596,29 +553,6 @@ export function VNextActionPanel({
       )}
 
       {campaign.state === CAMPAIGN_FUNDING && (
-        <div className="space-y-2" data-vnext-action="contribute">
-          <label className="text-sm block" htmlFor="vnext-contribution-amount">Góp vốn (MockUSDC, 6 decimals)</label>
-          <input id="vnext-contribution-amount" inputMode="numeric" value={amount} onChange={event => setAmount(event.target.value)} placeholder="10000000 = 10 MockUSDC" />
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className="button button--secondary" disabled={!amountValue || transaction.busy} onClick={approveContribution}>Approve MockUSDC</button>
-            <button type="button" className="button button--primary" disabled={!amountValue || transaction.busy} onClick={sendContribution}>Góp vốn</button>
-          </div>
-          {!amountValue && amount && <p className="text-sm text-[var(--danger)] m-0">Chỉ nhập số nguyên token unit, lớn hơn 0.</p>}
-        </div>
-      )}
-
-      {account.address && backerPosition.data && (
-        <div className="text-sm text-[var(--ink-subtle)]" data-vnext-read="backer-position">
-          Wallet hiện tại đã góp {backerPosition.data.contribution.toString()} token units; entitlement refund đọc từ contract là {backerPosition.data.entitlement.toString()}.
-        </div>
-      )}
-      {indexedBackerPosition.data?.[0] && (
-        <p className="text-xs text-[var(--ink-subtle)] m-0" data-vnext-read="indexed-backer-position">
-          Contract position: contribution {indexedBackerPosition.data[0].contributed}, refund entitlement {indexedBackerPosition.data[0].refundEntitlement}, claimed {indexedBackerPosition.data[0].refundClaimed ? 'yes' : 'no'}; indexed projection ghi nhận contribution {indexedBackerPosition.data[0].indexedContributed} và refund {indexedBackerPosition.data[0].indexedRefunded} ở block {indexedBackerPosition.data[0].lastBlockNumber}.
-        </p>
-      )}
-
-      {campaign.state === CAMPAIGN_FUNDING && (
         <div data-vnext-action="finalizeFunding">
           <button type="button" className="button button--secondary" disabled={!fundingEnded || transaction.busy || campaignNumber === null} onClick={() => void transaction.send('campaign', 'finalizeFunding', [campaignNumber!])}>Chốt funding sau deadline</button>
           {!fundingEnded && <p className="text-sm text-[var(--ink-subtle)] m-0">Funding chỉ đóng khi thời gian funding hết hạn.</p>}
@@ -626,13 +560,6 @@ export function VNextActionPanel({
       )}
 
       {creator && campaign.publicationReviewCaseId && <VNextEvidencePanel reviewCaseId={campaign.publicationReviewCaseId} enabled={Boolean(userId)} />}
-      {(campaign.state === CAMPAIGN_REFUNDING || campaign.state === CAMPAIGN_REFUNDING_REMAINDER) && (
-        <div className="flex flex-wrap gap-2" data-vnext-action="claimRefund">
-          <button type="button" className="button button--secondary" disabled={transaction.busy || campaignNumber === null} onClick={() => void transaction.send('campaign', 'freezeRefundAllocations', [campaignNumber!, 50n])}>Chuẩn bị entitlement refund</button>
-          <button type="button" className="button button--primary" disabled={transaction.busy || campaignNumber === null || !backerPosition.data?.allocationsFrozen || backerPosition.data.claimed || backerPosition.data.contribution === 0n} onClick={() => void transaction.send('campaign', 'claimRefund', [campaignNumber!])}>Claim refund</button>
-        </div>
-      )}
-
       {transaction.stage !== 'idle' && <p className="text-sm m-0" role="status">{vnextStageLabel(transaction.stage)}{transaction.txHash ? ` · ${transaction.txHash}` : ''}</p>}
       {transaction.error && <p className="monograph-alert monograph-alert--error" role="alert">{transaction.error}</p>}
     </section>

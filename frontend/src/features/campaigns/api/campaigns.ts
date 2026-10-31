@@ -152,6 +152,11 @@ export interface VNextTransactionStatus {
   txHash: `0x${string}`;
   state: 'INDEXING' | 'ON_CHAIN_CONFIRMED';
   eventCount: number;
+  events: VNextTransactionEvent[];
+}
+export interface VNextTransactionEvent {
+  eventName: string;
+  args: Record<string, unknown>;
 }
 export interface VNextIndexerStatus {
   configured: boolean;
@@ -251,6 +256,7 @@ export interface VNextBackerProjection {
   refundAllocationsFrozen: boolean;
   indexedContributed: string;
   indexedRefunded: string;
+  indexedRefundClaimed: boolean;
   lastBlockNumber: string;
 }
 export interface VNextChallengeProjection {

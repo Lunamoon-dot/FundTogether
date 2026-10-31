@@ -13,6 +13,7 @@ const actions = await server.ssrLoadModule('/src/features/campaigns/vnext/vnext-
 const descriptor = await server.ssrLoadModule('/src/features/campaigns/vnext/vnext-contract-descriptor.ts')
 const courtDashboard = await server.ssrLoadModule('/src/features/campaigns/vnext/VNextCourtDashboard.tsx')
 const milestoneFlow = await server.ssrLoadModule('/src/features/campaigns/vnext/vnext-milestone-flow.ts')
+const refundFlow = await server.ssrLoadModule('/src/features/campaigns/vnext/vnext-refund-flow.ts')
 const root = path.resolve(import.meta.dirname, '..')
 
 test('VNext action policy keeps Creator and Backer actions explicit', () => {
@@ -25,10 +26,160 @@ test('VNext action policy keeps Creator and Backer actions explicit', () => {
 
 test('VNext transaction lifecycle exposes receipt and indexer boundaries', () => {
   assert.deepEqual(actions.vnextTransactionStages(), [
-    'idle', 'wallet_requested', 'submitted', 'receipt_confirmed', 'indexed', 'failed',
+    'idle', 'wallet_requested', 'submitted', 'receipt_confirmed', 'indexing', 'indexed', 'failed',
   ])
   assert.equal(actions.vnextStageLabel('receipt_confirmed'), 'Receipt on-chain đã thành công')
+  assert.equal(actions.vnextStageLabel('indexing'), 'Đang chờ indexer xác nhận canonical')
   assert.equal(actions.vnextStageLabel('indexed'), 'Indexer đã xác nhận canonical')
+})
+
+test('VNext transaction lifecycle exposes authoritative receipt outcomes without changing callback compatibility', () => {
+  const transaction = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/vnext-transaction.ts'), 'utf8')
+  assert.match(transaction, /receiptStatus\?: 'success' \| 'reverted'/)
+  assert.match(transaction, /receiptStatus: 'reverted'/)
+  assert.match(transaction, /receiptStatus: 'success'/)
+  assert.match(transaction, /onSubmitted\(txHash\)/)
+  assert.match(transaction, /onReceiptConfirmed\(\)/)
+  assert.match(transaction, /onReceiptReverted\(\)/)
+  assert.match(transaction, /onIndexed\(\)/)
+})
+
+test('refund allocation pending keeps the claim action disabled', () => {
+  const state = refundFlow.vnextRefundDashboardState({
+    campaignState: 5,
+    walletConnected: true,
+    correctChain: true,
+    rpcAvailable: true,
+    allocationsFrozen: false,
+    contribution: 10_000_000n,
+    refundClaimed: false,
+    indexedRefundClaimed: false,
+    simulationReady: false,
+    transactionStage: 'idle',
+  })
+
+  assert.equal(state.claim.ready, false)
+  assert.match(state.claim.reason, /chưa hoàn tất/)
+  assert.equal(state.status, 'UNAVAILABLE')
+})
+
+test('frozen refund allocation enables an eligible simulated claim', () => {
+  const state = refundFlow.vnextRefundDashboardState({
+    campaignState: 5,
+    walletConnected: true,
+    correctChain: true,
+    rpcAvailable: true,
+    allocationsFrozen: true,
+    contribution: 10_000_000n,
+    refundClaimed: false,
+    indexedRefundClaimed: false,
+    simulationReady: true,
+    transactionStage: 'idle',
+  })
+
+  assert.equal(state.claim.ready, true)
+  assert.equal(state.claim.reason, undefined)
+  assert.equal(state.status, 'READY_TO_CLAIM')
+})
+
+test('wallet with no contribution cannot claim a refund', () => {
+  const state = refundFlow.vnextRefundDashboardState({
+    campaignState: 5,
+    walletConnected: true,
+    correctChain: true,
+    rpcAvailable: true,
+    allocationsFrozen: true,
+    contribution: 0n,
+    refundClaimed: false,
+    indexedRefundClaimed: false,
+    simulationReady: false,
+    transactionStage: 'idle',
+  })
+
+  assert.equal(state.claim.ready, false)
+  assert.match(state.claim.reason, /chưa đóng góp/)
+})
+
+test('an on-chain claimed refund blocks duplicate submission while indexing catches up', () => {
+  const state = refundFlow.vnextRefundDashboardState({
+    campaignState: 5,
+    walletConnected: true,
+    correctChain: true,
+    rpcAvailable: true,
+    allocationsFrozen: true,
+    contribution: 10_000_000n,
+    refundClaimed: true,
+    indexedRefundClaimed: false,
+    simulationReady: false,
+    transactionStage: 'idle',
+  })
+
+  assert.equal(state.claim.ready, false)
+  assert.match(state.claim.reason, /đã claim/)
+  assert.equal(state.status, 'INDEXING')
+})
+
+test('a submitted claim is not displayed as refunded', () => {
+  const state = refundFlow.vnextRefundDashboardState({
+    campaignState: 5,
+    walletConnected: true,
+    correctChain: true,
+    rpcAvailable: true,
+    allocationsFrozen: true,
+    contribution: 10_000_000n,
+    refundClaimed: false,
+    indexedRefundClaimed: false,
+    simulationReady: true,
+    transactionAction: 'claimRefund',
+    transactionStage: 'submitted',
+  })
+
+  assert.equal(state.claim.ready, false)
+  assert.equal(state.status, 'SUBMITTED')
+})
+
+test('canonical indexed refund reports REFUNDED with the indexed amount', () => {
+  const state = refundFlow.vnextRefundDashboardState({
+    campaignState: 5,
+    walletConnected: true,
+    correctChain: true,
+    rpcAvailable: true,
+    allocationsFrozen: true,
+    contribution: 10_000_000n,
+    refundClaimed: true,
+    indexedRefundClaimed: true,
+    indexedRefunded: 8_000_000n,
+    simulationReady: false,
+    transactionAction: 'claimRefund',
+    transactionStage: 'indexed',
+  })
+
+  assert.equal(state.status, 'REFUNDED')
+  assert.equal(state.refundedAmount, 8_000_000n)
+})
+
+test('REFUNDING_REMAINDER never enables unsupported refund contract actions', () => {
+  const state = refundFlow.vnextRefundDashboardState({
+    campaignState: 6,
+    walletConnected: true,
+    correctChain: true,
+    rpcAvailable: true,
+    allocationsFrozen: false,
+    contribution: 10_000_000n,
+    refundClaimed: false,
+    indexedRefundClaimed: false,
+    simulationReady: false,
+    transactionStage: 'idle',
+  })
+
+  assert.equal(state.allocation.ready, false)
+  assert.equal(state.claim.ready, false)
+  assert.match(state.claim.reason, /REFUNDING_REMAINDER/)
+})
+
+test('refund dashboard formats token units with deployment decimals', () => {
+  assert.equal(refundFlow.displayVNextTokenAmount(10_000_000n, 6), '10 MockUSDC')
+  assert.equal(refundFlow.displayVNextTokenAmount(10_000_000n, 18), '0.00000000001 MockUSDC')
 })
 
 test('VNext contract descriptors use only the manifest addresses', () => {
@@ -49,6 +200,7 @@ test('VNext contract descriptors use only the manifest addresses', () => {
 test('VNext campaign projection exposes permissionless Creator and Backer actions', () => {
   const page = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextProtocolPage.tsx'), 'utf8')
   const panel = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextActionPanel.tsx'), 'utf8')
+  const checkout = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextFundingCheckout.tsx'), 'utf8')
   const evidence = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextEvidencePanel.tsx'), 'utf8')
   assert.match(page, /VNextActionPanel/)
   assert.match(page, /VNextCreateCampaignPanel/)
@@ -56,16 +208,12 @@ test('VNext campaign projection exposes permissionless Creator and Backer action
   assert.match(page, /indexer-status/)
   assert.match(page, /VNextCourtDashboard/)
   assert.match(page, /Mở Milestone Dashboard/)
-  assert.match(panel, /contribute/)
+  assert.match(page, /VNextFundingCheckout/)
+  assert.match(checkout, /contribute/)
   assert.match(panel, /finalizeFunding/)
   assert.match(panel, /submitMilestoneEvidence/)
-  assert.match(panel, /claimRefund/)
-  assert.match(panel, /contributionOf/)
-  assert.match(panel, /refundEntitlement/)
   assert.match(panel, /VNextEvidencePanel/)
   assert.match(evidence, /availability không thay thế kiểm tra hash/)
-  assert.match(panel, /vnextBackerPosition/)
-  assert.match(panel, /indexed-backer-position/)
   assert.match(page, /milestones\.data\?\.length \? milestones\.data\.map/)
   assert.match(panel, /VNextMilestoneActions/)
   assert.match(panel, /retryPublication/)
@@ -93,6 +241,40 @@ test('VNext campaign projection exposes permissionless Creator and Backer action
   assert.match(panel, /payoutPreflightReady/)
   assert.match(panel, /transaction\.action === 'payMilestone'/)
   assert.doesNotMatch(panel, /approveCampaign/)
+})
+
+test('VNext campaign page owns one dedicated Backer Refund Dashboard', () => {
+  const page = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextProtocolPage.tsx'), 'utf8')
+  const actionPanel = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextActionPanel.tsx'), 'utf8')
+  const dashboard = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextRefundDashboard.tsx'), 'utf8')
+  const flow = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/vnext-refund-flow.ts'), 'utf8')
+
+  assert.match(page, /VNextRefundDashboard/)
+  assert.doesNotMatch(actionPanel, /freezeRefundAllocations|claimRefund/)
+  assert.match(dashboard, /contributionOf/)
+  assert.match(dashboard, /campaignRefundPool/)
+  assert.match(dashboard, /campaignRefundSnapshot/)
+  assert.match(dashboard, /refundEntitlement/)
+  assert.match(dashboard, /refundClaimed/)
+  assert.match(dashboard, /refundAllocationsFrozen/)
+  assert.match(dashboard, /simulateContract/)
+  assert.match(dashboard, /displayVNextTokenAmount/)
+  assert.match(flow, /formatUnits/)
+  assert.match(dashboard, /REFUND_BATCH_SIZE = 50n/)
+  assert.match(dashboard, /freezeRefundAllocations', \[campaignNumber, REFUND_BATCH_SIZE\]/)
+})
+
+test('VNext campaign integration renders funding, refund, court, evidence and settlement actions once', () => {
+  const page = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextProtocolPage.tsx'), 'utf8')
+  const actionPanel = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextActionPanel.tsx'), 'utf8')
+
+  assert.equal((page.match(/<VNextFundingCheckout/g) ?? []).length, 1)
+  assert.equal((page.match(/<VNextRefundDashboard/g) ?? []).length, 1)
+  assert.equal((page.match(/<VNextCourtDashboard/g) ?? []).length, 1)
+  assert.equal((actionPanel.match(/<VNextEvidenceSubmissionWizard/g) ?? []).length, 1)
+  assert.equal((actionPanel.match(/data-vnext-action="payMilestone"/g) ?? []).length, 1)
+  assert.doesNotMatch(actionPanel, /transaction\.send\('campaign', 'contribute'/)
+  assert.doesNotMatch(actionPanel, /transaction\.send\('campaign', 'claimRefund'/)
 })
 
 test('VNext creator creation uses the campaign contract and keeps publication before funding', () => {

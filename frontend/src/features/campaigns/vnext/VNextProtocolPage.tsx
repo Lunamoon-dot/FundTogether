@@ -6,8 +6,11 @@ import { useAccountSession } from '../../auth/AccountSessionProvider';
 import { VNextActionPanel, VNextMilestoneActions } from './VNextActionPanel';
 import { VNextCreateCampaignPanel } from './VNextCreateCampaignPanel';
 import { VNextCourtDashboard } from './VNextCourtDashboard';
+import { VNextFundingCheckout } from './VNextFundingCheckout';
+import { VNextRefundDashboard } from './VNextRefundDashboard';
+import { displayVNextTokenAmount } from './vnext-refund-flow';
 
-const campaignStates = ['CREATED', 'FUNDING', 'FUNDED', 'MILESTONES_RUNNING', 'COMPLETED', 'REFUNDING'];
+const campaignStates = ['CREATED', 'FUNDING', 'FUNDED', 'MILESTONES_RUNNING', 'COMPLETED', 'REFUNDING', 'REFUNDING_REMAINDER', 'REFUND_SETTLED'];
 const milestoneStates = ['PENDING', 'SUBMITTED', 'REVIEW_ENROLLMENT', 'BASE_REVIEW', 'RETRY_PENDING', 'PROVISIONAL_RULING', 'APPEAL_WINDOW', 'FINAL_RULING', 'PAYABLE', 'CHALLENGE_WINDOW', 'PAID', 'CORRECTION', 'RESUBMIT', 'TERMINAL'];
 
 export function VNextProtocolPage({ campaignId }: { campaignId?: string }) {
@@ -73,9 +76,29 @@ export function VNextProtocolPage({ campaignId }: { campaignId?: string }) {
         <section className="monograph-card space-y-3">
           <span className="monograph-card__kicker">CANONICAL PROJECTION</span>
           <h2 className="monograph-card__title">{campaignStates[campaign.data.state] ?? `STATE_${campaign.data.state}`}</h2>
-          <p className="monograph-card__desc">Raised {campaign.data.raised} · Paid {campaign.data.paidOut} · Refunded {campaign.data.refunded}</p>
+          <p className="monograph-card__desc">
+            Raised {displayVNextTokenAmount(campaign.data.raised, deployment.data?.tokenDecimals)} · Paid {displayVNextTokenAmount(campaign.data.paidOut, deployment.data?.tokenDecimals)} · Refunded {displayVNextTokenAmount(campaign.data.refunded, deployment.data?.tokenDecimals)}
+          </p>
           <p className="text-xs font-mono break-all">Terms {campaign.data.termsHash} · last event {campaign.data.lastEventName} · block {campaign.data.lastBlockNumber}</p>
         </section>
+        {deployment.data?.configured && campaignId && (
+          <VNextFundingCheckout
+            campaignId={campaignId}
+            userId={session?.userId}
+            campaign={campaign.data}
+            deployment={deployment.data}
+            onRefresh={refreshCampaign}
+          />
+        )}
+        {deployment.data?.configured && campaignId && (
+          <VNextRefundDashboard
+            campaignId={campaignId}
+            userId={session?.userId}
+            campaign={campaign.data}
+            deployment={deployment.data}
+            onRefresh={refreshCampaign}
+          />
+        )}
         <section className="monograph-card space-y-3">
           <span className="monograph-card__kicker">MILESTONE REVIEW</span>
           {milestones.isPending ? <p className="muted" role="status">Đang tải milestone projection…</p> : milestones.data?.length ? milestones.data.map(milestone => (

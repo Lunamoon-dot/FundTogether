@@ -15,6 +15,7 @@ import {
   isVNextEvidenceSubmissionState,
   matchVNextCanonicalSubmission,
   selectVNextEvidenceFile,
+  shouldRetainVNextEvidenceSubmissionLock,
   type VNextEvidenceSelection,
   type VNextEvidenceWizardStatus,
   vnextEvidenceSubmissionBlockReason,
@@ -175,24 +176,6 @@ export function VNextEvidenceSubmissionWizard({
     refetchInterval: isVNextEvidenceSubmissionState(milestone.state) && !lockedSubmission ? 5_000 : false,
   });
 
-  const transaction = useVNextTransaction(
-    onRefresh,
-    () => setReceiptConfirmed(true),
-    (txHash) => {
-      const evidenceHash = selection?.evidenceHash;
-      const currentRevision = preflight.data?.currentRevision;
-      if (!evidenceHash || currentRevision === undefined) return;
-      setLockedSubmission(
-        (current) =>
-          current ?? {
-            evidenceHash,
-            expectedRevision: (currentRevision + 1n).toString(),
-            txHash,
-          },
-      );
-    },
-  );
-
   const recoveryHash =
     preflight.data && !isVNextEvidenceSubmissionState(preflight.data.milestoneState) && /^0x[0-9a-f]{64}$/.test(preflight.data.evidenceHash) && preflight.data.evidenceHash !== `0x${'0'.repeat(64)}`
       ? (preflight.data.evidenceHash as `0x${string}`)
@@ -215,6 +198,32 @@ export function VNextEvidenceSubmissionWizard({
   const canonicalSubmission = canonicalProjection.data ?? recoveryProjection;
   const reviewCaseId = canonicalSubmission?.reviewCaseId ?? null;
   const canonicalHash = canonicalSubmission?.evidenceHash ?? null;
+  const transaction = useVNextTransaction(
+    onRefresh,
+    () => setReceiptConfirmed(true),
+    (txHash) => {
+      const evidenceHash = selection?.evidenceHash;
+      const currentRevision = preflight.data?.currentRevision;
+      if (!evidenceHash || currentRevision === undefined) return;
+      setLockedSubmission(
+        (current) =>
+          current ?? {
+            evidenceHash,
+            expectedRevision: (currentRevision + 1n).toString(),
+            txHash,
+          },
+      );
+    },
+    () => {
+      setLockedSubmission((current) => shouldRetainVNextEvidenceSubmissionLock({
+        receiptStatus: 'reverted',
+        canonicalReviewCaseExists: Boolean(canonicalSubmission),
+      }) ? current : null);
+      setReceiptConfirmed(false);
+      setWaitingForIndexer(false);
+      void preflight.refetch();
+    },
+  );
   const evidence = useQuery({
     queryKey: ['vnext-case-evidence', reviewCaseId],
     queryFn: ({ signal }) => campaignApi.vnextEvidence(reviewCaseId!, signal),
