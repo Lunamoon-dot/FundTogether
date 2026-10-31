@@ -31,9 +31,6 @@ Read implementation progress before treating the pure target as deployed.
 10. [Pure decentralized workflows](campaigns/WORKFLOWS_V2_DECENTRALIZED.md)
 11. [Financial Policy V2](campaigns/FINANCIAL_POLICY_V2_DECENTRALIZED.md)
 12. [Wallet-only authentication](auth/WALLET_ONLY_AUTH.md)
-13. [Pure decentralized design](superpowers/specs/2026-10-20-pure-decentralized-protocol-design.md)
-14. [A–Z VNext build roadmap](superpowers/plans/2026-10-20-vnext-a-z-build-roadmap.md)
-15. [Implementation plan](superpowers/plans/2026-10-20-pure-decentralized-protocol.md)
 
 ## Documentation map
 
@@ -44,7 +41,6 @@ Read implementation progress before treating the pure target as deployed.
 | protocol/ | Detailed VNext protocol specification and status boundaries |
 | architecture/ | Current pure-decentralized protocol architecture |
 | campaigns/*_V2_DECENTRALIZED.md | Current target scope, workflow and financial policy |
-| superpowers/ | VNext design, A–Z roadmap and implementation plans from the protocol reset onward |
 | research/ | Reproducible VNext research records and declared limitations |
 
 ## Source-of-truth rule
@@ -52,7 +48,7 @@ Read implementation progress before treating the pure target as deployed.
 The newest explicit user decision wins, followed by research-direction.md,
 PROJECT_OVERVIEW.md and the V2 decentralized policy. Code and test evidence
 describe what is actually implemented; they do not override the target policy.
-Plans are not runtime evidence.
+Removed plans remain available in Git history but are not runtime evidence.
 
 ## Historical-document rule
 
