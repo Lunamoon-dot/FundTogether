@@ -4,9 +4,7 @@
 > This is evidence of the listed slices only; it is not a claim that the full
 > protocol is deployed or financially complete.
 
-**Roadmap:** [A–Z VNext build roadmap](../superpowers/plans/2026-10-20-vnext-a-z-build-roadmap.md)
 **Specification:** [Protocol Specification V1](FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_V1.md)
-**Wallet journey slice:** [Wallet Journeys Implementation Spec](../superpowers/specs/2026-10-20-vnext-wallet-journeys-design.md)
 **Remediation registry:** [Parameter Registry V2](parameters-v2-remediation.md)
 **Runtime boundary:** local Anvil/MockUSDC only; no public-chain acceptance
 

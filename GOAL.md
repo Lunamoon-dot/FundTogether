@@ -43,7 +43,5 @@ launcher. The target design and implementation order are documented in
 [THREAT_MODEL_VNEXT.md](docs/protocol/THREAT_MODEL_VNEXT.md),
 [STATE_MACHINE_VNEXT.md](docs/protocol/STATE_MACHINE_VNEXT.md),
 [PURE_DECENTRALIZED_PROTOCOL.md](docs/architecture/PURE_DECENTRALIZED_PROTOCOL.md)
-and
-[2026-10-20-vnext-a-z-build-roadmap.md](docs/superpowers/plans/2026-10-20-vnext-a-z-build-roadmap.md)
-and
-[2026-10-20-pure-decentralized-protocol.md](docs/superpowers/plans/2026-10-20-pure-decentralized-protocol.md).
+and the live
+[implementation ledger](docs/protocol/IMPLEMENTATION_PROGRESS_VNEXT.md).

@@ -18,7 +18,6 @@ const files = [
   resolve(root, "AGENTS.md"),
   resolve(root, "contracts/README.md"),
   resolve(root, "frontend/README.md"),
-  resolve(root, "frontend/src/features/README.md"),
   ...markdownFiles(resolve(root, "docs")),
   ...markdownFiles(resolve(root, "research/pilot")),
 ];
