@@ -156,7 +156,7 @@ describe("PublicationService.terms", () => {
   }
 
   it("allows a published record to prepare publication terms when the current stream has no canonical binding", async () => {
-    const { campaign, review } = fixture();
+    const { campaign } = fixture();
     const { service: publication } = service([[campaign], [], [], [{ address: creatorWallet, chainId: "31339" }]]);
 
     await expect(publication.terms("campaign", "creator")).resolves.toMatchObject({

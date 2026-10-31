@@ -6,7 +6,12 @@ import { existsSync } from 'node:fs'
 
 const campaignManifest = fileURLToPath(new URL('../.local/fundtogether/generated/campaigns-deployment.local.json', import.meta.url))
 const historicalManifest = fileURLToPath(new URL('../.local/fundtogether/generated/historical-deployment.local.json', import.meta.url))
-const deploymentManifest = existsSync(campaignManifest)
+const testCampaignManifest = fileURLToPath(new URL('./test/fixtures/campaign-deployment.test.json', import.meta.url))
+const useTestCampaignManifest = process.env.NODE_ENV === 'test'
+  && process.env.FUNDTOGETHER_TEST_DEPLOYMENT === '1'
+const deploymentManifest = useTestCampaignManifest
+  ? testCampaignManifest
+  : existsSync(campaignManifest)
   ? campaignManifest
   : fileURLToPath(new URL('./src/lib/web3/missing-campaign-deployment.json', import.meta.url))
 const historicalDeploymentManifest = existsSync(historicalManifest)
@@ -17,6 +22,8 @@ const historicalDeploymentManifest = existsSync(historicalManifest)
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: {
+    // The historical Campaign alias remains the default runtime boundary.
+    // Tests opt into their fixture explicitly; dev/build never infer an identity.
     '@fundtogether/deployment': deploymentManifest,
     '@fundtogether/historical-deployment': historicalDeploymentManifest,
   } },

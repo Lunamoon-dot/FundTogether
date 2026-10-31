@@ -23,9 +23,11 @@
     "test:vnext-acceptance": "node scripts/campaigns/vnext-scenarios-e2e.cjs",
     "test:vnext-browser": "node scripts/campaigns/vnext-browser-e2e.cjs",
     "test:vnext-runtime": "node --test scripts/campaigns/vnext-runtime-identity.test.cjs",
+    "test:vnext:unit": "npm run test -- --runInBand --testMatch \"**/vnext*.spec.ts\" --testPathIgnorePatterns vnext-indexer.postgres.spec.ts",
     "test:workflow": "npm run test -- --runInBand src/modules/campaigns/tests/workflow-campaign.schema.spec.ts src/modules/pledges/tests/workflow-pledge.schema.spec.ts src/modules/campaigns/tests/workflow-commitment.service.spec.ts src/indexer/tests/historical-campaign-indexer.service.spec.ts src/modules/campaigns/tests/commitment.spec.ts",
     "test:fundtogether:e2e": "node scripts/campaigns/campaign-scenarios-e2e.cjs && npm run test -- --runInBand src/modules/campaigns/tests/workflow-http-acceptance.spec.ts src/modules/campaigns/tests/http.spec.ts src/modules/review/tests/review-http.spec.ts",
-    "lint": "eslint \"{src,test}/**/*.ts\" --fix",
+    "lint": "eslint \"{src,test}/**/*.ts\"",
+    "lint:fix": "eslint \"{src,test}/**/*.ts\" --fix",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage"
@@ -77,6 +79,7 @@
     "ts-loader": "^9.5.0",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "~5.7.2"
+    "typescript": "~5.7.2",
+    "typescript-eslint": "8.72.1"
   }
 }

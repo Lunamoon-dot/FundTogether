@@ -63,9 +63,9 @@ marketplace, charity and real-money/public-chain launch are out of scope.
 
 ## Current status
 
-The current code and local runtime have not yet migrated to the pure
-decentralized protocol. Existing Resolver-based tests and docs are historical
-evidence and must not be presented as target behavior. Follow the detailed
-specification and implementation plan only after the stake, randomness,
-reward/slashing, no-quorum, appeal, evidence availability and multi-court
-policies are versioned.
+The repository contains implemented VNext contract, indexer/API and
+Creator/Backer/Judge UI slices, but the default one-command local launcher is
+still the historical Campaign/Resolver runtime. Existing Resolver-based tests
+and docs are historical evidence and must not be presented as target behavior.
+Do not infer public-chain readiness or full runtime acceptance from focused
+tests; follow the versioned protocol and implementation ledger.

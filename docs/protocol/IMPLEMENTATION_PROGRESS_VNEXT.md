@@ -173,6 +173,37 @@ deploying policy V2 and is not a current acceptance run for this branch.
 Frontend evidence: `npm test` → 199 passed;
 `npm run build` completed with only the existing large-bundle warning.
 
+### Repository stabilization record — 2026-10-31
+
+This cleanup was verified from an isolated checkout based on `origin/main` plus
+the Judge workspace integration commit. It is repository/tooling evidence, not
+a new live-runtime acceptance result:
+
+```text
+frontend npm test                 -> 269 passed
+frontend npm run lint             -> passed (4 pre-existing warnings)
+frontend npm run build            -> passed (existing large-chunk warning)
+backend npm run lint              -> passed
+backend npm run build             -> passed
+backend npm run test:vnext:unit   -> 45 passed
+backend npm run test:vnext-runtime -> 6 passed
+backend focused cleanup regressions -> 27 passed
+forge build                       -> passed
+forge test --summary              -> 274 passed, 0 failed, 0 skipped
+```
+
+The frontend run includes negative deployment-policy checks for a zero policy
+hash, a non-local RPC URL and duplicate Judges. A deterministic deployment
+fixture is enabled only by the test bootstrap; development and production
+builds still require the real ignored manifest or retain the invalid sentinel.
+
+The full backend Jest suite was not accepted as green: its integration suites
+require the local PostgreSQL/MinIO/Anvil environment and deployment files, and
+one historical integration spec still has a pre-existing TypeScript address
+typing error. Lightweight CI therefore runs the isolated VNext unit and runtime
+identity checks. No chain, database or object-storage state was reset, and no
+fresh browser/wallet acceptance was performed.
+
 Current policy-freeze branch evidence after the bounded-settlement,
 escrow-boundary and evidence-availability slices:
 

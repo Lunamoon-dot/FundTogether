@@ -32,6 +32,8 @@ function LegacyCampaignRedirect({ href }: { href: string }) {
 export function PublicArea(props: PublicAreaProps) {
   const { path, session, sessionLoading, error, onSession } = props;
 
+  // Historical Campaign/Resolver routes remain supported while the explicit
+  // /campaigns/vnext surface is integrated; cleanup must not remap either path.
   const isCampaignFeed = path === '/' || path === '/campaigns';
   const isCampaignCommunityReview = path === '/campaigns/review';
   const isCampaignCreatorStudio = path === '/campaigns/creator';
