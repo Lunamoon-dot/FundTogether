@@ -103,3 +103,10 @@ export function isVNextEvidenceReady(response: VNextCaseEvidenceResponse | undef
 export function canSendVNextEvidenceTransaction(input: { evidenceHash: string | null; confirmed: boolean; preflightReady: boolean; submittedTxHash?: string }): boolean {
   return Boolean(input.evidenceHash && input.confirmed && input.preflightReady && !input.submittedTxHash);
 }
+
+export function shouldRetainVNextEvidenceSubmissionLock(input: {
+  receiptStatus?: 'success' | 'reverted';
+  canonicalReviewCaseExists: boolean;
+}): boolean {
+  return input.canonicalReviewCaseExists || input.receiptStatus !== 'reverted';
+}

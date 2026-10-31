@@ -69,6 +69,47 @@ test('an indexer delay cannot enable a duplicate on-chain submission', () => {
   assert.equal(wizard.canSendVNextEvidenceTransaction({ ...input, submittedTxHash: `0x${'d'.repeat(64)}` }), false)
 })
 
+test('a canonically reverted evidence transaction releases its submission lock', () => {
+  assert.equal(wizard.shouldRetainVNextEvidenceSubmissionLock({
+    transactionStage: 'failed',
+    receiptStatus: 'reverted',
+    canonicalReviewCaseExists: false,
+  }), false)
+})
+
+test('pending or unknown receipt status keeps the lock, while a canonical case stays in upload recovery', () => {
+  assert.equal(wizard.shouldRetainVNextEvidenceSubmissionLock({
+    receiptStatus: undefined,
+    canonicalReviewCaseExists: false,
+  }), true)
+  assert.equal(wizard.shouldRetainVNextEvidenceSubmissionLock({
+    receiptStatus: 'success',
+    canonicalReviewCaseExists: false,
+  }), true)
+  assert.equal(wizard.shouldRetainVNextEvidenceSubmissionLock({
+    receiptStatus: 'reverted',
+    canonicalReviewCaseExists: true,
+  }), true)
+})
+
+test('wizard reconciles its local lock from authoritative receipt state', () => {
+  const component = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextEvidenceSubmissionWizard.tsx'), 'utf8')
+  assert.match(component, /shouldRetainVNextEvidenceSubmissionLock/)
+  assert.match(component, /receiptStatus: 'reverted'/)
+  assert.match(component, /canonicalReviewCaseExists: Boolean\(canonicalSubmission\)/)
+  assert.match(component, /setLockedSubmission\(\(current\) => shouldRetainVNextEvidenceSubmissionLock/)
+})
+
+test('wallet rejection cannot create a lock and a canonical Review Case remains upload-only', () => {
+  const component = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextEvidenceSubmissionWizard.tsx'), 'utf8')
+  const transaction = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/vnext-transaction.ts'), 'utf8')
+  assert.ok(transaction.indexOf('await wallet.writeContract(request)') < transaction.indexOf('onSubmitted(txHash)'))
+  assert.equal((component.match(/transaction\.send\('campaign', 'submitMilestoneEvidence'/g) ?? []).length, 1)
+  assert.match(component, /selection\?\.evidenceHash && !reviewCaseId/)
+  assert.match(component, /reviewCaseId && canonicalHash/)
+  assert.match(component, /vnextUploadEvidence\(reviewCaseId, summary\.trim\(\), selection\.file\)/)
+})
+
 test('AVAILABLE metadata and READY policy are both required for completion', () => {
   const hash = `0x${'a'.repeat(64)}`
   const response = {

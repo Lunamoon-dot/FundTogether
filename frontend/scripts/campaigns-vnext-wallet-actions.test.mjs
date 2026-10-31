@@ -33,6 +33,17 @@ test('VNext transaction lifecycle exposes receipt and indexer boundaries', () =>
   assert.equal(actions.vnextStageLabel('indexed'), 'Indexer đã xác nhận canonical')
 })
 
+test('VNext transaction lifecycle exposes authoritative receipt outcomes without changing callback compatibility', () => {
+  const transaction = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/vnext-transaction.ts'), 'utf8')
+  assert.match(transaction, /receiptStatus\?: 'success' \| 'reverted'/)
+  assert.match(transaction, /receiptStatus: 'reverted'/)
+  assert.match(transaction, /receiptStatus: 'success'/)
+  assert.match(transaction, /onSubmitted\(txHash\)/)
+  assert.match(transaction, /onReceiptConfirmed\(\)/)
+  assert.match(transaction, /onReceiptReverted\(\)/)
+  assert.match(transaction, /onIndexed\(\)/)
+})
+
 test('refund allocation pending keeps the claim action disabled', () => {
   const state = refundFlow.vnextRefundDashboardState({
     campaignState: 5,
@@ -251,6 +262,19 @@ test('VNext campaign page owns one dedicated Backer Refund Dashboard', () => {
   assert.match(flow, /formatUnits/)
   assert.match(dashboard, /REFUND_BATCH_SIZE = 50n/)
   assert.match(dashboard, /freezeRefundAllocations', \[campaignNumber, REFUND_BATCH_SIZE\]/)
+})
+
+test('VNext campaign integration renders funding, refund, court, evidence and settlement actions once', () => {
+  const page = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextProtocolPage.tsx'), 'utf8')
+  const actionPanel = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextActionPanel.tsx'), 'utf8')
+
+  assert.equal((page.match(/<VNextFundingCheckout/g) ?? []).length, 1)
+  assert.equal((page.match(/<VNextRefundDashboard/g) ?? []).length, 1)
+  assert.equal((page.match(/<VNextCourtDashboard/g) ?? []).length, 1)
+  assert.equal((actionPanel.match(/<VNextEvidenceSubmissionWizard/g) ?? []).length, 1)
+  assert.equal((actionPanel.match(/data-vnext-action="payMilestone"/g) ?? []).length, 1)
+  assert.doesNotMatch(actionPanel, /transaction\.send\('campaign', 'contribute'/)
+  assert.doesNotMatch(actionPanel, /transaction\.send\('campaign', 'claimRefund'/)
 })
 
 test('VNext creator creation uses the campaign contract and keeps publication before funding', () => {

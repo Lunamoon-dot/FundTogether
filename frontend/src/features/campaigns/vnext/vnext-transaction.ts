@@ -25,6 +25,7 @@ export interface VNextTransactionState {
   stage: VNextTransactionStage;
   action?: string;
   txHash?: `0x${string}`;
+  receiptStatus?: 'success' | 'reverted';
   eventCount?: number;
   error?: string;
 }
@@ -40,6 +41,7 @@ export function useVNextTransaction(
   onIndexed: () => void = () => {},
   onReceiptConfirmed: () => void = () => {},
   onSubmitted: (txHash: `0x${string}`) => void = () => {},
+  onReceiptReverted: () => void = () => {},
 ) {
   const account = useAccount();
   const client = usePublicClient({ chainId: 31339 });
@@ -53,6 +55,7 @@ export function useVNextTransaction(
     txHash: `0x${string}`,
     action: string,
     canonicalEvent?: VNextTransactionOptions['canonicalEvent'],
+    receiptStatus?: 'success',
   ) {
     for (let attempt = 0; attempt < 20; attempt += 1) {
       try {
@@ -60,14 +63,14 @@ export function useVNextTransaction(
         const expectedEventIndexed = !canonicalEvent
           || vnextCanonicalEventIndexed(status.events, canonicalEvent);
         if (status.state === 'ON_CHAIN_CONFIRMED' && expectedEventIndexed) {
-          setState({ stage: 'indexed', action, txHash, eventCount: status.eventCount });
+          setState({ stage: 'indexed', action, txHash, receiptStatus: 'success', eventCount: status.eventCount });
           onIndexed();
           return true;
         }
       } catch {
         // A confirmed receipt remains successful while the indexer is unavailable.
       }
-      setState({ stage: 'indexing', action, txHash });
+      setState({ stage: 'indexing', action, txHash, receiptStatus });
       await sleep(500);
     }
     return false;
@@ -140,12 +143,16 @@ export function useVNextTransaction(
       setState({ stage: 'submitted', action: functionName, txHash });
       onSubmitted(txHash);
       const receipt = await client.waitForTransactionReceipt({ hash: txHash });
-      if (receipt.status !== 'success') throw new Error(`Transaction đã revert: ${txHash}`);
-      setState({ stage: 'receipt_confirmed', action: functionName, txHash });
+      if (receipt.status !== 'success') {
+        setState({ stage: 'failed', action: functionName, txHash, receiptStatus: 'reverted', error: `Transaction đã revert: ${txHash}` });
+        onReceiptReverted();
+        return undefined;
+      }
+      setState({ stage: 'receipt_confirmed', action: functionName, txHash, receiptStatus: 'success' });
       onReceiptConfirmed();
       if (kind === 'token' || options.waitForIndexer === false) return txHash;
       canonicalEventRef.current = options.canonicalEvent;
-      await pollForCanonicalIndexing(txHash, functionName, options.canonicalEvent);
+      await pollForCanonicalIndexing(txHash, functionName, options.canonicalEvent, 'success');
       return txHash;
     } catch (cause) {
       const error = getErrorMessage(cause);
@@ -163,11 +170,11 @@ export function useVNextTransaction(
   }
 
   async function reconcile() {
-    if (busyRef.current || !state.txHash || !state.action) return false;
+    if (busyRef.current || state.receiptStatus === 'reverted' || !state.txHash || !state.action) return false;
     busyRef.current = true;
     setBusy(true);
     try {
-      return await pollForCanonicalIndexing(state.txHash, state.action, canonicalEventRef.current);
+      return await pollForCanonicalIndexing(state.txHash, state.action, canonicalEventRef.current, state.receiptStatus);
     } finally {
       busyRef.current = false;
       setBusy(false);
