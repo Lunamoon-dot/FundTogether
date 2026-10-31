@@ -12,7 +12,16 @@ function markdownFiles(directory) {
   });
 }
 
-const files = [resolve(root, "README.md"), resolve(root, "PRODUCT.md"), ...markdownFiles(resolve(root, "docs"))];
+const files = [
+  resolve(root, "README.md"),
+  resolve(root, "GOAL.md"),
+  resolve(root, "AGENTS.md"),
+  resolve(root, "contracts/README.md"),
+  resolve(root, "frontend/README.md"),
+  resolve(root, "frontend/src/features/README.md"),
+  ...markdownFiles(resolve(root, "docs")),
+  ...markdownFiles(resolve(root, "research/pilot")),
+];
 const failures = [];
 const linkPattern = /\[[^\]]*\]\(([^)]+)\)/g;
 

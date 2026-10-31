@@ -34,7 +34,6 @@ Read implementation progress before treating the pure target as deployed.
 13. [Pure decentralized design](superpowers/specs/2026-10-20-pure-decentralized-protocol-design.md)
 14. [A–Z VNext build roadmap](superpowers/plans/2026-10-20-vnext-a-z-build-roadmap.md)
 15. [Implementation plan](superpowers/plans/2026-10-20-pure-decentralized-protocol.md)
-16. [Pre-reset progress evidence](PROJECT_PROGRESS.md)
 
 ## Documentation map
 
@@ -43,11 +42,10 @@ Read implementation progress before treating the pure target as deployed.
 | research-direction.md | Product and research source of truth |
 | PROJECT_OVERVIEW.md | Target architecture and source-of-truth boundaries |
 | protocol/ | Detailed VNext protocol specification and status boundaries |
-| architecture/ | Current protocol architecture plus historical blueprints |
+| architecture/ | Current pure-decentralized protocol architecture |
 | campaigns/*_V2_DECENTRALIZED.md | Current target scope, workflow and financial policy |
-| superpowers/ | Current design, A–Z roadmap and implementation plan |
-| PROJECT_PROGRESS.md | Pre-reset implementation evidence; not proof of the new protocol |
-| archive/ and old V1 documents | Historical only |
+| superpowers/ | VNext design, A–Z roadmap and implementation plans from the protocol reset onward |
+| research/ | Reproducible VNext research records and declared limitations |
 
 ## Source-of-truth rule
 
@@ -58,6 +56,8 @@ Plans are not runtime evidence.
 
 ## Historical-document rule
 
-Pre-reset Resolver, Admin-approval and advisory Community Review documents are
-retained for traceability. They must be labeled historical and must not be used
-to design or accept the new protocol.
+Pre-reset Resolver, HED, charity and advisory Community Review documents are
+not kept in the working tree. Use Git history only for a named regression or
+forensic question. Historical code that remains executable is still governed by
+its tests and explicit namespace; its removed documentation is not VNext
+authority.

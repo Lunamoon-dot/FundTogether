@@ -1,8 +1,8 @@
 # Pure Decentralized FundTogether Protocol Design
 
-> **Status:** Current design decision, 2026-10-20. The VNext contract core,
-> projection slice and read-only protocol surface are partially implemented;
-> full runtime acceptance is still pending.
+> **Status:** Current design decision, 2026-10-20. VNext contract,
+> projection/API and Creator/Backer/Judge wallet slices are implemented; a
+> consolidated launcher and fresh full-runtime acceptance are still pending.
 >
 > **Detailed source:** [FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_V1.md](../../protocol/FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_V1.md)
 

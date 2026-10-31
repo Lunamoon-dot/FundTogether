@@ -84,18 +84,19 @@ Email/password login remains outside the active surface.
 ## Implementation status
 
 The current repository and local runtime still contain the pre-reset Resolver
-implementation, alongside a partially implemented VNext contract core and
-projection surface. The VNext core covers publication/funding, stake-backed
-multi-court review, milestone evidence, appeal/retry, challenge, payout and
-refund. Foundry and focused backend/frontend tests are evidence for those
-slices only; they are not proof that the pure decentralized protocol is
-deployed or end-to-end accepted.
+implementation alongside VNext contracts, indexed/API projections and
+Creator/Backer/Judge wallet surfaces. VNext covers publication/funding,
+stake-backed multi-court review, milestone evidence, appeal/retry, payout and
+refund; local policy keeps challenge entrypoints disabled. Foundry and focused
+backend/frontend tests are evidence for those slices only. They are not proof
+that the pure decentralized protocol is deployed or freshly accepted end to
+end.
 
 Creator profile/Studio verification is optional metadata. Any remaining
 Resolver behavior is implementation residue and historical evidence, not target
-authority. Creator/Backer/Judge wallet transactions, production batch
-settlement, evidence availability policy and fresh local runtime acceptance
-remain roadmap work.
+authority. Remaining appeal/retry edge journeys, production settlement sizing,
+evidence availability guarantees, a consolidated VNext launcher and fresh local
+runtime acceptance remain roadmap work.
 
 The implementation order is threat model and policy, state machine and
 accounting, contract and invariants, indexer, evidence pipeline, vertical

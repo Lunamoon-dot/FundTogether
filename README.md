@@ -105,6 +105,6 @@ database hoặc storage chỉ để làm test xanh.
 | `backend/src/blockchain/generated/` | ABI/artifact cần cho runtime identity và frontend |
 | `contracts/src/` | VNext và historical contracts; production Solidity không phải cleanup target |
 | `docs/protocol/` | VNext specification, threat model và implementation ledger |
-| `docs/archive/` | Tài liệu lịch sử, không phải yêu cầu target hiện hành |
+| Git history | Tài liệu Resolver/HED cũ đã được gỡ khỏi working tree; chỉ dùng khi điều tra regression cụ thể |
 
 Đọc [docs/README.md](docs/README.md) để biết thứ tự nguồn chuẩn.

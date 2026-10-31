@@ -691,7 +691,7 @@ authority from operational surfaces.
 - Update: `frontend/src/features/campaigns/admin/AdminConsole.tsx`
 - Update: `frontend/src/features/campaigns/admin/CampaignOperationsPage.tsx`
 - Update: backend operational/indexer health controllers
-- Update: `docs/PROJECT_PROGRESS.md`
+- Update: `docs/protocol/IMPLEMENTATION_PROGRESS_VNEXT.md`
 - Test: `frontend/scripts/campaigns-vnext-operations.test.mjs`
 
 **Required behavior:** show RPC, indexer lag, failed events, storage health,
@@ -747,7 +747,7 @@ research-ready without claiming public-chain safety.
 
 **Files:**
 
-- Update: `docs/PROJECT_PROGRESS.md`
+- Update: `docs/protocol/IMPLEMENTATION_PROGRESS_VNEXT.md`
 - Create: `docs/protocol/VNEXT_RELEASE_REPORT.md`
 - Create: `docs/protocol/VNEXT_EXPERIMENT_RESULTS.md`
 - Update: `docs/research-direction.md` only with measured evidence
