@@ -17,12 +17,12 @@ export function buildVNextJudgeReviews<Review extends JudgeReviewRow, Assignment
 ): Array<Review & { assignments: Assignment[] }> {
   const wallets = new Set(walletAddresses.map(wallet => wallet.toLowerCase()));
   return reviews
-    .filter(review => !review.finalized)
     .map(review => ({
       ...review,
       assignments: assignments.filter(assignment => (
         assignment.reviewCaseId === review.reviewCaseId
         && wallets.has(assignment.judgeAddress.toLowerCase())
       )),
-    }));
+    }))
+    .filter(review => !review.finalized || review.assignments.length > 0);
 }
