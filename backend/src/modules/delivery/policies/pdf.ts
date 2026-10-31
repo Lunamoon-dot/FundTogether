@@ -22,7 +22,12 @@ export async function validatePdf(bytes: Buffer) {
     `, { eval: true, workerData: { bytes, library: require.resolve("pdf-lib") }, resourceLimits: { maxOldGenerationSizeMb: 64 } });
     const fail = () => reject(new BadRequestException("PDF cannot be opened within the local file limits; check encryption or corruption"));
     const timer = setTimeout(() => { void worker.terminate(); fail(); }, 5000);
-    worker.once("message", valid => { clearTimeout(timer); void worker.terminate(); valid ? resolve() : fail(); });
+    worker.once("message", valid => {
+      clearTimeout(timer);
+      void worker.terminate();
+      if (valid) resolve();
+      else fail();
+    });
     worker.once("error", () => { clearTimeout(timer); fail(); });
     worker.once("exit", () => { clearTimeout(timer); fail(); });
   });

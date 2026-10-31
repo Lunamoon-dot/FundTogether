@@ -251,6 +251,7 @@ test('VNext campaign page owns one dedicated Backer Refund Dashboard', () => {
   const actionPanel = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextActionPanel.tsx'), 'utf8')
   const dashboard = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextRefundDashboard.tsx'), 'utf8')
   const flow = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/vnext-refund-flow.ts'), 'utf8')
+  const formatter = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/vnext-format.ts'), 'utf8')
 
   assert.match(page, /VNextRefundDashboard/)
   assert.doesNotMatch(actionPanel, /freezeRefundAllocations|claimRefund/)
@@ -262,7 +263,8 @@ test('VNext campaign page owns one dedicated Backer Refund Dashboard', () => {
   assert.match(dashboard, /refundAllocationsFrozen/)
   assert.match(dashboard, /simulateContract/)
   assert.match(dashboard, /displayVNextTokenAmount/)
-  assert.match(flow, /formatUnits/)
+  assert.match(flow, /displayVNextTokenAmount/)
+  assert.match(formatter, /formatUnits/)
   assert.match(dashboard, /REFUND_BATCH_SIZE = 50n/)
   assert.match(dashboard, /freezeRefundAllocations', \[campaignNumber, REFUND_BATCH_SIZE\]/)
 })

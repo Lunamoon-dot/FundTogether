@@ -34,6 +34,9 @@ import { VNextController } from "./modules/campaigns/controllers/vnext.controlle
 import { VNextEvidenceController } from "./modules/campaigns/controllers/vnext-evidence.controller";
 import { VNextEvidenceService } from "./modules/campaigns/services/vnext-evidence.service";
 
+// The historical Campaign/Resolver runtime and VNext projection surface remain
+// registered side by side during migration. Registration does not grant either
+// backend path authority over VNext financial or Judge outcomes.
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true, load: [configuration] }),

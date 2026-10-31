@@ -8,7 +8,6 @@ import {
   historicalDisputes,
   historicalEntitlements,
   campaignTiers,
-  users,
 } from "../../../database/schema";
 import type {
   ClaimRefundInput,
