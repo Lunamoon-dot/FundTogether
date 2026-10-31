@@ -89,6 +89,10 @@ export function vnextBlockedReason(cause: unknown): string {
     [/FinalRulingAlreadyEstablished/i, 'Final ruling đã được thiết lập.'],
     [/FinalRulingAlreadySynced/i, 'Milestone outcome đã được đồng bộ.'],
     [/ReviewNotFinal/i, 'Review mới là provisional hoặc chưa có final ruling.'],
+    [/NotCampaignCreator/i, 'Chỉ Creator canonical của campaign được submit evidence.'],
+    [/EvidenceReviewActive/i, 'Milestone đang có review active; không thể submit revision trùng.'],
+    [/CorrectionLimitReached/i, 'Correction allowance đã hết.'],
+    [/MilestoneDeadlineExpired/i, 'Milestone submission/correction deadline đã hết.'],
     [/WrongState/i, 'Trạng thái on-chain hiện tại không cho phép thao tác này.'],
   ];
   return reasons.find(([pattern]) => pattern.test(message))?.[1]
