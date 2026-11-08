@@ -48,7 +48,15 @@ function findCampaignProjection(rows, streamId, campaignId) {
 async function send(client, wallet, request) {
   const hash = await wallet.writeContract(request);
   const receipt = await client.waitForTransactionReceipt({ hash, confirmations: 1 });
-  if (receipt.status !== 'success') throw new Error(`VNext transaction reverted: ${request.functionName}`);
+  if (receipt.status !== 'success') {
+    let reason = 'revert reason unavailable';
+    try {
+      await client.simulateContract({ ...request, account: wallet.account.address });
+    } catch (error) {
+      reason = error.shortMessage || error.message;
+    }
+    throw new Error(`VNext transaction reverted: ${request.functionName} (${reason})`);
+  }
   return receipt;
 }
 

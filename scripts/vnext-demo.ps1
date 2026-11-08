@@ -350,7 +350,10 @@ function Ensure-VNextDeployment([hashtable]$Values, [string]$AnvilPath) {
 function Test-FrontendResponse([int]$Port) {
   try {
     $page = Invoke-WebRequest -Uri "http://127.0.0.1:$Port" -TimeoutSec 3 -UseBasicParsing
-    return $page.StatusCode -eq 200 -and $page.Content.Contains('/src/main.tsx')
+    $deployment = Invoke-WebRequest -Uri "http://127.0.0.1:$Port/src/lib/web3/deployment-context.ts" -TimeoutSec 3 -UseBasicParsing
+    return $page.StatusCode -eq 200 -and $page.Content.Contains('/src/main.tsx') `
+      -and $deployment.StatusCode -eq 200 -and $deployment.Content.Contains('FUNDTOGETHER_VNEXT') `
+      -and $deployment.Content.Contains('FundTogether VNext')
   } catch { return $false }
 }
 

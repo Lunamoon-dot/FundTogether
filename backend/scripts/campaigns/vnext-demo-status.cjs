@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { parse } = require('dotenv');
 const { Pool } = require('pg');
+const { isVNextDemoReady, probeVNextFrontend, probeVNextRpc } = require('./vnext-demo-readiness.cjs');
 
 const root = path.resolve(__dirname, '../../..');
 const environmentPath = process.argv[2] || path.join(root, '.local/fundtogether/vnext-demo.env');
@@ -25,21 +26,9 @@ async function main() {
   const environment = parse(fs.readFileSync(environmentPath, 'utf8'));
   const manifest = fs.existsSync(manifestPath) ? JSON.parse(fs.readFileSync(manifestPath, 'utf8')) : undefined;
   const api = await probe(`http://127.0.0.1:${apiPort}/health`);
-  const frontend = await probe(`http://127.0.0.1:${webPort}`);
+  const frontend = await probeVNextFrontend(`http://127.0.0.1:${webPort}`);
   const minio = await probe(`${environment.S3_ENDPOINT}/minio/health/ready`);
-  let rpc;
-  try {
-    const response = await fetch(environment.FUNDTOGETHER_RPC_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_chainId', params: [] }),
-      signal: AbortSignal.timeout(4000),
-    });
-    const result = await response.json();
-    rpc = { ok: response.ok && Number.parseInt(result.result, 16) === 31339, chainId: Number.parseInt(result.result, 16) };
-  } catch (error) {
-    rpc = { ok: false, error: error.message };
-  }
+  const rpc = await probeVNextRpc(environment.FUNDTOGETHER_RPC_URL);
 
   let database;
   const pool = new Pool({ connectionString: environment.DATABASE_URL, connectionTimeoutMillis: 4000 });
@@ -86,7 +75,7 @@ async function main() {
     startupMs = JSON.parse(fs.readFileSync(launcherStatePath, 'utf8')).startupMs;
   }
   const report = {
-    status: api.ok && api.body?.protocolKind === 'FUNDTOGETHER_VNEXT' && frontend.ok && minio.ok && rpc.ok && database.ok && database.indexer?.status === 'synced' && identity.ok ? 'READY' : 'DEGRADED',
+    status: isVNextDemoReady({ api, frontend, minio, rpc, database, identity }) ? 'READY' : 'DEGRADED',
     startupMs,
     urls: { frontend: `http://127.0.0.1:${webPort}`, apiHealth: `http://127.0.0.1:${apiPort}/health`, rpc: environment.FUNDTOGETHER_RPC_URL, minio: environment.S3_ENDPOINT },
     api,

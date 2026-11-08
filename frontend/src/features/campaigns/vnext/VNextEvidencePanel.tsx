@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { campaignApi } from '../api/campaigns';
 import { getErrorMessage } from '../../../lib/api/error';
+import { http } from '../../../lib/api/http';
 
 export function VNextEvidencePanel({ reviewCaseId, evidenceRevision, enabled = true, allowUpload = true }: { reviewCaseId: string; evidenceRevision?: string; enabled?: boolean; allowUpload?: boolean }) {
   const [summary, setSummary] = useState('');
@@ -37,7 +38,7 @@ export function VNextEvidencePanel({ reviewCaseId, evidenceRevision, enabled = t
     setError(null);
     try {
       const ticket = await campaignApi.vnextEvidenceTicket(reviewCaseId, evidenceHash);
-      window.location.assign(ticket.url);
+      window.location.assign(http.getUri({ url: ticket.url }));
     } catch (cause) {
       setError(getErrorMessage(cause));
     } finally {

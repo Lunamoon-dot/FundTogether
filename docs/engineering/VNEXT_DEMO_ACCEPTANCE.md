@@ -6,12 +6,12 @@
 
 ## Result
 
-Fresh acceptance run `b6a7ad43c358491aa98c0e86fbce59e8` passed both phases:
+Fresh acceptance run `6ada12596cb942ad98f811aba409b6ef` passed both phases:
 
 | Phase | Result | Duration |
 |---|---:|---:|
-| Direct contract acceptance | PASS | 28.73 s |
-| Browser workflow acceptance | PASS | 173.86 s |
+| Direct contract acceptance | PASS | 22.95 s |
+| Browser workflow acceptance | PASS | 137.16 s |
 | Default runtime restoration | PASS | READY; 0 campaigns; indexer lag 0 |
 
 The run used separate disposable chain state, PostgreSQL databases, MinIO volumes and Compose projects for the direct and browser phases. The launcher removed those stacks and restored the default runtime. The generated machine-readable reports are under `.local/fundtogether/runtime/` and are intentionally not committed.
@@ -23,6 +23,7 @@ The run used separate disposable chain state, PostgreSQL databases, MinIO volume
 - Backer approved the exact `100000000` base-unit allowance and contributed `100000000` units (`100 MockUSDC`) through Funding Checkout. Receipt, `ContributionReceived`, indexed projection and escrow custody agreed.
 - The test advanced the disposable chain past the funding deadline and finalized funding through the UI. Creator payout remained zero.
 - Creator used the Evidence Wizard to select the exact PDF, calculate and confirm SHA-256, submit the hash on-chain, and upload the same bytes. The evidence projection reached `AVAILABLE` and policy `READY`.
+- Each assigned Judge used the scoped evidence ticket and downloaded the private bytes from the API. Browser acceptance computed SHA-256 over each download and matched it to the canonical evidence hash before the Judge committed a vote.
 - Test helpers directly reserved Judge stake, enrolled Judges, finalized the snapshot and assigned the milestone court. All three Judges used Guided Judge UI to select PASS, generate and back up salts, commit, reload, import backups, verify commitments and reveal. Court finalization was through the UI.
 - `finalizeNoAppeal` and bounded Judge settlement used direct contract calls because those actions are not available in the current UI. Creator then synchronized the final ruling and paid the milestone through the UI.
 - Final contract checks: raised `100000000`, paid `100000000`, refunded `0`, CampaignEscrow token balance `0`, Creator balance increased by exactly `100000000`; `MilestonePaid` and `CampaignCompleted` were emitted and indexed.
@@ -31,10 +32,10 @@ Key UI transaction receipts:
 
 | Action | Transaction | Gas used |
 |---|---|---:|
-| Campaign creation | `0x8652288e2904d3ec60b0d21e7e64d9060f846e78e814395d9cf0475518f6de55` | 707,891 |
+| Campaign creation | `0x7bb511a17cf3ee0b8c70dc9654acb864a66fc6ef957a9356773a033699211520` | 707,891 |
 | Backer contribution | `0xdb8c499e65485763f9b8dd0fbe2916a8a91910c33d4fb757761e75db9f067bf9` | 180,549 |
 | Funding finalization | `0xf7b95d78c3cbc6eac596faa83b5e03311ef5e8198147ff4eec831aee4932870c` | 59,413 |
-| Milestone evidence commit | `0xbe29f5d4df5bfe3db2def938becf9a4984af19e8c11ceb2700479fa1dd8677ef` | 508,372 |
+| Milestone evidence commit | `0xf7833494d38e5bd5e348ec2a43291fe48c53f4ff5db6e7976dbe73aeaaa58266` | 508,372 |
 | Milestone payout | `0xf64f6fe736eeaba04abc6ddff61fa203dba5653fa5e248f02e1f534074f77be1` | 107,170 |
 
 ## Scenario B — underfunded campaign and refund
@@ -47,7 +48,7 @@ Key UI transaction receipts:
 
 | Action | Transaction | Gas used |
 |---|---|---:|
-| Refund campaign creation | `0x13e41abb59139638c5aa9473be4c3b17b311f8865d2c6dda0b59522d455e2a29` | 713,491 |
+| Refund campaign creation | `0xfea2f51195fa4d357d1b968d738cec751973f05a721b842d418f055474fb3a74` | 713,491 |
 | Refund opening | `0x16b38df880b69de1fcd430d99e8db4777ffb0a69bfc6eda9310269eaab299db6` | 94,499 |
 | Refund claim | `0x10cde2ad1a284b2f3460a2d4b69d889b59e0d484f1b18300cbde54f267f8e886` | 92,651 |
 
@@ -62,7 +63,7 @@ Key UI transaction receipts:
 | Backend | `npm run lint` | PASS |
 | Backend | `npm run test:vnext:unit` | PASS — 13 suites, 45 tests |
 | Backend | `npm run test:vnext-runtime` | PASS — 6 tests |
-| Backend | `npm run test:vnext-demo-tools` | PASS — 2 tests |
+| Backend | `npm run test:vnext-demo-tools` | PASS — 5 tests covering isolated initialization, RPC outage, wrong frontend identity and indexer lag |
 | Contracts | `forge test --summary` (WSL Foundry 1.8.4) | PASS — all reported VNext, invariant, fuzz, historical and test-fixture suites; 0 failures |
 | Launcher | `doctor`, `status`, `smoke` | PASS — prerequisites available; VNext identity valid; services healthy; indexer lag 0 |
 | Launcher | PowerShell parser and `git diff --check` | PASS |
@@ -76,15 +77,15 @@ Measurements are from one local acceptance run and are descriptive only. They ar
 
 | Measurement | Observed |
 |---|---:|
-| Direct stack readiness | 56.97 s |
-| Browser stack readiness | 55.86 s |
-| Browser scenario duration | 149.98 s |
-| UI receipt confirmation | median 286 ms, 22 receipts |
-| Canonical indexer latency | median 2.34 s, 20 indexed transactions; range 1.01–6.96 s |
-| Principal VNext API reads | median 26 ms, 432 reads; maximum 1.27 s |
-| Frontend production entry bundle | 1,282.03 kB minified, 313.94 kB gzip |
+| Direct stack readiness | 74.99 s |
+| Browser stack readiness | 65.03 s |
+| Browser scenario duration | 135.26 s |
+| UI receipt confirmation | median 330.5 ms, 22 receipts |
+| Canonical indexer latency | median 1.05 s, 20 indexed transactions; range 7 ms–7.40 s |
+| Principal VNext API reads | median 19 ms, 430 reads; maximum 3.19 s |
+| Frontend production entry bundle | 1,282.04 kB minified, 313.96 kB gzip |
 
-Follow-up: split the large frontend entry bundle and profile the slower tail of API reads and canonical indexing under repeated runs. Local service startup is roughly 56–61 seconds on this machine; no broad performance refactor was part of this task.
+Follow-up: split the large frontend entry bundle and profile the slower tail of API reads and canonical indexing under repeated runs. Local service startup measured 65–75 seconds in this run; no broad performance refactor was part of this task.
 
 ## Human-wallet and remaining status
 

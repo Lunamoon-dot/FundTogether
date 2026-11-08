@@ -303,6 +303,18 @@ async function openJudgePage({ browser, account, apiUrl, reviewCaseId }) {
   return { context, page, caseCard };
 }
 
+async function inspectAuthorizedEvidence({ page, caseCard }, reviewCaseId, expectedHash) {
+  const evidencePanel = caseCard.locator(`[data-vnext-evidence-case="${reviewCaseId}"]`);
+  await evidencePanel.locator('p').filter({ hasText: `Evidence ${expectedHash} ·` }).waitFor();
+  const downloadPromise = page.waitForEvent('download');
+  await evidencePanel.getByRole('button', { name: 'Tải evidence', exact: true }).click();
+  const download = await downloadPromise;
+  const downloadedFile = await download.path();
+  assert.ok(downloadedFile, 'Assigned Judge could not download the authorized evidence');
+  const actualHash = `0x${createHash('sha256').update(fs.readFileSync(downloadedFile)).digest('hex')}`;
+  assert.equal(actualHash, expectedHash.toLowerCase(), 'Judge evidence bytes did not match the canonical SHA-256');
+}
+
 function providerScript(account) {
   return ({ account, rpcUrl }) => {
     const listeners = new Map();
@@ -612,6 +624,7 @@ async function main() {
   for (const judge of court.courtJudges) {
     markStep(`Judge ${judge} commits a vote through the workspace`);
     const opened = await openJudgePage({ browser, account: judge, apiUrl, reviewCaseId: milestoneCaseId });
+    await inspectAuthorizedEvidence(opened, milestoneCaseId, milestoneEvidenceHash);
     await opened.caseCard.getByRole('group', { name: 'Vote selection' }).getByRole('button', { name: 'PASS', exact: true }).click();
     await opened.caseCard.getByRole('button', { name: 'Generate secret salt', exact: true }).click();
     await opened.caseCard.getByRole('button', { name: 'Copy secret backup', exact: true }).click();

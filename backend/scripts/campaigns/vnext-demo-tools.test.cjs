@@ -6,6 +6,7 @@ const test = require('node:test');
 const { parse } = require('dotenv');
 const { initializeEnvironment } = require('./initialize-vnext-demo.cjs');
 const { assertVNextDemoDatabaseTarget } = require('./migrate-isolated.cjs');
+const { isVNextDemoReady, probeVNextFrontend, probeVNextRpc } = require('./vnext-demo-readiness.cjs');
 
 test('VNext demo initialization writes unique local credentials without replacing a file', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ft-vnext-demo-'));
@@ -33,4 +34,31 @@ test('VNext demo migrations accept only the declared isolated loopback database'
     { databaseUrl: valid.databaseUrl.replace('fundtogether_vnext_browser_a1b2', 'postgres') },
     { databaseUrl: 'not-a-url' },
   ]) assert.throws(() => assertVNextDemoDatabaseTarget({ ...valid, ...override }));
+});
+
+test('a temporarily unavailable VNext RPC is reported as unhealthy', async () => {
+  const rpc = await probeVNextRpc('http://127.0.0.1:9548', async () => { throw new Error('RPC temporarily unavailable'); });
+  assert.deepEqual(rpc, { ok: false, error: 'RPC temporarily unavailable' });
+});
+
+test('an HTTP 200 historical Vite page is not accepted as the VNext frontend', async () => {
+  const frontend = await probeVNextFrontend('http://127.0.0.1:5187', async url => ({
+    ok: true,
+    status: 200,
+    text: async () => url.endsWith('/src/lib/web3/deployment-context.ts') ? 'protocolKind: CAMPAIGNS' : '<div id="root"></div>',
+  }));
+  assert.equal(frontend.ok, false);
+});
+
+test('the demo is not ready until the canonical indexer catches up to the RPC head', () => {
+  const runtime = {
+    api: { ok: true, body: { protocolKind: 'FUNDTOGETHER_VNEXT' } },
+    frontend: { ok: true },
+    minio: { ok: true },
+    rpc: { ok: true, chainId: 31339 },
+    database: { ok: true, indexer: { status: 'synced', lag: '1' } },
+    identity: { ok: true },
+  };
+  assert.equal(isVNextDemoReady(runtime), false);
+  assert.equal(isVNextDemoReady({ ...runtime, database: { ...runtime.database, indexer: { status: 'synced', lag: '0' } } }), true);
 });
