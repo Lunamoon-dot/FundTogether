@@ -9,8 +9,15 @@ const historicalManifest = fileURLToPath(new URL('../.local/fundtogether/generat
 const testCampaignManifest = fileURLToPath(new URL('./test/fixtures/campaign-deployment.test.json', import.meta.url))
 const useTestCampaignManifest = process.env.NODE_ENV === 'test'
   && process.env.FUNDTOGETHER_TEST_DEPLOYMENT === '1'
+const useVNextManifest = process.env.FUNDTOGETHER_PROTOCOL === 'FUNDTOGETHER_VNEXT'
+const vnextManifest = process.env.FUNDTOGETHER_VNEXT_MANIFEST_PATH
+if (useVNextManifest && (!vnextManifest || !existsSync(vnextManifest))) {
+  throw new Error('FUNDTOGETHER_VNEXT_MANIFEST_PATH must point to the verified local VNext manifest.')
+}
 const deploymentManifest = useTestCampaignManifest
   ? testCampaignManifest
+  : useVNextManifest
+  ? vnextManifest!
   : existsSync(campaignManifest)
   ? campaignManifest
   : fileURLToPath(new URL('./src/lib/web3/missing-campaign-deployment.json', import.meta.url))

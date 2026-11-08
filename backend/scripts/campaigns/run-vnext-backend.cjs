@@ -30,8 +30,10 @@ function buildVNextRuntime(environment, manifestPath, port) {
 }
 
 function loadVNextRuntime(root, overrides = process.env) {
+  const environmentPath = overrides.FUNDTOGETHER_VNEXT_ENV_PATH
+    || path.join(root, '.local', 'fundtogether', 'vnext-demo.env');
   const environment = {
-    ...readEnvironment(path.join(root, '.local', 'fundtogether', 'backend.env')),
+    ...readEnvironment(environmentPath),
     ...overrides,
   };
   const manifestPath = environment.FUNDTOGETHER_VNEXT_MANIFEST_PATH

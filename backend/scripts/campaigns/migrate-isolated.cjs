@@ -26,6 +26,27 @@ async function migrateCampaignDatabase(root, options = {}) {
     throw new Error(`Campaign migration must target ${expectedDatabaseName}`);
   }
 
+  await applyMigrations(root, databaseUrl);
+}
+
+async function migrateVNextDemoDatabase(root, { databaseUrl, expectedDatabaseName, expectedPort }) {
+  assertVNextDemoDatabaseTarget({ databaseUrl, expectedDatabaseName, expectedPort });
+  await applyMigrations(root, databaseUrl);
+}
+
+function assertVNextDemoDatabaseTarget({ databaseUrl, expectedDatabaseName, expectedPort }) {
+  let target;
+  try { target = new URL(databaseUrl); } catch { throw new Error('VNext demo database URL is invalid'); }
+  if (!['postgres:', 'postgresql:'].includes(target.protocol)
+    || !['localhost', '127.0.0.1'].includes(target.hostname)
+    || target.port !== String(expectedPort)
+    || target.pathname !== `/${expectedDatabaseName}`
+    || !/^fundtogether_vnext_[a-z0-9_]+$/i.test(expectedDatabaseName)) {
+    throw new Error('VNext demo migrations require the expected isolated local database');
+  }
+}
+
+async function applyMigrations(root, databaseUrl) {
   const client = new Client({ connectionString: databaseUrl });
   await client.connect();
   try {
@@ -65,4 +86,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { migrateCampaignDatabase };
+module.exports = { assertVNextDemoDatabaseTarget, migrateCampaignDatabase, migrateVNextDemoDatabase };

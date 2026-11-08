@@ -226,7 +226,9 @@ async function fundCampaign({ client, wallets, manifest, campaignId, backers, go
 }
 
 async function syncPersistentProjection({ client, manifest, campaigns }) {
-  const env = { ...readEnvironment(path.join(root, '.local/fundtogether/backend.env')), ...process.env };
+  const environmentPath = process.env.FUNDTOGETHER_VNEXT_ENV_PATH
+    || path.join(root, '.local/fundtogether/vnext-demo.env');
+  const env = { ...readEnvironment(environmentPath), ...process.env };
   const databaseUrl = env.FUNDTOGETHER_VNEXT_DATABASE_URL || env.DATABASE_URL;
   if (!databaseUrl) throw new Error('VNext acceptance requires FUNDTOGETHER_VNEXT_DATABASE_URL or DATABASE_URL');
   const { Pool } = require('pg');

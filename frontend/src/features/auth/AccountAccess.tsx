@@ -86,18 +86,19 @@ export function AccountAccess({
       })
     return () => { active = false }
   }, [alreadyLinked, address, chainId, session?.userId])
-  const resolverWalletBlockReason = getResolverWalletBlockReason({
+  const campaignDeployment = deployment.protocolKind === 'CAMPAIGNS' ? deployment : null
+  const resolverWalletBlockReason = campaignDeployment ? getResolverWalletBlockReason({
     roles: session?.roles ?? [], connectedAddress: address,
-    resolverAddress: deployment.resolver, backupResolverAddress: deployment.backupResolver,
-  })
+    resolverAddress: campaignDeployment.resolver, backupResolverAddress: campaignDeployment.backupResolver,
+  }) : null
   const wrongResolverWallet = Boolean(resolverWalletBlockReason)
-  const hasPrimaryResolverWallet = Boolean(session?.wallets.some(
-    wallet => wallet.address.toLowerCase() === deployment.resolver.toLowerCase()
-      && wallet.chainId === deployment.chainId,
+  const hasPrimaryResolverWallet = Boolean(campaignDeployment && session?.wallets.some(
+    wallet => wallet.address.toLowerCase() === campaignDeployment.resolver.toLowerCase()
+      && wallet.chainId === campaignDeployment.chainId,
   ))
-  const hasBackupResolverWallet = Boolean(session?.wallets.some(
-    wallet => wallet.address.toLowerCase() === deployment.backupResolver.toLowerCase()
-      && wallet.chainId === deployment.chainId,
+  const hasBackupResolverWallet = Boolean(campaignDeployment && session?.wallets.some(
+    wallet => wallet.address.toLowerCase() === campaignDeployment.backupResolver.toLowerCase()
+      && wallet.chainId === campaignDeployment.chainId,
   ))
 
   async function run(action: () => Promise<void>) {
@@ -315,7 +316,7 @@ export function AccountAccess({
           )}
         </section>
 
-        {!compact && session.roles.includes('ADMIN') && (
+        {!compact && campaignDeployment && session.roles.includes('ADMIN') && (
           <section className="resolver-portal-banner" style={{ background: '#f5f3ff', borderColor: '#ddd6fe' }} aria-label="Khu vực quản trị viên">
             <div className="resolver-portal-banner__left">
               <strong style={{ color: '#5b21b6' }}>Cổng quản trị hệ thống (Admin Portal)</strong>
@@ -329,21 +330,21 @@ export function AccountAccess({
           </section>
         )}
 
-        {!compact && session.roles.includes('RESOLVER') && (
+        {!compact && campaignDeployment && session.roles.includes('RESOLVER') && (
           <section className="resolver-portal-banner" aria-label="Khu vực kiểm duyệt viên">
             <div className="resolver-portal-banner__left">
               <strong>Cổng kiểm duyệt viên (Resolver Portal)</strong>
               {hasPrimaryResolverWallet ? (
                 <p>
-                  Ví Resolver chính: <code>{deployment.resolver}</code> (Chain ID {deployment.chainId}). Ví này có thể ký duyệt chiến dịch và quyết định tranh chấp.
+                  Ví Resolver chính: <code>{campaignDeployment.resolver}</code> (Chain ID {campaignDeployment.chainId}). Ví này có thể ký duyệt chiến dịch và quyết định tranh chấp.
                 </p>
               ) : hasBackupResolverWallet ? (
                 <p>
-                  Ví Resolver dự phòng: <code>{deployment.backupResolver}</code> (Chain ID {deployment.chainId}). Ví này chỉ takeover quyền review sau 7 ngày nếu Resolver chính chưa xử lý.
+                  Ví Resolver dự phòng: <code>{campaignDeployment.backupResolver}</code> (Chain ID {campaignDeployment.chainId}). Ví này chỉ takeover quyền review sau 7 ngày nếu Resolver chính chưa xử lý.
                 </p>
               ) : (
                 <p>
-                  Contract có ví Resolver chính <code>{deployment.resolver}</code> và ví dự phòng <code>{deployment.backupResolver}</code> (Chain ID {deployment.chainId}). Hãy liên kết đúng ví tương ứng với tài khoản hiện tại.
+                  Contract có ví Resolver chính <code>{campaignDeployment.resolver}</code> và ví dự phòng <code>{campaignDeployment.backupResolver}</code> (Chain ID {campaignDeployment.chainId}). Hãy liên kết đúng ví tương ứng với tài khoản hiện tại.
                 </p>
               )}
             </div>

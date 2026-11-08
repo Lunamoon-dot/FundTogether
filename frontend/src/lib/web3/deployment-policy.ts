@@ -22,6 +22,18 @@ export interface DeploymentContext {
   policyHash: Hex
 }
 
+export interface VNextDeploymentContext {
+  protocolKind: 'FUNDTOGETHER_VNEXT'
+  chainId: 31339
+  rpcUrl: string
+  campaignEscrow: Address
+  juryRegistry: Address
+  juryReview: Address
+  tokenAddress: Address
+  tokenDecimals: 6
+  deploymentId: Hex
+}
+
 export function validateDeploymentContext(value: unknown): DeploymentContext {
   if (!value || typeof value !== 'object') throw new Error('Thiếu deployment manifest.')
   const v = value as Record<string, unknown>
@@ -54,4 +66,32 @@ export function validateDeploymentContext(value: unknown): DeploymentContext {
     tokenDecimals: 6, confirmations: 1, genesisHash: hex('genesisHash'), contractCodeHash: hex('contractCodeHash'),
     tokenCodeHash: hex('tokenCodeHash'), deploymentBlockNumber: v.deploymentBlockNumber, deploymentBlockHash: hex('deploymentBlockHash'),
     deploymentId: policyHash, abiVersion: 'campaigns-local-judge-v1', abiHash: hex('abiHash'), policyHash })
+}
+
+export function validateVNextDeploymentContext(value: unknown): VNextDeploymentContext {
+  if (!value || typeof value !== 'object') throw new Error('Thiếu VNext deployment manifest.')
+  const v = value as Record<string, unknown>
+  if (v.protocolKind !== 'FUNDTOGETHER_VNEXT' || v.chainId !== 31339 || v.tokenDecimals !== 6)
+    throw new Error('Cấu hình VNext không khớp.')
+  let rpc: URL
+  try { rpc = new URL(String(v.rpcUrl)) } catch { throw new Error('RPC VNext không hợp lệ.') }
+  if (rpc.protocol !== 'http:' || !['localhost', '127.0.0.1'].includes(rpc.hostname) || rpc.port !== '9548'
+    || rpc.username || rpc.password || rpc.search || rpc.hash) throw new Error('RPC không thuộc môi trường local VNext.')
+  const hex = (key: string, length = 40) => {
+    const field = v[key]
+    if (typeof field !== 'string' || !new RegExp(`^0x[0-9a-fA-F]{${length}}$`).test(field) || /^0x0+$/.test(field))
+      throw new Error(`Deployment VNext không hợp lệ: ${key}.`)
+    return field as Hex
+  }
+  return Object.freeze({
+    protocolKind: 'FUNDTOGETHER_VNEXT',
+    chainId: 31339,
+    rpcUrl: rpc.toString(),
+    campaignEscrow: hex('campaignEscrow') as Address,
+    juryRegistry: hex('juryRegistry') as Address,
+    juryReview: hex('juryReview') as Address,
+    tokenAddress: hex('tokenAddress') as Address,
+    tokenDecimals: 6,
+    deploymentId: hex('policyHash', 64),
+  })
 }
