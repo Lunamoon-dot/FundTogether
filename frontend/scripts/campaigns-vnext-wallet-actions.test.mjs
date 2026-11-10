@@ -519,5 +519,5 @@ test('VNext evidence uses a short-lived access ticket instead of a direct file U
   const panel = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextEvidencePanel.tsx'), 'utf8')
   assert.match(api, /vnextEvidenceTicket/)
   assert.doesNotMatch(api, /vnextEvidenceFileUrl/)
-  assert.match(panel, /window\.location\.assign\(ticket\.url\)/)
+  assert.match(panel, /window\.location\.assign\(http\.getUri\(\{\s*url:\s*ticket\.url\s*\}\)\)/)
 })
