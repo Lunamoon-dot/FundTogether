@@ -48,7 +48,15 @@ function findCampaignProjection(rows, streamId, campaignId) {
 async function send(client, wallet, request) {
   const hash = await wallet.writeContract(request);
   const receipt = await client.waitForTransactionReceipt({ hash, confirmations: 1 });
-  if (receipt.status !== 'success') throw new Error(`VNext transaction reverted: ${request.functionName}`);
+  if (receipt.status !== 'success') {
+    let reason = 'revert reason unavailable';
+    try {
+      await client.simulateContract({ ...request, account: wallet.account.address });
+    } catch (error) {
+      reason = error.shortMessage || error.message;
+    }
+    throw new Error(`VNext transaction reverted: ${request.functionName} (${reason})`);
+  }
   return receipt;
 }
 
@@ -226,7 +234,9 @@ async function fundCampaign({ client, wallets, manifest, campaignId, backers, go
 }
 
 async function syncPersistentProjection({ client, manifest, campaigns }) {
-  const env = { ...readEnvironment(path.join(root, '.local/fundtogether/backend.env')), ...process.env };
+  const environmentPath = process.env.FUNDTOGETHER_VNEXT_ENV_PATH
+    || path.join(root, '.local/fundtogether/vnext-demo.env');
+  const env = { ...readEnvironment(environmentPath), ...process.env };
   const databaseUrl = env.FUNDTOGETHER_VNEXT_DATABASE_URL || env.DATABASE_URL;
   if (!databaseUrl) throw new Error('VNext acceptance requires FUNDTOGETHER_VNEXT_DATABASE_URL or DATABASE_URL');
   const { Pool } = require('pg');

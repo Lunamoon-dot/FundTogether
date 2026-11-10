@@ -1,42 +1,51 @@
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { Client } = require('pg');
-const { migrateCampaignDatabase } = require('./migrate-isolated.cjs');
+const { migrateVNextDemoDatabase } = require('./migrate-isolated.cjs');
 const { main: runAcceptance } = require('./vnext-acceptance.cjs');
 
 const root = path.resolve(__dirname, '../../..');
-const environment = require('dotenv').parse(fs.readFileSync(path.join(root, '.local/fundtogether/backend.env')));
-const databaseName = `fundtogether_vnext_accept_${process.pid}`;
+const environmentPath = process.env.FUNDTOGETHER_VNEXT_ENV_PATH
+  || path.join(root, '.local/fundtogether/vnext-demo.env');
+const environment = require('dotenv').parse(fs.readFileSync(environmentPath));
+const databaseName = `fundtogether_vnext_accept_${crypto.randomUUID().replaceAll('-', '')}`;
 let admin;
+let databaseCreated = false;
 
 async function main() {
-  const source = new URL(environment.DATABASE_URL);
-  source.pathname = '/postgres';
-  admin = new Client({ connectionString: source.toString() });
+  const database = new URL(environment.DATABASE_URL);
+  database.pathname = '/postgres';
+  admin = new Client({ connectionString: database.toString() });
   await admin.connect();
   await admin.query(`CREATE DATABASE "${databaseName}"`);
-  const target = new URL(environment.DATABASE_URL);
-  target.pathname = `/${databaseName}`;
-  await migrateCampaignDatabase(root, { databaseUrl: target.toString(), expectedDatabaseName: databaseName });
-  process.env.FUNDTOGETHER_VNEXT_DATABASE_URL = target.toString();
-  try {
-    await runAcceptance();
-  } finally {
+  databaseCreated = true;
+  database.pathname = `/${databaseName}`;
+  const databaseUrl = database.toString();
+  await migrateVNextDemoDatabase(root, {
+    databaseUrl,
+    expectedDatabaseName: databaseName,
+    expectedPort: database.port,
+  });
+  Object.assign(process.env, environment, {
+    DATABASE_URL: databaseUrl,
+    FUNDTOGETHER_VNEXT_DATABASE_URL: databaseUrl,
+    FUNDTOGETHER_VNEXT_ENV_PATH: environmentPath,
+  });
+  await runAcceptance();
+}
+
+async function cleanup() {
+  if (admin && databaseCreated) {
     await admin.query(`DROP DATABASE "${databaseName}" WITH (FORCE)`).catch(() => undefined);
-    await admin.end();
-    admin = undefined;
   }
+  await admin?.end().catch(() => undefined);
 }
 
 if (require.main === module) {
-  main().catch(async error => {
-    console.error(error.stack || error.message);
-    if (admin) {
-      await admin.query(`DROP DATABASE IF EXISTS "${databaseName}" WITH (FORCE)`).catch(() => undefined);
-      await admin.end().catch(() => undefined);
-    }
-    process.exitCode = 1;
-  });
+  main()
+    .catch(error => { console.error(error.stack || error.message); process.exitCode = 1; })
+    .finally(cleanup);
 }
 
 module.exports = { main };
