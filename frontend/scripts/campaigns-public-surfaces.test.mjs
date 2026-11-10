@@ -80,7 +80,7 @@ test('published campaign without a current binding is labeled as activation pend
 test('funded filter reports canonical successful Campaign surfaces', () => {
   const html = renderFeed('funded')
 
-  assert.match(html, /aria-label="Campaign đã gây quỹ thành công: 1"/)
+  assert.match(html, /aria-label="Chiến dịch đã gây quỹ thành công: 1"/)
   assert.match(html, /Funded comic/)
   assert.doesNotMatch(html, /Chưa có campaign nào đã gây quỹ thành công/)
   assert.doesNotMatch(html, /historical|legacy|quyền lợi/i)
@@ -128,7 +128,7 @@ test('historical route does not leak records into the current Campaign feed', ()
   client.clear()
 
   assert.match(html, /aria-pressed="true"[^>]*>Đã gây quỹ/)
-  assert.match(html, /Chưa có campaign nào đã gây quỹ thành công/)
+  assert.match(html, /Chưa có chiến dịch nào đã gây quỹ thành công/)
   assert.doesNotMatch(html, /campaign-public-campaigns|historical|legacy/i)
 })
 
@@ -140,7 +140,8 @@ test('public Campaign feed renders a neutral empty state without a creator actio
   client.clear()
 
   assert.match(html, /campaign-feed-empty/)
-  assert.match(html, /Chưa có ấn phẩm nào/)
+  assert.match(html, /aria-label="Lọc chiến dịch theo trạng thái"/)
+  assert.match(html, /Chưa có chiến dịch nào/)
   assert.doesNotMatch(html, /campaign-empty-state|Tạo bản thảo|Bắt đầu xuất bản tác phẩm|#\/campaigns\/creator/)
 })
 

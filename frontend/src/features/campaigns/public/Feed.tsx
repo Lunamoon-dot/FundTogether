@@ -69,18 +69,18 @@ export function Feed({ initialFilter = 'all' }: { initialFilter?: FeedFilter } =
 
   return (
     <div className="campaign-container campaign-feed-page">
-      {loading && <p role="status" className="muted">Đang tải trạng thái campaign…</p>}
+      {loading && <p role="status" className="muted">Đang tải trạng thái chiến dịch…</p>}
       {error && <p role="alert" className="toast toast--error">{getErrorMessage(error)}</p>}
       <h1 className="sr-only">FundTogether</h1>
       <div className="campaign-feed-toolbar">
-        <div className="campaign-filter-bar" role="group" aria-label="Lọc ấn phẩm theo trạng thái">
+        <div className="campaign-filter-bar" role="group" aria-label="Lọc chiến dịch theo trạng thái">
           <button type="button" aria-pressed={filter === 'all'} className={`campaign-filter-btn ${filter === 'all' ? 'campaign-filter-btn--active' : ''}`} onClick={() => setFilter('all')}>
             Tất cả <span className="campaign-filter-count">{allItems.length}</span>
           </button>
           <button type="button" aria-pressed={filter === 'funding'} className={`campaign-filter-btn ${filter === 'funding' ? 'campaign-filter-btn--active' : ''}`} onClick={() => setFilter('funding')}>
             Đang gây quỹ <span className="campaign-filter-count">{fundingItems.length}</span>
           </button>
-          <button type="button" aria-pressed={filter === 'funded'} aria-label={`Campaign đã gây quỹ thành công: ${fundedItems.length}`} className={`campaign-filter-btn ${filter === 'funded' ? 'campaign-filter-btn--active' : ''}`} onClick={() => setFilter('funded')}>
+          <button type="button" aria-pressed={filter === 'funded'} aria-label={`Chiến dịch đã gây quỹ thành công: ${fundedItems.length}`} className={`campaign-filter-btn ${filter === 'funded' ? 'campaign-filter-btn--active' : ''}`} onClick={() => setFilter('funded')}>
             Đã gây quỹ <span className="campaign-filter-count">{fundedItems.length}</span>
           </button>
           <button type="button" aria-pressed={filter === 'activation'} aria-label={`Chờ Creator và Resolver kích hoạt: ${activationItems.length}`} className={`campaign-filter-btn ${filter === 'activation' ? 'campaign-filter-btn--active' : ''}`} onClick={() => setFilter('activation')}>
@@ -94,19 +94,19 @@ export function Feed({ initialFilter = 'all' }: { initialFilter?: FeedFilter } =
         </div>
       ) : (
         <section className="campaign-feed-empty" aria-live="polite">
-          <h2>{filter === 'all' ? 'Chưa có ấn phẩm nào' : 'Không có ấn phẩm phù hợp'}</h2>
+          <h2>{filter === 'all' ? 'Chưa có chiến dịch nào' : 'Không có chiến dịch phù hợp'}</h2>
           <p>
             {filter === 'funding'
-              ? 'Chưa có campaign nào đang nhận pledge.'
+              ? 'Chưa có chiến dịch nào đang nhận ủng hộ.'
               : filter === 'funded'
-                ? 'Chưa có campaign nào đã gây quỹ thành công.'
+                ? 'Chưa có chiến dịch nào đã gây quỹ thành công.'
                 : filter === 'activation'
-                  ? 'Không có hồ sơ nào đang chờ kích hoạt.'
-                  : 'Hiện chưa có campaign nào trong danh mục hiện tại.'}
+                  ? 'Không có chiến dịch nào đang chờ kích hoạt.'
+                  : 'Hiện chưa có chiến dịch nào.'}
           </p>
           {filter !== 'all' && (
             <div className="campaign-feed-empty__actions">
-              <button type="button" className="campaign-secondary-link" onClick={() => setFilter('all')}>Xem tất cả ấn phẩm</button>
+              <button type="button" className="campaign-secondary-link" onClick={() => setFilter('all')}>Xem tất cả chiến dịch</button>
             </div>
           )}
         </section>

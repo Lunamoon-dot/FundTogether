@@ -56,14 +56,14 @@ export function AppShell({
               alt="FundTogether"
             />
           </a>
-          <span className="campaign-shell__tagline">Comics & Artbooks</span>
+          <span className="campaign-shell__tagline">Gây quỹ cộng đồng</span>
         </div>
 
         <nav className="public-nav campaign-shell__nav" aria-label="Điều hướng chính">
           <div className="campaign-shell__nav-group">
             <span className="campaign-shell__nav-heading">Khám phá</span>
             <a href="#/campaigns" aria-current={isCampaignFeed ? 'page' : undefined}>
-              Truyện tranh & Artbook
+              Chiến dịch
             </a>
             <a href="#/campaigns/review" aria-current={isCampaignCommunityReview ? 'page' : undefined}>
               Community Review
