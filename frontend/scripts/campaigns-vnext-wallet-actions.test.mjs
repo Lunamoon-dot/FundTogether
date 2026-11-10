@@ -210,7 +210,7 @@ test('VNext campaign projection exposes permissionless Creator and Backer action
   assert.match(page, /vnextIndexer/)
   assert.match(page, /indexer-status/)
   assert.match(page, /VNextCourtDashboard/)
-  assert.match(page, /Mở Milestone Dashboard/)
+  assert.match(page, /Mở bảng điều khiển milestone/)
   assert.match(page, /VNextFundingCheckout/)
   assert.match(checkout, /contribute/)
   assert.match(panel, /finalizeFunding/)
@@ -293,6 +293,25 @@ test('VNext creator creation uses the campaign contract and keeps publication be
   assert.match(actionPanel, /finalizePublication/)
   assert.match(panel, /milestoneBudgets/)
   assert.doesNotMatch(panel, /approveCampaign/)
+})
+
+test('VNext creator setup uses readable inputs and hashes the actual evidence bytes', () => {
+  const panel = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextCreateCampaignPanel.tsx'), 'utf8')
+  assert.match(panel, /parseVNextContributionAmount/)
+  assert.match(panel, /hashVNextEvidenceFile/)
+  assert.match(panel, /<textarea/)
+  assert.match(panel, /type="file"/)
+  assert.doesNotMatch(panel, /vnext-acceptance-hash|vnext-publication-hash/)
+  assert.match(panel, /wallets\.some/)
+  assert.match(panel, /chainId === 31339/)
+})
+
+test('VNext creator can open the canonical campaign after indexing', () => {
+  const panel = fs.readFileSync(path.join(root, 'src/features/campaigns/vnext/VNextCreateCampaignPanel.tsx'), 'utf8')
+  assert.match(panel, /campaignApi\.vnextTransaction/)
+  assert.match(panel, /CampaignCreated/)
+  assert.match(panel, /campaigns\/vnext\//)
+  assert.match(panel, /waiting for the indexer|Đang chờ indexer/i)
 })
 
 test('VNext Judge workspace exposes stake and assigned commit-reveal actions', () => {

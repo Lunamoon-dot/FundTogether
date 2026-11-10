@@ -64,7 +64,7 @@ test('public campaign route keeps the public discovery shell', () => {
   const html = render('/campaigns', { userId: 'admin', roles: ['ADMIN', 'RESOLVER'], wallets: [] })
 
   assert.match(html, /Khám phá/)
-  assert.match(html, /Truyện tranh &amp; Artbook/)
+  assert.match(html, /Chiến dịch/)
   assert.match(html, /Thẩm định Resolver/)
   assert.doesNotMatch(html, /Creator Studio|Resolver Console|Admin Operations/)
 })

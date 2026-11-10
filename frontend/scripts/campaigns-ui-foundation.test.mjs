@@ -114,6 +114,8 @@ test('AppShell renders active navigation, role-gated navigation, environment con
 
   // Navigation & active state
   assert.match(html, /href="#\/campaigns"[^>]*aria-current="page"/)
+  assert.match(html, />Chiến dịch</)
+  assert.doesNotMatch(html, /Comics &amp; Artbooks|Truyện tranh &amp; Artbook/i)
   assert.match(html, /href="#\/campaigns\/review"/)
   assert.doesNotMatch(html, /Campaign Campaign đã tồn tại|href="#\/campaigns\/history"/)
   assert.match(html, /Child Content/)
@@ -128,6 +130,12 @@ test('AppShell renders active navigation, role-gated navigation, environment con
   // Environment and account
   assert.match(html, /MockUSDC|Mạng thử nghiệm/)
   assert.match(html, /href="#\/account"/)
+})
+
+test('browser tab uses the generic campaign name', async () => {
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8')
+  assert.match(html, /<title>FundTogether — Chiến dịch<\/title>/)
+  assert.doesNotMatch(html, /Comics &amp; Artbooks/i)
 })
 
 test('AppShell keeps Creator workspace navigation for an ordinary member', () => {
