@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, ForbiddenException, ConflictException, BadRequestException, Optional } from "@nestjs/common";
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { DRIZZLE_DB } from "../../../database/database.constants";
 import * as schema from "../../../database/schema";
@@ -10,7 +10,6 @@ import {
   campaignTiers,
   historicalCampaignProjection,
   campaignChainCampaigns,
-  users,
 } from "../../../database/schema";
 import type {
   CreateCampaignDraftInput,

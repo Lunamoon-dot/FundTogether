@@ -1,5 +1,4 @@
 import { CampaignWorkflowService } from "../workflow/campaign.service";
-import * as schema from "../../../database/schema";
 
 const draft = {
   mode: "FUNDTOGETHER_V1" as const,

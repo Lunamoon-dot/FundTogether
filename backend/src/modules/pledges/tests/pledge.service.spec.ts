@@ -1,5 +1,5 @@
 import { ConflictException } from "@nestjs/common";
-import { historicalDisputes, historicalEntitlements, platformRoles } from "../../../database/schema";
+import { historicalDisputes, platformRoles } from "../../../database/schema";
 import { PledgeService } from "../workflow/pledge.service";
 
 const entitlementId = "00000000-0000-0000-0000-000000000001";

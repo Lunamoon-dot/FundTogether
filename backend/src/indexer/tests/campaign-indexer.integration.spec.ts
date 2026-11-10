@@ -71,8 +71,6 @@ describe("Campaign canonical ledger on isolated PostgreSQL and real local Anvil"
     backerUser = backer.id;
     const [link] = await db.insert(schema.walletLinks).values([{ userId: owner.id, chainId: "31339", address: accounts[3] }, { userId: backer.id, chainId: "31339", address: accounts[4] }, { userId: reviewer.id, chainId: "31339", address: accounts[1] }]).returning();
     const [profile] = await db.insert(schema.creatorProfiles).values({ userId: owner.id, displayName: "Artist", bio: "Comic creator", ipDeclaration: "I own the publication rights", originalWorkPledge: true, studioWalletLinkId: link.id, status: "VERIFIED" }).returning();
-    const now = (await client.getBlock()).timestamp;
-    const deadline = now + 20n * 86400n;
     const config = campaignDraft(); config.goal = "20000000"; config.fundingDuration = 86400;
     const snapshot: CampaignSnapshot = { commitmentVersion: "campaigns-review-v1", config,
       creator: { userId: owner.id, profileId: profile.id, displayName: profile.displayName, ipDeclaration: profile.ipDeclaration },

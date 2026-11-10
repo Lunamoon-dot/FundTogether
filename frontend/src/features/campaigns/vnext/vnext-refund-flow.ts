@@ -1,14 +1,6 @@
-import { formatUnits } from 'viem';
 import type { VNextTransactionStage } from './vnext-actions';
 
-export function displayVNextTokenAmount(value: bigint | string | undefined, decimals: number | undefined) {
-  if (value === undefined || decimals === undefined) return 'Không khả dụng';
-  try {
-    return `${formatUnits(typeof value === 'bigint' ? value : BigInt(value), decimals)} MockUSDC`;
-  } catch {
-    return 'Không khả dụng';
-  }
-}
+export { displayVNextTokenAmount } from './vnext-format';
 
 export interface VNextRefundDashboardInput {
   campaignState: number;

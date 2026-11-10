@@ -33,17 +33,15 @@ workflow and public-chain/real-money launch are outside the pilot.
 
 ## Current evidence boundary
 
-The current checkout still contains the pre-reset Resolver implementation and
-a partially implemented VNext contract/indexer/read-only UI slice. Its tests
-and runtime evidence are evidence only for the named slices, not proof of a
-fresh end-to-end deployment. The target design and implementation order are
-documented in
+The current checkout still contains the pre-reset Resolver implementation
+alongside VNext contract, indexer/API and Creator/Backer/Judge wallet surfaces.
+Its tests and runtime evidence are evidence only for the named slices, not proof
+of a fresh end-to-end deployment. There is no consolidated VNext one-command
+launcher. The target design and implementation order are documented in
 [FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_V1.md](docs/protocol/FUNDTOGETHER_VNEXT_PROTOCOL_SPEC_V1.md),
 [parameters-v1.md](docs/protocol/parameters-v1.md),
 [THREAT_MODEL_VNEXT.md](docs/protocol/THREAT_MODEL_VNEXT.md),
 [STATE_MACHINE_VNEXT.md](docs/protocol/STATE_MACHINE_VNEXT.md),
 [PURE_DECENTRALIZED_PROTOCOL.md](docs/architecture/PURE_DECENTRALIZED_PROTOCOL.md)
-and
-[2026-10-20-vnext-a-z-build-roadmap.md](docs/superpowers/plans/2026-10-20-vnext-a-z-build-roadmap.md)
-and
-[2026-10-20-pure-decentralized-protocol.md](docs/superpowers/plans/2026-10-20-pure-decentralized-protocol.md).
+and the live
+[implementation ledger](docs/protocol/IMPLEMENTATION_PROGRESS_VNEXT.md).

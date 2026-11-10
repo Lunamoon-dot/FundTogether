@@ -1,32 +1,23 @@
-# React + TypeScript + Vite
+# FundTogether frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The React/Vite frontend contains the current VNext Creator, Backer, Judge,
+court, evidence, payout and refund surfaces alongside explicitly historical
+Campaign/Resolver routes that remain available during migration.
 
-Currently, two official plugins are available:
+Runtime deployment identity comes from the ignored local manifest under
+`.local/fundtogether/generated/`. Tests opt into a deterministic fixture through
+their bootstrap; development and production builds never substitute that
+fixture for a real deployment.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Verify locally
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```powershell
+cd frontend
+npm.cmd ci
+npm.cmd test
+npm.cmd run lint
+npm.cmd run build
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Wallet submission is not financial completion. UI flows distinguish wallet
+request, submitted transaction, canonical receipt and indexed projection.

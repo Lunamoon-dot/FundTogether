@@ -1,6 +1,7 @@
-import { formatUnits, parseUnits } from 'viem';
+import { parseUnits } from 'viem';
 import type { VNextTransactionEvent } from '../api/campaigns';
 import type { VNextTransactionStage } from './vnext-actions';
+import { displayVNextTokenAmount } from './vnext-format';
 
 export function parseVNextContributionAmount(input: string, decimals: number) {
   const value = input.trim();
@@ -20,17 +21,7 @@ export function parseVNextContributionAmount(input: string, decimals: number) {
   return { amount };
 }
 
-export function displayVNextFundingAmount(
-  value: bigint | string | undefined,
-  decimals: number | undefined,
-) {
-  if (value === undefined || decimals === undefined) return 'Không khả dụng';
-  try {
-    return `${formatUnits(typeof value === 'bigint' ? value : BigInt(value), decimals)} MockUSDC`;
-  } catch {
-    return 'Không khả dụng';
-  }
-}
+export const displayVNextFundingAmount = displayVNextTokenAmount;
 
 export function vnextFundingProgress(raised: bigint, goal: bigint) {
   const remaining = raised >= goal ? 0n : goal - raised;
